@@ -8572,6 +8572,26 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     const ctx = { scene, camera, renderer, balls, raycaster, mouse, clock, animFrame: null };
     sceneRef.current = ctx;
 
+    const handleClick = (e) => {
+      if (stageRef.current !== "select") return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      ctx.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      ctx.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      ctx.raycaster.setFromCamera(ctx.mouse, ctx.camera);
+      const hits = ctx.raycaster.intersectObjects(ctx.balls.map((b) => b.mesh));
+      if (!hits.length) return;
+      const ball = ctx.balls.find((b) => b.mesh === hits[0].object);
+      if (!ball) return;
+      toggleBallSelection(ball);
+    };
+    // Attached directly to the canvas itself rather than relying on
+    // React's onClick on a parent div — the canvas element was inserted
+    // imperatively (mount.appendChild(renderer.domElement) above), and a
+    // native listener bound right where the actual pixels are is the most
+    // direct, dependable way to guarantee clicks are caught, with no
+    // dependency on how any wrapping element's event handling behaves.
+    mount.addEventListener("click", handleClick);
+
     const onResize = () => {
       if (!host) return;
       const w = Math.max(MOT_MIN_CANVAS_DIM, host.clientWidth || MOT_MIN_CANVAS_DIM);
@@ -8681,6 +8701,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     animate();
 
     return () => {
+      mount.removeEventListener("click", handleClick);
       resizeObserver.disconnect();
       cancelAnimationFrame(ctx.animFrame);
       ballGeo.dispose();
@@ -8874,20 +8895,6 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     }
   };
 
-  const handleCanvasClick = (e) => {
-    const ctx = sceneRef.current;
-    if (!ctx || stageRef.current !== "select") return;
-    const rect = ctx.renderer.domElement.getBoundingClientRect();
-    ctx.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    ctx.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    ctx.raycaster.setFromCamera(ctx.mouse, ctx.camera);
-    const hits = ctx.raycaster.intersectObjects(ctx.balls.map((b) => b.mesh));
-    if (!hits.length) return;
-    const ball = ctx.balls.find((b) => b.mesh === hits[0].object);
-    if (!ball) return;
-    toggleBallSelection(ball);
-  };
-
   // Lets each ball be picked by its letter key instead of requiring a
   // precise click — same effect as clicking it, just keyboard-driven.
   useEffect(() => {
@@ -8919,10 +8926,9 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
           nothing to click through first. */}
       <div
         ref={canvasHostRef}
-        onClick={handleCanvasClick}
         className="relative w-full bg-slate-950 overflow-hidden"
         style={{
-          height: "min(640px, calc(100dvh - 180px))",
+          height: "min(720px, calc(100dvh - 140px))",
           cursor: stage === "select" ? "pointer" : "default",
         }}
       >
