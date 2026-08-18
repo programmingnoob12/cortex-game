@@ -8575,14 +8575,33 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     const handleClick = (e) => {
       if (stageRef.current !== "select") return;
       const rect = renderer.domElement.getBoundingClientRect();
-      ctx.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      ctx.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      ctx.raycaster.setFromCamera(ctx.mouse, ctx.camera);
-      const hits = ctx.raycaster.intersectObjects(ctx.balls.map((b) => b.mesh));
-      if (!hits.length) return;
-      const ball = ctx.balls.find((b) => b.mesh === hits[0].object);
-      if (!ball) return;
-      toggleBallSelection(ball);
+      const clickX = e.clientX - rect.left;
+      const clickY = e.clientY - rect.top;
+      // Forgiving nearest-ball pick (in 2D screen space) rather than exact
+      // 3D raycasting — clicking close to a ball selects it even if the
+      // cursor isn't landing on its exact rendered pixels, which matters
+      // most when a few balls are visually clustered close together. The
+      // 46px threshold is deliberately generous — roughly a full ball's
+      // width of forgiveness in every direction.
+      let closest = null;
+      let closestDist = Infinity;
+      ctx.balls.forEach((b) => {
+        const { x, y, behindCamera } = motProjectToScreen(
+          b.mesh.position,
+          ctx.camera,
+          rect.width,
+          rect.height
+        );
+        if (behindCamera) return;
+        const dist = Math.hypot(x - clickX, y - clickY);
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = b;
+        }
+      });
+      if (closest && closestDist <= 46) {
+        toggleBallSelection(closest);
+      }
     };
     // Attached directly to the canvas itself rather than relying on
     // React's onClick on a parent div — the canvas element was inserted
@@ -8924,9 +8943,10 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
           nothing to click through first. */}
       <div
         ref={canvasHostRef}
-        className="relative w-full bg-slate-950 overflow-hidden"
+        className="relative bg-slate-950 overflow-hidden mx-auto"
         style={{
           height: "min(720px, calc(100dvh - 140px))",
+          width: "min(100%, min(720px, calc(100dvh - 140px)))",
           cursor: stage === "select" ? "pointer" : "default",
         }}
       >
