@@ -8737,8 +8737,6 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     roundStartRef.current = Date.now();
 
     ctx.balls.forEach((b) => {
-      b.mesh.position.copy(motRandomPointInCube(MOT_BALL_RADIUS));
-      b.vel.copy(motRandomUnitVector());
       b.selected = false;
       b.isTarget = false;
       b.mesh.scale.setScalar(1);
