@@ -8259,7 +8259,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 const MOT_BALL_COUNT = 10;
 const MOT_TARGET_COUNT = 5;
 const MOT_CUBE_HALF = 3.2; // half-extent of the bounding cube along each axis
-const MOT_CUBE_HALF_X = MOT_CUBE_HALF * 1.5; // wider left/right than the other two axes — same cube, stretched only on X
+const MOT_CUBE_HALF_X = MOT_CUBE_HALF * 1.125; // wider left/right than the other two axes — same cube, stretched only on X (1.5x, reduced 25%)
 const MOT_BALL_RADIUS = 0.34;
 const MOT_HIGHLIGHT_MS = 1800; // how long targets flash gold before blending in
 const MOT_TRACK_MS = 8000; // how long balls drift before freezing for selection
