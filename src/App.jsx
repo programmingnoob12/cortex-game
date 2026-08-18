@@ -8936,10 +8936,10 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
           nothing to click through first. */}
       <div
         ref={canvasHostRef}
-        className="relative bg-slate-950 overflow-hidden mx-auto"
+        className="fixed inset-0 bg-slate-950 overflow-hidden"
         style={{
-          height: "min(860px, calc(100dvh - 60px))",
-          width: "min(100%, min(860px, calc(100dvh - 60px)))",
+          width: "100vw",
+          height: "100dvh",
           cursor: stage === "select" ? "pointer" : "default",
         }}
       >
