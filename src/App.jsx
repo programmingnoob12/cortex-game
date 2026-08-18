@@ -20,8 +20,8 @@ import { createClient } from "@supabase/supabase-js";
 // is: a logged-in user may read/write rows where user_id = their own auth
 // uid, and nothing else. Nobody's data is reachable from anybody else's
 // session even though this key is public.
-const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL"; // e.g. https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
+const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co"; // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = "sb_publishable_oeUIhMq6Wg9ElS6gCzbIZw_djTvdsLm";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
