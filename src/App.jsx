@@ -20,8 +20,8 @@ import { createClient } from "@supabase/supabase-js";
 // is: a logged-in user may read/write rows where user_id = their own auth
 // uid, and nothing else. Nobody's data is reachable from anybody else's
 // session even though this key is public.
-const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co"; // e.g. https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = "sb_publishable_oeUIhMq6Wg9ElS6gCzbIZw_djTvdsLm";
+const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL"; // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -97,13 +97,26 @@ function makeSupabaseStorage(userId) {
 function AuthGate({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [linkSent, setLinkSent] = useState(false);
   const [authError, setAuthError] = useState("");
   const [membershipOk, setMembershipOk] = useState(null); // null = checking, true/false once known
+  // 'magic' | 'password' | 'forgot' | 'forgotSent' | 'recovery' — which
+  // form the signed-out screen shows. 'recovery' is a special case:
+  // Supabase puts the user into an authenticated-but-recovering session
+  // when they click a password-reset email link, detected below via
+  // onAuthStateChange's PASSWORD_RECOVERY event, and they must set a new
+  // password before anything else proceeds.
+  const [mode, setMode] = useState("magic");
+  const [newPassword, setNewPassword] = useState("");
+  const [passwordPrompt, setPasswordPrompt] = useState(null); // null = not decided yet, true = show it, false = skip
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, s) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setMode("recovery");
+      }
       setSession(s ?? null);
     });
     return () => listener.subscription.unsubscribe();
@@ -136,8 +149,16 @@ function AuthGate({ children }) {
   useEffect(() => {
     if (session?.user && membershipOk) {
       window.storage = makeSupabaseStorage(session.user.id);
+      // One-time "set a password" nudge — a plain localStorage flag keyed
+      // by user id is enough here (it just controls whether a dismissible
+      // prompt reappears on this browser; it isn't account data, so it
+      // doesn't need to live in Supabase or sync across devices).
+      const seenKey = `password_prompt_seen_${session.user.id}`;
+      if (mode !== "recovery") {
+        setPasswordPrompt(!localStorage.getItem(seenKey));
+      }
     }
-  }, [session, membershipOk]);
+  }, [session, membershipOk, mode]);
 
   const handleSendLink = async (e) => {
     e.preventDefault();
@@ -153,6 +174,57 @@ function AuthGate({ children }) {
     setLinkSent(true);
   };
 
+  const handlePasswordLogin = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) setAuthError(error.message);
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    setMode("forgotSent");
+  };
+
+  const handleSetNewPassword = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    // Recovery complete — the session Supabase gave them during recovery
+    // is now a normal authenticated session, so just fall through to the
+    // regular membership check / app render below.
+    setMode("magic");
+  };
+
+  const handleSkipPasswordPrompt = () => {
+    if (session?.user) localStorage.setItem(`password_prompt_seen_${session.user.id}`, "1");
+    setPasswordPrompt(false);
+  };
+
+  const handleSetPasswordFromPrompt = async (e) => {
+    e.preventDefault();
+    setAuthError("");
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setAuthError(error.message);
+      return;
+    }
+    if (session?.user) localStorage.setItem(`password_prompt_seen_${session.user.id}`, "1");
+    setPasswordPrompt(false);
+  };
+
   if (session === undefined) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
@@ -161,17 +233,63 @@ function AuthGate({ children }) {
     );
   }
 
-  if (!session) {
+  // A password-recovery session takes priority over everything else —
+  // the person clicked a "reset your password" email link and needs to
+  // set a new one before they can do anything else in the app.
+  if (mode === "recovery") {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-5">
-          <h1 className="text-2xl font-semibold text-center">Sign in</h1>
-          {linkSent ? (
-            <p className="text-slate-300 text-center text-base">
-              Check <span className="font-medium">{email}</span> for a sign-in link.
+          <h1 className="text-2xl font-semibold text-center">Set a new password</h1>
+          <form onSubmit={handleSetNewPassword} className="space-y-3">
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="New password"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              type="submit"
+              className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+            >
+              Save new password
+            </button>
+            {authError && <p className="text-red-400 text-sm">{authError}</p>}
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    if (mode === "forgotSent") {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full space-y-4 text-center">
+            <h1 className="text-2xl font-semibold">Check your email</h1>
+            <p className="text-slate-300 text-base">
+              We've sent a password reset link to <span className="font-medium">{email}</span>.
             </p>
-          ) : (
-            <form onSubmit={handleSendLink} className="space-y-3">
+            <button
+              onClick={() => setMode("magic")}
+              className="text-indigo-400 text-sm hover:underline"
+            >
+              Back to sign in
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "forgot") {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full space-y-5">
+            <h1 className="text-2xl font-semibold text-center">Reset your password</h1>
+            <form onSubmit={handleForgotPassword} className="space-y-3">
               <input
                 type="email"
                 required
@@ -184,10 +302,99 @@ function AuthGate({ children }) {
                 type="submit"
                 className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
               >
-                Send sign-in link
+                Send reset link
               </button>
               {authError && <p className="text-red-400 text-sm">{authError}</p>}
             </form>
+            <button
+              onClick={() => setMode("magic")}
+              className="w-full text-center text-indigo-400 text-sm hover:underline"
+            >
+              Back to sign in
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (mode === "password") {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full space-y-5">
+            <h1 className="text-2xl font-semibold text-center">Sign in</h1>
+            <form onSubmit={handlePasswordLogin} className="space-y-3">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+              />
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+              />
+              <button
+                type="submit"
+                className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+              >
+                Sign in
+              </button>
+              {authError && <p className="text-red-400 text-sm">{authError}</p>}
+            </form>
+            <div className="flex justify-between text-sm">
+              <button onClick={() => setMode("magic")} className="text-indigo-400 hover:underline">
+                Use email link instead
+              </button>
+              <button onClick={() => setMode("forgot")} className="text-slate-400 hover:underline">
+                Forgot password?
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Default: magic-link sign in
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full space-y-5">
+          <h1 className="text-2xl font-semibold text-center">Sign in</h1>
+          {linkSent ? (
+            <p className="text-slate-300 text-center text-base">
+              Check <span className="font-medium">{email}</span> for a sign-in link.
+            </p>
+          ) : (
+            <>
+              <form onSubmit={handleSendLink} className="space-y-3">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                />
+                <button
+                  type="submit"
+                  className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+                >
+                  Send sign-in link
+                </button>
+                {authError && <p className="text-red-400 text-sm">{authError}</p>}
+              </form>
+              <button
+                onClick={() => setMode("password")}
+                className="w-full text-center text-indigo-400 text-sm hover:underline"
+              >
+                Have a password? Sign in with it instead
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -211,6 +418,47 @@ function AuthGate({ children }) {
             This account isn't linked to an active membership. If you just paid, this can take a
             minute to sync — try refreshing.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // One-time, skippable prompt shown after a successful login, letting
+  // someone who signed in via magic link set a password so future logins
+  // don't require waiting on email. Purely optional — skipping it changes
+  // nothing about their account or data.
+  if (passwordPrompt) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="max-w-sm w-full space-y-5">
+          <h1 className="text-2xl font-semibold text-center">Set a password?</h1>
+          <p className="text-slate-400 text-sm text-center">
+            Optional — lets you sign in directly next time instead of waiting on an email link.
+          </p>
+          <form onSubmit={handleSetPasswordFromPrompt} className="space-y-3">
+            <input
+              type="password"
+              required
+              minLength={6}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Choose a password"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+            />
+            <button
+              type="submit"
+              className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+            >
+              Save password
+            </button>
+            {authError && <p className="text-red-400 text-sm">{authError}</p>}
+          </form>
+          <button
+            onClick={handleSkipPasswordPrompt}
+            className="w-full text-center text-slate-400 text-sm hover:underline"
+          >
+            Skip for now
+          </button>
         </div>
       </div>
     );
@@ -5333,9 +5581,12 @@ function NBackSessionApp() {
               <h1 className="text-4xl font-semibold tracking-tight">
                 Account
               </h1>
-              <p className="text-slate-500 text-base mt-3">
-                Mockup only — sign-in comes later.
-              </p>
+              <button
+                onClick={() => supabase.auth.signOut()}
+                className="mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-red-400/40 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
+              >
+                Log out
+              </button>
             </div>
 
             <div className="flex items-center gap-6">
