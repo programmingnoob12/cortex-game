@@ -8259,6 +8259,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 const MOT_BALL_COUNT = 10;
 const MOT_TARGET_COUNT = 5;
 const MOT_CUBE_HALF = 3.2; // half-extent of the bounding cube along each axis
+const MOT_CUBE_HALF_X = MOT_CUBE_HALF * 1.5; // wider left/right than the other two axes — same cube, stretched only on X
 const MOT_BALL_RADIUS = 0.34;
 const MOT_HIGHLIGHT_MS = 1800; // how long targets flash gold before blending in
 const MOT_TRACK_MS = 8000; // how long balls drift before freezing for selection
@@ -8333,8 +8334,9 @@ function motRandomUnitVector() {
 // spawned here doesn't already need to be resolved out of the wall).
 function motRandomPointInCube(margin) {
   const span = MOT_CUBE_HALF - margin;
+  const spanX = MOT_CUBE_HALF_X - margin;
   return new THREE.Vector3(
-    (Math.random() * 2 - 1) * span,
+    (Math.random() * 2 - 1) * spanX,
     (Math.random() * 2 - 1) * span,
     (Math.random() * 2 - 1) * span
   );
@@ -8493,7 +8495,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     // Shadow camera frustum sized to just cover the cube the balls move
     // in — tight enough for crisp shadows, loose enough that a ball near
     // any wall still casts/receives correctly.
-    const shadowExtent = MOT_CUBE_HALF * 1.6;
+    const shadowExtent = MOT_CUBE_HALF_X * 1.6;
     dirLight.shadow.camera.left = -shadowExtent;
     dirLight.shadow.camera.right = shadowExtent;
     dirLight.shadow.camera.top = shadowExtent;
@@ -8511,7 +8513,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     scene.add(fillLight);
 
     const boundaryGeo = new THREE.BoxGeometry(
-      MOT_CUBE_HALF * 2,
+      MOT_CUBE_HALF_X * 2,
       MOT_CUBE_HALF * 2,
       MOT_CUBE_HALF * 2
     );
@@ -8637,17 +8639,21 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       if (stageRef.current === "track" && !pausedRef.current) {
         const speedNow = motDisplaySpeedToVelocity(speedRef.current);
         const bound = MOT_CUBE_HALF - MOT_BALL_RADIUS;
+        const boundX = MOT_CUBE_HALF_X - MOT_BALL_RADIUS;
         ctx.balls.forEach((b) => {
           b.mesh.position.addScaledVector(b.vel, speedNow * dt);
           const p = b.mesh.position;
           // Axis-aligned reflection off each of the cube's 6 walls —
           // independent per axis, unlike the sphere's single radial check.
+          // X uses its own wider bound since the box is stretched
+          // left/right relative to the other two axes.
           ["x", "y", "z"].forEach((axis) => {
-            if (p[axis] > bound) {
-              p[axis] = bound;
+            const axisBound = axis === "x" ? boundX : bound;
+            if (p[axis] > axisBound) {
+              p[axis] = axisBound;
               b.vel[axis] = -Math.abs(b.vel[axis]);
-            } else if (p[axis] < -bound) {
-              p[axis] = -bound;
+            } else if (p[axis] < -axisBound) {
+              p[axis] = -axisBound;
               b.vel[axis] = Math.abs(b.vel[axis]);
             }
           });
