@@ -20,8 +20,8 @@ import { createClient } from "@supabase/supabase-js";
 // is: a logged-in user may read/write rows where user_id = their own auth
 // uid, and nothing else. Nobody's data is reachable from anybody else's
 // session even though this key is public.
-const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co"; // e.g. https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = "sb_publishable_oeUIhMq6Wg9ElS6gCzbIZw_djTvdsLm";
+const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL"; // e.g. https://xxxx.supabase.co
+const SUPABASE_ANON_KEY = "YOUR_SUPABASE_ANON_KEY";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -8390,13 +8390,7 @@ function buildBallLineTemplate(radius, color) {
 // (see Motion3DExercise below — it starts the first round itself on
 // mount), so this no longer needs a stage-dependent reserved amount; the
 // canvas is always effectively the entire card, edge to edge.
-const MOT_RESERVED_BELOW_CANVAS = 16;
 const MOT_MIN_CANVAS_DIM = 220;
-function computeMotionCanvasSize(hostWidth, hostTop) {
-  const w = Math.max(MOT_MIN_CANVAS_DIM, Math.round(hostWidth || MOT_MIN_CANVAS_DIM));
-  const h = Math.max(MOT_MIN_CANVAS_DIM, Math.round(window.innerHeight - hostTop - MOT_RESERVED_BELOW_CANVAS));
-  return { w, h };
-}
 
 // Home-row keys (plus "i", the natural 10th neighbor) — one letter per
 // ball, so picking a target is a single keypress without needing to look
@@ -8462,10 +8456,9 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     const mount = canvasMountRef.current;
     if (!host || !mount) return;
 
-    const { w: width, h: height } = computeMotionCanvasSize(
-      host.clientWidth,
-      host.getBoundingClientRect().top
-    );
+    const { clientWidth, clientHeight } = host;
+    const width = Math.max(MOT_MIN_CANVAS_DIM, clientWidth || MOT_MIN_CANVAS_DIM);
+    const height = Math.max(MOT_MIN_CANVAS_DIM, clientHeight || MOT_MIN_CANVAS_DIM);
     setCanvasSize({ w: width, h: height });
 
     const scene = new THREE.Scene();
@@ -8581,16 +8574,21 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
 
     const onResize = () => {
       if (!host) return;
-      const { w, h } = computeMotionCanvasSize(
-        host.clientWidth,
-        host.getBoundingClientRect().top
-      );
+      const w = Math.max(MOT_MIN_CANVAS_DIM, host.clientWidth || MOT_MIN_CANVAS_DIM);
+      const h = Math.max(MOT_MIN_CANVAS_DIM, host.clientHeight || MOT_MIN_CANVAS_DIM);
       renderer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       setCanvasSize({ w, h });
     };
-    window.addEventListener("resize", onResize);
+    // ResizeObserver instead of a plain window "resize" listener — this
+    // fires whenever the HOST ELEMENT's own box changes size, which covers
+    // an actual window resize but also things a window-resize listener
+    // would miss entirely: other UI on the page pushing this box smaller,
+    // orientation changes, or the box's final size simply not being known
+    // yet on the very first layout pass.
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(host);
     onResizeRef.current = onResize;
 
     // Reduced offset from center (was 0.95, 0.78) for a more front-facing,
@@ -8683,7 +8681,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     animate();
 
     return () => {
-      window.removeEventListener("resize", onResize);
+      resizeObserver.disconnect();
       cancelAnimationFrame(ctx.animFrame);
       ballGeo.dispose();
       ballLineTemplate.traverse((obj) => {
@@ -8922,8 +8920,8 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       <div
         ref={canvasHostRef}
         onClick={handleCanvasClick}
-        className="relative w-full bg-slate-950 overflow-hidden"
-        style={{ height: canvasSize.h, cursor: stage === "select" ? "pointer" : "default" }}
+        className="relative w-full h-full bg-slate-950 overflow-hidden"
+        style={{ cursor: stage === "select" ? "pointer" : "default" }}
       >
         <div ref={canvasMountRef} className="absolute inset-0" />
 
