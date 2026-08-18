@@ -8554,11 +8554,23 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       mesh.position.copy(motRandomPointInCube(MOT_BALL_RADIUS));
       const lines = ballLineTemplate.clone();
       mesh.add(lines);
+      // Invisible, larger sphere used ONLY for click detection — a child
+      // of the visible mesh, so it automatically tracks the ball's
+      // position with zero extra code. Makes clicking noticeably more
+      // forgiving than requiring the cursor to land on the ball's exact
+      // (fairly small) visible pixels, without changing how raycasting
+      // itself works — same proven mechanism, just a bigger target.
+      const hitMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 2.4, 12, 8),
+        new THREE.MeshBasicMaterial({ visible: false })
+      );
+      mesh.add(hitMesh);
       scene.add(mesh);
       balls.push({
         id: i,
         letter: letters[i],
         mesh,
+        hitMesh,
         vel: motRandomUnitVector(),
         selected: false,
         isTarget: false,
@@ -8575,33 +8587,14 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     const handleClick = (e) => {
       if (stageRef.current !== "select") return;
       const rect = renderer.domElement.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      // Forgiving nearest-ball pick (in 2D screen space) rather than exact
-      // 3D raycasting — clicking close to a ball selects it even if the
-      // cursor isn't landing on its exact rendered pixels, which matters
-      // most when a few balls are visually clustered close together. The
-      // 46px threshold is deliberately generous — roughly a full ball's
-      // width of forgiveness in every direction.
-      let closest = null;
-      let closestDist = Infinity;
-      ctx.balls.forEach((b) => {
-        const { x, y, behindCamera } = motProjectToScreen(
-          b.mesh.position,
-          ctx.camera,
-          rect.width,
-          rect.height
-        );
-        if (behindCamera) return;
-        const dist = Math.hypot(x - clickX, y - clickY);
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = b;
-        }
-      });
-      if (closest && closestDist <= 46) {
-        toggleBallSelection(closest);
-      }
+      ctx.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      ctx.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      ctx.raycaster.setFromCamera(ctx.mouse, ctx.camera);
+      const hits = ctx.raycaster.intersectObjects(ctx.balls.map((b) => b.hitMesh));
+      if (!hits.length) return;
+      const ball = ctx.balls.find((b) => b.hitMesh === hits[0].object);
+      if (!ball) return;
+      toggleBallSelection(ball);
     };
     // Attached directly to the canvas itself rather than relying on
     // React's onClick on a parent div — the canvas element was inserted
@@ -8945,8 +8938,8 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
         ref={canvasHostRef}
         className="relative bg-slate-950 overflow-hidden mx-auto"
         style={{
-          height: "min(720px, calc(100dvh - 140px))",
-          width: "min(100%, min(720px, calc(100dvh - 140px)))",
+          height: "min(860px, calc(100dvh - 60px))",
+          width: "min(100%, min(860px, calc(100dvh - 60px)))",
           cursor: stage === "select" ? "pointer" : "default",
         }}
       >
