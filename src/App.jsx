@@ -8462,7 +8462,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     setCanvasSize({ w: width, h: height });
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(62, width / height, 0.1, 100);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
@@ -8561,7 +8561,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       // (fairly small) visible pixels, without changing how raycasting
       // itself works — same proven mechanism, just a bigger target.
       const hitMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 2.4, 12, 8),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.6, 12, 8),
         new THREE.MeshBasicMaterial({ visible: false })
       );
       mesh.add(hitMesh);
@@ -8627,7 +8627,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     // straight-into-the-box look — closer to eye-level and centered, with
     // just enough offset left that the side/floor/ceiling edges still read
     // as a cube rather than a flat square. Never moves — only the balls do.
-    camera.position.set(0.35, 0.2, 9.0);
+    camera.position.set(0.23, 0.13, 6.0);
     camera.lookAt(0, 0, 0);
 
     const animate = () => {
