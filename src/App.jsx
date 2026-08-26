@@ -11,18 +11,10 @@ import {
 } from "recharts";
 import { createClient } from "@supabase/supabase-js";
 import { loadStripe } from "@stripe/stripe-js";
+import BillingCardForm from "./BillingCardForm";
 
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51LWmPKIUM9SdKsj1bdD2uLndjdet0b306mTFPXNXRw9lPt6swwW8Ab5F2dLwmvku3jcGL2ur5pHfl6rryakxEmT000QkCO4SuI";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
-
-// Real card form — see BillingCardForm.jsx alongside this file.
-// Left as null here so THIS file can still render as a chat preview
-// artifact without trying (and failing) to resolve a local file import.
-//
-// DEPLOYING FOR REAL: delete this const line and instead add, up near the
-// other imports at the very top of the file:
-//   import BillingCardForm from "./BillingCardForm";
-const BillingCardForm = null;
 
 // =======================================================================
 // THEME OVERRIDE — dark palette
