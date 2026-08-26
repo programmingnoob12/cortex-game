@@ -10,17 +10,258 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { createClient } from "@supabase/supabase-js";
+import { loadStripe } from "@stripe/stripe-js";
+
+const STRIPE_PUBLISHABLE_KEY = "pk_test_51LWmPKIUM9SdKsj1bdD2uLndjdet0b306mTFPXNXRw9lPt6swwW8Ab5F2dLwmvku3jcGL2ur5pHfl6rryakxEmT000QkCO4SuI";
+const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
+// Real card form — see BillingCardForm.jsx alongside this file.
+// Left as null here so THIS file can still render as a chat preview
+// artifact without trying (and failing) to resolve a local file import.
+//
+// DEPLOYING FOR REAL: delete this const line and instead add, up near the
+// other imports at the very top of the file:
+//   import BillingCardForm from "./BillingCardForm";
+const BillingCardForm = null;
+
+// =======================================================================
+// THEME OVERRIDE — dark palette
+// =======================================================================
+// The palette is applied as a stylesheet that remaps the Tailwind colour
+// utilities the app already uses (slate/indigo/emerald/... -> the new
+// tokens) instead of rewriting every className to an arbitrary value like
+// `bg-[#08090A]`, because the preview environment doesn't always generate
+// arbitrary-value colour classes — when it doesn't, every colour class
+// silently drops out and the whole app renders unstyled/light.
+// Appended to <head> at module load so it applies everywhere, including
+// the login screen. Gem tiers, task stimuli (n-back colours, RRT palette,
+// Voronoi accents), avatar backgrounds and badge frames are deliberately
+// untouched.
+const THEME_CSS = `
+:root{--bg:#08090A;--surface:#101112;--surface-raised:#18191B;--border:#23252A;
+--text:#F7F8F8;--text-muted:#8A8F98;--text-dim:#6E7178;
+--primary:#4CB9D8;--primary-hover:#5FC5E0;--primary-text:#8FD8EC;
+--green:#4CB782;--red:#EB5757;--yellow:#F2C94C;--cyan:#4CB9D8;--violet:#8B7FE8;--lime:#68CC58;
+color-scheme:dark;}
+html,body{background-color:#08090A;color:#F7F8F8;}
+.accent-indigo-500{accent-color:#4CB9D8 !important}
+.accent-teal-500{accent-color:#4CB9D8 !important}
+.bg-amber-400{background-color:#B08D34 !important}
+.bg-amber-500\\/10{background-color:rgba(176,141,52,0.1) !important}
+.bg-amber-500\\/20{background-color:rgba(176,141,52,0.2) !important}
+.bg-amber-500\\/90{background-color:rgba(176,141,52,0.9) !important}
+.bg-amber-950\\/40{background-color:rgba(42,35,20,0.4) !important}
+.bg-cyan-400{background-color:#4CB9D8 !important}
+.bg-cyan-500\\/10{background-color:rgba(76,185,216,0.1) !important}
+.bg-emerald-400{background-color:#4CB782 !important}
+.bg-emerald-500{background-color:#4CB782 !important}
+.bg-emerald-500\\/10{background-color:rgba(76,183,130,0.1) !important}
+.bg-emerald-500\\/20{background-color:rgba(76,183,130,0.2) !important}
+.bg-emerald-500\\/90{background-color:rgba(76,183,130,0.9) !important}
+.bg-emerald-600{background-color:#4CB782 !important}
+.bg-emerald-950\\/40{background-color:rgba(20,42,32,0.4) !important}
+.bg-green-950\\/20{background-color:rgba(20,42,32,0.2) !important}
+.bg-indigo-400{background-color:#4CB9D8 !important}
+.bg-indigo-500{background-color:#4CB9D8 !important}
+.bg-indigo-500\\/10{background-color:rgba(76,185,216,0.1) !important}
+.bg-indigo-600\\/20{background-color:rgba(76,185,216,0.2) !important}
+.bg-indigo-950\\/40{background-color:rgba(16,35,42,0.4) !important}
+.bg-lime-400{background-color:#68CC58 !important}
+.bg-lime-500\\/10{background-color:rgba(104,204,88,0.1) !important}
+.bg-lime-500\\/20{background-color:rgba(104,204,88,0.2) !important}
+.bg-red-500{background-color:#EB5757 !important}
+.bg-red-500\\/10{background-color:rgba(235,87,87,0.1) !important}
+.bg-red-500\\/20{background-color:rgba(235,87,87,0.2) !important}
+.bg-red-950\\/30{background-color:rgba(42,20,22,0.3) !important}
+.bg-red-950\\/40{background-color:rgba(42,20,22,0.4) !important}
+.bg-rose-400{background-color:#EB5757 !important}
+.bg-rose-500\\/10{background-color:rgba(235,87,87,0.1) !important}
+.bg-rose-500\\/90{background-color:rgba(235,87,87,0.9) !important}
+.bg-rose-600{background-color:#EB5757 !important}
+.bg-slate-200\\/80{background-color:rgba(247,248,248,0.8) !important}
+.bg-slate-700{background-color:#23252A !important}
+.bg-slate-800{background-color:#18191B !important}
+.bg-slate-800\\/40{background-color:rgba(24,25,27,0.4) !important}
+.bg-slate-800\\/60{background-color:rgba(24,25,27,0.6) !important}
+.bg-slate-900{background-color:#101112 !important}
+.bg-slate-900\\/60{background-color:rgba(16,17,18,0.6) !important}
+.bg-slate-900\\/70{background-color:rgba(16,17,18,0.7) !important}
+.bg-slate-900\\/90{background-color:rgba(16,17,18,0.9) !important}
+.bg-slate-950{background-color:#08090A !important}
+.bg-slate-950\\/70{background-color:rgba(8,9,10,0.7) !important}
+.bg-slate-950\\/80{background-color:rgba(8,9,10,0.8) !important}
+.bg-slate-950\\/90{background-color:rgba(8,9,10,0.9) !important}
+.bg-stone-200{background-color:#F7F8F8 !important}
+.bg-teal-700{background-color:#4CB9D8 !important}
+.bg-violet-400{background-color:#8B7FE8 !important}
+.bg-violet-400\\/25{background-color:rgba(139,127,232,0.25) !important}
+.bg-violet-500\\/10{background-color:rgba(139,127,232,0.1) !important}
+.bg-violet-600\\/15{background-color:rgba(139,127,232,0.15) !important}
+.border-amber-400{border-color:#D9B65A !important}
+.border-amber-500\\/40{border-color:rgba(217,182,90,0.4) !important}
+.border-amber-800{border-color:#D9B65A !important}
+.border-cyan-400{border-color:#4CB9D8 !important}
+.border-cyan-500\\/40{border-color:rgba(76,185,216,0.4) !important}
+.border-emerald-400{border-color:#4CB782 !important}
+.border-emerald-500\\/40{border-color:rgba(76,183,130,0.4) !important}
+.border-emerald-800{border-color:#4CB782 !important}
+.border-green-700{border-color:#4CB782 !important}
+.border-indigo-400{border-color:#4CB9D8 !important}
+.border-indigo-500{border-color:#4CB9D8 !important}
+.border-indigo-500\\/40{border-color:rgba(76,185,216,0.4) !important}
+.border-lime-400{border-color:#68CC58 !important}
+.border-lime-500\\/40{border-color:rgba(104,204,88,0.4) !important}
+.border-orange-400\\/30{border-color:rgba(217,182,90,0.3) !important}
+.border-orange-400\\/40{border-color:rgba(217,182,90,0.4) !important}
+.border-orange-400\\/60{border-color:rgba(217,182,90,0.6) !important}
+.border-red-600{border-color:#EB5757 !important}
+.border-red-900{border-color:#EB5757 !important}
+.border-rose-400{border-color:#EB5757 !important}
+.border-rose-400\\/30{border-color:rgba(235,87,87,0.3) !important}
+.border-rose-500\\/40{border-color:rgba(235,87,87,0.4) !important}
+.border-slate-500{border-color:#2E3138 !important}
+.border-slate-600{border-color:#23252A !important}
+.border-slate-600\\/70{border-color:rgba(35,37,42,0.7) !important}
+.border-slate-700{border-color:#23252A !important}
+.border-slate-700\\/60{border-color:rgba(35,37,42,0.6) !important}
+.border-slate-700\\/70{border-color:rgba(35,37,42,0.7) !important}
+.border-slate-800{border-color:#18191B !important}
+.border-slate-800\\/70{border-color:rgba(24,25,27,0.7) !important}
+.border-slate-950{border-color:#08090A !important}
+.border-stone-300{border-color:#3A3D44 !important}
+.border-violet-400{border-color:#8B7FE8 !important}
+.border-violet-400\\/40{border-color:rgba(139,127,232,0.4) !important}
+.border-violet-500\\/40{border-color:rgba(139,127,232,0.4) !important}
+.disabled\\:hover\\:bg-slate-700:disabled:hover{background-color:#23252A !important}
+.disabled\\:hover\\:bg-teal-700:disabled:hover{background-color:#4CB9D8 !important}
+.focus\\:border-indigo-400:focus{border-color:#4CB9D8 !important}
+.focus\\:border-indigo-500:focus{border-color:#4CB9D8 !important}
+.focus\\:border-teal-500:focus{border-color:#4CB9D8 !important}
+.from-amber-500{--tw-gradient-from:#B08D34 !important}
+.from-amber-500\\/50{--tw-gradient-from:rgba(176,141,52,0.5) !important}
+.from-cyan-400{--tw-gradient-from:#4CB9D8 !important}
+.from-cyan-500{--tw-gradient-from:#4CB9D8 !important}
+.from-cyan-600\\/50{--tw-gradient-from:rgba(76,185,216,0.5) !important}
+.from-emerald-500{--tw-gradient-from:#4CB782 !important}
+.from-fuchsia-600\\/50{--tw-gradient-from:rgba(139,127,232,0.5) !important}
+.from-indigo-500{--tw-gradient-from:#4CB9D8 !important}
+.from-indigo-600\\/50{--tw-gradient-from:rgba(76,185,216,0.5) !important}
+.from-lime-500{--tw-gradient-from:#68CC58 !important}
+.from-orange-400{--tw-gradient-from:#B08D34 !important}
+.from-orange-500\\/20{--tw-gradient-from:rgba(176,141,52,0.2) !important}
+.from-rose-500{--tw-gradient-from:#EB5757 !important}
+.from-rose-600{--tw-gradient-from:#EB5757 !important}
+.from-slate-800{--tw-gradient-from:#18191B !important}
+.from-teal-500{--tw-gradient-from:#4CB9D8 !important}
+.from-violet-500{--tw-gradient-from:#8B7FE8 !important}
+.from-violet-500\\/20{--tw-gradient-from:rgba(139,127,232,0.2) !important}
+.group:hover .group-hover\\:text-indigo-300{color:#8FD8EC !important}
+.hover\\:bg-emerald-500:hover{background-color:#4CB782 !important}
+.hover\\:bg-indigo-400:hover{background-color:#4CB9D8 !important}
+.hover\\:bg-red-950\\/60:hover{background-color:rgba(42,20,22,0.6) !important}
+.hover\\:bg-rose-500:hover{background-color:#EB5757 !important}
+.hover\\:bg-slate-600:hover{background-color:#2E3138 !important}
+.hover\\:bg-slate-700:hover{background-color:#23252A !important}
+.hover\\:bg-slate-800:hover{background-color:#18191B !important}
+.hover\\:bg-slate-800\\/80:hover{background-color:rgba(24,25,27,0.8) !important}
+.hover\\:bg-teal-600:hover{background-color:#4CB9D8 !important}
+.hover\\:border-amber-400:hover{border-color:#D9B65A !important}
+.hover\\:border-amber-400\\/40:hover{border-color:rgba(217,182,90,0.4) !important}
+.hover\\:border-cyan-400:hover{border-color:#4CB9D8 !important}
+.hover\\:border-emerald-400:hover{border-color:#4CB782 !important}
+.hover\\:border-emerald-400\\/40:hover{border-color:rgba(76,183,130,0.4) !important}
+.hover\\:border-indigo-400:hover{border-color:#4CB9D8 !important}
+.hover\\:border-indigo-400\\/40:hover{border-color:rgba(76,185,216,0.4) !important}
+.hover\\:border-lime-400:hover{border-color:#68CC58 !important}
+.hover\\:border-red-400\\/40:hover{border-color:rgba(235,87,87,0.4) !important}
+.hover\\:border-rose-400:hover{border-color:#EB5757 !important}
+.hover\\:border-slate-300:hover{border-color:#3A3D44 !important}
+.hover\\:border-slate-400:hover{border-color:#3A3D44 !important}
+.hover\\:border-slate-500:hover{border-color:#2E3138 !important}
+.hover\\:border-slate-600:hover{border-color:#23252A !important}
+.hover\\:border-teal-400\\/40:hover{border-color:rgba(76,185,216,0.4) !important}
+.hover\\:border-violet-400:hover{border-color:#8B7FE8 !important}
+.hover\\:from-violet-500\\/30:hover{--tw-gradient-from:rgba(139,127,232,0.3) !important}
+.hover\\:shadow-amber-500\\/10:hover{--tw-shadow-color:rgba(176,141,52,0.1) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.hover\\:shadow-emerald-500\\/10:hover{--tw-shadow-color:rgba(76,183,130,0.1) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.hover\\:shadow-indigo-500\\/10:hover{--tw-shadow-color:rgba(76,185,216,0.1) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.hover\\:shadow-teal-500\\/10:hover{--tw-shadow-color:rgba(76,185,216,0.1) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.hover\\:shadow-violet-500\\/30:hover{--tw-shadow-color:rgba(139,127,232,0.3) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.hover\\:text-indigo-300:hover{color:#8FD8EC !important}
+.hover\\:text-slate-200:hover{color:#F7F8F8 !important}
+.hover\\:text-slate-300:hover{color:#8A8F98 !important}
+.hover\\:to-fuchsia-500\\/30:hover{--tw-gradient-to:rgba(139,127,232,0.3) !important}
+.placeholder-slate-500::placeholder{color:#6E7178 !important}
+.placeholder\\:text-slate-500::placeholder{color:#6E7178 !important}
+.shadow-orange-950\\/40{--tw-shadow-color:rgba(42,35,20,0.4) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.shadow-rose-950\\/40{--tw-shadow-color:rgba(42,20,22,0.4) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.shadow-violet-950\\/50{--tw-shadow-color:rgba(30,26,46,0.5) !important;--tw-shadow:var(--tw-shadow-colored) !important}
+.text-amber-300{color:#D9B65A !important}
+.text-amber-400{color:#D9B65A !important}
+.text-cyan-300{color:#4CB9D8 !important}
+.text-emerald-300{color:#4CB782 !important}
+.text-emerald-400{color:#4CB782 !important}
+.text-green-400{color:#4CB782 !important}
+.text-indigo-300{color:#8FD8EC !important}
+.text-indigo-400{color:#8FD8EC !important}
+.text-lime-300{color:#68CC58 !important}
+.text-orange-100{color:#D9B65A !important}
+.text-orange-400{color:#D9B65A !important}
+.text-red-300{color:#EB5757 !important}
+.text-red-400{color:#EB5757 !important}
+.text-red-500{color:#EB5757 !important}
+.text-rose-300{color:#EB5757 !important}
+.text-rose-400{color:#EB5757 !important}
+.text-slate-100{color:#F7F8F8 !important}
+.text-slate-200{color:#F7F8F8 !important}
+.text-slate-300{color:#8A8F98 !important}
+.text-slate-400{color:#8A8F98 !important}
+.text-slate-500{color:#6E7178 !important}
+.text-slate-600{color:#6E7178 !important}
+.text-violet-100{color:#8B7FE8 !important}
+.text-violet-300{color:#8B7FE8 !important}
+.to-blue-700\\/40{--tw-gradient-to:rgba(76,185,216,0.4) !important}
+.to-cyan-400{--tw-gradient-to:#4CB9D8 !important}
+.to-fuchsia-500{--tw-gradient-to:#8B7FE8 !important}
+.to-fuchsia-500\\/20{--tw-gradient-to:rgba(139,127,232,0.2) !important}
+.to-fuchsia-600\\/40{--tw-gradient-to:rgba(139,127,232,0.4) !important}
+.to-indigo-900\\/50{--tw-gradient-to:rgba(76,185,216,0.5) !important}
+.to-lime-400{--tw-gradient-to:#68CC58 !important}
+.to-orange-500{--tw-gradient-to:#B08D34 !important}
+.to-pink-500{--tw-gradient-to:#8B7FE8 !important}
+.to-red-500{--tw-gradient-to:#EB5757 !important}
+.to-red-500\\/20{--tw-gradient-to:rgba(235,87,87,0.2) !important}
+.to-rose-500\\/40{--tw-gradient-to:rgba(235,87,87,0.4) !important}
+.to-sky-500{--tw-gradient-to:#4CB9D8 !important}
+.to-slate-900{--tw-gradient-to:#101112 !important}
+.to-teal-300{--tw-gradient-to:#4CB9D8 !important}
+.to-teal-500{--tw-gradient-to:#4CB9D8 !important}
+.via-orange-500\\/40{--tw-gradient-via:rgba(176,141,52,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(176,141,52,0.4), var(--tw-gradient-to) !important}
+.via-purple-700\\/40{--tw-gradient-via:rgba(139,127,232,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(139,127,232,0.4), var(--tw-gradient-to) !important}
+.via-sky-600\\/40{--tw-gradient-via:rgba(76,185,216,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(76,185,216,0.4), var(--tw-gradient-to) !important}
+.via-violet-600\\/40{--tw-gradient-via:rgba(139,127,232,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(139,127,232,0.4), var(--tw-gradient-to) !important}
+.rrt-flash{animation:rrtFlashIn .18s ease-out}
+@keyframes rrtFlashIn{from{opacity:0}to{opacity:1}}
+.rank-glow{position:relative}
+.rank-glow::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:0 0 24px 6px rgba(250,204,21,0.5), inset 0 0 0 1px rgba(250,204,21,0.7);animation:rankGlowFade 2.6s ease-in-out infinite;will-change:opacity}
+@keyframes rankGlowFade{0%,100%{opacity:.4}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.rank-glow::after{animation:none;opacity:.7}}
+.nback-stimulus{width:80%;height:80%;display:flex;align-items:center;justify-content:center}
+.nback-stimulus>svg{width:100% !important;height:100% !important}
+.to-violet-500{--tw-gradient-to:#5FC5E0 !important}
+`;
+if (typeof document !== "undefined" && !document.getElementById("app-theme-override")) {
+  const el = document.createElement("style");
+  el.id = "app-theme-override";
+  el.textContent = THEME_CSS;
+  document.head.appendChild(el);
+}
+
 
 // ---------------------------------------------------------------------
 // PRODUCTION BACKEND — Supabase (Postgres + Auth + Row-Level Security)
 // ---------------------------------------------------------------------
-// Fill these in from your Supabase project settings (Project Settings ->
-// API). The anon key is safe to ship client-side — it can only do what
-// your Row-Level Security policies (see schema.sql) allow it to do, which
-// is: a logged-in user may read/write rows where user_id = their own auth
-// uid, and nothing else. Nobody's data is reachable from anybody else's
-// session even though this key is public.
-const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co"; // e.g. https://xxxx.supabase.co
+const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_oeUIhMq6Wg9ElS6gCzbIZw_djTvdsLm";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -567,6 +808,104 @@ class AppErrorBoundary extends Component {
 const LETTERS = ["A", "K", "L", "Z", "R", "O", "G", "Q", "S", "F", "Y"];
 const SHAPE_TYPES = ["square", "triangle", "star", "circle", "diamond", "hexagon"];
 const COLORS = ["#3b82f6", "#eab308", "#f97316", "#22c55e", "#a855f7", "#ef4444"];
+// n-back grid chrome — a neutral lattice, deliberately outside the accent
+// system so the grid never picks up an exercise colour.
+const NBACK_GRID_LINE = "#8A8F98";
+const NBACK_CELL_BG = "#18191B";
+const NBACK_CELL_ACTIVE = "#F7F8F8";
+
+// Grid box: full column width, capped so the square grid plus its answer
+// buttons always fit the viewport height.
+const NBACK_BOX_SIZE = "max(240px, min(100%, 760px, calc(100vh - 250px)))";
+
+
+// ---------------------------------------------------------------------
+// LETTER AUDIO
+// ---------------------------------------------------------------------
+// Recorded letter voices, with browser text-to-speech as the fallback.
+//
+// TO ADD THE FILES: drop one file per letter into `public/audio/letters/`,
+// named for the letter in uppercase — A.mp3, K.mp3, L.mp3, and so on, one for
+// every entry in LETTERS. Vite serves `public/` from the site root, so
+// `public/audio/letters/K.mp3` is fetched as `/audio/letters/K.mp3`; no import
+// or build step is involved. Anything missing falls back to speech synthesis
+// on its own, so a partial set still runs.
+//
+// Trim the files tight — leading silence is dead time the app can't see, and
+// at a 500ms stimulus window even 100ms of it shifts the letter noticeably
+// later than the visual it's meant to accompany.
+const LETTER_AUDIO_BASE = "/audio/letters/";
+const letterAudioBuffers = new Map(); // letter -> decoded AudioBuffer
+let letterAudioCtx = null;
+let letterAudioGain = null;
+let letterAudioSource = null; // the one currently playing, so it can be cut off
+
+function letterAudioContext() {
+  if (letterAudioCtx) return letterAudioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  letterAudioCtx = new Ctx();
+  letterAudioGain = letterAudioCtx.createGain();
+  letterAudioGain.connect(letterAudioCtx.destination);
+  return letterAudioCtx;
+}
+
+// Web Audio rather than <audio> elements: play() on an element carries tens of
+// milliseconds of unpredictable latency, which is exactly the kind of jitter
+// that makes an audio/visual pair feel out of sync. A decoded buffer starts on
+// the next audio frame.
+async function preloadLetterAudio() {
+  const ctx = letterAudioContext();
+  if (!ctx) return;
+  await Promise.all(
+    LETTERS.map(async (letter) => {
+      if (letterAudioBuffers.has(letter)) return;
+      try {
+        const res = await fetch(`${LETTER_AUDIO_BASE}${letter}.mp3`);
+        if (!res.ok) return; // no file for this letter — speech synthesis covers it
+        letterAudioBuffers.set(letter, await ctx.decodeAudioData(await res.arrayBuffer()));
+      } catch {
+        // Network error or an unsupported/corrupt file: leave it unset and let
+        // the fallback handle it rather than failing the whole preload.
+      }
+    })
+  );
+}
+
+// Browsers won't start audio until the page has had a real user gesture, and a
+// context created before one begins life suspended. Called from the Start
+// button, which is a gesture by definition.
+function unlockLetterAudio() {
+  const ctx = letterAudioContext();
+  if (ctx && ctx.state === "suspended") ctx.resume();
+  preloadLetterAudio();
+}
+
+function playLetterSample(letter, onstart) {
+  const buffer = letterAudioBuffers.get(letter);
+  const ctx = letterAudioCtx;
+  if (!buffer || !ctx || ctx.state !== "running") return false;
+  // Supersede whatever's still sounding — same rule the speech path follows,
+  // so a fast trial never stacks two letters on top of each other.
+  if (letterAudioSource) {
+    try {
+      letterAudioSource.stop();
+    } catch {
+      // Already finished; stop() on a stopped source throws.
+    }
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(letterAudioGain);
+  source.onended = () => {
+    if (letterAudioSource === source) letterAudioSource = null;
+  };
+  letterAudioSource = source;
+  source.start();
+  if (onstart) onstart();
+  return true;
+}
+
 const GRID_SIZE = 9; // 3x3 grid, positions 0-8
 const POSITIONS = Array.from({ length: GRID_SIZE }, (_, i) => i);
 
@@ -647,7 +986,7 @@ const ACCENT_STYLES = {
   indigo: {
     border: "border-indigo-500/40",
     borderStrong: "border-indigo-400",
-    hoverBorderStrong: "hover:border-indigo-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-indigo-500/10",
     text: "text-indigo-300",
     dot: "bg-indigo-400",
@@ -656,7 +995,7 @@ const ACCENT_STYLES = {
   violet: {
     border: "border-violet-500/40",
     borderStrong: "border-violet-400",
-    hoverBorderStrong: "hover:border-violet-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-violet-500/10",
     text: "text-violet-300",
     dot: "bg-violet-400",
@@ -665,7 +1004,7 @@ const ACCENT_STYLES = {
   amber: {
     border: "border-amber-500/40",
     borderStrong: "border-amber-400",
-    hoverBorderStrong: "hover:border-amber-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-amber-500/10",
     text: "text-amber-300",
     dot: "bg-amber-400",
@@ -674,7 +1013,7 @@ const ACCENT_STYLES = {
   cyan: {
     border: "border-cyan-500/40",
     borderStrong: "border-cyan-400",
-    hoverBorderStrong: "hover:border-cyan-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-cyan-500/10",
     text: "text-cyan-300",
     dot: "bg-cyan-400",
@@ -683,7 +1022,7 @@ const ACCENT_STYLES = {
   rose: {
     border: "border-rose-500/40",
     borderStrong: "border-rose-400",
-    hoverBorderStrong: "hover:border-rose-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-rose-500/10",
     text: "text-rose-300",
     dot: "bg-rose-400",
@@ -692,7 +1031,7 @@ const ACCENT_STYLES = {
   lime: {
     border: "border-lime-500/40",
     borderStrong: "border-lime-400",
-    hoverBorderStrong: "hover:border-lime-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-lime-500/10",
     text: "text-lime-300",
     dot: "bg-lime-400",
@@ -701,7 +1040,7 @@ const ACCENT_STYLES = {
   emerald: {
     border: "border-emerald-500/40",
     borderStrong: "border-emerald-400",
-    hoverBorderStrong: "hover:border-emerald-400",
+    hoverBorderStrong: "hover:border-slate-500",
     bg: "bg-emerald-500/10",
     text: "text-emerald-300",
     dot: "bg-emerald-400",
@@ -731,9 +1070,9 @@ const EXERCISE_LIBRARY = {
     key: "quad",
     title: "Quad N-Back",
     abbrev: "Q",
-    accent: "violet",
+    accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
-    maxN: 9,
+    maxN: 10,
     defaultN: 3,
     stimMs: 3000,
     scoreType: "accuracy",
@@ -744,9 +1083,9 @@ const EXERCISE_LIBRARY = {
     key: "rrt",
     title: "RRT",
     abbrev: "R",
-    accent: "amber",
+    accent: "indigo",
     modalities: [],
-    maxN: 9, // level 9 = 10p — the ceiling for RRT's own achievements/gem tiers (level = premiseCount - 1, starting at 2p)
+    maxN: 10, // level = premise count, so level 10 = 10p — the ceiling for RRT's own achievements/gem tiers
     defaultN: 1,
     stimMs: 0,
     comingSoon: false,
@@ -758,9 +1097,9 @@ const EXERCISE_LIBRARY = {
     key: "iqnb",
     title: "QNB'",
     abbrev: "QNB'",
-    accent: "cyan",
+    accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
-    maxN: 8,
+    maxN: 10,
     defaultN: 4,
     stimMs: 2500, // overridden per-run from qnbPrimeSettingsFor once a session starts
     comingSoon: false,
@@ -772,7 +1111,7 @@ const EXERCISE_LIBRARY = {
     key: "motion3d",
     title: "3D Motion",
     abbrev: "3D",
-    accent: "emerald",
+    accent: "indigo",
     modalities: [],
     maxN: 10,
     defaultN: 1,
@@ -813,7 +1152,7 @@ const REGIMES = [
     title: "Balanced",
     subtitle: "45 min",
     summary: "RRT · QNB' · 3D Motion",
-    accent: "cyan",
+    accent: "indigo",
     steps: [
       { key: "rrt", minutes: 10 },
       { key: "iqnb", minutes: 20 },
@@ -825,7 +1164,7 @@ const REGIMES = [
     title: "Deep",
     subtitle: "95 min",
     summary: "RRT · Dual N-Back · QNB' · Quad N-Back",
-    accent: "lime",
+    accent: "indigo",
     steps: [
       { key: "rrt", minutes: 10 },
       { key: "dual", minutes: 25 },
@@ -906,6 +1245,10 @@ if (typeof window !== "undefined" && "speechSynthesis" in window) {
 let pendingSpeakTimeout = null;
 
 function speak(letter, onstart) {
+  // A recorded voice wins when there's a file for this letter; everything
+  // below is the fallback for letters with no recording, and for before the
+  // preload finishes.
+  if (playLetterSample(letter, onstart)) return;
   if (!("speechSynthesis" in window)) {
     if (onstart) onstart();
     return;
@@ -1038,10 +1381,10 @@ function useBinauralBeats(enabled) {
   return { unlock, audioError };
 }
 
-function poolFor(modality) {
+function poolFor(modality, shapeSet) {
   if (modality === "pos") return POSITIONS;
   if (modality === "audio") return LETTERS;
-  if (modality === "shape") return SHAPE_TYPES;
+  if (modality === "shape") return shapeSet || SHAPE_TYPES;
   if (modality === "color") return COLORS;
   return [];
 }
@@ -1086,10 +1429,17 @@ function generateStream(pool, n, length, interference = 0, matchChance = 0.3) {
   return stream;
 }
 
-function generateSequence(modalities, n, length, interference = 0, matchChance = 0.3) {
+function generateSequence(
+  modalities,
+  n,
+  length,
+  interference = 0,
+  matchChance = 0.3,
+  shapeSet = null
+) {
   const seq = { __n: n };
   modalities.forEach((m) => {
-    seq[m] = generateStream(poolFor(m), n, length, interference, matchChance);
+    seq[m] = generateStream(poolFor(m, shapeSet), n, length, interference, matchChance);
   });
   return seq;
 }
@@ -1489,6 +1839,14 @@ const RRT_COLOR_PALETTE = [
   { name: "Purple", hex: "#a855f7" },
   { name: "Red", hex: "#ef4444" },
 ];
+// Exact green/red from the reference build, used for every correct/wrong
+// signal in RRT — the flash over the puzzle box, the history verdicts, and the
+// TRUE/FALSE answer values — so the exercise reads as one system instead of
+// three different greens.
+const RRT_GREEN = "#1E982B";
+const RRT_RED = "#971426";
+const RRT_TIMEOUT = "#8A8F98";
+
 const RRT_RELATIONS = ["same as", "opposite of"];
 
 // "contains"/"is within", "more than"/"less than", and "on top of"/"is
@@ -1499,10 +1857,10 @@ const RRT_RELATIONS = ["same as", "opposite of"];
 // two items in an order puzzle can end up with NO provable relation at all
 // — see generateRrtOrderPuzzle for why. RRT_ORDER_CONFIGS holds the
 // vocabulary/phrasing that's different between contains, comparison, and
-// vertical; the actual generation and explanation logic is shared. One
-// more type is planned (a "space2d" compass-direction variant) but not
-// built yet, so it's left out of RRT_PUZZLE_TYPES for now rather than
-// stubbed in half-built.
+// vertical; the actual generation and explanation logic is shared. The
+// space2d compass-direction type is deliberately NOT in here — it isn't a
+// linear order at all, so it has its own generator and its own explanation
+// (a map rather than a chain). See generateRrtSpace2dPuzzle.
 const RRT_ORDER_CONFIGS = {
   contains: {
     label: "Contains",
@@ -1518,7 +1876,7 @@ const RRT_ORDER_CONFIGS = {
         : `Is ${a.label} within ${b.label}?`,
     chainHeading: "Containment Chain",
     reversalNote:
-      "The chain reverses direction partway through, so neither item is actually established as containing the other — that's why the honest answer is False.",
+      "The chain doesn't establish that relation in the direction the conclusion claims — that's why the honest answer is False.",
   },
   comparison: {
     label: "Comparison",
@@ -1530,10 +1888,10 @@ const RRT_ORDER_CONFIGS = {
     conclusionText: (a, b, askRelation) => `Is ${a.label} ${askRelation} ${b.label}?`,
     chainHeading: "Comparison Chain",
     reversalNote:
-      "The chain reverses direction partway through, so neither item is actually established as more or less than the other — that's why the honest answer is False.",
+      "The chain doesn't establish that relation in the direction the conclusion claims — that's why the honest answer is False.",
   },
   vertical: {
-    label: "Vertical",
+    label: "Linear",
     // [0] = the "greater" (on top) relation, [1] = the "lesser" (under) relation
     relations: ["on top of", "is under"],
     premiseText: (child, parent, childIsGreater) =>
@@ -1549,12 +1907,13 @@ const RRT_ORDER_CONFIGS = {
       "The chain reverses direction partway through, so neither item is actually established as on top of or under the other — that's why the honest answer is False.",
   },
 };
-const RRT_PUZZLE_TYPES = ["distinction", "contains", "comparison", "vertical"];
+const RRT_PUZZLE_TYPES = ["distinction", "contains", "comparison", "vertical", "space2d"];
 const RRT_PUZZLE_TYPE_LABEL = {
   distinction: "Distinction",
   contains: RRT_ORDER_CONFIGS.contains.label,
   comparison: RRT_ORDER_CONFIGS.comparison.label,
   vertical: RRT_ORDER_CONFIGS.vertical.label,
+  space2d: "Space 2D",
 };
 
 // "is {relation}" reads right for the distinction relations ("is same as",
@@ -1566,6 +1925,9 @@ const RRT_PUZZLE_TYPE_LABEL = {
 // every premise/conclusion render site (the live round, the history log)
 // phrases it the same way instead of each guessing at string surgery.
 function rrtRelationPhrase(relation) {
+  // Bearings read "is North-East of", so the trailing "of" belongs to the
+  // phrase rather than to the sentence template around it.
+  if (RRT_SPACE2D_DIRS.some((d) => d.name === relation)) return `is ${relation} of`;
   if (relation === "contains") return "contains";
   if (relation === "is within") return "is within";
   if (relation === "on top of") return "is on top of";
@@ -1603,6 +1965,31 @@ function rrtRandomLetters(used) {
   return word;
 }
 
+
+// Hues people name differently at a glance — deliberately uneven in degrees,
+// because the colour wheel is perceptually uneven. Greens are one wide band
+// that needs few samples; blues and purples separate well and get more.
+const RRT_IDENTITY_HUES = [0, 28, 50, 88, 140, 172, 196, 220, 248, 278, 306, 334];
+
+const RRT_HUE_NAMES = [
+  [15, "Red"],
+  [45, "Orange"],
+  [70, "Yellow"],
+  [95, "Lime"],
+  [150, "Green"],
+  [185, "Teal"],
+  [205, "Cyan"],
+  [240, "Blue"],
+  [270, "Indigo"],
+  [300, "Violet"],
+  [330, "Magenta"],
+  [360, "Pink"],
+];
+function rrtHueName(hue) {
+  const h = ((hue % 360) + 360) % 360;
+  for (const [limit, name] of RRT_HUE_NAMES) if (h < limit) return name;
+  return "Red";
+}
 function rrtRandomColor(used) {
   const available = RRT_COLOR_PALETTE.filter((c) => !used.has(c.name));
   const pool = available.length > 0 ? available : RRT_COLOR_PALETTE;
@@ -1621,28 +2008,72 @@ function buildRrtItems(itemCount) {
   const usedWords = new Set();
   const usedColors = new Set();
 
-  // Force a genuine mix of letter-tag and Voronoi-swatch items instead of
-  // an independent coin flip per item, which can easily land on a chain
-  // that's almost all one type by chance. Split close to 50/50, capped so
-  // the Voronoi count never exceeds the number of distinct colors
-  // available — repeating a color would be just as confusing as two
-  // similar-looking letter tags.
-  const voronoiCount = Math.min(
-    Math.round(itemCount / 2),
-    RRT_COLOR_PALETTE.length
-  );
-  const types = Array.from({ length: itemCount }, (_, i) =>
-    i < voronoiCount ? "voronoi" : "letters"
-  );
+  // Three kinds in equal thirds — letter tag, square swatch, landscape
+  // swatch — then shuffled. Dealing them out rather than rolling per item is
+  // what guarantees the mix: independent coin flips regularly produced a
+  // chain that was nearly all one kind, which removes a whole dimension the
+  // person could otherwise use to keep the items apart.
+  const kinds = ["letters", "square", "wide"];
+  const types = Array.from({ length: itemCount }, (_, i) => kinds[i % 3]);
   for (let i = types.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [types[i], types[j]] = [types[j], types[i]];
   }
 
+  // Identity colours: random every round, but never two that could be
+  // confused.
+  //
+  // Spacing hues evenly in degrees doesn't work — the wheel isn't
+  // perceptually even, so 90 and 140 (lime and green) look far closer than
+  // 190 and 240 (cyan and blue) despite the same gap. Greedily picking from a
+  // list of anchors doesn't work either: it can't always find n that are far
+  // enough apart and ends up relaxing its own guarantee.
+  //
+  // So positions are spaced evenly on a *perceptual* ladder — the anchors in
+  // RRT_IDENTITY_HUES, treated as equal steps and interpolated between — and
+  // then converted to real hues. Even spacing on that ladder means even
+  // spacing to the eye, and it's guaranteed rather than searched for. The
+  // start point is random and the jitter is capped well inside the step, so
+  // the colours are different every round without ever crowding.
+  const swatchTotal = types.filter((t) => t !== "letters").length;
+  const ladderAt = (pos) => {
+    const n = RRT_IDENTITY_HUES.length;
+    const p = ((pos % n) + n) % n;
+    const i = Math.floor(p);
+    const f = p - i;
+    const a = RRT_IDENTITY_HUES[i];
+    let b = RRT_IDENTITY_HUES[(i + 1) % n];
+    if (b < a) b += 360;
+    return (a + (b - a) * f) % 360;
+  };
+  const ladderStart = Math.random() * RRT_IDENTITY_HUES.length;
+  const ladderStep = RRT_IDENTITY_HUES.length / Math.max(swatchTotal, 1);
+  const hueQueue = Array.from({ length: swatchTotal }, (_, i) => ({
+    hue: ladderAt(ladderStart + i * ladderStep + (Math.random() - 0.5) * ladderStep * 0.3),
+    // Second axis: alternating dark and light identity values, so even the
+    // closest pair still differs in a way that survives being small.
+    light: i % 2 === 0 ? 36 + Math.random() * 8 : 59 + Math.random() * 8,
+  }));
+  for (let i = hueQueue.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [hueQueue[i], hueQueue[j]] = [hueQueue[j], hueQueue[i]];
+  }
+
   return types.map((type) => {
-    if (type === "voronoi") {
-      const color = rrtRandomColor(usedColors);
-      return { type: "voronoi", hex: color.hex, colorName: color.name, label: `the ${color.name} Voronoi` };
+    if (type !== "letters") {
+      const identity = hueQueue.pop() || { hue: Math.random() * 360, light: 50 };
+      const hue = identity.hue;
+      const name = rrtHueName(hue);
+      usedColors.add(name);
+      return {
+        type: "voronoi",
+        hue,
+        identityLight: identity.light,
+        colorName: name,
+        patternSeed: `${name}-${Math.random().toString(36).slice(2)}`,
+        wide: type === "wide",
+        label: `the ${name} tile`,
+      };
     }
     const letters = rrtRandomLetters(usedWords);
     return { type: "letters", letters, label: letters };
@@ -1697,8 +2128,130 @@ function pickRrtPuzzleType() {
   return RRT_PUZZLE_TYPES[Math.floor(Math.random() * RRT_PUZZLE_TYPES.length)];
 }
 
+
+// ---------------------------------------------------------------------
+// SPACE 2D
+// ---------------------------------------------------------------------
+// Items sit on a 2D grid and each premise gives one item's compass bearing
+// from another — "MAY is North-East of NED". The deduction is genuinely
+// spatial rather than a single ordering: you have to hold a rough map, not a
+// line, which is why it's worth having alongside contains/comparison/vertical.
+//
+// Direction between any two distinct cells is read off the SIGNS of the
+// offset, so every pair resolves to exactly one of the eight bearings and
+// there's never an ambiguous or unprovable pair. Distance doesn't enter into
+// it: two cells east and one north is North-East, same as one and one.
+const RRT_SPACE2D_DIRS = [
+  { name: "North", dx: 0, dy: 1 },
+  { name: "North-East", dx: 1, dy: 1 },
+  { name: "East", dx: 1, dy: 0 },
+  { name: "South-East", dx: 1, dy: -1 },
+  { name: "South", dx: 0, dy: -1 },
+  { name: "South-West", dx: -1, dy: -1 },
+  { name: "West", dx: -1, dy: 0 },
+  { name: "North-West", dx: -1, dy: 1 },
+];
+
+function rrtSpaceDirectionFor(dx, dy) {
+  const sx = Math.sign(dx);
+  const sy = Math.sign(dy);
+  const hit = RRT_SPACE2D_DIRS.find((d) => d.dx === sx && d.dy === sy);
+  return hit ? hit.name : null;
+}
+
+function generateRrtSpace2dPuzzle(premiseCount, branchingEnabled = true) {
+  const itemCount = premiseCount + 1;
+  const items = buildRrtItems(itemCount);
+
+  const positions = [{ x: 0, y: 0 }];
+  const taken = new Set(["0,0"]);
+  const premises = [];
+  const adjacency = Array.from({ length: itemCount }, () => []);
+
+  for (let i = 1; i < itemCount; i++) {
+    // Branching on: attach to any item placed so far, which spreads the map
+    // out into a real shape. Branching off: always the previous item, giving
+    // one walkable path — which is what scrambleFactor 0 relies on to
+    // guarantee each premise shares an item with the next.
+    const parentIdx = branchingEnabled ? Math.floor(Math.random() * i) : i - 1;
+    const parent = positions[parentIdx];
+
+    // Try random bearings until one lands on an empty cell. Two items in the
+    // same cell would make the map contradictory, so a collision is retried
+    // rather than accepted.
+    let placed = null;
+    let dirName = null;
+    for (let attempt = 0; attempt < 40 && !placed; attempt++) {
+      const dir = RRT_SPACE2D_DIRS[Math.floor(Math.random() * RRT_SPACE2D_DIRS.length)];
+      const candidate = { x: parent.x + dir.dx, y: parent.y + dir.dy };
+      const key = `${candidate.x},${candidate.y}`;
+      if (taken.has(key)) continue;
+      placed = candidate;
+      dirName = dir.name;
+      taken.add(key);
+    }
+    if (!placed) {
+      // Every bearing around this parent was occupied — fall back to a scan
+      // outward so generation can't fail outright.
+      outer: for (let r = 1; r < 6; r++) {
+        for (const dir of RRT_SPACE2D_DIRS) {
+          const candidate = { x: parent.x + dir.dx * r, y: parent.y + dir.dy * r };
+          const key = `${candidate.x},${candidate.y}`;
+          if (taken.has(key)) continue;
+          placed = candidate;
+          dirName = dir.name;
+          taken.add(key);
+          break outer;
+        }
+      }
+    }
+
+    positions.push(placed);
+    premises.push({
+      subject: items[i],
+      relation: dirName,
+      object: items[parentIdx],
+      text: `${items[i].label} is ${dirName} of ${items[parentIdx].label}.`,
+    });
+    adjacency[i].push(parentIdx);
+    adjacency[parentIdx].push(i);
+  }
+
+  const { aIdx, bIdx } = pickRrtConclusionPair(itemCount, adjacency);
+  const actual = rrtSpaceDirectionFor(
+    positions[aIdx].x - positions[bIdx].x,
+    positions[aIdx].y - positions[bIdx].y
+  );
+
+  // Half the time ask the true bearing, half the time a different one. Since
+  // every pair has exactly one correct bearing, a wrong one is always
+  // genuinely wrong — no "can't be determined" cases to reason about.
+  const askTrue = Math.random() < 0.5;
+  const wrongOptions = RRT_SPACE2D_DIRS.map((d) => d.name).filter((n) => n !== actual);
+  const askRelation = askTrue
+    ? actual
+    : wrongOptions[Math.floor(Math.random() * wrongOptions.length)];
+
+  return {
+    items,
+    premises,
+    positions,
+    puzzleType: "space2d",
+    conclusion: {
+      subject: items[aIdx],
+      relation: askRelation,
+      object: items[bIdx],
+      text: `Is ${items[aIdx].label} ${askRelation} of ${items[bIdx].label}?`,
+      answer: askRelation === actual,
+    },
+  };
+}
+
 function generateRrtPuzzle(premiseCount, branchingEnabled = true, puzzleType) {
   const type = puzzleType || pickRrtPuzzleType();
+  if (type === "space2d") {
+    return generateRrtSpace2dPuzzle(premiseCount, branchingEnabled);
+  }
   if (RRT_ORDER_CONFIGS[type]) {
     return generateRrtOrderPuzzle(premiseCount, branchingEnabled, type);
   }
@@ -1756,23 +2309,29 @@ function generateRrtDistinctionPuzzle(premiseCount, branchingEnabled = true) {
   };
 }
 
-// The "order" RRT puzzle types — contains/is-within and more-than/less-than
-// — share this one generator. Same tree-of-premises shape as the
-// distinction puzzle above (each item after the first gets one premise
-// connecting it back to an earlier item, branching or not), but the
-// relation is directed and transitive rather than a same/opposite
-// equivalence. That has a real consequence: unlike distinction, where any
-// two items in the tree always resolve to a definite same-as/opposite-of
-// answer no matter how they're connected, two items here can end up with
-// NO provable relation at all — e.g. two different things both contain (or
-// are both more than) the same third item, which says nothing about how
-// those two relate to each other. So each edge gets a random direction,
-// and the conclusion is worked out by walking the unique tree path between
-// the two chosen items and checking whether every edge along that path
-// points the same way. If it does, the order holds transitively (in
-// whichever direction); if the path reverses direction anywhere, neither
-// direction of the relation is actually established, and the honest
-// answer is False either way.
+// The "order" RRT puzzle types — contains/is-within, more-than/less-than,
+// and on-top-of/is-under — share this one generator. Unlike the distinction
+// puzzle above, this NEVER branches, even when branchingEnabled is on: each
+// of these relations describes a strict physical stack (one thing directly
+// containing/on top of/greater than the next), and a stack can't have two
+// different items both sitting directly in the same position — "A contains
+// B" and "A contains C" would mean B and C are both the one thing directly
+// inside A, which doesn't correspond to any actual arrangement. So item i's
+// premise always links back to i-1, forming one straight chain — item[0]
+// through item[n-1] each directly related to the next, no forks. What
+// branchingEnabled changes for THESE types is nothing; distinction is the
+// only one it affects (see generateRrtDistinctionPuzzle), since a same/
+// opposite equivalence class has no such "only one thing per spot"
+// constraint.
+//
+// The chain also runs in ONE direction the whole way — every edge points the
+// same way, chosen once per puzzle. An earlier version rolled each edge
+// independently, which read as more varied but quietly produced impossible
+// arrangements: a reversal makes some item the "peak", directly containing
+// (or directly under) two different items at once, and no real stack looks
+// like that. With a monotonic chain every pair has a genuine order, and the
+// conclusion is False whenever it asserts the direction the chain doesn't
+// support — which is a real deduction to make, not a trick.
 function generateRrtOrderPuzzle(premiseCount, branchingEnabled, typeKey) {
   const config = RRT_ORDER_CONFIGS[typeKey];
   const itemCount = premiseCount + 1;
@@ -1784,15 +2343,28 @@ function generateRrtOrderPuzzle(premiseCount, branchingEnabled, typeKey) {
   // (config.relations[0]) side of the relation to `to`", -1 means the
   // reverse (config.relations[1]).
   const signedAdjacency = Array.from({ length: itemCount }, () => []);
+  // One direction for the whole chain, chosen once. A per-edge coin flip
+  // would let the order reverse partway along, which puts two items in the
+  // same slot — see the note above this function.
+  const chainAscending = Math.random() < 0.5;
   for (let i = 1; i < items.length; i++) {
-    const parentIdx = branchingEnabled ? Math.floor(Math.random() * i) : i - 1;
-    const iIsGreater = Math.random() < 0.5;
-    const relation = iIsGreater ? config.relations[0] : config.relations[1];
+    // Always i - 1, never branching — see the comment above this function
+    // for why: two items can't both occupy the one spot directly
+    // containing/on top of/exceeding the same item in a real stack.
+    const parentIdx = i - 1;
+    const iIsGreater = chainAscending;
+    // Which item leads the sentence. Flipping it swaps the relation to its
+    // opposite, which states the identical fact the other way round.
+    const iLeads = Math.random() < 0.5;
+    const subject = iLeads ? items[i] : items[parentIdx];
+    const object = iLeads ? items[parentIdx] : items[i];
+    const subjectIsGreater = iLeads ? iIsGreater : !iIsGreater;
+    const relation = subjectIsGreater ? config.relations[0] : config.relations[1];
     premises.push({
-      subject: items[i],
+      subject,
       relation,
-      object: items[parentIdx],
-      text: config.premiseText(items[i], items[parentIdx], iIsGreater),
+      object,
+      text: config.premiseText(subject, object, subjectIsGreater),
     });
     adjacency[i].push(parentIdx);
     adjacency[parentIdx].push(i);
@@ -2034,7 +2606,17 @@ function jitteredGridPoints(rand, count, cols, rows) {
     return [c * cellW + jx * cellW, r * cellH + jy * cellH];
   });
 }
-function voronoiCells(seedStr, baseHex) {
+function rrtPolyArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x1, y1] = poly[i];
+    const [x2, y2] = poly[(i + 1) % poly.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
+function voronoiCells(seedStr, baseHex, fixedFill = null) {
   const countRand = mulberry32(hashStringToSeed(`${seedStr}-count`));
   const pointCount = 4 + Math.floor(countRand() * 2); // 4-5 seeds — fewer, bigger, clearer cells at small render sizes
   const pointRand = mulberry32(hashStringToSeed(`${seedStr}-points`));
@@ -2059,46 +2641,270 @@ function voronoiCells(seedStr, baseHex) {
       poly = clipPolygonHalfPlane(poly, nx, ny, c);
     }
     if (poly.length >= 3) {
-      // Bolder, more saturated accent mixing (higher odds, wider blend
-      // range) so cells read as genuinely different hues at a glance —
-      // like real mosaic tiles — instead of subtle shades of one color.
       let color;
-      if (colorRand() < 0.85) {
+      if (fixedFill) {
+        // Painted below, once every cell's area is known — the stimulus
+        // colour has to go on the biggest one.
+        color = null;
+      } else if (colorRand() < 0.85) {
         const accent = VORONOI_ACCENTS[Math.floor(colorRand() * VORONOI_ACCENTS.length)];
         color = mixHex(baseHex, accent, 0.4 + colorRand() * 0.45);
       } else {
         color = shadeHex(baseHex, (colorRand() - 0.5) * 1.1);
       }
-      cells.push({ points: poly.map((p) => p.join(",")).join(" "), color });
+      cells.push({
+        points: poly.map((p) => p.join(",")).join(" "),
+        color,
+        area: fixedFill ? rrtPolyArea(poly) : 0,
+      });
     }
   }
+
+  if (fixedFill) {
+    const pool = fixedFill.accents;
+    // Two-thirds of the time take a consecutive run of the hue-ordered
+    // palette, so the cells are near neighbours and the shape reads as one
+    // colour family. The rest spread across the list for contrast. Without
+    // that mix every stimulus looks the same amount of busy.
+    const related = colorRand() < 0.66;
+    const start = Math.floor(colorRand() * pool.length);
+    const stride = related ? 1 : 1 + Math.floor(colorRand() * (pool.length - 2));
+    // Biggest cell carries the stimulus colour, so the shape still announces
+    // which colour it is even when the rest are close together.
+    let biggest = 0;
+    for (let i = 1; i < cells.length; i++) {
+      if (cells[i].area > cells[biggest].area) biggest = i;
+    }
+    let taken = 0;
+    cells.forEach((cell, i) => {
+      cell.color =
+        i === biggest
+          ? fixedFill.identityColor
+          : pool[(start + stride * taken++) % pool.length];
+    });
+  }
+
   return cells;
 }
+
+// ---------------------------------------------------------------------
+// RRT SWATCH TILES
+// ---------------------------------------------------------------------
+// A recursive binary partition of the square: pick the biggest region,
+// cut it with a straight line, repeat. Cuts are mostly axis-aligned with
+// the occasional diagonal, which is what gives these their poster-like
+// look — hard flat shapes meeting on clean edges, rather than the softer
+// many-celled mosaic the QNB' swatches use.
+//
+// Colours are drawn fresh rather than derived from one base hue: each
+// region gets its own random hue, and the lightness values are dealt from
+// a shuffled spread of dark / mid / light so a tile reliably contains real
+// contrast instead of three similar mid-tones. That contrast is the whole
+// point — these have to be told apart at 28px, from memory, several
+// premises later.
+function rrtTileColor(rand, band, hue = Math.floor(rand() * 360), lightOverride = null) {
+  // Bands: 0 = near-black, 1 = saturated mid, 2 = pastel. Saturation drops
+  // at both ends because a fully saturated near-black reads as mud and a
+  // fully saturated pastel reads as neon.
+  const sat = band === 0 ? 45 + rand() * 30 : band === 1 ? 55 + rand() * 30 : 30 + rand() * 35;
+  const light =
+    lightOverride != null
+      ? lightOverride
+      : band === 0
+      ? 8 + rand() * 9
+      : band === 1
+      ? 42 + rand() * 16
+      : 74 + rand() * 16;
+  // A hue is only legible at reasonable saturation once it's this light, so an
+  // identity colour forced to a specific lightness gets saturation to match.
+  const finalSat = lightOverride != null ? Math.max(sat, 58) : sat;
+  return `hsl(${hue} ${Math.round(finalSat)}% ${Math.round(light)}%)`;
+}
+
+function rrtPolygonArea(poly) {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const [x1, y1] = poly[i];
+    const [x2, y2] = poly[(i + 1) % poly.length];
+    a += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(a) / 2;
+}
+
+// `width` is in the same 0-100 units as the height, so a value of 200 gives
+// the 2:1 landscape tile. Everything below works off the region's own bounding
+// box, so nothing else needs to know the shape.
+// `hueBase`, when given, is the identity of this tile: the largest region is
+// painted in it and every other region is pushed at least 45 degrees away, so
+// the shape you actually notice first is the one carrying the hue that tells
+// two items apart. buildRrtItems hands out hueBase values spread evenly around
+// the wheel, which is what stops two swatches in the same puzzle both reading
+// as "the green one".
+// `fixedFill` swaps the generated hues for a supplied palette: the largest
+// region takes `identityColor` and the rest are dealt from `accents`. QNB'
+// uses this because its fill colour IS the stimulus — a freely generated
+// palette would destroy the thing the person is being asked to remember.
+function rrtTileRegions(seedStr, width = 100, hueBase = null, identityLight = null, fixedFill = null) {
+  const rand = mulberry32(hashStringToSeed(seedStr));
+  let regions = [
+    [
+      [0, 0],
+      [width, 0],
+      [width, 100],
+      [0, 100],
+    ],
+  ];
+  const minPiece = 220 * (width / 100);
+
+  // Landscape tiles are always exactly three colours — at 2:1 that reads as a
+  // deliberate flag rather than an arbitrary carve-up, and it keeps the wide
+  // shape distinct from the square at a glance. Squares vary from 2 to 5.
+  const target =
+    fixedFill && fixedFill.regions
+      ? fixedFill.regions[Math.floor(rand() * fixedFill.regions.length)]
+      : width > 100
+      ? 3
+      : 2 + Math.floor(rand() * 4);
+  let guard = 0;
+  let misses = 0;
+  while (regions.length < target && guard < 60) {
+    guard += 1;
+    // A cut can be rejected for leaving too small a piece. If that keeps
+    // happening the minimum is what's blocking the target, so ease it rather
+    // than give up and return a tile with the wrong number of colours.
+    const floorArea = misses > 10 ? minPiece * 0.45 : minPiece;
+    // Always split the largest region, so the result is a few bold shapes
+    // rather than one big field with slivers cut off its edge.
+    let bi = 0;
+    for (let i = 1; i < regions.length; i++) {
+      if (rrtPolygonArea(regions[i]) > rrtPolygonArea(regions[bi])) bi = i;
+    }
+    const poly = regions[bi];
+    const xs = poly.map((p) => p[0]);
+    const ys = poly.map((p) => p[1]);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+    // Cut at 30-70% so neither side comes out as a sliver.
+    const t = 0.3 + rand() * 0.4;
+    let nx;
+    let ny;
+    let c;
+    const roll = rand();
+    if (roll < 0.35) {
+      nx = 1;
+      ny = 0;
+      c = minX + (maxX - minX) * t;
+    } else if (roll < 0.7) {
+      nx = 0;
+      ny = 1;
+      c = minY + (maxY - minY) * t;
+    } else {
+      // Diagonal: a 45-degree cut in one of the four orientations.
+      const dir = Math.floor(rand() * 4);
+      nx = dir === 0 || dir === 3 ? 1 : -1;
+      ny = dir === 0 || dir === 1 ? 1 : -1;
+      const cx = minX + (maxX - minX) * t;
+      const cy = minY + (maxY - minY) * t;
+      c = nx * cx + ny * cy;
+    }
+
+    const a = clipPolygonHalfPlane(poly, nx, ny, c);
+    const b = clipPolygonHalfPlane(poly, -nx, -ny, -c);
+    // A cut that misses (or shaves off almost nothing) is discarded rather
+    // than kept as a hairline that just reads as a rendering artefact.
+    if (a.length >= 3 && b.length >= 3 && rrtPolygonArea(a) > floorArea && rrtPolygonArea(b) > floorArea) {
+      regions.splice(bi, 1, a, b);
+    } else {
+      misses += 1;
+    }
+  }
+
+  // Deal one lightness band per region from a shuffled spread, so every
+  // tile has both a dark and a light area to read against.
+  const bands = [];
+  for (let i = 0; i < regions.length; i++) bands.push(i % 3);
+  for (let i = bands.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [bands[i], bands[j]] = [bands[j], bands[i]];
+  }
+
+  // Largest region first, so it can claim the identity hue.
+  const order = regions
+    .map((poly, i) => ({ i, area: rrtPolygonArea(poly) }))
+    .sort((a, b) => b.area - a.area);
+  const hues = new Array(regions.length).fill(null);
+  if (hueBase != null) {
+    hues[order[0].i] = hueBase;
+    // Everything else lands in the 270 degrees that aren't within 45 of the
+    // identity hue, so a supporting region can never be mistaken for it.
+    for (let k = 1; k < order.length; k++) {
+      hues[order[k].i] = Math.round((hueBase + 45 + rand() * 270) % 360);
+    }
+    // The identity region is pinned to a mid, saturated colour rather than
+    // left to the band lottery. Near-black hides the hue entirely and pastel
+    // washes it out — two pastels 50 degrees apart both just read as "pale
+    // mint", which is exactly the collision this is meant to prevent.
+    bands[order[0].i] = 1;
+  }
+
+  if (fixedFill) {
+    // Walk the palette from a seed-derived offset rather than picking each
+    // accent independently: that way one tile never uses the same accent
+    // twice, and the palette stays recognisable round to round.
+    const pool = fixedFill.accents;
+    const step = Math.floor(rand() * pool.length);
+    let taken = 0;
+    return regions.map((poly, i) => ({
+      points: poly.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" "),
+      color:
+        i === order[0].i
+          ? fixedFill.identityColor
+          : pool[(step + taken++) % pool.length],
+    }));
+  }
+
+  return regions.map((poly, i) => ({
+    points: poly.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(" "),
+    color: rrtTileColor(
+      rand,
+      bands[i],
+      hues[i] ?? undefined,
+      hueBase != null && i === order[0].i ? identityLight : null
+    ),
+  }));
+}
+
 function RrtItemTile({ item, size = 40 }) {
   const cells = useMemo(
     () =>
-      item.type === "voronoi" ? voronoiCells(item.colorName || item.hex, item.hex) : null,
-    [item.type, item.colorName, item.hex]
+      item.type === "voronoi"
+        ? rrtTileRegions(
+            item.patternSeed || item.colorName || item.hex,
+            item.wide ? 160 : 100,
+            item.hue ?? null,
+            item.identityLight ?? null
+          )
+        : null,
+    [item.type, item.patternSeed, item.colorName, item.hex, item.wide]
   );
   if (item.type === "voronoi") {
-    const voronoiSize = size * 0.7;
+    const voronoiSize = size * 0.86;
     return (
       <svg
-        width={voronoiSize}
+        width={item.wide ? voronoiSize * 1.6 : voronoiSize}
         height={voronoiSize}
-        viewBox="0 0 100 100"
-        className="inline-block rounded-md border border-black/20 shrink-0"
+        viewBox={item.wide ? "0 0 160 100" : "0 0 100 100"}
+        className="inline-block rounded-md shrink-0"
+        style={{ outline: "1px solid rgba(0,0,0,0.55)", outlineOffset: "-1px" }}
       >
-        <rect x="0" y="0" width="100" height="100" fill={item.hex} />
+        {/* No stroke between regions: the reference look is hard flat shapes
+            meeting on a clean edge. A stroke here reads as a mosaic grout
+            line and softens exactly what makes these easy to tell apart. */}
         {cells.map((c, i) => (
-          <polygon
-            key={i}
-            points={c.points}
-            fill={c.color}
-            stroke="rgba(255,255,255,0.35)"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
+          <polygon key={i} points={c.points} fill={c.color} />
         ))}
       </svg>
     );
@@ -2113,13 +2919,21 @@ function RrtItemTile({ item, size = 40 }) {
 // A small clickable chip for an item inside a History log entry — tapping
 // it opens an enlarged view (see historyItemPopup in RRTExercise) so a
 // pattern that's hard to make out at this size is easy to check.
+// True only on devices with a real hover-capable pointer. Touchscreens report
+// no hover, and their synthetic mouse events are what made an earlier hover
+// implementation close the panel the moment it opened.
+function rrtHasRealPointer() {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
 function RrtHistoryItemChip({ item, onClick }) {
   return (
     <button
       onClick={() => onClick(item)}
-      className="inline-flex items-center gap-1.5 bg-slate-800/60 hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+      className="inline-flex items-center gap-1.5 rounded-md px-0.5 py-0.5 opacity-100 hover:opacity-80 transition-opacity"
     >
-      <RrtItemTile item={item} size={28} />
+      <RrtItemTile item={item} size={38} />
     </button>
   );
 }
@@ -2136,9 +2950,39 @@ function RrtHistoryItemChip({ item, onClick }) {
 // — older history entries saved before puzzleType existed default to
 // "distinction" (that was the only type there was).
 function buildRrtExplanationChain(entry) {
+  if (entry.puzzleType === "space2d") return buildRrtSpace2dExplanation(entry);
   return RRT_ORDER_CONFIGS[entry.puzzleType]
     ? buildRrtOrderExplanation(entry)
     : buildRrtDistinctionExplanation(entry);
+}
+
+// The explanation for a spatial puzzle is the map itself: every item dropped
+// on the grid it was actually generated on, so the conclusion's bearing can
+// be read off directly instead of re-derived premise by premise. Normalised
+// to a 0-based grid with y flipped, since screen rows run downward and North
+// runs up.
+function buildRrtSpace2dExplanation(entry) {
+  const positions = entry.positions || [];
+  if (!positions.length) {
+    return { puzzleType: "space2d", cells: [], cols: 0, rows: 0, groups: null };
+  }
+  const xs = positions.map((p) => p.x);
+  const ys = positions.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  return {
+    puzzleType: "space2d",
+    cols: maxX - minX + 1,
+    rows: maxY - minY + 1,
+    cells: positions.map((p, i) => ({
+      item: entry.items[i],
+      col: p.x - minX,
+      row: maxY - p.y,
+    })),
+    groups: null,
+  };
 }
 
 function buildRrtDistinctionExplanation(entry) {
@@ -2264,17 +3108,50 @@ function buildRrtOrderExplanation(entry) {
       }
     }
   }
-  const pathIdx = [bIdx];
+  // Walk the whole chain rather than just aIdx -> bIdx. The premises form a
+  // path graph, so the two items with a single neighbour are its ends; start
+  // at one and walk to the other to recover the full ordering.
+  const ends = items
+    .map((_, i) => i)
+    .filter((i) => adjacency[i].length === 1);
+  const pathIdx = [];
   const pathRelations = [];
-  let cur = bIdx;
-  while (cur !== aIdx) {
-    const edge = parentEdge[cur];
-    pathRelations.push(edge.sign === 1 ? config.relations[0] : config.relations[1]);
-    cur = edge.from;
-    pathIdx.push(cur);
+  if (ends.length === 2) {
+    let prev = -1;
+    let node = ends[0];
+    while (node != null) {
+      pathIdx.push(node);
+      const next = adjacency[node].find((e) => e.to !== prev);
+      if (!next) break;
+      pathRelations.push(next.sign === 1 ? config.relations[0] : config.relations[1]);
+      prev = node;
+      node = next.to;
+    }
+    // Orient it so the chain reads in the "greater" direction throughout,
+    // whichever way the walk happened to start.
+    if (pathRelations[0] === config.relations[1]) {
+      pathIdx.reverse();
+      pathRelations.reverse();
+      for (let i = 0; i < pathRelations.length; i++) {
+        pathRelations[i] =
+          pathRelations[i] === config.relations[0] ? config.relations[1] : config.relations[0];
+      }
+    }
+  } else {
+    // Fallback for anything that isn't a clean path (older history entries
+    // saved before the chain was made monotonic): the original a -> b walk.
+    pathIdx.push(bIdx);
+    let cur = bIdx;
+    while (cur !== aIdx) {
+      const edge = parentEdge[cur];
+      if (!edge) break;
+      pathRelations.push(edge.sign === 1 ? config.relations[0] : config.relations[1]);
+      cur = edge.from;
+      pathIdx.push(cur);
+    }
+    pathIdx.reverse();
+    pathRelations.reverse();
   }
-  pathIdx.reverse();
-  pathRelations.reverse();
   const chainItems = pathIdx.map((i) => items[i]);
   const chainRelations = pathRelations;
   const determinate =
@@ -2336,6 +3213,136 @@ function ShapeIcon({ shape, color, size = 64 }) {
 
 // Per-shape SVG geometry, reused by both the flat ShapeIcon above and the
 // voronoi-clipped version below so the two stay pixel-for-pixel aligned.
+
+// ---------------------------------------------------------------------
+// QNB' SHAPE SET
+// ---------------------------------------------------------------------
+// Plain geometric figures, drawn on a common circumradius so no one shape
+// looks oversized next to another. Vertices are computed rather than
+// eyeballed, which is most of why these read as clean.
+//
+// Geometry isn't copyrightable — a regular octagon is a regular octagon — so
+// there's nothing to license here, unlike an icon set.
+//
+// Chosen for silhouette separation as much as looks: the whole task is telling
+// one from another several trials later, so the set avoids near-neighbours
+// (no heptagon next to the octagon, no six-point star next to the five).
+//
+// An entry is a list because a clipPath unions its children — but every shape
+// here is a single element, since each part gets stroked separately and a
+// union of primitives shows its internal seams as if they were mistakes.
+const QNB_SHAPE_GEOMETRY = {
+  circle: [{ el: "circle", props: { cx: 50, cy: 50, r: 44 } }],
+  square: [{ el: "rect", props: { x: 8, y: 8, width: 84, height: 84, rx: 4 } }],
+  triangle: [{ el: "polygon", props: { points: "50,6 88.1,72 11.9,72" } }],
+  diamond: [{ el: "polygon", props: { points: "50,4 92,50 50,96 8,50" } }],
+  pentagon: [
+    { el: "polygon", props: { points: "50,6 91.8,36.4 75.9,85.6 24.1,85.6 8.2,36.4" } },
+  ],
+  hexagon: [
+    { el: "polygon", props: { points: "50,6 88.1,28 88.1,72 50,94 11.9,72 11.9,28" } },
+  ],
+  octagon: [
+    {
+      el: "polygon",
+      props: { points: "66.8,9.3 90.7,33.2 90.7,66.8 66.8,90.7 33.2,90.7 9.3,66.8 9.3,33.2 33.2,9.3" },
+    },
+  ],
+  star: [
+    {
+      el: "polygon",
+      props: {
+        points: "50,4 61.2,34.6 93.7,35.8 68.1,55.9 77,87.2 50,69 23,87.2 31.9,55.9 6.3,35.8 38.8,34.6",
+      },
+    },
+  ],
+  cross: [
+    {
+      el: "polygon",
+      props: { points: "36,6 64,6 64,36 94,36 94,64 64,64 64,94 36,94 36,64 6,64 6,36 36,36" },
+    },
+  ],
+  // A rounded bar and an ellipse aren't polygons, which keeps them clearly
+  // apart from everything above at a glance rather than only on inspection.
+  ellipse: [{ el: "ellipse", props: { cx: 50, cy: 50, rx: 44, ry: 30 } }],
+  arch: [
+    {
+      el: "path",
+      props: { d: "M10 92 V44 A40 40 0 0 1 90 44 V92 Z" },
+    },
+  ],
+  // A trapezoid rather than a chevron: the chevron's notch read as two arrows
+  // rather than one shape at this size, and a concave outline fights the
+  // Voronoi fill behind it.
+  trapezoid: [{ el: "polygon", props: { points: "24,10 76,10 94,90 6,90" } }],
+};
+
+const QNB_SHAPE_TYPES = Object.keys(QNB_SHAPE_GEOMETRY);
+
+// Supporting colours inside a QNB' stimulus. One fixed set, always the same,
+// so the palette becomes familiar rather than novel every trial — but wide
+// enough in hue that a shape reads as a real mosaic rather than a colour with
+// grey on it.
+//
+// The neutral version of this list was a mistake: it made every stimulus a
+// bold field with a plain wedge beside it, which is far too easy to tell
+// apart. Colour is what makes two of these genuinely hard to hold apart in
+// working memory, which is the entire point of the exercise.
+// No entry may be lighter than the cell behind it (#F7F8F8) — a near-white
+// cell would read as a hole in the shape rather than as part of it, which is
+// why the cream here is knocked down well below the background.
+//
+// Ordered by hue, deliberately — voronoiCells takes a consecutive run from
+// this list most of the time, so neighbouring entries need to be neighbouring
+// colours. Reordering it changes how the stimuli look, not just their order.
+const QNB_FILL_ACCENTS = [
+  "#E08A6A",
+  "#C2410C",
+  "#DDD6C4",
+  "#6B7F33",
+  "#166534",
+  "#0F766E",
+  "#0EA5B7",
+  "#4B5563",
+  "#12171F",
+  "#1E3A8A",
+  "#6D28D9",
+  "#9F1239",
+];
+
+// Hue distance in degrees, the short way round the wheel.
+function qnbHueOf(hex) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return null; // greys have no hue to compare
+  const d = max - min;
+  let hue;
+  if (max === r) hue = ((g - b) / d) % 6;
+  else if (max === g) hue = (b - r) / d + 2;
+  else hue = (r - g) / d + 4;
+  return ((hue * 60) + 360) % 360;
+}
+
+// Accents at least 40 degrees off the stimulus hue. Greys and near-blacks
+// always qualify — they can't be confused with a colour. Falls back to the
+// whole list if the filter is ever too aggressive to leave enough to work
+// with.
+function qnbAccentsFor(stimulusHex) {
+  const base = qnbHueOf(stimulusHex);
+  if (base == null) return QNB_FILL_ACCENTS;
+  const ok = QNB_FILL_ACCENTS.filter((hex) => {
+    const h = qnbHueOf(hex);
+    if (h == null) return true;
+    const d = Math.abs(h - base) % 360;
+    return (d > 180 ? 360 - d : d) >= 40;
+  });
+  return ok.length >= 4 ? ok : QNB_FILL_ACCENTS;
+}
+
 const SHAPE_CLIP_GEOMETRY = {
   square: { el: "rect", props: { x: 15, y: 15, width: 70, height: 70, rx: 6 } },
   triangle: { el: "polygon", props: { points: "50,12 90,88 10,88" } },
@@ -2352,33 +3359,56 @@ const SHAPE_CLIP_GEOMETRY = {
 // the same outline ShapeIcon uses, instead of a flat solid fill — reuses the
 // same voronoiCells() generator RRT's Voronoi items use.
 function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
-  const geometry = SHAPE_CLIP_GEOMETRY[shape] || SHAPE_CLIP_GEOMETRY.square;
+  // Back to the original outlines. QNB_SHAPE_GEOMETRY is still defined for
+  // when a richer set is wanted, but nothing routes to it right now.
+  const parts = [SHAPE_CLIP_GEOMETRY[shape] || SHAPE_CLIP_GEOMETRY.square];
   const clipId = `qnbp-clip-${shape}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
+  // The same straight-cut partition RRT's tiles use, rather than the older
+  // many-celled mosaic: fewer, bigger, flat regions read far better at this
+  // size. The stimulus colour takes the largest region so the shape still
+  // announces which colour it is, and the supporting regions come from one
+  // fixed palette — varied enough not to feel repetitive, constant enough that
+  // an unfamiliar colour never appears and competes with the stimulus.
   const cells = useMemo(
-    () => voronoiCells(`${seed || color}-${shape}`, color),
+    () =>
+      voronoiCells(`${seed || color}-${shape}`, color, {
+        identityColor: color,
+        accents: QNB_FILL_ACCENTS,
+      }),
     [seed, color, shape]
   );
-  const ClipEl = geometry.el;
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
         <clipPath id={clipId}>
-          <ClipEl {...geometry.props} />
+          {parts.map((part, i) => {
+            const El = part.el;
+            return <El key={i} {...part.props} />;
+          })}
         </clipPath>
       </defs>
       <g clipPath={`url(#${clipId})`}>
-        <rect x="0" y="0" width="100" height="100" fill={color} />
         {cells.map((c, i) => (
-          <polygon
-            key={i}
-            points={c.points}
-            fill={c.color}
-            stroke="rgba(255,255,255,0.35)"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
+          <polygon key={i} points={c.points} fill={c.color} />
         ))}
       </g>
+      {/* Outline drawn over the fill rather than clipped by it — a clipped
+          stroke loses its outer half and renders at half the weight asked
+          for. Kept thin so it defines the silhouette against the light cell
+          without becoming a feature of its own. */}
+      {parts.map((part, i) => {
+        const El = part.el;
+        return (
+          <El
+            key={`o${i}`}
+            {...part.props}
+            fill="none"
+            stroke="#12171F"
+            strokeWidth="1.3"
+            strokeLinejoin="round"
+          />
+        );
+      })}
     </svg>
   );
 }
@@ -2388,9 +3418,9 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
 // so e.g. "D6B" (Dual 6-Back) and "Q6B" (Quad 6-Back) both carry the same name.
 const GEM_TIERS = {
   1: { color: "#94a3b8", glow: false, label: "Novice" },
-  2: { color: "#4ade80", glow: true, label: "Astute" },
+  2: { color: "#4ade80", glow: true, label: "Apprentice" },
   3: { color: "#38bdf8", glow: true, label: "Adept" },
-  4: { color: "#818cf8", glow: true, label: "Expert" },
+  4: { color: "#E8EDF5", glow: true, label: "Proficient" },
   5: { color: "#22d3ee", glow: true, label: "Bright" },
   6: { color: "#fb7185", glow: true, label: "Radiant" },
   7: { color: "#c084fc", glow: true, label: "Brilliant" },
@@ -2620,7 +3650,7 @@ function Dropdown({ options, value, onChange, accent, label }) {
 const AVATAR_OPTIONS = [
   { id: "fox", emoji: "🦊", bg: "#f97316" },
   { id: "owl", emoji: "🦉", bg: "#8b5cf6" },
-  { id: "panda", emoji: "🐼", bg: "#64748b" },
+  { id: "panda", emoji: "🐼", bg: "#6E7178" },
   { id: "tiger", emoji: "🐯", bg: "#eab308" },
   { id: "koala", emoji: "🐨", bg: "#94a3b8" },
   { id: "turtle", emoji: "🐢", bg: "#22c55e" },
@@ -2644,22 +3674,22 @@ const BONUS_AVATAR_OPTIONS = [];
 const FRAME_OPTIONS = [
   { id: "none", label: "None", unlockedBy: null },
   { id: "glow", label: "Glow", unlockedBy: "regimeStreak7" },
-  { id: "splitTone", label: "Split Tone", unlockedBy: "wellRounded" },
+  { id: "splitTone", label: "Split Tone", unlockedBy: "streak365" },
   { id: "aura", label: "Aura", unlockedBy: "streak180" },
 ];
 const PROFILE_COLOR_OPTIONS = [
   { id: "indigo", label: "Indigo", unlockedBy: null },
   { id: "violet", label: "Violet", unlockedBy: "dualAdept" },
-  { id: "cyan", label: "Cyan", unlockedBy: "hours5" },
-  { id: "amber", label: "Amber", unlockedBy: "sessions50" },
-  { id: "rose", label: "Rose", unlockedBy: "perfectRun" },
-  { id: "emerald", label: "Emerald", unlockedBy: "wellRounded" },
+  { id: "cyan", label: "Cyan", unlockedBy: "streak14" },
+  { id: "amber", label: "Amber", unlockedBy: "streak30" },
+  { id: "rose", label: "Rose", unlockedBy: "streak90" },
+  { id: "emerald", label: "Emerald", unlockedBy: "streak365" },
 ];
 const PROFILE_BACKGROUND_OPTIONS = [
   { id: "none", label: "Default", unlockedBy: null, grad: "from-slate-800 to-slate-900" },
   { id: "aurora", label: "Aurora", unlockedBy: "regimeStreak7", grad: "from-indigo-600/50 via-violet-600/40 to-fuchsia-600/40" },
-  { id: "sunrise", label: "Sunrise", unlockedBy: "sessions50", grad: "from-amber-500/50 via-orange-500/40 to-rose-500/40" },
-  { id: "deepSea", label: "Deep Sea", unlockedBy: "hours25", grad: "from-cyan-600/50 via-sky-600/40 to-blue-700/40" },
+  { id: "sunrise", label: "Sunrise", unlockedBy: "streak30", grad: "from-amber-500/50 via-orange-500/40 to-rose-500/40" },
+  { id: "deepSea", label: "Deep Sea", unlockedBy: "streak90", grad: "from-cyan-600/50 via-sky-600/40 to-blue-700/40" },
   { id: "midnight", label: "Midnight", unlockedBy: "streak180", grad: "from-fuchsia-600/50 via-purple-700/40 to-indigo-900/50" },
 ];
 function isCosmeticUnlocked(option, state) {
@@ -2750,16 +3780,15 @@ function fileToAvatarDataUrl(file, size = 160) {
   });
 }
 
-// One explanatory paragraph per exercise, shown a screen at a time on the Tutorial.
+// Placeholder only — real per-exercise tutorial copy/walkthrough content
+// goes here later. Keyed the same way so each exercise still gets its own
+// tutorial screen in the flow.
 const TUTORIAL_CONTENT = {
-  dual:
-    "A square lights up and a letter is spoken each trial. Press Position (A) if the square's position matches N steps back, and/or Sound (L) if the letter matches N steps back.",
-  quad:
-    "Same idea as Dual N-Back, with two more streams: shape (J) and color (F). Press any button whose stream matches N steps back.",
-  rrt: "Relational Reasoning Training. Read a chain of premises about a set of items, then answer whether the final relationship holds.",
-  iqnb: "Same as Quad N-Back — position, sound, color, and shape — but the color/shape stream is a Voronoi-textured blob instead of a flat-colored shape, and the level climbs in fine 0.01 increments (e.g. 4.37) instead of jumping a whole level at a time.",
-  motion3d:
-    "10 balls sit inside a 3D box — 5 flash gold as your targets, then everything turns the same color and drifts around. Keep your eyes on the center dot and use your peripheral vision to track the targets, then click the 5 you tracked once they freeze. Speed climbs after a perfect round and eases back down otherwise.",
+  dual: "🚧 Tutorial placeholder — Dual N-Back instructions go here.",
+  quad: "🚧 Tutorial placeholder — Quad N-Back instructions go here.",
+  rrt: "🚧 Tutorial placeholder — Relational Reasoning Training instructions go here.",
+  iqnb: "🚧 Tutorial placeholder — IQ N-Back instructions go here.",
+  motion3d: "🚧 Tutorial placeholder — 3D Motion Tracking instructions go here.",
 };
 
 // Rough draft placeholder leaderboard data — no real backend/accounts yet.
@@ -2767,87 +3796,72 @@ const TUTORIAL_CONTENT = {
 // personal-best level shown alongside it); rrt/iqnb/motion3d rank by their
 // own score unit (points / decimal) even though `level` still drives which
 // gem tier is shown.
+//
+// Tiers line up across boards: whatever a Dual N-Back level N shows, the
+// equivalent rung elsewhere shows the same gem — QNB' 10.00, RRT 10p and
+// 3D Motion tier 10 are all Enlightened, same as D10B. Each board walks its
+// own ladder top to bottom, from that exercise's EXERCISE_LIBRARY maxN down.
+//
+// RRT: the tier is the premise count, so a 10p run is level 10 whatever the
+// time on it — the seconds only tiebreak the score, never the rank. Scores
+// encode as premises + seconds/100, which formatScoreValue renders as
+// "10p 20s", and only real 5p-10p at 30s/25s/20s combinations appear.
 const LEADERBOARD_DATA = {
   dual: [
-    { name: "Ava", level: 6, accuracy: 91 },
-    { name: "Marcus", level: 5, accuracy: 88 },
+    { name: "Ava", level: 10, accuracy: 93 },
+    { name: "Marcus", level: 9, accuracy: 91 },
+    { name: "Priya", level: 8, accuracy: 90 },
+    { name: "Diego", level: 7, accuracy: 88 },
+    { name: "Sofia", level: 6, accuracy: 87 },
+    { name: "Jamal", level: 5, accuracy: 85 },
     { name: "You", level: 4, accuracy: 84 },
-    { name: "Priya", level: 4, accuracy: 80 },
-    { name: "Diego", level: 3, accuracy: 86 },
-    { name: "Sofia", level: 2, accuracy: 83 },
-    { name: "Jamal", level: 2, accuracy: 81 },
-    { name: "Noah", level: 2, accuracy: 80 },
-    { name: "Liam", level: 2, accuracy: 80 },
-    { name: "Zara", level: 1, accuracy: 89 },
-    { name: "Kenji", level: 1, accuracy: 85 },
-    { name: "Elena", level: 1, accuracy: 83 },
-    { name: "Omar", level: 1, accuracy: 81 },
-    { name: "Ines", level: 1, accuracy: 80 },
-    { name: "Theo", level: 1, accuracy: 80 },
+    { name: "Noah", level: 3, accuracy: 83 },
+    { name: "Zara", level: 2, accuracy: 81 },
+    { name: "Kenji", level: 1, accuracy: 80 },
   ],
   quad: [
-    { name: "Priya", level: 5, accuracy: 90, score: 5.9 },
-    { name: "Ava", level: 4, accuracy: 87, score: 4.87 },
-    { name: "Diego", level: 4, accuracy: 82, score: 4.82 },
-    { name: "You", level: 3, accuracy: 85, score: 3.85 },
-    { name: "Marcus", level: 3, accuracy: 80, score: 3.8 },
-    { name: "Sofia", level: 2, accuracy: 84, score: 2.84 },
-    { name: "Jamal", level: 1, accuracy: 88, score: 1.88 },
-    { name: "Noah", level: 1, accuracy: 84, score: 1.84 },
-    { name: "Liam", level: 1, accuracy: 82, score: 1.82 },
-    { name: "Zara", level: 1, accuracy: 81, score: 1.81 },
-    { name: "Kenji", level: 1, accuracy: 80, score: 1.8 },
-    { name: "Elena", level: 1, accuracy: 80, score: 1.8 },
-    { name: "Omar", level: 1, accuracy: 80, score: 1.8 },
-    { name: "Ines", level: 1, accuracy: 80, score: 1.8 },
+    { name: "Ava", level: 10, accuracy: 93 },
+    { name: "Marcus", level: 9, accuracy: 91 },
+    { name: "Priya", level: 8, accuracy: 90 },
+    { name: "Diego", level: 7, accuracy: 88 },
+    { name: "Sofia", level: 6, accuracy: 87 },
+    { name: "Jamal", level: 5, accuracy: 85 },
+    { name: "You", level: 4, accuracy: 84 },
+    { name: "Noah", level: 3, accuracy: 83 },
+    { name: "Zara", level: 2, accuracy: 81 },
+    { name: "Kenji", level: 1, accuracy: 80 },
   ],
   rrt: [
-    { name: "Marcus", level: 4, score: 6.2 },
-    { name: "Sofia", level: 3, score: 5.2 },
-    { name: "You", level: 3, score: 5.25 },
-    { name: "Ava", level: 3, score: 4.2 },
-    { name: "Jamal", level: 2, score: 3.2 },
-    { name: "Diego", level: 2, score: 3.25 },
-    { name: "Priya", level: 1, score: 2.2 },
-    { name: "Noah", level: 1, score: 2.25 },
-    { name: "Liam", level: 1, score: 2.3 },
-    { name: "Zara", level: 1, score: 1.2 },
-    { name: "Kenji", level: 1, score: 1.25 },
-    { name: "Elena", level: 1, score: 1.25 },
-    { name: "Omar", level: 1, score: 1.3 },
-    { name: "Ines", level: 1, score: 1.3 },
+    { name: "Ava", level: 10, score: 10.20 },
+    { name: "Marcus", level: 9, score: 9.20 },
+    { name: "Priya", level: 8, score: 8.25 },
+    { name: "You", level: 7, score: 7.20 },
+    { name: "Diego", level: 6, score: 6.30 },
+    { name: "Sofia", level: 5, score: 5.25 },
   ],
   iqnb: [
-    { name: "Diego", level: 4, score: 5.23 },
-    { name: "Ava", level: 3, score: 4.55 },
-    { name: "Priya", level: 3, score: 4.33 },
-    { name: "You", level: 2, score: 3.85 },
-    { name: "Marcus", level: 2, score: 3.6 },
-    { name: "Jamal", level: 2, score: 3.4 },
-    { name: "Sofia", level: 1, score: 2.9 },
-    { name: "Noah", level: 1, score: 2.7 },
-    { name: "Liam", level: 1, score: 2.5 },
-    { name: "Zara", level: 1, score: 2.3 },
-    { name: "Kenji", level: 1, score: 2.1 },
-    { name: "Elena", level: 1, score: 1.9 },
-    { name: "Omar", level: 1, score: 1.7 },
-    { name: "Ines", level: 1, score: 1.5 },
+    { name: "Ava", level: 10, score: 10.00 },
+    { name: "Marcus", level: 9, score: 9.00 },
+    { name: "Priya", level: 8, score: 8.00 },
+    { name: "Diego", level: 7, score: 7.00 },
+    { name: "Sofia", level: 6, score: 6.00 },
+    { name: "Jamal", level: 5, score: 5.00 },
+    { name: "You", level: 4, score: 4.00 },
+    { name: "Noah", level: 3, score: 3.00 },
+    { name: "Zara", level: 2, score: 2.00 },
+    { name: "Kenji", level: 1, score: 1.00 },
   ],
   motion3d: [
-    { name: "Sofia", level: 3, score: 0.62 },
-    { name: "Priya", level: 3, score: 0.58 },
-    { name: "Ava", level: 2, score: 0.5 },
-    { name: "Marcus", level: 2, score: 0.47 },
-    { name: "You", level: 2, score: 0.45 },
-    { name: "Diego", level: 1, score: 0.38 },
-    { name: "Jamal", level: 1, score: 0.35 },
-    { name: "Noah", level: 1, score: 0.32 },
-    { name: "Liam", level: 1, score: 0.3 },
-    { name: "Zara", level: 1, score: 0.28 },
-    { name: "Kenji", level: 1, score: 0.25 },
-    { name: "Elena", level: 1, score: 0.22 },
-    { name: "Omar", level: 1, score: 0.2 },
-    { name: "Ines", level: 1, score: 0.18 },
+    { name: "Ava", level: 10, score: 1.05 },
+    { name: "Marcus", level: 9, score: 0.95 },
+    { name: "Priya", level: 8, score: 0.85 },
+    { name: "Diego", level: 7, score: 0.75 },
+    { name: "Sofia", level: 6, score: 0.65 },
+    { name: "Jamal", level: 5, score: 0.55 },
+    { name: "You", level: 4, score: 0.45 },
+    { name: "Noah", level: 3, score: 0.35 },
+    { name: "Zara", level: 2, score: 0.25 },
+    { name: "Kenji", level: 1, score: 0.15 },
   ],
 };
 
@@ -2856,23 +3870,89 @@ const LEADERBOARD_DATA = {
 // data. `progress` is optional flavor text shown while still locked; `reward`
 // is optional flavor text (shown in italics) describing what unlocking it
 // actually gives you — most of these rewards aren't wired up to anything yet.
+// Which exercise an achievement belongs to. Prefers the explicit `exercise`
+// field the level-achievement generators set, and otherwise falls back to the
+// id prefix, which is how the hand-written per-exercise ones (dualMaster,
+// qnbPrimeAdept, …) identify themselves.
+const ACHIEVEMENT_ID_PREFIXES = {
+  dual: "dual",
+  quad: "quad",
+  rrt: "rrt",
+  iqnb: "qnbPrime",
+  motion3d: "motion3d",
+};
+function exerciseKeyFor(a) {
+  if (a.exercise) return a.exercise;
+  const hit = Object.entries(ACHIEVEMENT_ID_PREFIXES).find(
+    ([, prefix]) => a.id.startsWith(prefix)
+  );
+  return hit ? hit[0] : null;
+}
+
+// Top-level rows: one per exercise that has achievements, in EXERCISE_LIBRARY
+// order, plus a "General" bucket for the ones that aren't exercise-specific.
+function achievementExerciseSections() {
+  const sections = [];
+  const general = ACHIEVEMENTS_CATALOG.filter((a) => !exerciseKeyFor(a));
+  Object.keys(EXERCISE_LIBRARY).forEach((key) => {
+    const items = ACHIEVEMENTS_CATALOG.filter((a) => exerciseKeyFor(a) === key);
+    if (items.length) {
+      sections.push({ key, label: EXERCISE_LIBRARY[key].title, items });
+    }
+  });
+  if (general.length) {
+    sections.push({ key: "general", label: "General", items: general });
+  }
+  return sections;
+}
+
+// Second level: the achievement groups present within one exercise's list.
+function achievementGroupSectionsFor(items) {
+  const sections = ["Consistency", "Performance", "Variety", "Volume"]
+    .map((group) => ({
+      key: group,
+      label: group,
+      items: items.filter((a) => a.group === group),
+    }))
+    .filter((section) => section.items.length);
+  // One group only — drop the redundant inner header and show the list.
+  if (sections.length === 1) return [{ ...sections[0], label: null }];
+  return sections;
+}
+
+// Splits one achievement group into an untagged block plus one block per
+// exercise that has achievements in it, keeping EXERCISE_LIBRARY's order.
+function achievementSectionsFor(group) {
+  const inGroup = ACHIEVEMENTS_CATALOG.filter((a) => a.group === group);
+  const sections = [];
+  const untagged = inGroup.filter((a) => !exerciseKeyFor(a));
+  if (untagged.length) sections.push({ key: "_", label: null, items: untagged });
+  Object.keys(EXERCISE_LIBRARY).forEach((key) => {
+    const items = inGroup.filter((a) => exerciseKeyFor(a) === key);
+    if (items.length) {
+      sections.push({ key, label: EXERCISE_LIBRARY[key].title, items });
+    }
+  });
+  return sections;
+}
+
 const GROUP_ACCENTS = {
-  Consistency: "amber",
-  Performance: "violet",
-  Variety: "emerald",
-  Volume: "cyan",
+  Consistency: "indigo",
+  Performance: "indigo",
+  Variety: "indigo",
+  Volume: "indigo",
 };
 // Raw hex counterparts of ACCENT_STYLES' Tailwind classes — for spots that
 // need an actual CSS color value (inline conic-gradients, box-shadow glows
 // via a --glow-color custom property, etc.) rather than a class name.
 const ACCENT_HEX = {
-  indigo: "#6366f1",
-  violet: "#8b5cf6",
-  amber: "#f59e0b",
-  cyan: "#22d3ee",
-  rose: "#f43f5e",
-  lime: "#84cc16",
-  emerald: "#10b981",
+  indigo: "#4CB9D8",
+  violet: "#8B7FE8",
+  amber: "#D9B65A",
+  cyan: "#4CB9D8",
+  rose: "#EB5757",
+  lime: "#68CC58",
+  emerald: "#4CB782",
 };
 
 // Generates a "reach level X for the first time" achievement for every
@@ -2895,6 +3975,7 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
   const isMax = level === ex.maxN;
   return {
     id: `${exerciseKey}Level${level}`,
+    exercise: exerciseKey,
     group: "Performance",
     icon: exerciseKey === "dual" ? "🧠" : "🧩",
     title: tierTitle,
@@ -2930,10 +4011,11 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
   const isMax = level === ex.maxN;
   return {
     id: `iqnbLevel${level}`,
+    exercise: "iqnb",
     group: "Performance",
     icon: "🌀",
     title: `QNB' ${gemTierFor(level).label}`,
-    description: `Reach QNB' level ${level} for the first time.`,
+    description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
     progress: (s) => `Level ${Math.min(s.exerciseStats.iqnb?.bestN || 0, level)}/${level}`,
@@ -2963,10 +4045,11 @@ function rrtLevelAchievement(level, overrides = {}) {
   const isMax = level === ex.maxN;
   return {
     id: `rrtLevel${level}`,
+    exercise: "rrt",
     group: "Performance",
     icon: "🔗",
     title: `RRT ${gemTierFor(level).label}`,
-    description: `Reach ${premiseCount} premises for the first time.`,
+    description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
     progress: (s) => `${Math.min(s.exerciseStats.rrt?.bestN || 0, level) + 1}p/${premiseCount}p`,
@@ -2998,10 +4081,11 @@ function motion3dLevelAchievement(level, overrides = {}) {
   const isMax = level === ex.maxN;
   return {
     id: `motion3dLevel${level}`,
+    exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
     title: `3D Motion ${gemTierFor(level).label}`,
-    description: `Reach 3D Motion speed tier ${level} for the first time.`,
+    description: `Reach 3D Motion tier ${level} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
     progress: (s) => `Tier ${Math.min(s.exerciseStats.motion3d?.bestN || 0, level)}/${level}`,
@@ -3018,78 +4102,84 @@ function motion3dLevelAchievements(overridesByLevel = {}) {
 }
 
 const ACHIEVEMENTS_CATALOG = [
-  // Consistency
+  // Consistency — major milestones only
   {
     id: "regimeStreak7",
     group: "Consistency",
     icon: "🔥",
-    title: "7-Day Streak",
+    title: "1 Week",
     description: "Complete your regime 7 days in a row without missing a day.",
     reward: "1 month free membership · Glow avatar border",
     unlocked: (s) => s.regimeStreak >= 7,
     progress: (s) => `${Math.min(s.regimeStreak, 7)}/7 days`,
   },
   {
+    id: "streak14",
+    group: "Consistency",
+    icon: "🔥",
+    title: "2 Weeks",
+    description: "Train 14 days in a row.",
+    unlocked: (s) => s.streak >= 14,
+    progress: (s) => `${Math.min(s.streak, 14)}/14 days`,
+  },
+  {
     id: "streak30",
     group: "Consistency",
     icon: "🔥",
-    title: "1-Month Streak",
+    title: "1 Month",
     description: "Train 30 days in a row.",
     reward: "Unlocks the Custom regime option",
     unlocked: (s) => s.streak >= 30,
     progress: (s) => `${Math.min(s.streak, 30)}/30 days`,
   },
   {
+    id: "streak90",
+    group: "Consistency",
+    icon: "🔥",
+    title: "3 Months",
+    description: "Train 90 days in a row.",
+    unlocked: (s) => s.streak >= 90,
+    progress: (s) => `${Math.min(s.streak, 90)}/90 days`,
+  },
+  {
     id: "streak180",
     group: "Consistency",
     icon: "🔥",
-    title: "6-Month Streak",
+    title: "6 Months",
     description: "Train 180 days in a row.",
     reward: "Animated aura around your avatar",
     unlocked: (s) => s.streak >= 180,
     progress: (s) => `${Math.min(s.streak, 180)}/180 days`,
   },
   {
-    id: "comeback",
+    id: "streak365",
     group: "Consistency",
-    icon: "🔁",
-    title: "Comeback",
-    description: "Break a streak, then come back and train again.",
-    reward: '"Comeback" badge',
-    unlocked: (s) => s.comeback,
+    icon: "🔥",
+    title: "1 Year",
+    description: "Train 365 days in a row.",
+    unlocked: (s) => s.streak >= 365,
+    progress: (s) => `${Math.min(s.streak, 365)}/365 days`,
+  },
+  {
+    id: "streak730",
+    group: "Consistency",
+    icon: "🔥",
+    title: "2 Years",
+    description: "Train 730 days in a row.",
+    unlocked: (s) => s.streak >= 730,
+    progress: (s) => `${Math.min(s.streak, 730)}/730 days`,
+  },
+  {
+    id: "streak1095",
+    group: "Consistency",
+    icon: "🔥",
+    title: "3 Years",
+    description: "Train 1095 days in a row.",
+    unlocked: (s) => s.streak >= 1095,
+    progress: (s) => `${Math.min(s.streak, 1095)}/1095 days`,
   },
 
-  // Performance
-  {
-    id: "grandmaster",
-    group: "Performance",
-    icon: "👑",
-    title: "Grandmaster",
-    description: `Reach Dual ${EXERCISE_LIBRARY.dual.maxN}-Back and Quad ${EXERCISE_LIBRARY.quad.maxN}-Back — max level in both.`,
-    reward: "Glowing leaderboard rank",
-    unlocked: (s) =>
-      (s.exerciseStats.dual?.bestN || 0) >= EXERCISE_LIBRARY.dual.maxN &&
-      (s.exerciseStats.quad?.bestN || 0) >= EXERCISE_LIBRARY.quad.maxN,
-    progress: (s) =>
-      `Dual ${Math.min(s.exerciseStats.dual?.bestN || 0, EXERCISE_LIBRARY.dual.maxN)}/${EXERCISE_LIBRARY.dual.maxN} · Quad ${Math.min(s.exerciseStats.quad?.bestN || 0, EXERCISE_LIBRARY.quad.maxN)}/${EXERCISE_LIBRARY.quad.maxN}`,
-  },
-  {
-    id: "perfectRun",
-    group: "Performance",
-    icon: "💯",
-    title: "Perfect Run",
-    description: "Complete a session with zero misses.",
-    reward: "Flawless badge",
-    unlocked: (s) => Object.values(s.exerciseStats).some((v) => (v?.bestAccuracy || 0) >= 100),
-  },
-  {
-    id: "sharpShooter",
-    group: "Performance",
-    icon: "🎯",
-    title: "Sharp Shooter",
-    description: "Score 90%+ accuracy at a given N-level.",
-    unlocked: (s) => Object.values(s.exerciseStats).some((v) => (v?.bestAccuracy || 0) >= 90),
-  },
+  // Performance — per-exercise level ladders
   ...nBackLevelAchievements("dual", {
     3: { id: "dualAdept" },
     [EXERCISE_LIBRARY.dual.maxN]: { id: "dualMaster" },
@@ -3106,85 +4196,6 @@ const ACHIEVEMENTS_CATALOG = [
   ...motion3dLevelAchievements({
     [EXERCISE_LIBRARY.motion3d.maxN]: { id: "motion3dMaster" },
   }),
-
-  // Volume
-  {
-    id: "hours5",
-    group: "Volume",
-    icon: "⏱️",
-    title: "5 Hours Trained",
-    description: "Rack up 5 hours of total training time.",
-    unlocked: (s) => s.totalMsTrained >= 5 * 3600000,
-    progress: (s) => `${formatHours(Math.min(s.totalMsTrained, 5 * 3600000))}/5h`,
-  },
-  {
-    id: "hours25",
-    group: "Volume",
-    icon: "⏱️",
-    title: "25 Hours Trained",
-    description: "Rack up 25 hours of total training time.",
-    unlocked: (s) => s.totalMsTrained >= 25 * 3600000,
-    progress: (s) => `${formatHours(Math.min(s.totalMsTrained, 25 * 3600000))}/25h`,
-  },
-  {
-    id: "hours100",
-    group: "Volume",
-    icon: "⏱️",
-    title: "100 Hours Trained",
-    description: "Rack up 100 hours of total training time.",
-    unlocked: (s) => s.totalMsTrained >= 100 * 3600000,
-    progress: (s) => `${formatHours(Math.min(s.totalMsTrained, 100 * 3600000))}/100h`,
-  },
-  {
-    id: "hours500",
-    group: "Volume",
-    icon: "⏱️",
-    title: "500 Hours Trained",
-    description: "Rack up 500 hours of total training time.",
-    unlocked: (s) => s.totalMsTrained >= 500 * 3600000,
-    progress: (s) => `${formatHours(Math.min(s.totalMsTrained, 500 * 3600000))}/500h`,
-  },
-  {
-    id: "sessions50",
-    group: "Volume",
-    icon: "📈",
-    title: "50 Sessions",
-    description: "Complete 50 training sessions.",
-    unlocked: (s) => s.totalSessions >= 50,
-    progress: (s) => `${Math.min(s.totalSessions, 50)}/50`,
-  },
-  {
-    id: "sessions200",
-    group: "Volume",
-    icon: "📈",
-    title: "200 Sessions",
-    description: "Complete 200 training sessions.",
-    unlocked: (s) => s.totalSessions >= 200,
-    progress: (s) => `${Math.min(s.totalSessions, 200)}/200`,
-  },
-  {
-    id: "sessions1000",
-    group: "Volume",
-    icon: "📈",
-    title: "1000 Sessions",
-    description: "Complete 1000 training sessions.",
-    unlocked: (s) => s.totalSessions >= 1000,
-    progress: (s) => `${Math.min(s.totalSessions, 1000)}/1000`,
-  },
-
-  // Variety
-  {
-    id: "wellRounded",
-    group: "Variety",
-    icon: "🎭",
-    title: "Well-Rounded",
-    description: "Train both Dual N-Back and Quad N-Back regularly.",
-    reward: "Split-tone avatar",
-    unlocked: (s) =>
-      (s.exerciseStats.dual?.sessions || 0) >= 10 && (s.exerciseStats.quad?.sessions || 0) >= 10,
-    progress: (s) =>
-      `${Math.min(Math.min(s.exerciseStats.dual?.sessions || 0, s.exerciseStats.quad?.sessions || 0), 10)}/10 each`,
-  },
 ];
 
 // Whether an achievement counts as unlocked — real progress via the
@@ -3234,7 +4245,7 @@ function avatarFrameTier(state) {
     ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, state)).map((a) => a.id)
   );
   if (unlockedIds.has("streak180")) return "aura";
-  if (unlockedIds.has("wellRounded")) return "splitTone";
+  if (unlockedIds.has("streak365")) return "splitTone";
   if (unlockedIds.has("regimeStreak7")) return "glow";
   return "none";
 }
@@ -3435,7 +4446,15 @@ function NBackSessionApp() {
   const [unlockInfo, setUnlockInfo] = useState(null); // { exerciseKey, level, title } — drives the "new emblem unlocked" overlay (see the fixed-position block near the other celebration overlays, not a mainView)
   const [profileTarget, setProfileTarget] = useState(null); // "you" | <leaderboard name> | null — who the Profile screen is showing
   const [achievementCelebrationQueue, setAchievementCelebrationQueue] = useState([]); // ACHIEVEMENTS_CATALOG entries just unlocked, shown one at a time as a full-screen celebration
-  const [simulatedUnlockedIds, setSimulatedUnlockedIds] = useState(() => new Set()); // achievement ids force-unlocked via the per-badge 🧪 Simulate button, independent of real progress
+  const [openAchievementSections, setOpenAchievementSections] = useState(() => new Set()); // "group:exerciseKey" ids of the expanded per-exercise achievement lists — collapsed by default so the page is a short index instead of one long scroll
+  const [simulatedUnlockedIds, setSimulatedUnlockedIds] = useState(() => new Set());
+  const toggleAchievementSection = (id) =>
+    setOpenAchievementSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    }); // achievement ids force-unlocked via the per-badge 🧪 Simulate button, independent of real progress
   const [badgeDetail, setBadgeDetail] = useState(null); // { achievement, state } | null — clicked badge shown in an in-page detail modal
   const [streakCardOpen, setStreakCardOpen] = useState(false); // home screen's 🔥 streak badge — opens a small popup with the week view
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -3495,9 +4514,199 @@ function NBackSessionApp() {
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
-  const [membershipPlan, setMembershipPlan] = useState("monthly"); // "monthly" | "annual" | "canceled" — mock only, no real billing yet
-  const [seenTutorialRegimes, setSeenTutorialRegimesState] = useState({}); // { [regimeKey]: true } — persisted; tutorial shown once PER regime since each has different exercises
-  const [tutorialStep, setTutorialStep] = useState(0); // index into that regime's exercise order, walked through via the tutorial's Next button
+  const [membershipPlan, setMembershipPlan] = useState("monthly"); // "monthly" | "annual" | "canceled" — mirrors billing.plan for the Account row; the source of truth is `billing` below
+  const [billingState, setBillingState] = useState(null); // fetched from /api/billing/state
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [billingError, setBillingError] = useState("");
+  const [previewData, setPreviewData] = useState(null); // proration preview shown before confirming a plan switch
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewTargetPlan, setPreviewTargetPlan] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const [showCancelForm, setShowCancelForm] = useState(false);
+  const [cancelFeedback, setCancelFeedback] = useState("");
+  const [cancelComment, setCancelComment] = useState("");
+  const [setupClientSecret, setSetupClientSecret] = useState(null);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const [setupError, setSetupError] = useState("");
+  const [cardUpdateSaved, setCardUpdateSaved] = useState(false);
+
+  // Every /api/billing/* call goes through here — attaches the person's
+  // real Supabase auth token so the backend can verify who's asking and
+  // derive their Stripe customer id itself, rather than trusting anything
+  // the client claims about which customer/subscription it is.
+  const callBillingApi = useCallback(async (path, body) => {
+    const {
+      data: { session: authSession },
+    } = await supabase.auth.getSession();
+    const res = await fetch(`/api/billing/${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authSession?.access_token}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Something went wrong");
+    return data;
+  }, []);
+
+  useEffect(() => {
+    if (mainView !== "membership") return;
+    let cancelled = false;
+    setBillingLoading(true);
+    setBillingError("");
+    callBillingApi("state")
+      .then((data) => {
+        if (!cancelled) setBillingState(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setBillingError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setBillingLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mainView, callBillingApi]);
+
+  const handlePreviewSwitch = async (plan) => {
+    setActionError("");
+    setPreviewLoading(true);
+    setPreviewTargetPlan(plan);
+    try {
+      const data = await callBillingApi("preview-switch", { plan });
+      setPreviewData(data);
+    } catch (err) {
+      setActionError(err.message);
+      setPreviewTargetPlan(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const handleConfirmSwitch = async () => {
+    if (!previewTargetPlan || !previewData) return;
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("switch", {
+        plan: previewTargetPlan,
+        prorationDate: previewData.prorationDate,
+      });
+      setBillingState(data);
+      setPreviewData(null);
+      setPreviewTargetPlan(null);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelSwitch = () => {
+    setPreviewData(null);
+    setPreviewTargetPlan(null);
+  };
+
+  const handlePause = async () => {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("pause");
+      setBillingState(data);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleResume = async () => {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("resume");
+      setBillingState(data);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReactivate = async () => {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("reactivate");
+      setBillingState(data);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCancelSubmit = async () => {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("cancel", {
+        feedback: cancelFeedback,
+        comment: cancelComment,
+      });
+      setBillingState(data);
+      setShowCancelForm(false);
+      setCancelFeedback("");
+      setCancelComment("");
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRetryInvoice = async () => {
+    setActionLoading(true);
+    setActionError("");
+    try {
+      const data = await callBillingApi("retry-invoice");
+      setBillingState(data);
+    } catch (err) {
+      setActionError(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleStartCardUpdate = async () => {
+    setSetupError("");
+    setSetupLoading(true);
+    setCardUpdateSaved(false);
+    try {
+      const data = await callBillingApi("setup-intent");
+      setSetupClientSecret(data.clientSecret);
+    } catch (err) {
+      setSetupError(err.message);
+    } finally {
+      setSetupLoading(false);
+    }
+  };
+  
+  const [hideTutorials, setHideTutorialsState] = useState(false); // persisted — global "skip every tutorial" override, toggled only via the Account page switch
+  const hideTutorialsRef = useRef(false);
+  useEffect(() => {
+    hideTutorialsRef.current = hideTutorials;
+  }, [hideTutorials]);
+  const [dismissedTutorials, setDismissedTutorialsState] = useState({}); // persisted — { [exerciseKey]: true }, set via that exercise's own tutorial "Don't show this again" checkbox; only skips THAT exercise's tutorial, not every exercise's
+  const dismissedTutorialsRef = useRef({});
+  useEffect(() => {
+    dismissedTutorialsRef.current = dismissedTutorials;
+  }, [dismissedTutorials]);
+  const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false); // this run's checkbox state — reset to unchecked each time a fresh tutorial starts
   const currentRunStartRef = useRef(null);
   const avatarFileInputRef = useRef(null);
   const MAX_HISTORY_ENTRIES = 200;
@@ -3610,12 +4819,20 @@ function NBackSessionApp() {
         // no saved bio yet
       }
       try {
-        const res = await window.storage.get("seen-tutorial-regimes", false);
+        const res = await window.storage.get("hide-tutorials", false);
         if (res && res.value) {
-          setSeenTutorialRegimesState(JSON.parse(res.value));
+          setHideTutorialsState(JSON.parse(res.value));
         }
       } catch (err) {
-        // no saved tutorial flags yet
+        // no saved tutorial preference yet
+      }
+      try {
+        const res = await window.storage.get("dismissed-tutorials", false);
+        if (res && res.value) {
+          setDismissedTutorialsState(JSON.parse(res.value));
+        }
+      } catch (err) {
+        // no saved per-exercise tutorial dismissals yet
       }
       try {
         const res = await window.storage.get("selected-frame", false);
@@ -4219,13 +5436,18 @@ function NBackSessionApp() {
     }
   }, []);
 
-  const markTutorialSeen = useCallback((regimeKey) => {
-    setSeenTutorialRegimesState((prev) => {
-      const next = { ...prev, [regimeKey]: true };
+  const setHideTutorials = useCallback((val) => {
+    setHideTutorialsState(val);
+    if (window.storage) {
+      safeStorageSet("hide-tutorials", JSON.stringify(val), false);
+    }
+  }, []);
+
+  const setTutorialDismissed = useCallback((exerciseKey, val) => {
+    setDismissedTutorialsState((prev) => {
+      const next = { ...prev, [exerciseKey]: val };
       if (window.storage) {
-        window.storage
-          .set("seen-tutorial-regimes", JSON.stringify(next), false)
-          .catch(() => {});
+        safeStorageSet("dismissed-tutorials", JSON.stringify(next), false);
       }
       return next;
     });
@@ -4491,7 +5713,14 @@ function NBackSessionApp() {
         : ex.key === "quad"
         ? 0.25
         : 0.3;
-      const seq = generateSequence(modalities, nn, tt, runInterference, runMatchChance);
+      const seq = generateSequence(
+        modalities,
+        nn,
+        tt,
+        runInterference,
+        runMatchChance,
+        null
+      );
       setSequence(seq);
       setResults([]);
       setIndex(0);
@@ -4515,6 +5744,36 @@ function NBackSessionApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [n, exercise, runTrial, interference]
   );
+
+  // Dev/test only — used by Motion3DExercise's "🧪 Simulate 15 min
+  // elapsed" button. Unlike forceSwitchToNext (which just steps to
+  // whatever's immediately next in the regime — another real exercise if
+  // motion3d isn't the last step), this always lands on the Overview
+  // screen directly, since the point of the button is "show me what the
+  // end of a session looks like" regardless of where motion3d happens to
+  // sit in the current regime. Mirrors forceSwitchToNext's own real
+  // end-of-regime handling (training-sourced overview + counts toward the
+  // regime-streak) rather than goToOverview's plain "just go look" version
+  // (which sources from "home" and doesn't touch the streak), since this
+  // is standing in for that same real transition, just skipping ahead to it.
+  const forceJumpToOverview = useCallback((fromIndex) => {
+    if (exerciseIndexRef.current !== fromIndex) return; // already moved on
+    const list = activeExercisesRef.current;
+    const currentEx = list[fromIndex];
+    clearTimeout(sessionTimersRef.current[currentEx.key]);
+    runGenerationRef.current += 1;
+    clearTimeout(timeoutRef.current);
+    stopRunTimer(currentEx.key);
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+
+    const overviewIndex = list.findIndex((e) => e.key === "overview");
+    if (overviewIndex === -1) return; // no overview step in this regime
+    setExerciseIndex(overviewIndex);
+    setScreen("setup");
+    setOverviewView("summary");
+    setOverviewSource("training");
+    markRegimeCompletedToday();
+  }, []);
 
   const forceSwitchToNext = useCallback((fromIndex) => {
     if (exerciseIndexRef.current !== fromIndex) return; // already moved on
@@ -4545,6 +5804,18 @@ function NBackSessionApp() {
     setTimeout(() => {
       setSwitchNotice(false);
       setN(exerciseLevelsRef.current[nextExercise.key] ?? nextExercise.defaultN);
+      // Show this specific exercise's tutorial right before it starts — the
+      // whole reason forceSwitchToNext is the second gate alongside
+      // proceedStartFromHome: every exercise transition mid-session should
+      // get its own tutorial screen, not just the very first one.
+      if (
+        !hideTutorialsRef.current &&
+        !dismissedTutorialsRef.current[nextExercise.key] &&
+        TUTORIAL_CONTENT[nextExercise.key]
+      ) {
+        setTutorialDontShowAgain(false);
+        setMainView("tutorial");
+      }
       // land on the setup screen for the next exercise; user presses Start themselves
     }, 2500);
   }, []);
@@ -4629,11 +5900,10 @@ function NBackSessionApp() {
     new Set(currentRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
 
-  // Tutorial mirrors the regime's own step order (same list as the overview) —
-  // it starts on that regime's first exercise and "Next" walks through the rest.
-  const tutorialExercises = overviewExercises;
-  const tutorialStepExercise = tutorialExercises[tutorialStep] || tutorialExercises[0];
-  const isLastTutorialStep = tutorialStep >= tutorialExercises.length - 1;
+  // The tutorial now always shows for exactly the one exercise that's about
+  // to start (gated in proceedStartFromHome / forceSwitchToNext below) —
+  // no more walking through every exercise in the regime up front.
+  const tutorialStepExercise = exercise;
 
   // Whether they've finished their WHOLE regime today (not just attempted
   // one exercise) — this is what "Tomorrow" on the Next-session card means,
@@ -4757,15 +6027,38 @@ function NBackSessionApp() {
   };
 
   const proceedStartFromHome = () => {
+    unlockLetterAudio();
     // If we're currently parked on the overview "exercise" (e.g. from a
     // previous visit), land on the first exercise in the regime instead of it
     // — restoring whatever level they'd actually reached there, not always
     // resetting back to that exercise's starting default.
+    let targetExercise = exercise;
     if (exercise.key === "overview") {
       setExerciseIndex(0);
-      const first = activeExercises[0];
-      setN(exerciseLevelsRef.current[first.key] ?? first.defaultN);
+      targetExercise = activeExercises[0];
+      setN(exerciseLevelsRef.current[targetExercise.key] ?? targetExercise.defaultN);
     }
+    setScreen("setup");
+    if (!hideTutorials && !dismissedTutorials[targetExercise.key] && TUTORIAL_CONTENT[targetExercise.key]) {
+      setTutorialDontShowAgain(false);
+      setMainView("tutorial");
+    } else {
+      setMainView("app");
+    }
+  };
+
+  // 🧪 Dev/test shortcut — jump straight to any exercise's setup screen,
+  // skipping regime selection and the Start Training flow entirely. Swaps
+  // activeExercises down to just the one chosen exercise (so there's
+  // nothing to auto-advance to afterward — this is a one-off test run, not
+  // a real session), and restores whatever level was actually last reached
+  // for it, same as the normal flow does.
+  const jumpToExercise = (key) => {
+    const ex = EXERCISE_LIBRARY[key];
+    if (!ex) return;
+    setActiveExercises([ex, OVERVIEW_EXERCISE]);
+    setExerciseIndex(0);
+    setN(exerciseLevelsRef.current[key] ?? ex.defaultN);
     setScreen("setup");
     setMainView("app");
   };
@@ -4815,13 +6108,7 @@ function NBackSessionApp() {
     setScreen("setup");
     setSwitchNotice(false);
     setLevelChangeNotice(null);
-    if (!seenTutorialRegimes[key]) {
-      markTutorialSeen(key);
-      setTutorialStep(0);
-      setMainView("tutorial");
-    } else {
-      setMainView("home");
-    }
+    setMainView("home");
   };
 
   // Dev/test-only: zeroes the streak back to 0. Severs it at today (same
@@ -4934,7 +6221,14 @@ function NBackSessionApp() {
   return (
     <div
       className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
-        isMotion3dApp ? "items-stretch justify-center p-2" : "items-center justify-center p-12"
+        isMotion3dApp
+          ? "items-stretch justify-center p-2"
+          : screen === "running"
+          // The running screen is the one view that has to fit a square grid
+          // plus its answer buttons inside the viewport, so it gets much
+          // tighter vertical padding than the scrollable screens.
+          ? "items-center justify-center px-4 py-4"
+          : "items-center justify-center p-12"
       }`}
     >
       <div
@@ -5001,11 +6295,7 @@ function NBackSessionApp() {
       `}</style>
       <div
         className="relative w-full"
-        style={
-          isMotion3dApp
-            ? { maxWidth: "100vw" }
-            : { maxWidth: "42rem" }
-        }
+        style={isMotion3dApp ? undefined : { maxWidth: "42rem" }}
       >
         {mainView === "regime" && (
           <div className="space-y-14">
@@ -5039,7 +6329,7 @@ function NBackSessionApp() {
                           </span>
                         )}
                       </div>
-                      <div className={`text-lg font-medium ${acc.text}`}>
+                      <div className="text-lg font-medium text-slate-100">
                         {r.subtitle}
                       </div>
                     </div>
@@ -5068,7 +6358,7 @@ function NBackSessionApp() {
                     <div className="text-lg font-medium text-slate-600">—</div>
                   </div>
                   <div className="text-slate-600 text-base mt-2">
-                    Build your own regime from scratch.
+                    Build your own regime.
                   </div>
                 </button>
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
@@ -5104,16 +6394,77 @@ function NBackSessionApp() {
               </p>
             </div>
 
-            {["Consistency", "Performance", "Variety", "Volume"].map((group) => {
-              const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[group]];
+            {achievementExerciseSections().map((topSection) => {
+              const group = topSection.key;
+              const groupAccent = ACCENT_STYLES.indigo;
+              const groupId = `${group}:__group`;
+              const groupOpen = openAchievementSections.has(groupId);
+              const groupItems = topSection.items;
+              const groupUnlocked = groupItems.filter((a) =>
+                isAchievementUnlocked(a, achievementState)
+              ).length;
               return (
                 <div key={group} className="space-y-5">
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-2.5">
-                    <span className={`w-2.5 h-2.5 rounded-full ${groupAccent.dot}`} />
-                    {group}
-                  </h2>
+                  <button
+                    onClick={() => toggleAchievementSection(groupId)}
+                    aria-expanded={groupOpen}
+                    className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
+                  >
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${groupAccent.dot}`} />
+                    <h2 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
+                      {topSection.label}
+                    </h2>
+                    <span className="text-sm text-slate-400 tabular-nums">
+                      {groupUnlocked}/{groupItems.length}
+                    </span>
+                    <span
+                      className="text-slate-400 text-sm transition-transform"
+                      style={{ transform: groupOpen ? "rotate(90deg)" : "none" }}
+                      aria-hidden="true"
+                    >
+                      ▶
+                    </span>
+                  </button>
+                  {groupOpen && (
+                  <div className="space-y-5">
+                  {/* Within a group, anything tagged with an exercise is
+                      split out under that exercise's own header, in
+                      EXERCISE_LIBRARY order, so the Performance list reads as
+                      "RRT / Dual N-Back / …" instead of one long run. Untagged
+                      achievements stay in a single unlabelled block first. */}
+                  {achievementGroupSectionsFor(topSection.items).map((section) => {
+                  const sectionId = `${group}:${section.key}`;
+                  const isOpen = !section.label || openAchievementSections.has(sectionId);
+                  const unlockedCount = section.items.filter((a) =>
+                    isAchievementUnlocked(a, achievementState)
+                  ).length;
+                  return (
+                  <div key={section.key} className="space-y-4">
+                  {section.label && (
+                    <button
+                      onClick={() => toggleAchievementSection(sectionId)}
+                      aria-expanded={isOpen}
+                      className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
+                    >
+                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${groupAccent.dot}`} />
+                      <h3 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
+                        {section.label}
+                      </h3>
+                      <span className="text-sm text-slate-400 tabular-nums">
+                        {unlockedCount}/{section.items.length}
+                      </span>
+                      <span
+                        className="text-slate-400 text-sm transition-transform"
+                        style={{ transform: isOpen ? "rotate(90deg)" : "none" }}
+                        aria-hidden="true"
+                      >
+                        ▶
+                      </span>
+                    </button>
+                  )}
+                  {isOpen && (
                   <div className="grid grid-cols-1 gap-4">
-                    {ACHIEVEMENTS_CATALOG.filter((a) => a.group === group).map((a) => {
+                    {section.items.map((a) => {
                       const isUnlocked = isAchievementUnlocked(a, achievementState);
                       const progressText =
                         !isUnlocked && a.progress ? a.progress(achievementState) : null;
@@ -5191,10 +6542,20 @@ function NBackSessionApp() {
                       );
                     })}
                   </div>
+                  )}
+                  </div>
+                  );
+                  })}
+                  </div>
+                  )}
                 </div>
               );
             })}
           </div>
+        )}
+
+        {mainView === "hypnosis" && (
+          <HypnosisScreen onDone={() => setMainView("home")} />
         )}
 
         {mainView === "home" && (
@@ -5216,8 +6577,8 @@ function NBackSessionApp() {
                   onClick={() => setStreakCardOpen(true)}
                   className={`flex items-center gap-2 rounded-lg py-2 px-5 text-base font-semibold ${
                     achievementState.streak > 0
-                      ? "bg-gradient-to-r from-orange-500/20 to-red-500/20 border border-orange-400/40 text-orange-100"
-                      : "bg-slate-800 border border-slate-700 text-slate-500"
+                      ? "bg-amber-500/10 border border-amber-500/40 text-amber-300"
+                      : "bg-slate-900 border border-slate-700/70 text-slate-500"
                   }`}
                 >
                   <span className="text-lg">🔥</span>
@@ -5328,6 +6689,22 @@ function NBackSessionApp() {
               >
                 🧪 Reset next session (test)
               </button>
+              <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
+                <div className="text-sm text-slate-500">
+                  🧪 Skip to exercise (test) — bypasses regime/Start Training entirely
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.values(EXERCISE_LIBRARY).map((e) => (
+                    <button
+                      key={e.key}
+                      onClick={() => jumpToExercise(e.key)}
+                      className={`rounded-lg py-2.5 text-sm font-medium border transition-colors ${ACCENT_STYLES[e.accent].bg} ${ACCENT_STYLES[e.accent].border} text-slate-100 hover:opacity-80`}
+                    >
+                      {e.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -5369,8 +6746,7 @@ function NBackSessionApp() {
                 // a leaderboard-display-only override; the real Quad N-Back
                 // exercise's own accuracy tracking (Home/Account/Overview)
                 // is untouched.
-                const isAccuracy =
-                  tabExercise?.scoreType === "accuracy" && activeLeaderboardTab !== "quad";
+                const isAccuracy = tabExercise?.scoreType === "accuracy";
                 const avatarId = isYou ? selectedAvatarId : PLACEHOLDER_AVATARS[entry.name];
                 const tier = gemTierFor(entry.level);
                 const entryFrameTier = isYou ? ownAvatarFrameTier : avatarFrameTier(entryState);
@@ -5387,12 +6763,7 @@ function NBackSessionApp() {
                       isYou
                         ? `${tabAccent.bg} ${tabAccent.border} ${tabAccent.hoverBorderStrong}`
                         : "bg-slate-900 border-slate-700/60 hover:border-slate-500"
-                    }`}
-                    style={
-                      entryHasGlow
-                        ? { animation: "rankGlowPulse 2.2s ease-in-out infinite" }
-                        : undefined
-                    }
+                    } ${entryHasGlow ? "rank-glow" : ""}`}
                   >
                     <div className="w-6 text-center text-lg font-semibold text-slate-500">
                       {rank}
@@ -5409,7 +6780,7 @@ function NBackSessionApp() {
                     </div>
                     <div className="flex items-center gap-5">
                       <div className="text-right">
-                        <div className="text-base text-slate-300">
+                        <div className="text-base text-slate-100">
                           {isAccuracy
                             ? `${abbrev}${entry.level}B · ${entry.accuracy}%`
                             : activeLeaderboardTab === "quad"
@@ -5543,19 +6914,31 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-8">
-              <p className="text-slate-300 text-lg">
+            {/* Placeholder — real per-exercise tutorial walkthrough content
+                (images/animations/steps) goes here later. TUTORIAL_CONTENT
+                just holds a placeholder string per exercise for now. */}
+            <div className="bg-slate-900 border border-dashed border-slate-700/70 rounded-lg p-8">
+              <p className="text-slate-400 text-lg">
                 {TUTORIAL_CONTENT[tutorialStepExercise.key]}
               </p>
             </div>
 
+            <label className="flex items-center gap-3 text-slate-300 text-base cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={tutorialDontShowAgain}
+                onChange={(e) => setTutorialDontShowAgain(e.target.checked)}
+                className="w-5 h-5 rounded border-slate-600 bg-slate-800 accent-indigo-500"
+              />
+              Don't show this tutorial again
+            </label>
+
             <button
               onClick={() => {
-                if (isLastTutorialStep) {
-                  setMainView("home");
-                } else {
-                  setTutorialStep((i) => i + 1);
+                if (tutorialDontShowAgain) {
+                  setTutorialDismissed(tutorialStepExercise.key, true);
                 }
+                setMainView("app");
               }}
               className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
             >
@@ -5583,7 +6966,7 @@ function NBackSessionApp() {
               </h1>
               <button
                 onClick={() => supabase.auth.signOut()}
-                className="mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-red-400/40 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
+                className="mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
               >
                 Log out
               </button>
@@ -6002,7 +7385,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setBadgesExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-amber-400/40 transition-all duration-200 hover:shadow-lg hover:shadow-amber-500/10 rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Badges</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -6034,7 +7417,7 @@ function NBackSessionApp() {
 
             <button
               onClick={() => setMainView("regime")}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-indigo-400/40 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/10 rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
               <span className="text-slate-500 text-base font-normal">
@@ -6044,13 +7427,45 @@ function NBackSessionApp() {
 
             <button
               onClick={() => setMainView("membership")}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-emerald-400/40 transition-all duration-200 hover:shadow-lg hover:shadow-emerald-500/10 rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Membership</span>
               <span className="text-slate-500 text-base font-normal capitalize">
                 {membershipPlan} ›
               </span>
             </button>
+
+            <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-medium">Show tutorials</div>
+                <div className="text-slate-500 text-base mt-1">
+                  Shown before training when this is on. Exercises you
+                  individually dismissed with "Don't show this tutorial
+                  again" stay dismissed even when this is on
+                  {Object.values(dismissedTutorials).some(Boolean) && (
+                    <>
+                      {" — "}
+                      <button
+                        onClick={() => {
+                          setDismissedTutorialsState({});
+                          if (window.storage) {
+                            safeStorageSet("dismissed-tutorials", JSON.stringify({}), false);
+                          }
+                        }}
+                        className="text-indigo-400 hover:text-indigo-300 underline"
+                      >
+                        reset those
+                      </button>
+                    </>
+                  )}
+                  .
+                </div>
+              </div>
+              <Toggle
+                on={!hideTutorials}
+                onToggle={() => setHideTutorials(!hideTutorials)}
+              />
+            </div>
 
             {/* Diagnostics — surfaces failed storage writes and thrown
                 errors that used to fail completely silently (see
@@ -6114,7 +7529,7 @@ function NBackSessionApp() {
                 Membership
               </h1>
               <p className="text-slate-500 text-base mt-3">
-                Placeholder only — no billing is connected yet.
+                Manage your subscription — switch plans, update your card, pause, or cancel.
               </p>
             </div>
 
@@ -6128,41 +7543,250 @@ function NBackSessionApp() {
               </div>
             )}
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7">
-              <div className="text-slate-400 text-base uppercase tracking-wide">
-                Current plan
-              </div>
-              <div className="text-2xl font-semibold mt-2 capitalize">
-                {membershipPlan === "canceled" ? "Canceled" : membershipPlan}
-              </div>
-            </div>
+            {billingLoading && (
+              <div className="text-slate-500 text-base">Loading your subscription…</div>
+            )}
 
-            <div className="flex flex-col gap-5">
-              {membershipPlan !== "annual" && (
-                <button
-                  onClick={() => setMembershipPlan("annual")}
-                  className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
-                >
-                  Switch to annual
-                </button>
-              )}
-              {membershipPlan !== "monthly" && (
-                <button
-                  onClick={() => setMembershipPlan("monthly")}
-                  className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
-                >
-                  Switch to monthly
-                </button>
-              )}
-              {membershipPlan !== "canceled" && (
-                <button
-                  onClick={() => setMembershipPlan("canceled")}
-                  className="w-full bg-red-950/40 hover:bg-red-950/60 border border-red-900 text-red-400 transition-colors rounded-lg py-5 text-xl font-medium"
-                >
-                  Cancel membership
-                </button>
-              )}
-            </div>
+            {!billingLoading && billingError && (
+              <div className="bg-red-950/40 border border-red-900 rounded-lg p-5 text-red-400 text-base">
+                {billingError}
+              </div>
+            )}
+
+            {!billingLoading && billingState && (
+              <>
+                <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7 space-y-3">
+                  <div className="text-slate-400 text-base uppercase tracking-wide">
+                    Current plan
+                  </div>
+                  <div className="text-2xl font-semibold capitalize">
+                    {billingState.plan}{" "}
+                    <span className="text-slate-400 text-lg font-normal">
+                      — ${(billingState.amount / 100).toFixed(2)}{" "}
+                      {billingState.currency?.toUpperCase()}
+                    </span>
+                  </div>
+                  {billingState.pausedUntil ? (
+                    <div className="text-amber-400 text-base">
+                      Paused until{" "}
+                      {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
+                    </div>
+                  ) : billingState.cancelAtPeriodEnd ? (
+                    <div className="text-red-400 text-base">
+                      Cancels on{" "}
+                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
+                    </div>
+                  ) : (
+                    <div className="text-slate-400 text-base">
+                      Renews{" "}
+                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+
+                {billingState.openInvoiceId && (
+                  <div className="bg-amber-950/40 border border-amber-800 rounded-lg p-5 space-y-3">
+                    <div className="text-amber-300 text-base">
+                      A recent payment didn't go through — update your card or retry to keep
+                      your membership active.
+                    </div>
+                    <button
+                      onClick={handleRetryInvoice}
+                      disabled={actionLoading}
+                      className="bg-amber-600 hover:bg-amber-500 disabled:opacity-50 transition-colors rounded-lg py-3 px-6 text-base font-medium"
+                    >
+                      Retry payment
+                    </button>
+                  </div>
+                )}
+
+                {actionError && <div className="text-red-400 text-sm">{actionError}</div>}
+
+                {!billingState.cancelAtPeriodEnd && !billingState.pausedUntil && (
+                  <div className="flex flex-col gap-4">
+                    {billingState.plan !== "annual" && (
+                      <button
+                        onClick={() => handlePreviewSwitch("annual")}
+                        disabled={previewLoading || actionLoading}
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                      >
+                        Switch to annual
+                      </button>
+                    )}
+                    {billingState.plan !== "monthly" && (
+                      <button
+                        onClick={() => handlePreviewSwitch("monthly")}
+                        disabled={previewLoading || actionLoading}
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                      >
+                        Switch to monthly
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {previewData && previewTargetPlan && (
+                  <div className="bg-slate-900 border border-indigo-500/40 rounded-lg p-7 space-y-4">
+                    <div className="text-lg font-semibold">
+                      Switch to {previewTargetPlan}?
+                    </div>
+                    <div className="space-y-1.5 text-sm text-slate-400">
+                      {previewData.lines.map((line, i) => (
+                        <div key={i} className="flex justify-between gap-4">
+                          <span>{line.desc}</span>
+                          <span className="text-slate-300">
+                            ${(line.amount / 100).toFixed(2)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between text-base font-semibold border-t border-slate-800 pt-3">
+                      <span>Due now</span>
+                      <span>
+                        ${(previewData.dueNow / 100).toFixed(2)}{" "}
+                        {previewData.currency?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleCancelSwitch}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 font-medium text-base"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleConfirmSwitch}
+                        disabled={actionLoading}
+                        className="flex-1 bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 disabled:opacity-50 transition-opacity rounded-lg py-3 font-medium text-base"
+                      >
+                        {actionLoading ? "Confirming…" : "Confirm switch"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7 space-y-4">
+                  <div className="text-slate-400 text-base uppercase tracking-wide">
+                    Payment method
+                  </div>
+                  {billingState.card && !setupClientSecret && !cardUpdateSaved && (
+                    <div className="text-lg capitalize">
+                      {billingState.card.brand} •••• {billingState.card.last4}{" "}
+                      <span className="text-slate-500 text-base">
+                        exp {billingState.card.expMonth}/{billingState.card.expYear}
+                      </span>
+                    </div>
+                  )}
+                  {cardUpdateSaved && (
+                    <p className="text-emerald-400 text-sm">Payment method updated.</p>
+                  )}
+                  {!setupClientSecret && !cardUpdateSaved && (
+                    <button
+                      onClick={handleStartCardUpdate}
+                      disabled={setupLoading}
+                      className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-4 text-base font-medium"
+                    >
+                      {setupLoading ? "Loading…" : "Update payment method"}
+                    </button>
+                  )}
+                  {setupError && <p className="text-sm text-red-400">{setupError}</p>}
+                  {setupClientSecret && typeof BillingCardForm === "function" && (
+                    <BillingCardForm
+                      clientSecret={setupClientSecret}
+                      onDone={() => {
+                        setSetupClientSecret(null);
+                        setCardUpdateSaved(true);
+                        callBillingApi("state").then(setBillingState).catch(() => {});
+                      }}
+                      onError={(msg) => setSetupError(msg)}
+                    />
+                  )}
+                  {setupClientSecret && typeof BillingCardForm !== "function" && (
+                    <div className="text-sm text-slate-500 border border-dashed border-slate-700 rounded-lg p-4">
+                      Card form placeholder — renders as the real embedded Stripe form once
+                      deployed (see BillingCardForm.jsx).
+                    </div>
+                  )}
+                </div>
+
+                {!billingState.cancelAtPeriodEnd &&
+                  (billingState.pausedUntil ? (
+                    <button
+                      onClick={handleResume}
+                      disabled={actionLoading}
+                      className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                    >
+                      Resume membership
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handlePause}
+                      disabled={actionLoading}
+                      className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                    >
+                      Pause for 30 days
+                    </button>
+                  ))}
+
+                {billingState.cancelAtPeriodEnd ? (
+                  <button
+                    onClick={handleReactivate}
+                    disabled={actionLoading}
+                    className="w-full bg-emerald-950/40 hover:bg-emerald-950/60 disabled:opacity-50 border border-emerald-800 text-emerald-400 transition-colors rounded-lg py-5 text-xl font-medium"
+                  >
+                    Reactivate membership
+                  </button>
+                ) : !showCancelForm ? (
+                  <button
+                    onClick={() => setShowCancelForm(true)}
+                    disabled={actionLoading}
+                    className="w-full bg-red-950/40 hover:bg-red-950/60 disabled:opacity-50 border border-red-900 text-red-400 transition-colors rounded-lg py-5 text-xl font-medium"
+                  >
+                    Cancel membership
+                  </button>
+                ) : (
+                  <div className="bg-slate-900 border border-red-900/60 rounded-lg p-7 space-y-4">
+                    <div className="text-lg font-semibold">Sorry to see you go</div>
+                    <select
+                      value={cancelFeedback}
+                      onChange={(e) => setCancelFeedback(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100"
+                    >
+                      <option value="">Why are you canceling? (optional)</option>
+                      <option value="too_expensive">Too expensive</option>
+                      <option value="unused">Not using it enough</option>
+                      <option value="missing_features">Missing features</option>
+                      <option value="too_complex">Too complex</option>
+                      <option value="switched_service">Switched to another service</option>
+                      <option value="customer_service">Customer service</option>
+                      <option value="other">Other</option>
+                    </select>
+                    <textarea
+                      value={cancelComment}
+                      onChange={(e) => setCancelComment(e.target.value)}
+                      placeholder="Anything else? (optional)"
+                      rows={3}
+                      className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 resize-none"
+                    />
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowCancelForm(false)}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 font-medium text-base"
+                      >
+                        Never mind
+                      </button>
+                      <button
+                        onClick={handleCancelSubmit}
+                        disabled={actionLoading}
+                        className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 transition-colors rounded-lg py-3 font-medium text-base"
+                      >
+                        {actionLoading ? "Canceling…" : "Confirm cancel"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
 
             <button
               onClick={() => setMainView("account")}
@@ -6249,7 +7873,7 @@ function NBackSessionApp() {
                 ? e.key === "motion3d"
                   ? formatScoreValue(e, stat.bestAccuracy)
                   : e.key === "iqnb"
-                  ? `${e.abbrev} · ${formatScoreValue(e, stat.bestAccuracy)}`
+                  ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
                   : e.key === "rrt"
                   ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
                   : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} · ${formatScoreValue(
@@ -6266,18 +7890,14 @@ function NBackSessionApp() {
                   </h2>
                   <div className="grid grid-cols-2 gap-6">
                     <Stat
-                      size="sm"
                       label={bestLabel}
                       value={bestValue}
                       color={stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined}
-                      accent={ACCENT_STYLES[e.accent]}
                     />
                     <Stat
-                      size="sm"
                       label={avgLabel}
                       value={avgValue}
                       color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
-                      accent={ACCENT_STYLES[e.accent]}
                     />
                   </div>
                 </div>
@@ -6292,10 +7912,10 @@ function NBackSessionApp() {
                 Stats
               </button>
               <button
-                onClick={() => setMainView("home")}
+                onClick={() => setMainView("hypnosis")}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
-                Home
+                Done
               </button>
             </div>
           </div>
@@ -6305,7 +7925,7 @@ function NBackSessionApp() {
           <div className="space-y-14">
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-4xl font-semibold tracking-tight">
-                Accuracy Over Time
+                Stats
               </h1>
               <button
                 onClick={() =>
@@ -6328,35 +7948,38 @@ function NBackSessionApp() {
               }));
               return (
                 <div key={e.key} className="space-y-4">
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-100">{e.title}</h2>
+                  <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
+                    <span className={`w-2.5 h-2.5 rounded-full ${ACCENT_STYLES[e.accent].dot}`} />
+                    {e.title}
+                  </h2>
                   {chartData.length > 0 ? (
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={chartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                          <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
                           <XAxis
                             dataKey="session"
-                            stroke="#64748b"
-                            tick={{ fill: "#64748b", fontSize: 12 }}
+                            stroke="#6E7178"
+                            tick={{ fill: "#6E7178", fontSize: 12 }}
                             label={{
                               value: "Session",
                               position: "insideBottom",
                               offset: -4,
-                              fill: "#64748b",
+                              fill: "#6E7178",
                               fontSize: 12,
                             }}
                           />
                           <YAxis
                             domain={isAccuracy ? [0, 100] : ["auto", "auto"]}
-                            stroke="#64748b"
-                            tick={{ fill: "#64748b", fontSize: 12 }}
+                            stroke="#6E7178"
+                            tick={{ fill: "#6E7178", fontSize: 12 }}
                           />
                           <Tooltip
                             contentStyle={{
-                              background: "#0f172a",
-                              border: "1px solid #1e293b",
+                              background: "#101112",
+                              border: "1px solid #23252A",
                               borderRadius: 8,
-                              color: "#e2e8f0",
+                              color: "#F7F8F8",
                             }}
                             formatter={(value, name, props) => [
                               isAccuracy
@@ -6368,9 +7991,9 @@ function NBackSessionApp() {
                           <Line
                             type="monotone"
                             dataKey="accuracy"
-                            stroke="#818cf8"
+                            stroke="#8FD8EC"
                             strokeWidth={2}
-                            dot={{ r: 3, fill: "#818cf8" }}
+                            dot={{ r: 3, fill: "#8FD8EC" }}
                           />
                         </LineChart>
                       </ResponsiveContainer>
@@ -6400,7 +8023,7 @@ function NBackSessionApp() {
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-slate-700/70 text-left text-slate-500">
+                          <tr className="border-b border-slate-700/70 text-left text-slate-100">
                             <th className="px-4 py-2.5 font-medium">Day</th>
                             <th className="px-4 py-2.5 font-medium">Date</th>
                             <th className="px-4 py-2.5 font-medium">Time</th>
@@ -6415,17 +8038,20 @@ function NBackSessionApp() {
                             return (
                               <tr
                                 key={row.dateKey}
-                                className={`border-b border-slate-800/70 last:border-0 ${
-                                  row.missed ? "bg-red-500/10" : "bg-emerald-500/10"
-                                }`}
+                                className="border-b border-slate-800/70 last:border-0"
+                                style={{
+                                  backgroundColor: row.missed
+                                    ? "rgba(151,20,38,0.14)"
+                                    : "rgba(30,152,43,0.12)",
+                                }}
                               >
-                                <td className="px-4 py-2.5 text-slate-400">
+                                <td className="px-4 py-2.5 text-slate-100">
                                   {d.toLocaleDateString(undefined, { weekday: "short" })}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-400">
+                                <td className="px-4 py-2.5 text-slate-100">
                                   {d.toLocaleDateString()}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-400">
+                                <td className="px-4 py-2.5 text-slate-100">
                                   {row.missed ? "—" : formatDuration(row.durationMs)}
                                 </td>
                                 <td className="px-4 py-2.5 text-slate-100 font-medium">
@@ -6521,6 +8147,7 @@ function NBackSessionApp() {
           <Motion3DExercise
             exercise={exercise}
             onFinish={() => forceSwitchToNext(exerciseIndex)}
+            onForceOverview={() => forceJumpToOverview(exerciseIndex)}
             onStageChange={setMotion3dStage}
             onLevelUp={recordMotion3dLevelUp}
             onSessionEnd={recordMotion3dSessionEnd}
@@ -6706,19 +8333,33 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && screen === "running" && (
-          <div className="flex flex-col items-center gap-8">
+          <div className="flex flex-col items-center gap-3 w-full">
             <div className="text-center">
-              <div className={`text-3xl font-semibold tracking-tight ${ACCENT_STYLES[exercise.accent].text}`}>
+              <div className={`text-2xl font-semibold tracking-tight ${ACCENT_STYLES[exercise.accent].text}`}>
                 {exercise.key === "iqnb"
                   ? `${exercise.title} ${qnbPrimeLevel.toFixed(2)}`
                   : exercise.title.replace("N-Back", `${n}-Back`)}
               </div>
-              <div className="text-slate-400 text-lg mt-2">
+              <div className="text-slate-400 text-base mt-0.5">
                 {trialCount - index}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 grid-rows-3 gap-6 w-full aspect-square">
+            {/* Plain 3x3 lattice: shared hairlines, no gaps, no rounded
+                corners and no accent colour, so the stimulus is the only
+                thing in the grid carrying any colour. */}
+            <div
+              style={{
+                width: NBACK_BOX_SIZE,
+                aspectRatio: "1 / 1",
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateRows: "repeat(3, 1fr)",
+                gap: 0,
+                borderTop: `1px solid ${NBACK_GRID_LINE}`,
+                borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+              }}
+            >
               {POSITIONS.map((cellIdx) => {
                 const isActive = activeCell === cellIdx;
                 const shapeType = exercise.modalities.includes("shape")
@@ -6726,37 +8367,40 @@ function NBackSessionApp() {
                   : "square";
                 const color = exercise.modalities.includes("color")
                   ? sequence.color?.[index]
-                  : "#818cf8";
+                  : "#8FD8EC";
                 const hasShapeOrColor =
                   exercise.modalities.includes("shape") ||
                   exercise.modalities.includes("color");
                 return (
                   <div
                     key={cellIdx}
-                    className={`rounded-xl border flex items-center justify-center overflow-hidden transition-colors ${
-                      isActive
-                        ? "bg-stone-200 border-stone-300"
-                        : `bg-slate-900 ${ACCENT_STYLES[exercise.accent].border}`
-                    }`}
+                    className="flex items-center justify-center overflow-hidden transition-colors"
+                    style={{
+                      borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                      borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                      backgroundColor: isActive ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                    }}
                   >
                     {isActive && hasShapeOrColor && (
-                      exercise.key === "iqnb" ? (
-                        <VoronoiShapeIcon
-                          shape={shapeType}
-                          color={color}
-                          seed={`${index}-${shapeType}-${color}`}
-                          size={96}
-                        />
-                      ) : (
-                        <ShapeIcon shape={shapeType} color={color} size={96} />
-                      )
+                      <div className="nback-stimulus">
+                        {exercise.key === "iqnb" ? (
+                          <VoronoiShapeIcon
+                            shape={shapeType}
+                            color={color}
+                            seed={`${index}-${shapeType}-${color}`}
+                            size={220}
+                          />
+                        ) : (
+                          <ShapeIcon shape={shapeType} color={color} size={220} />
+                        )}
+                      </div>
                     )}
                   </div>
                 );
               })}
             </div>
 
-            <div className="grid grid-cols-2 gap-6 w-full">
+            <div className="grid grid-cols-2 gap-3" style={{ width: NBACK_BOX_SIZE }}>
               {exercise.modalities.map((m) => {
                 const meta = MODALITY_META[m];
                 const state = feedback[m];
@@ -6770,7 +8414,7 @@ function NBackSessionApp() {
                   <button
                     key={m}
                     onClick={() => handlePress(m)}
-                    className={`transition-colors duration-150 rounded-lg py-5 font-semibold text-xl ${cls}`}
+                    className={`transition-colors duration-150 rounded-lg py-3 font-semibold text-xl ${cls}`}
                   >
                     {meta.label}{" "}
                     <span className="text-base font-normal opacity-70">
@@ -6951,7 +8595,7 @@ function NBackSessionApp() {
               className="relative flex flex-col items-center text-center gap-8 max-w-sm"
               style={{ animation: "celebrationPop 0.6s cubic-bezier(0.34,1.56,0.64,1)" }}
             >
-              <div className="text-base uppercase tracking-wide text-violet-300 font-semibold">
+              <div className="text-base uppercase tracking-wide text-indigo-300 font-semibold">
                 Achievement unlocked
               </div>
 
@@ -7177,20 +8821,37 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
-          className="fixed top-6 right-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-amber-400/40 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-amber-500/10 rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="fixed top-6 right-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
         >
           🏆 Leaderboard
+        </button>
+      )}
+
+      {/* Testing convenience — jumps straight to the next exercise in the
+          regime (same mechanic as forceSwitchToNext everywhere else,
+          including the tutorial-screen gate) without needing to sit through
+          the current one's full duration. Shown on every exercise page
+          (setup/running/results, and RRT/3D Motion's own self-contained
+          screens) rather than duplicated per-screen, so there's exactly one
+          place this can go stale. Hidden during the brief switchNotice
+          transition since forceSwitchToNext is already mid-flight then. */}
+      {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
+        <button
+          onClick={() => forceSwitchToNext(exerciseIndex)}
+          className="fixed top-6 right-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2.5 px-5 text-sm font-medium shadow-lg"
+        >
+          🧪 Skip to next exercise
         </button>
       )}
 
       {mainView === "home" && (
         <button
           onClick={() => setMainView("achievements")}
-          className="fixed top-6 left-6 flex items-center gap-2.5 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 hover:from-violet-500/30 hover:to-fuchsia-500/30 border border-violet-400/40 text-violet-100 transition-all duration-200 hover:scale-105 rounded-full py-3 px-6 text-base font-medium shadow-lg shadow-violet-950/50 hover:shadow-xl hover:shadow-violet-500/30"
+          className="fixed top-6 left-6 flex items-center gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-3 px-6 text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
         >
           <span className="text-lg">🏅</span>
           <span>Achievements</span>
-          <span className="text-xs font-semibold bg-violet-400/25 text-violet-100 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5">
             {ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, achievementState)).length}/
             {ACHIEVEMENTS_CATALOG.length}
           </span>
@@ -7200,7 +8861,7 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("account")}
-          className="fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-indigo-400/40 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-indigo-500/10 rounded-full py-3 px-7 text-base font-medium shadow-lg"
+          className="fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
           <AvatarFrame tier={ownAvatarFrameTier}>
             <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={24} />
@@ -7216,7 +8877,7 @@ function NBackSessionApp() {
             setFeedbackText("");
             setFeedbackOpen(true);
           }}
-          className="fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-teal-400/40 transition-all duration-200 hover:scale-105 hover:shadow-xl hover:shadow-teal-500/10 rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
         >
           💬 Feedback
         </button>
@@ -7256,7 +8917,7 @@ function NBackSessionApp() {
                   autoFocus
                   value={feedbackText}
                   onChange={(e) => setFeedbackText(e.target.value)}
-                  placeholder="What could be better?"
+                  placeholder="What do you want added / changed?"
                   rows={5}
                   maxLength={1000}
                   className="w-full text-base text-slate-100 bg-slate-950 border border-slate-700/70 focus:border-teal-500 focus:outline-none rounded-lg px-4 py-3 resize-none placeholder:text-slate-500"
@@ -7337,7 +8998,20 @@ export default function NBackSessionAppWithDiagnostics() {
 // isn't at the mercy of whether the CSS build has picked up this class.
 // Shared by both the premises and conclusion screens so the card is the
 // same height either way and nothing shifts when moving between them.
-const RRT_FOOTER_MIN_HEIGHT = 108;
+// How many wrong or missed answers in a row force the difficulty back down a
+// step. Three was too tight: a couple of unlucky rounds at a newly-reached
+// premise count dropped the level before there was any evidence the person
+// couldn't hold it, which is demoralising and slows real progress. Ten means
+// a drop reflects a genuine plateau rather than a bad patch.
+// Fixed height for the premise/conclusion line. Its contents vary — letter
+// tags are shorter than tiles, and a long proposition wraps to two rows — and
+// without this the card grew and shrank between premises, nudging the Back and
+// Next buttons a few pixels each time.
+const RRT_PROPOSITION_MIN_HEIGHT = 104;
+
+const RRT_DROP_AFTER_WRONG = 10;
+
+const RRT_FOOTER_MIN_HEIGHT = 116;
 
 function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true }) {
   const accent = ACCENT_STYLES[exercise.accent];
@@ -7431,6 +9105,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // The history entry currently showing its deduction-chain explanation
   // (hover on desktop, tap-to-toggle on touch — see the button below).
   const [explanationFor, setExplanationFor] = useState(null);
+  // Tracks whether the open explanation came from a hover (transient) or a
+  // click (pinned), so leaving the button only closes the transient one.
+  const [explanationHover, setExplanationHover] = useState(null);
 
   const pushRoundHistory = (userAnswer, correct) => {
     if (!puzzle) return;
@@ -7441,6 +9118,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           puzzleType: puzzle.puzzleType,
           items: puzzle.items,
           premises: puzzle.premises,
+          positions: puzzle.positions, // space2d only — the grid the map is drawn from
+
           conclusion: puzzle.conclusion,
           userAnswer, // true | false | null (missed — never answered)
           correct,
@@ -7590,7 +9269,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         setCorrectStreak(0);
         const nextWrong = wrongStreak + 1;
         let override = null;
-        if (nextWrong >= 3) {
+        if (nextWrong >= RRT_DROP_AFTER_WRONG) {
           override = triggerRrtDecrement();
           setWrongStreak(0);
         } else {
@@ -7620,7 +9299,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     return { premiseCount: newPremiseCount, roundMs: newRoundMs };
   };
 
-  // The other direction — 3 wrong/missed answers in a row (see wrongStreak
+  // The other direction — RRT_DROP_AFTER_WRONG wrong/missed in a row (see wrongStreak
   // in answer() and the miss-timeout effect below) forces the difficulty
   // back down by exactly one step, same granularity as an increment (round
   // length first, then premise count once it wraps). No-ops at the very
@@ -7638,6 +9317,18 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     clearTimeout(downNoticeTimeoutRef.current);
     downNoticeTimeoutRef.current = setTimeout(() => setDownNotice(false), 3000);
     return { premiseCount: newPremiseCount, roundMs: newRoundMs };
+  };
+
+  // Dev/test-only: sets the difficulty ladder straight to 7p / 30s. Same
+  // shape as triggerRrtIncrement so it threads through triggerFlash the same
+  // way, regenerating the round on screen rather than only bumping state.
+  const jumpRrtTo7p = () => {
+    const targetCount = 15; // 2 + floor(15 / 3) = 7 premises, 15 % 3 = 0 -> 30s
+    setRrtIncrementCount(targetCount);
+    const premiseCount = 2 + Math.floor(targetCount / 3);
+    const roundMs = (30 - (targetCount % 3) * 5) * 1000;
+    onLevelUp?.(premiseCount - 1, `RRT ${premiseCount}p ${roundMs / 1000}s`);
+    return { premiseCount, roundMs };
   };
 
   const answer = (value) => {
@@ -7676,10 +9367,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     } else {
       setCorrectStreak(0);
       const nextWrong = wrongStreak + 1;
-      // 3 wrong in a row forces the difficulty back down one step — the
-      // mirror of the 20-correct step-up above, just at a much shorter
-      // fuse (matching how dual/quad drop after 3 bad sessions in a row).
-      if (nextWrong >= 3) {
+      // Wrong answers in a row force the difficulty back down one step — the
+      // mirror of the 20-correct step-up above.
+      if (nextWrong >= RRT_DROP_AFTER_WRONG) {
         override = triggerRrtDecrement();
         setWrongStreak(0);
       } else {
@@ -7743,7 +9433,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             {formatDuration(elapsedMs)}
           </div>
           <button
-            onClick={() => setHistoryOpen(true)}
+            onClick={() => {
+              setTimerRunning(false);
+              setHistoryOpen(true);
+            }}
             className="text-sm text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2 transition-colors"
           >
             History
@@ -7806,13 +9499,19 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       </div>
 
       {historyOpen && (
-        <div className="fixed inset-0 z-40 bg-black/80 flex items-start justify-center overflow-y-auto p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl my-8">
+        <div
+          className="fixed inset-0 z-40 bg-black/80 flex items-start justify-center overflow-y-auto p-4"
+          onClick={() => setHistoryOpen(false)}
+        >
+          <div
+            className="w-full max-w-xl bg-slate-900 border border-slate-700 rounded-2xl my-8"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 sticky top-0 bg-slate-900 rounded-t-2xl">
-              <div className="italic font-bold tracking-wide text-slate-300 text-lg">HISTORY</div>
+              <div className="font-semibold text-slate-100 text-xl uppercase" style={{ letterSpacing: "0.18em" }}>History</div>
               <button
                 onClick={() => setHistoryOpen(false)}
-                className="text-slate-400 hover:text-slate-200 text-2xl leading-none px-2"
+                className="text-slate-400 hover:text-slate-200 text-4xl leading-none px-3 py-1 -my-1 transition-colors"
               >
                 ×
               </button>
@@ -7828,84 +9527,95 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                   return (
                   <div
                     key={entry.id}
-                    className={`rounded-xl border p-4 space-y-3 ${
-                      missed
-                        ? "border-slate-700 bg-black/40"
+                    className="rounded-xl border p-5 space-y-4 bg-slate-950"
+                    style={{
+                      borderColor: missed
+                        ? RRT_TIMEOUT
                         : entry.correct
-                        ? "border-green-700 bg-green-950/20"
-                        : "border-red-600 bg-red-950/30"
-                    }`}
+                        ? RRT_GREEN
+                        : RRT_RED,
+                    }}
                   >
-                    <div className="flex items-center justify-between text-base">
-                      <span className="text-slate-400 font-medium">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-300 text-sm font-semibold uppercase" style={{ letterSpacing: "0.14em" }}>
                         Round {roundHistory.length - i}
                       </span>
                       <span
-                        className={
-                          missed
-                            ? "text-slate-400 font-bold"
+                        className="text-sm font-bold uppercase rounded-full px-3 py-1"
+                        style={{
+                          letterSpacing: "0.12em",
+                          color: "#F7F8F8",
+                          backgroundColor: missed
+                            ? RRT_TIMEOUT
                             : entry.correct
-                            ? "text-green-400 font-bold"
-                            : "text-red-500 font-bold"
-                        }
+                            ? RRT_GREEN
+                            : RRT_RED,
+                        }}
                       >
-                        {missed ? "MISSED" : entry.correct ? "CORRECT" : "WRONG"}
+                        {missed ? "Missed" : entry.correct ? "Correct" : "Wrong"}
                       </span>
                     </div>
-                    <div className="space-y-1.5 text-base text-slate-200">
-                      <div className="text-slate-400 uppercase text-sm tracking-wide font-semibold">
+                    <div className="space-y-2.5 text-lg text-slate-100">
+                      <div className="text-slate-300 uppercase text-sm tracking-wide font-semibold">
                         Premises
                       </div>
                       {entry.premises.map((p, pi) => (
-                        <div key={pi} className="flex items-center gap-2 flex-wrap">
+                        <div key={pi} className="flex items-center gap-3 flex-wrap">
                           <RrtHistoryItemChip item={p.subject} onClick={setHistoryItemPopup} />
                           <span className="font-medium">{rrtRelationPhrase(p.relation)}</span>
                           <RrtHistoryItemChip item={p.object} onClick={setHistoryItemPopup} />
                         </div>
                       ))}
                     </div>
-                    <div className="space-y-1.5 text-base text-slate-200 pt-2 border-t border-slate-800">
-                      <div className="text-slate-400 uppercase text-sm tracking-wide font-semibold">
+                    <div className="space-y-2.5 text-lg text-slate-100 pt-3 border-t border-slate-800">
+                      <div className="text-slate-300 uppercase text-sm tracking-wide font-semibold">
                         Conclusion
                       </div>
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <RrtHistoryItemChip item={entry.conclusion.subject} onClick={setHistoryItemPopup} />
                         <span className="font-medium">{rrtRelationPhrase(entry.conclusion.relation)}</span>
                         <RrtHistoryItemChip item={entry.conclusion.object} onClick={setHistoryItemPopup} />
                         <span className="font-medium">?</span>
                       </div>
                     </div>
-                    <div className="text-base font-bold pt-1 space-y-0.5">
-                      <div>
-                        User Answer:{" "}
-                        <span
-                          className={
-                            missed
-                              ? "text-slate-400"
-                              : entry.userAnswer
-                              ? "text-green-400"
-                              : "text-red-500"
-                          }
-                        >
-                          {missed ? "(TIMED OUT)" : entry.userAnswer ? "TRUE" : "FALSE"}
-                        </span>
-                      </div>
-                      <div>
-                        Right Answer:{" "}
-                        <span
-                          className={
-                            entry.conclusion.answer ? "text-green-400" : "text-red-500"
-                          }
-                        >
-                          {entry.conclusion.answer ? "TRUE" : "FALSE"}
-                        </span>
-                      </div>
-                      <div className="text-slate-200">
-                        Response Time: {(entry.responseTimeMs / 1000).toFixed(1)} sec
-                      </div>
+                    {/* Answer readout as a label/value grid: muted small-caps
+                        labels on the left, the value carrying the colour, so the
+                        three lines line up instead of running together as bold
+                        sentences. */}
+                    <div className="pt-2 border-t border-slate-800 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 items-baseline">
+                      <span className="text-slate-400 text-sm font-semibold uppercase" style={{ letterSpacing: "0.12em" }}>
+                        Your answer
+                      </span>
+                      <span
+                        className="text-lg font-bold tabular-nums"
+                        style={{
+                          color: missed
+                            ? RRT_TIMEOUT
+                            : entry.userAnswer
+                            ? RRT_GREEN
+                            : RRT_RED,
+                        }}
+                      >
+                        {missed ? "Timed out" : entry.userAnswer ? "TRUE" : "FALSE"}
+                      </span>
+                      <span className="text-slate-400 text-sm font-semibold uppercase" style={{ letterSpacing: "0.12em" }}>
+                        Correct
+                      </span>
+                      <span
+                        className="text-lg font-bold"
+                        style={{ color: entry.conclusion.answer ? RRT_GREEN : RRT_RED }}
+                      >
+                        {entry.conclusion.answer ? "TRUE" : "FALSE"}
+                      </span>
+                      <span className="text-slate-400 text-sm font-semibold uppercase" style={{ letterSpacing: "0.12em" }}>
+                        Time
+                      </span>
+                      <span className="text-lg text-slate-100 tabular-nums">
+                        {(entry.responseTimeMs / 1000).toFixed(1)}s
+                      </span>
                     </div>
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-slate-600 text-sm">
+                      <span className="text-slate-400 text-base font-medium">
                         {RRT_PUZZLE_TYPE_LABEL[entry.puzzleType] || "Distinction"}
                       </span>
                       <button
@@ -7919,7 +9629,22 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                         onClick={() =>
                           setExplanationFor((cur) => (cur === entry ? null : entry))
                         }
-                        className="bg-teal-700 hover:bg-teal-600 transition-colors rounded-lg px-4 py-1.5 text-sm font-medium"
+                        onMouseEnter={() => {
+                          if (!rrtHasRealPointer()) return;
+                          setExplanationHover(entry);
+                          setExplanationFor(entry);
+                        }}
+                        onMouseLeave={() => {
+                          if (!rrtHasRealPointer()) return;
+                          // Only close what the hover itself opened — if the
+                          // panel was pinned by a click, moving the mouse away
+                          // shouldn't dismiss it.
+                          setExplanationHover((hovered) => {
+                            if (hovered === entry) setExplanationFor(null);
+                            return null;
+                          });
+                        }}
+                        className="bg-teal-700 hover:bg-teal-600 transition-colors rounded-lg px-5 py-2 text-base font-medium"
                       >
                         Explanation
                       </button>
@@ -7933,17 +9658,73 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         </div>
       )}
 
-      {explanationFor && (
+      {explanationFor && (() => {
+      const explanationIsVertical = explanationFor.puzzleType === "vertical";
+      return (
         <div
           className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"
-          onClick={() => setExplanationFor(null)}
+          style={explanationHover ? { pointerEvents: "none" } : undefined}
+          onClick={() => {
+            setExplanationHover(null);
+            setExplanationFor(null);
+          }}
         >
           <div
-            className="bg-slate-900 border border-slate-700 rounded-2xl p-7 max-w-sm w-full"
+            className={`bg-slate-900 border border-slate-700 rounded-2xl w-full ${
+              explanationIsVertical ? "p-6" : "p-5"
+            }`}
+            style={{
+              maxWidth: explanationIsVertical ? "15rem" : "42rem",
+              width: "fit-content",
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
               const explanation = buildRrtExplanationChain(explanationFor);
+              if (explanation.puzzleType === "space2d") {
+                return (
+                  <div className="overflow-x-auto">
+                    <div
+                      className="mx-auto"
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: `repeat(${explanation.cols}, 4.25rem)`,
+                        gridTemplateRows: `repeat(${explanation.rows}, 4.25rem)`,
+                        gap: 0,
+                        borderTop: "1px solid #3A3D44",
+                        borderLeft: "1px solid #3A3D44",
+                        width: "fit-content",
+                      }}
+                    >
+                      {Array.from({ length: explanation.cols * explanation.rows }).map((_, idx) => {
+                        const col = idx % explanation.cols;
+                        const row = Math.floor(idx / explanation.cols);
+                        const here = explanation.cells.find((c) => c.col === col && c.row === row);
+                        return (
+                          <div
+                            key={idx}
+                            className="flex items-center justify-center"
+                            style={{
+                              borderRight: "1px solid #3A3D44",
+                              borderBottom: "1px solid #3A3D44",
+                            }}
+                          >
+                            {here ? (
+                              here.item.type === "voronoi" ? (
+                                <RrtItemTile item={here.item} size={46} />
+                              ) : (
+                                <div className="text-slate-100 font-bold text-lg tracking-wide">
+                                  {here.item.letters}
+                                </div>
+                              )
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              }
               const orderConfig = RRT_ORDER_CONFIGS[explanation.puzzleType];
               if (orderConfig) {
                 const isVertical = explanation.puzzleType === "vertical";
@@ -7951,41 +9732,57 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                   <div
                     className={
                       isVertical
-                        ? "flex flex-col items-center gap-4"
-                        : "flex items-center justify-center gap-4"
+                        ? "flex flex-col items-center gap-2 overflow-y-auto"
+                        : "flex items-center justify-center gap-2.5 flex-wrap"
                     }
+                    style={isVertical ? { maxHeight: "70vh" } : undefined}
                   >
                     {explanation.chainItems.map((it, idx) => (
-                      <div
-                        key={idx}
-                        className={!isVertical && idx > 0 ? "pl-4 border-l border-slate-700" : ""}
-                      >
-                        {it.type === "voronoi" ? (
-                          <RrtItemTile item={it} size={56} />
-                        ) : (
-                          <div className="text-slate-100 font-bold text-lg tracking-wide">
-                            {it.letters}
-                          </div>
+                      <Fragment key={idx}>
+                        {idx > 0 && !isVertical && (
+                          <span
+                            className={`text-slate-400 font-semibold select-none ${
+                              isVertical ? "text-base leading-none" : "text-xl"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            {isVertical
+                              ? "\u2193"
+                              : explanation.puzzleType === "comparison"
+                              ? ">"
+                              : "\u203A"}
+                          </span>
                         )}
-                      </div>
+                        <div>
+                          {it.type === "voronoi" ? (
+                            <RrtItemTile item={it} size={46} />
+                          ) : (
+                            <div
+                              className="text-slate-100 font-bold text-lg tracking-wide"
+                            >
+                              {it.letters}
+                            </div>
+                          )}
+                        </div>
+                      </Fragment>
                     ))}
                   </div>
                 );
               }
               const { groups } = explanation;
               return (
-                <div className="flex items-stretch justify-center gap-6">
+                <div className="flex items-stretch justify-center gap-2">
                   {groups.map((group, gi) => (
                     <div
                       key={gi}
-                      className={`flex flex-col items-center gap-3 px-4 ${
+                      className={`flex flex-col items-center gap-3 px-5 ${
                         gi > 0 ? "border-l border-slate-700" : ""
                       }`}
                     >
                       {group
                         .filter((it) => it.type === "voronoi")
                         .map((it, idx) => (
-                          <RrtItemTile key={idx} item={it} size={64} />
+                          <RrtItemTile key={idx} item={it} size={46} />
                         ))}
                       {group
                         .filter((it) => it.type === "letters")
@@ -8002,15 +9799,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                 </div>
               );
             })()}
-            <button
-              onClick={() => setExplanationFor(null)}
-              className="mt-5 text-base text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2"
-            >
-              Close
-            </button>
           </div>
         </div>
-      )}
+      );
+      })()}
 
       {historyItemPopup && (
         <div
@@ -8024,7 +9816,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             <RrtItemTile item={historyItemPopup} size={96} />
             {historyItemPopup.type === "voronoi" && (
               <div className="text-slate-300 text-base font-medium">
-                {historyItemPopup.colorName} Voronoi
+                {historyItemPopup.colorName} tile
               </div>
             )}
             {historyItemPopup.type === "letters" && (
@@ -8044,21 +9836,30 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     </>
   );
 
+  // Verdict flash: a tinted wash plus a hard inset ring in the verdict colour,
+  // with the label set small and letter-spaced over it. The puzzle stays
+  // readable underneath instead of being painted out by a full-bleed block
+  // with an emoji on it.
+  const flashColor =
+    flash === "correct" ? RRT_GREEN : flash === "wrong" ? RRT_RED : RRT_TIMEOUT;
   const flashOverlay = flash && (
     <div
-      className={`absolute inset-0 rounded-2xl flex flex-col items-center justify-center gap-2 z-10 ${
-        flash === "correct"
-          ? "bg-emerald-500/90"
-          : flash === "wrong"
-          ? "bg-rose-500/90"
-          : "bg-amber-500/90"
-      }`}
+      className="absolute inset-0 rounded-2xl flex items-center justify-center z-10 rrt-flash"
+      style={{
+        backgroundColor: `${flashColor}33`,
+        boxShadow: `inset 0 0 0 2px ${flashColor}, inset 0 0 60px ${flashColor}55`,
+        backdropFilter: "blur(1px)",
+      }}
     >
-      <div className="text-5xl">
-        {flash === "correct" ? "✅" : flash === "wrong" ? "❌" : "⏱"}
-      </div>
-      <div className="text-2xl font-semibold text-white">
-        {flash === "correct" ? "Correct!" : flash === "wrong" ? "Wrong" : "Missed"}
+      <div
+        className="text-base font-semibold uppercase px-5 py-2 rounded-lg"
+        style={{
+          letterSpacing: "0.3em",
+          color: "#F7F8F8",
+          backgroundColor: `${flashColor}`,
+        }}
+      >
+        {flash === "correct" ? "Correct" : flash === "wrong" ? "Wrong" : "Timed out"}
       </div>
     </div>
   );
@@ -8068,11 +9869,11 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     const isFirst = premiseIndex === 0;
     const isLast = premiseIndex === puzzle.premises.length - 1;
     return (
-      <div className="relative max-w-xs mx-auto">
+      <div className="relative max-w-sm mx-auto">
         {flashOverlay}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
-          <div className="p-4 flex flex-col">
-            <div className="space-y-2.5">
+          <div className="p-6 flex flex-col">
+            <div className="space-y-5">
               {timerHeader}
 
               <div className="flex items-center justify-between">
@@ -8084,20 +9885,23 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                 </div>
               </div>
 
-              <div className="flex items-center justify-center gap-2.5 py-1.5 px-1 flex-wrap text-center">
-                <RrtItemTile item={premise.subject} size={32} />
-                <span className="text-slate-100 text-lg font-medium">
+              <div
+                className="flex items-center justify-center gap-3.5 py-5 px-1 flex-wrap text-center"
+                style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
+              >
+                <RrtItemTile item={premise.subject} size={46} />
+                <span className="text-slate-100 text-2xl font-medium">
                   {rrtRelationPhrase(premise.relation)}
                 </span>
-                <RrtItemTile item={premise.object} size={32} />
+                <RrtItemTile item={premise.object} size={46} />
               </div>
             </div>
 
             <div
-              className="flex flex-col justify-start gap-3 mt-1.5"
+              className="flex flex-col justify-start gap-3 mt-4"
               style={{ minHeight: RRT_FOOTER_MIN_HEIGHT }}
             >
-              <div className="flex gap-2.5">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setPremiseIndex((i) => Math.max(0, i - 1))}
                   disabled={isFirst}
@@ -8145,6 +9949,16 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             🧪 20 in a row
           </button>
           <button
+            onClick={() => {
+              setCorrectStreak(0);
+              const override = jumpRrtTo7p();
+              triggerFlash("correct", override);
+            }}
+            className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
+          >
+            🧪 Skip to 7p
+          </button>
+          <button
             onClick={onFinish}
             className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
           >
@@ -8158,11 +9972,11 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // stage === "question"
   const { conclusion } = puzzle;
   return (
-    <div className="relative max-w-xs mx-auto">
+    <div className="relative max-w-sm mx-auto">
       {flashOverlay}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
-        <div className="p-4 flex flex-col">
-          <div className="space-y-2.5">
+        <div className="p-6 flex flex-col">
+          <div className="space-y-5">
             {timerHeader}
 
             <div className="text-center">
@@ -8171,21 +9985,24 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               </div>
             </div>
 
-            <div className="flex items-center justify-center gap-2.5 py-1.5 px-1 flex-wrap text-center">
-              <RrtItemTile item={conclusion.subject} size={32} />
-              <span className="text-slate-100 text-lg font-medium">
+            <div
+              className="flex items-center justify-center gap-3.5 py-5 px-1 flex-wrap text-center"
+              style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
+            >
+              <RrtItemTile item={conclusion.subject} size={46} />
+              <span className="text-slate-100 text-2xl font-medium">
                 {rrtRelationPhrase(conclusion.relation)}
               </span>
-              <RrtItemTile item={conclusion.object} size={32} />
-              <span className="text-slate-100 text-lg font-medium">?</span>
+              <RrtItemTile item={conclusion.object} size={46} />
+              <span className="text-slate-100 text-2xl font-medium">?</span>
             </div>
           </div>
 
           <div
-            className="flex flex-col justify-start gap-3 mt-1.5"
+            className="flex flex-col justify-start gap-3 mt-4"
             style={{ minHeight: RRT_FOOTER_MIN_HEIGHT }}
           >
-            <div className="flex gap-2.5">
+            <div className="flex gap-3">
               <button
                 onClick={() => {
                   setPremiseIndex(puzzle.premises.length - 1);
@@ -8203,7 +10020,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               </button>
             </div>
 
-            <div className="flex gap-2.5">
+            <div className="flex gap-3">
               <button
                 onClick={() => answer(true)}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-500 transition-colors rounded-lg py-2 text-base font-medium"
@@ -8236,6 +10053,16 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           🧪 20 in a row
         </button>
         <button
+          onClick={() => {
+            setCorrectStreak(0);
+            const override = jumpRrtTo7p();
+            triggerFlash("correct", override);
+          }}
+          className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
+        >
+          🧪 Skip to 7p
+        </button>
+        <button
           onClick={onFinish}
           className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
         >
@@ -8258,9 +10085,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 // misses" spirit as RRT, just continuous instead of streak-gated.
 const MOT_BALL_COUNT = 10;
 const MOT_TARGET_COUNT = 5;
-const MOT_CUBE_HALF = 3.2; // half-extent of the bounding cube along each axis
-const MOT_CUBE_HALF_X = MOT_CUBE_HALF * 1.5; // wider left/right than the other two axes — same cube, stretched only on X
+const MOT_CUBE_HALF = 2.6; // half-extent of the bounding cube along each axis — sized against MOT_BALL_RADIUS so the interior doesn't read as empty
+const MOT_CUBE_HALF_X = MOT_CUBE_HALF * 1.4; // wider left/right than the other two axes — same cube, stretched only on X
 const MOT_BALL_RADIUS = 0.34;
+const MOT_CAMERA_FOV = 62; // vertical field of view, degrees
 const MOT_HIGHLIGHT_MS = 1800; // how long targets flash gold before blending in
 const MOT_TRACK_MS = 8000; // how long balls drift before freezing for selection
 // Range recalibrated so ~0.50 sits near the top of what's manageable for
@@ -8332,9 +10160,9 @@ function motRandomUnitVector() {
 
 // Random point inside the cube, inset by `margin` on every axis (so a ball
 // spawned here doesn't already need to be resolved out of the wall).
-function motRandomPointInCube(margin) {
+function motRandomPointInCube(margin, halfX) {
   const span = MOT_CUBE_HALF - margin;
-  const spanX = MOT_CUBE_HALF_X - margin;
+  const spanX = halfX - margin;
   return new THREE.Vector3(
     (Math.random() * 2 - 1) * spanX,
     (Math.random() * 2 - 1) * span,
@@ -8402,6 +10230,58 @@ const MOT_MIN_CANVAS_DIM = 220;
 // to round for the mechanic to work.
 const MOT_KEY_LETTERS = ["a", "s", "d", "f", "g", "h", "j", "k", "l", "i"];
 
+// Solves for the camera distance that mathematically guarantees the whole
+// cube (every ball included, at any position it can legally occupy) stays
+// inside the view frustum, for the CURRENT aspect ratio — rather than a
+// fixed distance eyeballed against one screenshot's aspect ratio, which is
+// exactly why this kept clipping differently on different screen shapes.
+//
+// The worst case for each axis is a ball simultaneously at that axis's
+// extreme AND at max Z (closest to the camera, since the cube has real
+// depth too) — that's the shortest possible camera-to-ball distance
+// combined with the largest possible off-axis offset, i.e. the case most
+// likely to fall outside the frustum. A ball's surface can reach exactly
+// the cube's half-extent (its center is clamped to half-extent minus its
+// own radius, see the `bound`/`boundX` clamps in the animation loop), so
+// the cube's half-extents ARE the values that need to stay inside frame —
+// no separate radius term needed.
+//
+// For each axis: requiring (cameraDistance - MOT_CUBE_HALF) * tanHalfFov
+// >= thatAxis'sHalfExtent, solved for cameraDistance, gives the minimum
+// distance that keeps it fully framed. Takes the larger of the vertical
+// and horizontal requirements, then adds a small safety margin.
+// Scroll-zoom bounds, as multipliers on the computed fit-the-box distance:
+// 0.45 is about as close as you can get before the camera crosses the front
+// wall, 2.2 is far enough back to see the whole room with margin.
+// Widest the room is ever allowed to get, as a multiple of its Y/Z
+// half-extent. Without a ceiling the room tracked the viewport aspect ratio
+// without limit, so an ultrawide window produced a room stretched more than
+// 2:1 — a letterbox slot rather than a box.
+const MOT_CUBE_HALF_X_MAX = MOT_CUBE_HALF * 1.5;
+
+// Room X half-extent for a given canvas size: tracks the viewport aspect
+// ratio so a wider screen gets a wider room, but clamped at both ends so the
+// proportions stay box-like. Beyond the cap the extra width becomes margin
+// around the room instead of more room.
+function motCubeHalfX(width, height) {
+  return Math.min(
+    MOT_CUBE_HALF_X_MAX,
+    Math.max(MOT_CUBE_HALF_X, MOT_CUBE_HALF * (width / height))
+  );
+}
+
+const MOT_ZOOM_MIN = 0.45;
+const MOT_ZOOM_MAX = 2.2;
+
+function computeMotionCameraDistance(width, height, fovDeg, cubeHalfX) {
+  const aspect = width / height;
+  const tanHalfV = Math.tan((fovDeg * Math.PI) / 360);
+  const tanHalfH = tanHalfV * aspect;
+  const distV = MOT_CUBE_HALF / tanHalfV + MOT_CUBE_HALF;
+  const distH = cubeHalfX / tanHalfH + MOT_CUBE_HALF;
+  return Math.max(distV, distH) * 1.06; // small safety margin on top of the exact minimum
+}
+
 // Projects a ball's live 3D position to 2D canvas-pixel coordinates, for
 // positioning its letter label — the label is a real DOM element (crisp
 // at any zoom, unaffected by the ball's own rotation) rather than baked
@@ -8415,7 +10295,144 @@ function motProjectToScreen(position, camera, width, height) {
   };
 }
 
-function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, onResetProgress, paused }) {
+
+// =======================================================================
+// Hypnosis / motivation module
+// =======================================================================
+// Shown once at the end of a completed session (the Overview screen's "Home"
+// button routes here instead of straight home), so it lands while the effort
+// is still fresh rather than competing with the decision to start training.
+//
+// TO ADD THE TRACK: drop the audio file's URL into HYPNOSIS_TRACK.url. Until
+// that's set the screen renders with the player disabled and says so, rather
+// than showing a play button that does nothing.
+const HYPNOSIS_TRACK = {
+  url: "", // e.g. "https://your-host/motivation-01.mp3"
+  title: "Motivation",
+  blurb:
+    "A short guided hypnosis track. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
+};
+
+function HypnosisScreen({ onDone }) {
+  const audioRef = useRef(null);
+  const [playing, setPlaying] = useState(false);
+  const [progress, setProgress] = useState(0); // 0..1
+  const [duration, setDuration] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const hasTrack = !!HYPNOSIS_TRACK.url;
+
+  // Pause on unmount so the audio can't keep playing over the rest of the app
+  // after this screen is left mid-track.
+  useEffect(() => {
+    return () => {
+      const el = audioRef.current;
+      if (el) el.pause();
+    };
+  }, []);
+
+  const toggle = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (el.paused) {
+      el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
+    } else {
+      el.pause();
+      setPlaying(false);
+    }
+  };
+
+  const seek = (e) => {
+    const el = audioRef.current;
+    if (!el || !duration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
+    el.currentTime = ratio * duration;
+    setProgress(ratio);
+    setElapsed(ratio * duration);
+  };
+
+  const fmt = (s) => {
+    if (!s || !isFinite(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="space-y-14">
+      <div>
+        <div className="text-base uppercase tracking-wide font-semibold text-indigo-300">
+          Session complete
+        </div>
+        <h1 className="text-4xl font-semibold tracking-tight mt-2">
+          {HYPNOSIS_TRACK.title}
+        </h1>
+      </div>
+
+      <p className="text-slate-300 text-lg leading-relaxed">
+        {HYPNOSIS_TRACK.blurb}
+      </p>
+
+      <div className="bg-slate-900 border border-slate-700/70 rounded-2xl p-8 space-y-6">
+        {hasTrack ? (
+          <>
+            <audio
+              ref={audioRef}
+              src={HYPNOSIS_TRACK.url}
+              preload="metadata"
+              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+              onTimeUpdate={(e) => {
+                const el = e.currentTarget;
+                setElapsed(el.currentTime);
+                setProgress(el.duration ? el.currentTime / el.duration : 0);
+              }}
+              onEnded={() => {
+                setPlaying(false);
+                setProgress(1);
+              }}
+            />
+            <div className="flex items-center gap-6">
+              <button
+                onClick={toggle}
+                aria-label={playing ? "Pause" : "Play"}
+                className="w-16 h-16 shrink-0 rounded-full bg-indigo-500 hover:bg-indigo-400 transition-colors flex items-center justify-center text-2xl"
+              >
+                {playing ? "⏸" : "▶"}
+              </button>
+              <div className="flex-1 space-y-2">
+                <div
+                  onClick={seek}
+                  className="h-2 rounded-full bg-slate-700 cursor-pointer overflow-hidden"
+                >
+                  <div
+                    className="h-full bg-indigo-400 transition-[width] duration-150"
+                    style={{ width: `${Math.round(progress * 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-slate-400 text-sm tabular-nums">
+                  <span>{fmt(elapsed)}</span>
+                  <span>{fmt(duration)}</span>
+                </div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="text-slate-400 text-base">
+            No track loaded yet — add the audio file URL to HYPNOSIS_TRACK.url.
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={onDone}
+        className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+      >
+        {hasTrack ? "Done" : "Home"}
+      </button>
+    </div>
+  );
+}
+
+function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, onLevelUp, onSessionEnd, onResetProgress, paused }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | highlight | track | select | result
   const [speed, setSpeed] = useState(MOT_START_SPEED);
@@ -8438,6 +10455,11 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
   const trainedMsRef = useRef(0); // cumulative real duration of rounds that were actually answered — only submitSelection adds to this, so hitting Restart mid-round (or letting the app sit idle) can't pad the timer
   const tallyRef = useRef({ correct: 0, wrong: 0 }); // mirrors `tally`, but read synchronously — lets the finish path report this session's final correct/wrong count without waiting on a state update to land
   const onResizeRef = useRef(null); // lets the resize handler defined inside the scene-setup effect be re-invoked (e.g. on an actual window resize) from outside that effect's closure
+  // Scroll-wheel zoom factor, applied as a multiplier on the computed
+  // camera distance. A ref (not state) so the wheel handler and the resize
+  // handler can both read/write it without re-running the scene effect.
+  const motZoomRef = useRef(1);
+  const cubeHalfXRef = useRef(MOT_CUBE_HALF_X); // live current cube X half-extent — updated by onResize below (not just computed once at mount), so a screen that's wide from the start, or becomes wide later, actually gets a wider room instead of the room staying locked at whatever aspect ratio happened to be measured first
 
   useEffect(() => {
     stageRef.current = stage;
@@ -8463,8 +10485,25 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     const height = Math.max(MOT_MIN_CANVAS_DIM, clientHeight || MOT_MIN_CANVAS_DIM);
     setCanvasSize({ w: width, h: height });
 
+    // The room's actual width in world units, derived from the real
+    // measured aspect ratio — MOT_CUBE_HALF * aspect is exactly the value
+    // that makes the width-fit and height-fit camera distances equal (see
+    // computeMotionCameraDistance below), i.e. no wasted margin on either
+    // side. Math.max against the old fixed MOT_CUBE_HALF_X means a normal
+    // or narrower window still gets exactly the room it had before —
+    // this only widens things on screens wider than that original ratio,
+    // which is exactly the "doesn't fill a wide screen" case being fixed.
+    // Written into cubeHalfXRef (not just a local const) because onResize
+    // below recomputes and rebuilds the boundary box from this same ref
+    // every time the aspect ratio actually changes — the geometry stays in
+    // sync with the live viewport instead of being frozen at whatever
+    // width happened to be measured on this very first layout pass. Only
+    // this X extent is ever touched; MOT_CUBE_HALF (the Y/Z extents that
+    // drive vertical framing) is a fixed constant nothing here changes.
+    cubeHalfXRef.current = motCubeHalfX(width, height);
+
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(62, width / height, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(MOT_CAMERA_FOV, width / height, 0.1, 100);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
@@ -8495,7 +10534,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     // Shadow camera frustum sized to just cover the cube the balls move
     // in — tight enough for crisp shadows, loose enough that a ball near
     // any wall still casts/receives correctly.
-    const shadowExtent = MOT_CUBE_HALF_X * 1.6;
+    const shadowExtent = cubeHalfXRef.current * 1.6;
     dirLight.shadow.camera.left = -shadowExtent;
     dirLight.shadow.camera.right = shadowExtent;
     dirLight.shadow.camera.top = shadowExtent;
@@ -8512,23 +10551,26 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     fillLight.position.set(-5, -2, -6);
     scene.add(fillLight);
 
-    const boundaryGeo = new THREE.BoxGeometry(
-      MOT_CUBE_HALF_X * 2,
-      MOT_CUBE_HALF * 2,
-      MOT_CUBE_HALF * 2
-    );
-    // EdgesGeometry + LineSegments draws only the 12 real cube edges — a
-    // plain wireframe material on the box mesh would also draw the
-    // diagonal split of each face's two triangles, which reads as stray
-    // lines slicing across the cube.
-    const boundaryEdges = new THREE.EdgesGeometry(boundaryGeo);
-    const boundaryMat = new THREE.LineBasicMaterial({
-      color: 0x475569,
-      transparent: true,
-      opacity: 0.55,
-    });
-    const boundary = new THREE.LineSegments(boundaryEdges, boundaryMat);
-    scene.add(boundary);
+    // Boundary box geometry is rebuilt by name (buildBoundary, defined just
+    // below) so onResize can call the exact same construction again with a
+    // new width later, instead of this being a one-off mount-only build.
+    const buildBoundary = (halfX) => {
+      const geo = new THREE.BoxGeometry(halfX * 2, MOT_CUBE_HALF * 2, MOT_CUBE_HALF * 2);
+      // EdgesGeometry + LineSegments draws only the 12 real cube edges — a
+      // plain wireframe material on the box mesh would also draw the
+      // diagonal split of each face's two triangles, which reads as stray
+      // lines slicing across the cube.
+      const edges = new THREE.EdgesGeometry(geo);
+      const mat = new THREE.LineBasicMaterial({
+        color: 0x475569,
+        transparent: true,
+        opacity: 0.55,
+      });
+      const mesh = new THREE.LineSegments(edges, mat);
+      return { geo, edges, mat, mesh };
+    };
+    let boundaryParts = buildBoundary(cubeHalfXRef.current);
+    scene.add(boundaryParts.mesh);
 
     const ballGeo = new THREE.SphereGeometry(MOT_BALL_RADIUS, 24, 18);
     // Template for the latitude/longitude line overlay — cloned per ball
@@ -8553,7 +10595,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       const mesh = new THREE.Mesh(ballGeo, mat);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
-      mesh.position.copy(motRandomPointInCube(MOT_BALL_RADIUS));
+      mesh.position.copy(motRandomPointInCube(MOT_BALL_RADIUS, cubeHalfXRef.current));
       const lines = ballLineTemplate.clone();
       mesh.add(lines);
       // Invisible, larger sphere used ONLY for click detection — a child
@@ -8612,6 +10654,38 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       const h = Math.max(MOT_MIN_CANVAS_DIM, host.clientHeight || MOT_MIN_CANVAS_DIM);
       renderer.setSize(w, h);
       camera.aspect = w / h;
+
+      // Same formula as the initial mount computation above — recomputed
+      // here so a screen that's wide from the very first layout pass (or
+      // becomes wide later, e.g. a window resize or sidebar closing) gets
+      // an actually wider room, not just a camera that pulls back to fit
+      // more empty space around an unchanged, narrower box. Only ever
+      // touches the X extent — MOT_CUBE_HALF (Y/Z, i.e. height) is a fixed
+      // constant that nothing in this resize path reads or writes.
+      const newHalfX = motCubeHalfX(w, h);
+      if (Math.abs(newHalfX - cubeHalfXRef.current) > 0.01) {
+        cubeHalfXRef.current = newHalfX;
+        scene.remove(boundaryParts.mesh);
+        boundaryParts.geo.dispose();
+        boundaryParts.edges.dispose();
+        boundaryParts.mat.dispose();
+        boundaryParts = buildBoundary(newHalfX);
+        scene.add(boundaryParts.mesh);
+      }
+
+      // Aspect ratio changing (window resize, orientation change, sidebar
+      // opening/closing) changes what camera distance is actually required
+      // to keep the cube fully framed — recomputed here every time rather
+      // than left at whatever distance happened to be right for the
+      // aspect ratio at mount, which is exactly how this ended up clipping
+      // on some screen shapes but not others before.
+      camera.position.set(
+        0,
+        0,
+        computeMotionCameraDistance(w, h, MOT_CAMERA_FOV, cubeHalfXRef.current) *
+          motZoomRef.current
+      );
+      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
       setCanvasSize({ w, h });
     };
@@ -8625,12 +10699,36 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
     resizeObserver.observe(host);
     onResizeRef.current = onResize;
 
-    // Reduced offset from center (was 0.95, 0.78) for a more front-facing,
-    // straight-into-the-box look — closer to eye-level and centered, with
-    // just enough offset left that the side/floor/ceiling edges still read
-    // as a cube rather than a flat square. Never moves — only the balls do.
-    camera.position.set(0.23, 0.13, 6.0);
-    camera.lookAt(0, 0, 0);
+    // Dead-on, head-first view: the camera sits exactly on the box's centre
+    // axis (x = 0, y = 0) looking straight down -Z at the middle of the room,
+    // so the back wall is centred and the four side walls read as symmetric
+    // trapezoids around it. The old (0.23, 0.02) offset put the vanishing
+    // point off-centre and skewed the perspective.
+    //
+    // Z distance is computed, not guessed — see computeMotionCameraDistance
+    // for the containment math — then scaled by the scroll-wheel zoom factor.
+    // Recomputed on every resize too (see onResize above), so it stays
+    // correct across aspect ratios instead of being tuned for one window shape.
+    const applyCameraDistance = (w, h) => {
+      const base = computeMotionCameraDistance(w, h, MOT_CAMERA_FOV, cubeHalfXRef.current);
+      camera.position.set(0, 0, base * motZoomRef.current);
+      camera.lookAt(0, 0, 0);
+    };
+    applyCameraDistance(width, height);
+
+    // Scroll to zoom. Multiplicative so each notch feels the same at any
+    // distance, clamped so the camera can neither end up inside the box nor
+    // pull so far back the room becomes a speck. Non-passive because it has
+    // to preventDefault — otherwise the wheel scrolls the page instead.
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const next = motZoomRef.current * Math.exp(e.deltaY * 0.0012);
+      motZoomRef.current = Math.min(MOT_ZOOM_MAX, Math.max(MOT_ZOOM_MIN, next));
+      const w = Math.max(MOT_MIN_CANVAS_DIM, host.clientWidth || MOT_MIN_CANVAS_DIM);
+      const h = Math.max(MOT_MIN_CANVAS_DIM, host.clientHeight || MOT_MIN_CANVAS_DIM);
+      applyCameraDistance(w, h);
+    };
+    mount.addEventListener("wheel", handleWheel, { passive: false });
 
     const animate = () => {
       ctx.animFrame = requestAnimationFrame(animate);
@@ -8639,7 +10737,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
       if (stageRef.current === "track" && !pausedRef.current) {
         const speedNow = motDisplaySpeedToVelocity(speedRef.current);
         const bound = MOT_CUBE_HALF - MOT_BALL_RADIUS;
-        const boundX = MOT_CUBE_HALF_X - MOT_BALL_RADIUS;
+        const boundX = cubeHalfXRef.current - MOT_BALL_RADIUS;
         ctx.balls.forEach((b) => {
           b.mesh.position.addScaledVector(b.vel, speedNow * dt);
           const p = b.mesh.position;
@@ -8720,6 +10818,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
 
     return () => {
       mount.removeEventListener("click", handleClick);
+      mount.removeEventListener("wheel", handleWheel);
       resizeObserver.disconnect();
       cancelAnimationFrame(ctx.animFrame);
       ballGeo.dispose();
@@ -8727,9 +10826,9 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) obj.material.dispose();
       });
-      boundaryGeo.dispose();
-      boundaryEdges.dispose();
-      boundaryMat.dispose();
+      boundaryParts.geo.dispose();
+      boundaryParts.edges.dispose();
+      boundaryParts.mat.dispose();
       balls.forEach((b) => b.mesh.material.dispose());
       renderer.dispose();
       host.innerHTML = "";
@@ -8944,8 +11043,6 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
         ref={canvasHostRef}
         className="fixed inset-0 bg-slate-950 overflow-hidden"
         style={{
-          width: "100vw",
-          height: "100dvh",
           cursor: stage === "select" ? "pointer" : "default",
         }}
       >
@@ -8967,7 +11064,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
               // The actual key the person presses is unaffected either way
               // — that's matched against the lowercase letter in
               // MOT_KEY_LETTERS regardless of how it's displayed.
-              WebkitTextStroke: "1.5px rgba(15,23,42,0.85)",
+              WebkitTextStroke: "1.5px rgba(8,9,10,0.85)",
               textShadow: "0 1px 3px rgba(0,0,0,0.6)",
               display: "none",
             }}
@@ -8978,7 +11075,7 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
 
         <div
           className="absolute top-1/2 left-1/2 w-2 h-2 -mt-1 -ml-1 rounded-full bg-slate-200/80 pointer-events-none"
-          style={{ boxShadow: "0 0 6px 2px rgba(226,232,240,0.35)" }}
+          style={{ boxShadow: "0 0 6px 2px rgba(247,248,248,0.35)" }}
         />
 
         {/* Total elapsed session time — only updates when submitSelection
@@ -9010,7 +11107,11 @@ function Motion3DExercise({ exercise, onFinish, onStageChange, onLevelUp, onSess
                 durationMs: trainedMsRef.current,
               });
             }
-            onFinish?.();
+            // Straight to Overview, not just "whatever's next" — this is
+            // simulating the whole session ending, so it should land where
+            // a real 15-minute cutoff eventually would even if motion3d
+            // isn't the last step in the current regime.
+            (onForceOverview || onFinish)?.();
           }}
           className="absolute top-12 left-3 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1 transition-colors"
         >
@@ -9073,7 +11174,7 @@ function Stat({ label, value, color, size = "lg", accent }) {
     : "bg-slate-900 border border-slate-700/60";
   return (
     <div className={`${cardClass} rounded-lg p-6`}>
-      <div className="text-slate-300 text-lg font-semibold uppercase tracking-wide">
+      <div className="text-slate-100 text-lg font-semibold uppercase tracking-wide">
         {label}
       </div>
       <div className={`${valueClass} font-medium mt-2`} style={color ? { color } : undefined}>
