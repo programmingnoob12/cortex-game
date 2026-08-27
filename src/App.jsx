@@ -6442,11 +6442,13 @@ function NBackSessionApp() {
         button:not(:disabled) {
           transition: box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
         }
-        button:not(:disabled):hover {
-          box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.08);
-        }
+        /* The flat 999px hover fill that used to live here has moved to
+           index.css as a top-lit gradient overlay. Keeping both meant every
+           button got lightened twice, which is why the tinted ones (the
+           Achievements pill especially) blew out on hover. Only the press
+           state stays here. */
         button:not(:disabled):active {
-          box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.15);
+          box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.12);
         }
         @keyframes gemPop {
           0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
