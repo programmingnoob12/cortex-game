@@ -4,7 +4,7 @@ import { sendCancellationEmail } from "./_mail.js";
 
 export default withBillingHandler(async (req) => {
   const { feedback, comment } = req.body || {};
-  const { customerId, subscriptionId } = await getBillingContext(req);
+  const { customerId, subscriptionId, email } = await getBillingContext(req);
 
   await stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: true,
@@ -20,7 +20,7 @@ export default withBillingHandler(async (req) => {
   try {
     const customer = await stripe.customers.retrieve(customerId);
     await sendCancellationEmail({
-      customerEmail: customer?.email,
+      customerEmail: email || customer?.email,
       feedback,
       comment,
       subscriptionId,

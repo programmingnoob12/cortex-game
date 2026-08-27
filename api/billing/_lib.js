@@ -42,7 +42,7 @@ export async function getBillingContext(req) {
 
   const { data: row, error: rowErr } = await supabaseAdmin
     .from("users")
-    .select("stripe_customer_id, stripe_subscription_id")
+    .select("email, stripe_customer_id, stripe_subscription_id")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -54,6 +54,9 @@ export async function getBillingContext(req) {
 
   return {
     userId: user.id,
+    // Prefer the verified auth email — the Stripe customer is created at
+    // checkout before any email is known, so customer.email is often null.
+    email: user.email || row.email || null,
     customerId: row.stripe_customer_id,
     subscriptionId: row.stripe_subscription_id,
   };
@@ -104,6 +107,13 @@ export async function buildStateResponse(customerId, subscriptionId) {
     amount: price?.unit_amount ?? null,
     currentPeriodEnd: subscription.current_period_end,
     cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    // Set when an annual plan has been switched to monthly: the price is
+    // already changed but the first monthly charge only lands at renewal,
+    // so the UI must say "annual until then" rather than "monthly now".
+    scheduledPlan: subscription.metadata?.scheduled_plan || null,
+    scheduledPlanAt: subscription.metadata?.scheduled_plan_at
+      ? Number(subscription.metadata.scheduled_plan_at)
+      : null,
     pausedUntil: subscription.pause_collection?.resumes_at ?? null,
     card,
     invoices,

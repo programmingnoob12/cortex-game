@@ -21,12 +21,29 @@ export default withBillingHandler(async (req) => {
   const { customerId, subscriptionId } = await getBillingContext(req);
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const currentItem = subscription.items.data[0];
+  const currentInterval = currentItem?.price?.recurring?.interval;
+
+  // DOWNGRADE (annual -> monthly): deferred to renewal, never prorated.
+  //
+  // Switching immediately would refund most of an unused year as account
+  // credit, which then silently pays for months of monthly billing — the
+  // customer appears to get free months and the revenue is already gone.
+  // Waiting until renewal means they use the year they paid for, then start
+  // monthly. No credit is created, no money moves early, nobody loses out.
+  if (currentInterval === "year" && plan === "monthly") {
+    return {
+      deferred: true,
+      dueNow: 0,
+      currency: subscription.currency,
+      effectiveDate: subscription.current_period_end,
+      lines: [],
+    };
+  }
+
+  // UPGRADE (monthly -> annual): immediate, prorated to the second. Unused
+  // time on the current month is credited against the annual charge.
   const prorationDate = Math.floor(Date.now() / 1000);
 
-  // stripe-node v22 removed invoices.retrieveUpcoming in favour of
-  // invoices.createPreview, and moved the subscription_* top-level params
-  // under a subscription_details object. Older versions are kept working
-  // by falling back, so this doesn't break if the SDK is pinned back.
   const upcoming = stripe.invoices.createPreview
     ? await stripe.invoices.createPreview({
         customer: customerId,
@@ -44,7 +61,14 @@ export default withBillingHandler(async (req) => {
       });
 
   return {
+    deferred: false,
     dueNow: upcoming.amount_due,
+    // total is the sum of the line items. starting_balance is stored credit
+    // being applied (negative when credit exists). Without surfacing it,
+    // "Due now" can look wrong — lines adding to $440 while only cents are
+    // charged because credit covers the rest.
+    total: upcoming.total,
+    creditApplied: upcoming.starting_balance || 0,
     currency: upcoming.currency,
     prorationDate,
     lines: upcoming.lines.data.map((line) => ({

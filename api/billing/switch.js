@@ -18,15 +18,41 @@ export default withBillingHandler(async (req) => {
   const { customerId, subscriptionId } = await getBillingContext(req);
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const currentItem = subscription.items.data[0];
+  const currentInterval = currentItem?.price?.recurring?.interval;
+
+  const isDowngrade = currentInterval === "year" && plan === "monthly";
+
+  if (isDowngrade) {
+    // proration_behavior "none" changes the price without invoicing now and
+    // without issuing credit. The current period still runs to the annual
+    // renewal date, and the first monthly charge happens then. They keep
+    // every day they paid for; no refund, no free months.
+    await stripe.subscriptions.update(subscriptionId, {
+      items: [{ id: currentItem.id, price: newPriceId }],
+      proration_behavior: "none",
+      cancel_at_period_end: false,
+      metadata: {
+        ...subscription.metadata,
+        scheduled_plan: "monthly",
+        scheduled_plan_at: String(subscription.current_period_end),
+      },
+    });
+    return buildStateResponse(customerId, subscriptionId);
+  }
 
   await stripe.subscriptions.update(subscriptionId, {
     items: [{ id: currentItem.id, price: newPriceId }],
     proration_behavior: "create_prorations",
-    // Reuses the exact proration_date the person already saw in the
-    // preview step, so what they confirmed matches what actually bills —
-    // without this, a few seconds' drift could change the amount charged.
+    // Reuses the exact proration_date the person already saw in the preview
+    // step, so what they confirmed matches what actually bills — without
+    // this, a few seconds' drift could change the amount charged.
     proration_date: prorationDate,
     cancel_at_period_end: false,
+    metadata: {
+      ...subscription.metadata,
+      scheduled_plan: "",
+      scheduled_plan_at: "",
+    },
   });
 
   return buildStateResponse(customerId, subscriptionId);

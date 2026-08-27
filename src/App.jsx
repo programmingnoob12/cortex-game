@@ -7599,7 +7599,13 @@ function NBackSessionApp() {
                       {billingState.currency?.toUpperCase()}
                     </span>
                   </div>
-                  {billingState.pausedUntil ? (
+                  {billingState.scheduledPlan && billingState.scheduledPlanAt ? (
+                    <div className="text-amber-400 text-base">
+                      Annual until{" "}
+                      {new Date(billingState.scheduledPlanAt * 1000).toLocaleDateString()}, then
+                      switches to monthly
+                    </div>
+                  ) : billingState.pausedUntil ? (
                     <div className="text-amber-400 text-base">
                       Paused until{" "}
                       {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
@@ -7692,7 +7698,25 @@ function NBackSessionApp() {
                     <div className="text-lg font-semibold">
                       Switch to {previewTargetPlan}?
                     </div>
-                    <div className="space-y-1.5 text-sm text-slate-400">
+                    {previewData.deferred ? (
+                      <div className="text-sm text-slate-400 space-y-2">
+                        <p>
+                          Nothing is charged today and nothing is refunded. You keep annual
+                          access until{" "}
+                          <span className="text-slate-200">
+                            {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
+                          </span>
+                          , then billing continues monthly at $40.00 NZD.
+                        </p>
+                        <p>
+                          Switching at renewal instead of today means you use the full year
+                          you already paid for.
+                        </p>
+                      </div>
+                    ) : null}
+                    <div
+                      className={previewData.deferred ? "hidden" : "space-y-1.5 text-sm text-slate-400"}
+                    >
                       {previewData.lines.map((line, i) => (
                         <div key={i} className="flex justify-between gap-4">
                           <span>{line.desc}</span>
@@ -7702,7 +7726,21 @@ function NBackSessionApp() {
                         </div>
                       ))}
                     </div>
-                    <div className="flex justify-between text-base font-semibold border-t border-slate-800 pt-3">
+                    {!previewData.deferred && previewData.creditApplied < 0 && (
+                      <div className="flex justify-between text-sm text-emerald-400 border-t border-slate-800 pt-3">
+                        <span>Account credit applied</span>
+                        <span>
+                          -${(Math.abs(previewData.creditApplied) / 100).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={
+                        previewData.deferred
+                          ? "hidden"
+                          : "flex justify-between text-base font-semibold border-t border-slate-800 pt-3"
+                      }
+                    >
                       <span>Due now</span>
                       <span>
                         ${(previewData.dueNow / 100).toFixed(2)}{" "}
