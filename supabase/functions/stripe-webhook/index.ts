@@ -42,9 +42,27 @@ Deno.serve(async (req) => {
 
   if (event.type === "payment_intent.succeeded") {
     const intent = event.data.object as Stripe.PaymentIntent;
-    const email = intent.receipt_email;
+    // Fall back to the customer record. Stripe only attaches receipt_email
+    // when the browser confirms, so abandoned or superseded intents arrive
+    // here with none. Returning 400 for those made Stripe retry them
+    // forever and count the endpoint as failing — 200 with nothing to do is
+    // the correct answer for an event we legitimately cannot act on.
+    let email = intent.receipt_email;
+    if (!email && intent.customer) {
+      const cid = typeof intent.customer === "string" ? intent.customer : intent.customer.id;
+      try {
+        const cust = await stripe.customers.retrieve(cid);
+        if (!("deleted" in cust) || !cust.deleted) email = cust.email ?? null;
+      } catch (err) {
+        console.error("customer lookup failed:", err.message);
+      }
+    }
     if (!email) {
-      return new Response("No email on payment intent — cannot provision account", { status: 400 });
+      console.log("no email on payment intent, skipping:", intent.id);
+      return new Response(JSON.stringify({ received: true, skipped: "no email" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // Subscriptions attach their first invoice's PaymentIntent — pull the
@@ -152,10 +170,12 @@ Deno.serve(async (req) => {
 
     const { error: syncErr } = await supabaseAdmin
       .from("users")
-      .update({
-        membership_status: status,
-        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
-      })
+      // Only membership_status is written here. The wider billing columns
+      // (cancel_at_period_end, plan, current_period_end) come from a
+      // migration that has not been run on this project, and including one
+      // makes Postgres reject the entire statement — which silently left
+      // paused accounts reading as active.
+      .update({ membership_status: status })
       .eq("stripe_customer_id", customerId);
     if (syncErr) {
       console.error("membership sync error:", syncErr.message);
