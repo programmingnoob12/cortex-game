@@ -375,7 +375,7 @@ function AuthGate({ children }) {
     (async () => {
       const { data, error } = await supabase
         .from("users")
-        .select("membership_status")
+        .select("membership_status, current_period_end")
         .eq("id", session.user.id)
         .maybeSingle();
       if (cancelled) return;
@@ -385,7 +385,17 @@ function AuthGate({ children }) {
         return;
       }
       setMembershipStatus(data?.membership_status || null);
-      setMembershipOk(data?.membership_status === "active");
+      // Access is granted while the period they already paid for is still
+      // running, even if the status has moved to paused or past_due. That
+      // period is theirs — a pause or a failed card only takes effect once
+      // it runs out. Only "inactive" (the subscription actually ended)
+      // locks immediately, and by then the period is over anyway.
+      const paidUntil = data?.current_period_end
+        ? new Date(data.current_period_end).getTime()
+        : null;
+      const stillInPaidPeriod =
+        data?.membership_status !== "inactive" && paidUntil !== null && paidUntil > Date.now();
+      setMembershipOk(data?.membership_status === "active" || stillInPaidPeriod);
     })();
     return () => {
       cancelled = true;
@@ -737,12 +747,17 @@ function AuthGate({ children }) {
               {recoverBusy ? "Just a moment…" : state.action}
             </button>
           )}
-          <button
-            onClick={() => window.location.reload()}
-            className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"
-          >
-            Refresh
-          </button>
+          {/* Refresh is only useful for the sync case, where the fix really
+              is to wait a moment and look again. On paused / ended / failed
+              card it is noise — the action button above is the way out. */}
+          {!state.action && (
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"
+            >
+              Refresh
+            </button>
+          )}
           <button
             onClick={() => supabase.auth.signOut()}
             className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"

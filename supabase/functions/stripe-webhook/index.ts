@@ -170,12 +170,19 @@ Deno.serve(async (req) => {
 
     const { error: syncErr } = await supabaseAdmin
       .from("users")
-      // Only membership_status is written here. The wider billing columns
-      // (cancel_at_period_end, plan, current_period_end) come from a
-      // migration that has not been run on this project, and including one
-      // makes Postgres reject the entire statement — which silently left
-      // paused accounts reading as active.
-      .update({ membership_status: status })
+      // current_period_end is what actually decides access. Pausing stops
+      // future charges, but the period already paid for must still be
+      // usable — locking someone out the moment they pause would take time
+      // they bought. The app grants access while now < current_period_end,
+      // whatever the status says, so a pause only bites once the paid
+      // period runs out.
+      .update({
+        membership_status: status,
+        current_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
+        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      })
       .eq("stripe_customer_id", customerId);
     if (syncErr) {
       console.error("membership sync error:", syncErr.message);
