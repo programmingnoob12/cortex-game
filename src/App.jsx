@@ -4638,11 +4638,11 @@ function NBackSessionApp() {
     setPreviewTargetPlan(null);
   };
 
-  const handlePause = async () => {
+  const handlePause = async (months = 1) => {
     setActionLoading(true);
     setActionError("");
     try {
-      const data = await callBillingApi("pause");
+      const data = await callBillingApi("pause", { months });
       setBillingState(data);
     } catch (err) {
       setActionError(err.message);
@@ -7551,6 +7551,12 @@ function NBackSessionApp() {
 
         {mainView === "membership" && (
           <div className="space-y-14">
+            <button
+              onClick={() => setMainView("account")}
+              className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors text-base"
+            >
+              <span className="text-lg leading-none">&larr;</span> Back
+            </button>
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Membership
@@ -7629,7 +7635,9 @@ function NBackSessionApp() {
 
                 {actionError && <div className="text-red-400 text-sm">{actionError}</div>}
 
-                {!billingState.cancelAtPeriodEnd && !billingState.pausedUntil && (
+                {!billingState.cancelAtPeriodEnd &&
+                  !billingState.pausedUntil &&
+                  !(previewData && previewTargetPlan) && (
                   <div className="flex flex-col gap-4">
                     {billingState.plan !== "annual" && (
                       <button
@@ -7750,14 +7758,22 @@ function NBackSessionApp() {
                     >
                       Resume membership
                     </button>
-                  ) : (
-                    <button
-                      onClick={handlePause}
-                      disabled={actionLoading}
-                      className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
-                    >
-                      Pause for 30 days
-                    </button>
+                  ) : billingState.plan === "annual" ? null : (
+                    <div className="space-y-3">
+                      <div className="text-slate-400 text-base">Pause billing for</div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[1, 2, 3].map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => handlePause(m)}
+                            disabled={actionLoading}
+                            className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                          >
+                            {m} month{m > 1 ? "s" : ""}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
 
                 {billingState.cancelAtPeriodEnd ? (
@@ -7820,12 +7836,6 @@ function NBackSessionApp() {
               </>
             )}
 
-            <button
-              onClick={() => setMainView("account")}
-              className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-            >
-              Back
-            </button>
           </div>
         )}
 
