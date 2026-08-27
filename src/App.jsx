@@ -7800,6 +7800,11 @@ function NBackSessionApp() {
                           </button>
                         ))}
                       </div>
+                      <p className="text-slate-500 text-sm">
+                        You keep your streak and history while paused. Billing restarts
+                        automatically on the return date — this is not a cancellation, and
+                        you can resume early at any time.
+                      </p>
                     </div>
                   ))}
 

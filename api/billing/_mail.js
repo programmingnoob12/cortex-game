@@ -7,25 +7,30 @@
 
 import nodemailer from "nodemailer";
 
-let transporter = null;
-
-function getTransporter() {
-  if (transporter) return transporter;
+// Deliberately NOT cached in module scope. Vercel keeps a warm container
+// between invocations, and Gmail closes idle SMTP connections — a reused
+// transporter throws on the second send even though the first succeeded.
+// A fresh, unpooled connection per email costs a few hundred ms and is
+// reliable.
+function makeTransporter() {
   const user = process.env.GMAIL_USER;
   const pass = process.env.GMAIL_APP_PASSWORD;
   if (!user || !pass) return null;
 
-  transporter = nodemailer.createTransport({
+  return nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
     secure: true,
+    pool: false,
     auth: { user, pass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
   });
-  return transporter;
 }
 
 export async function sendCancellationEmail({ customerEmail, feedback, comment, subscriptionId }) {
-  const tx = getTransporter();
+  const tx = makeTransporter();
   if (!tx) {
     console.warn("cancellation email skipped — GMAIL_USER/GMAIL_APP_PASSWORD not set");
     return;
@@ -49,7 +54,8 @@ export async function sendCancellationEmail({ customerEmail, feedback, comment, 
   const reason = REASONS[feedback] || feedback || "No reason given";
   const note = comment?.trim() || "(no comment left)";
 
-  await tx.sendMail({
+  try {
+    await tx.sendMail({
     from: `"Cortex" <${process.env.GMAIL_USER}>`,
     to,
     replyTo: customerEmail || undefined,
@@ -70,5 +76,10 @@ export async function sendCancellationEmail({ customerEmail, feedback, comment, 
       ``,
       `They keep access until the end of the current billing period.`,
     ].join("\n"),
-  });
+    });
+  } finally {
+    // Always tear the connection down so nothing stale is left behind for
+    // the next invocation on this warm container.
+    tx.close();
+  }
 }
