@@ -1241,7 +1241,7 @@ const EXERCISE_LIBRARY = {
   },
   motion3d: {
     key: "motion3d",
-    title: "3D Motion",
+    title: "3D MOT",
     abbrev: "3D",
     accent: "indigo",
     modalities: [],
@@ -1283,7 +1283,7 @@ const REGIMES = [
     key: "medium",
     title: "Balanced",
     subtitle: "45 min",
-    summary: "RRT · QNB' · 3D Motion",
+    summary: "RRT · QNB' · 3D MOT",
     accent: "indigo",
     steps: [
       { key: "rrt", minutes: 10 },
@@ -3920,7 +3920,7 @@ const TUTORIAL_CONTENT = {
   quad: "🚧 Tutorial placeholder: Quad N-Back instructions go here.",
   rrt: "🚧 Tutorial placeholder: Relational Reasoning Training instructions go here.",
   iqnb: "🚧 Tutorial placeholder: IQ N-Back instructions go here.",
-  motion3d: "🚧 Tutorial placeholder: 3D Motion Tracking instructions go here.",
+  motion3d: "🚧 Tutorial placeholder: 3D MOT instructions go here.",
 };
 
 // Rough draft placeholder leaderboard data — no real backend/accounts yet.
@@ -4104,7 +4104,7 @@ const ACHIEVEMENT_EXERCISE_NAMES = {
   quad: "Quad N-Back",
   iqnb: "Quad N-Back Prime",
   rrt: "Relational Reasoning Training",
-  motion3d: "3D Motion Tracking",
+  motion3d: "3D MOT",
 };
 
 function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
@@ -4229,8 +4229,8 @@ function motion3dLevelAchievement(level, overrides = {}) {
     exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
-    title: `3D Motion ${gemTierFor(level).label}`,
-    description: `Reach 3D Motion tier ${level} for the first time.`,
+    title: `3D MOT ${gemTierFor(level).label}`,
+    description: `Reach 3D MOT tier ${level} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
     progress: (s) => `Tier ${Math.min(s.exerciseStats.motion3d?.bestN || 0, level)}/${level}`,
@@ -4696,7 +4696,7 @@ function NBackSessionApp() {
   // next visit. Wrapped in try/catch because private-mode browsers throw
   // on localStorage rather than just returning null.
   const applyBillingState = useCallback((data) => {
-    applyBillingState(data);
+    setBillingState(data);
     try {
       if (data) localStorage.setItem("cortex.billingState", JSON.stringify(data));
     } catch {
@@ -9162,7 +9162,7 @@ function NBackSessionApp() {
           regime (same mechanic as forceSwitchToNext everywhere else,
           including the tutorial-screen gate) without needing to sit through
           the current one's full duration. Shown on every exercise page
-          (setup/running/results, and RRT/3D Motion's own self-contained
+          (setup/running/results, and RRT/3D MOT's own self-contained
           screens) rather than duplicated per-screen, so there's exactly one
           place this can go stale. Hidden during the brief switchNotice
           transition since forceSwitchToNext is already mid-flight then. */}
@@ -11281,7 +11281,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // tier — not literally every round, or it'd go off constantly since
     // speed adjusts every single round (unlike RRT's 20-in-a-row gate).
     if (nextTier > prevTier) {
-      onLevelUp?.(nextTier, nextSpeedValue, `3D Motion speed ${nextSpeedValue.toFixed(2)}`);
+      onLevelUp?.(nextTier, nextSpeedValue, `3D MOT speed ${nextSpeedValue.toFixed(2)}`);
     }
     speedRef.current = nextSpeedValue;
     setSpeed(nextSpeedValue);
