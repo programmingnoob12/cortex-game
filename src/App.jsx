@@ -686,13 +686,13 @@ function AuthGate({ children }) {
         action: "Come back now",
       },
       past_due: {
-        title: "There's a problem with your card",
-        body: "We couldn't take the last payment, so training is on hold. Updating your card puts everything back straight away.",
-        action: "Update payment method",
+        title: "Your card was declined",
+        body: "Add a working card to get back in.",
+        action: "Update card",
       },
       inactive: {
         title: "Your membership has ended",
-        body: "Your streak and scores are still saved. Rejoin and you'll pick up exactly where you left off.",
+        body: "Your streak and scores are still saved. Rejoin and everything is where you left it.",
         action: "Rejoin",
       },
     };
@@ -722,9 +722,31 @@ function AuthGate({ children }) {
           window.location.reload();
           return;
         }
-        // past_due and inactive both need the checkout flow, where a card
-        // can be entered and a subscription started or restarted.
-        window.location.href = CHECKOUT_URL;
+        // Restart on the account they are signed in to, reusing their saved
+        // card. Going to the public checkout would provision by whatever
+        // email they type there — a different address means a brand new
+        // account and their history is stranded. Only fall back to checkout
+        // when there is genuinely no card on file, and carry their email in
+        // the URL so it is at least the address suggested to them.
+        const res = await fetch("/api/billing/rejoin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSession?.access_token}`,
+          },
+          body: JSON.stringify({ plan: "monthly" }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          window.location.reload();
+          return;
+        }
+        if (data.error === "NO_SAVED_CARD") {
+          const email = authSession?.user?.email || "";
+          window.location.href = `${CHECKOUT_URL}?email=${encodeURIComponent(email)}`;
+          return;
+        }
+        throw new Error(data.error || "Could not restart your membership");
       } catch (err) {
         setRecoverError(err.message);
       } finally {
@@ -7714,13 +7736,15 @@ function NBackSessionApp() {
                       {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
                     </div>
                   )}
-                  {billingState.scheduledPlan && billingState.scheduledPlanAt && (
+                  {!billingState.cancelAtPeriodEnd &&
+                    billingState.scheduledPlan &&
+                    billingState.scheduledPlanAt && (
                     <div className="text-amber-400 text-base">
                       Annual until{" "}
                       {new Date(billingState.scheduledPlanAt * 1000).toLocaleDateString()}, then
                       switches to monthly
-                    </div>
-                  )}
+                      </div>
+                    )}
                   {!billingState.pausedUntil &&
                     !billingState.cancelAtPeriodEnd &&
                     !billingState.scheduledPlan && (
