@@ -4642,6 +4642,9 @@ function NBackSessionApp() {
   const [overviewView, setOverviewView] = useState("summary"); // "summary" | "graph"
   const [statsDisplay, setStatsDisplay] = useState("chart"); // "chart" | "spreadsheet" — which form the stats/graph screen shows session history in
   const [overviewSource, setOverviewSource] = useState("training"); // "training" | "home" — controls which time-trained stat the Session Overview screen shows
+  // Plays for a beat between finishing a regime and landing on Motivation,
+  // so the end of a session registers as an event rather than a page change.
+  const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
   const [selectedAvatarId, setSelectedAvatarIdState] = useState(DEFAULT_AVATAR_ID); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
   const [customAvatarImage, setCustomAvatarImageState] = useState(null); // data URL string | null — an uploaded photo, takes priority over the preset avatar when set
   const [displayName, setDisplayNameState] = useState("You"); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
@@ -4753,12 +4756,53 @@ function NBackSessionApp() {
     };
   }, [mainView, callBillingApi]);
 
+  // The proration figures come from a Stripe round trip, so asking for them
+  // at click time always meant a visible wait. They are fetched in the
+  // background as soon as Membership opens instead, keyed by plan, so the
+  // confirm box has its numbers ready before the button is pressed.
+  const previewCacheRef = useRef({});
+
+  useEffect(() => {
+    if (mainView !== "membership" || !billingState) return;
+    const target = billingState.plan === "annual" ? "monthly" : "annual";
+    if (previewCacheRef.current[target]) return;
+    let cancelled = false;
+    callBillingApi("preview-switch", { plan: target })
+      .then((data) => {
+        if (!cancelled) previewCacheRef.current[target] = data;
+      })
+      .catch(() => {
+        // Silent. The click-time fetch will surface any real error.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mainView, billingState, callBillingApi]);
+
   const handlePreviewSwitch = async (plan) => {
     setActionError("");
-    setPreviewLoading(true);
     setPreviewTargetPlan(plan);
+
+    const cached = previewCacheRef.current[plan];
+    if (cached) {
+      setPreviewData(cached);
+      setPreviewLoading(false);
+      // Refresh behind the already-visible box. prorationDate drifts with
+      // the clock, and the amount Stripe charges must match what was
+      // confirmed, so a stale preview cannot be the one that gets used.
+      callBillingApi("preview-switch", { plan })
+        .then((fresh) => {
+          previewCacheRef.current[plan] = fresh;
+          setPreviewData((current) => (current === cached ? fresh : current));
+        })
+        .catch(() => {});
+      return;
+    }
+
+    setPreviewLoading(true);
     try {
       const data = await callBillingApi("preview-switch", { plan });
+      previewCacheRef.current[plan] = data;
       setPreviewData(data);
     } catch (err) {
       setActionError(err.message);
@@ -4772,6 +4816,8 @@ function NBackSessionApp() {
     if (!previewTargetPlan || !previewData) return;
     setActionLoading(true);
     setActionError("");
+    // Both directions are stale once the plan actually changes.
+    previewCacheRef.current = {};
     try {
       const data = await callBillingApi("switch", {
         plan: previewTargetPlan,
@@ -6456,6 +6502,21 @@ function NBackSessionApp() {
            top-lit inset shadow. Keeping a second rule here meant every
            button was lightened twice, which is why the tinted ones (the
            Achievements pill especially) blew out on hover. */
+        @keyframes sessionDoneRing {
+          0% { transform: scale(0.4); opacity: 0; }
+          45% { transform: scale(1); opacity: 1; }
+          100% { transform: scale(1.9); opacity: 0; }
+        }
+        @keyframes sessionDoneMark {
+          0% { transform: scale(0.5) rotate(-8deg); opacity: 0; }
+          55% { transform: scale(1.12) rotate(3deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes sessionDoneText {
+          0%, 25% { transform: translateY(10px); opacity: 0; }
+          55%, 88% { transform: translateY(0); opacity: 1; }
+          100% { opacity: 0; }
+        }
         @keyframes gemPop {
           0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
           60% { transform: scale(1.15) rotate(4deg); opacity: 1; }
@@ -7717,11 +7778,13 @@ function NBackSessionApp() {
 
         {mainView === "membership" && (
           <div className="space-y-14">
+            {/* Same markup as the Account screen's back button so every
+                back control in the app looks and behaves identically. */}
             <button
               onClick={() => setMainView("account")}
-              className="flex items-center gap-2 text-slate-400 hover:text-slate-100 transition-colors text-base"
+              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
             >
-              <span className="text-lg leading-none">&larr;</span> Back
+              &lsaquo; Back
             </button>
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
@@ -8049,8 +8112,7 @@ function NBackSessionApp() {
                       </div>
                       <p className="text-slate-500 text-sm">
                         You keep your streak and history while you are away. Your membership
-                        picks back up on its own when the break ends. This is not a
-                        cancellation, and you can come back early any time.
+                        will start again after the pause.
                       </p>
                     </div>
                   ))}
@@ -8245,9 +8307,17 @@ function NBackSessionApp() {
                   real end of a session, which is the only time the Motivation
                   track should be offered. */}
               <button
-                onClick={() =>
-                  setMainView(overviewSource === "home" ? "home" : "hypnosis")
-                }
+                onClick={() => {
+                  if (overviewSource === "home") {
+                    setMainView("home");
+                    return;
+                  }
+                  setSessionCompleteAnim(true);
+                  setTimeout(() => {
+                    setSessionCompleteAnim(false);
+                    setMainView("hypnosis");
+                  }, 2100);
+                }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
                 {overviewSource === "home" ? "Home" : "Done"}
@@ -9152,6 +9222,38 @@ function NBackSessionApp() {
           </div>
         );
       })()}
+
+      {/* End-of-session celebration. Sits between the Overview screen and
+          the Motivation screen so finishing a regime lands as a moment
+          rather than a silent navigation. Pointer events off so it can never
+          trap a click if the timer is somehow missed. */}
+      {sessionCompleteAnim && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm pointer-events-none">
+          <div className="relative flex items-center justify-center">
+            <span
+              className="absolute w-40 h-40 rounded-full border-2 border-cyan-400"
+              style={{ animation: "sessionDoneRing 1.5s ease-out forwards" }}
+            />
+            <span
+              className="absolute w-40 h-40 rounded-full border border-cyan-400"
+              style={{ animation: "sessionDoneRing 1.5s ease-out 0.22s forwards" }}
+            />
+            <div
+              className="w-28 h-28 rounded-full bg-cyan-500/10 border border-cyan-400 flex items-center justify-center text-5xl text-cyan-300"
+              style={{ animation: "sessionDoneMark 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
+            >
+              ✓
+            </div>
+          </div>
+          <div
+            className="mt-10 text-center"
+            style={{ animation: "sessionDoneText 2.1s ease-out forwards" }}
+          >
+            <div className="text-3xl font-semibold tracking-tight">Session complete</div>
+            <div className="text-slate-400 text-base mt-2">Nice work. That one counts.</div>
+          </div>
+        </div>
+      )}
 
       {mainView === "home" && (
         <button
@@ -10695,10 +10797,10 @@ function HypnosisScreen({ onDone }) {
   return (
     <div className="space-y-14">
       <div>
-        <div className="text-base uppercase tracking-wide font-semibold text-indigo-300">
-          Session complete
-        </div>
-        <h1 className="text-4xl font-semibold tracking-tight mt-2">
+        {/* No "Session complete" eyebrow. This screen is reachable from Home
+            at any time, where that label was simply untrue, and after a
+            session the celebration overlay already says it. */}
+        <h1 className="text-4xl font-semibold tracking-tight">
           {HYPNOSIS_TRACK.title}
         </h1>
       </div>
