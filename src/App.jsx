@@ -7716,10 +7716,15 @@ function NBackSessionApp() {
                   {setupClientSecret && typeof BillingCardForm === "function" && (
                     <BillingCardForm
                       clientSecret={setupClientSecret}
-                      onDone={() => {
+                      onDone={(setupIntentId) => {
                         setSetupClientSecret(null);
                         setCardUpdateSaved(true);
-                        callBillingApi("state").then(setBillingState).catch(() => {});
+                        // confirm-card promotes the new card to the
+                        // subscription's default and returns fresh state,
+                        // so the card line re-renders with the new digits.
+                        callBillingApi("confirm-card", { setupIntentId })
+                          .then(setBillingState)
+                          .catch((err) => setSetupError(err.message));
                       }}
                       onError={(msg) => setSetupError(msg)}
                     />

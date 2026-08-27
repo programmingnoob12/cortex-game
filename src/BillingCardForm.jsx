@@ -50,7 +50,7 @@ function InnerForm({ onDone, onError }) {
 
     // "if_required" keeps the person on this screen — Stripe only redirects
     // when a payment method genuinely requires it (rare for cards).
-    const { error } = await stripe.confirmSetup({
+    const { error, setupIntent } = await stripe.confirmSetup({
       elements,
       redirect: "if_required",
     });
@@ -64,7 +64,10 @@ function InnerForm({ onDone, onError }) {
     }
 
     setSubmitting(false);
-    onDone?.();
+    // Confirming a SetupIntent only ATTACHES the card to the customer. It
+    // does not make it the card the subscription bills. Hand the intent id
+    // back so the server can promote it to default.
+    onDone?.(setupIntent?.id);
   };
 
   return (
