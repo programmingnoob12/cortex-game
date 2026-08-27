@@ -687,7 +687,7 @@ function AuthGate({ children }) {
       },
       past_due: {
         title: "Your card was declined",
-        body: "Add a working card to get back in.",
+        body: "Your card was declined so training is on hold. Update your card to rejoin.",
         action: "Update card",
       },
       inactive: {
@@ -801,7 +801,7 @@ function AuthGate({ children }) {
         <div className="max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Set a password?</h1>
           <p className="text-slate-400 text-sm text-center">
-            Optional — lets you sign in directly next time instead of waiting on an email link.
+            Optional. Lets you sign in directly next time instead of waiting on an email link.
           </p>
           <form onSubmit={handleSetPasswordFromPrompt} className="space-y-3">
             <input
@@ -915,7 +915,7 @@ class AppErrorBoundary extends Component {
             <div className="text-5xl">⚠️</div>
             <h1 className="text-2xl font-semibold">Something went wrong</h1>
             <p className="text-slate-400 text-base">
-              The app hit an unexpected error. It's been logged — reloading
+              The app hit an unexpected error. It's been logged. Reloading
               should get you back to where you were.
             </p>
             <button
@@ -2003,7 +2003,7 @@ const RRT_ORDER_CONFIGS = {
         : `Is ${a.label} within ${b.label}?`,
     chainHeading: "Containment Chain",
     reversalNote:
-      "The chain doesn't establish that relation in the direction the conclusion claims — that's why the honest answer is False.",
+      "The chain doesn't establish that relation in the direction the conclusion claims, so the honest answer is False.",
   },
   comparison: {
     label: "Comparison",
@@ -2015,7 +2015,7 @@ const RRT_ORDER_CONFIGS = {
     conclusionText: (a, b, askRelation) => `Is ${a.label} ${askRelation} ${b.label}?`,
     chainHeading: "Comparison Chain",
     reversalNote:
-      "The chain doesn't establish that relation in the direction the conclusion claims — that's why the honest answer is False.",
+      "The chain doesn't establish that relation in the direction the conclusion claims, so the honest answer is False.",
   },
   vertical: {
     label: "Linear",
@@ -2031,7 +2031,7 @@ const RRT_ORDER_CONFIGS = {
         : `Is ${a.label} under ${b.label}?`,
     chainHeading: "Vertical Chain",
     reversalNote:
-      "The chain reverses direction partway through, so neither item is actually established as on top of or under the other — that's why the honest answer is False.",
+      "The chain reverses direction partway through, so neither item is actually established as on top of or under the other, which is why the honest answer is False.",
   },
 };
 const RRT_PUZZLE_TYPES = ["distinction", "contains", "comparison", "vertical", "space2d"];
@@ -3911,11 +3911,11 @@ function fileToAvatarDataUrl(file, size = 160) {
 // goes here later. Keyed the same way so each exercise still gets its own
 // tutorial screen in the flow.
 const TUTORIAL_CONTENT = {
-  dual: "🚧 Tutorial placeholder — Dual N-Back instructions go here.",
-  quad: "🚧 Tutorial placeholder — Quad N-Back instructions go here.",
-  rrt: "🚧 Tutorial placeholder — Relational Reasoning Training instructions go here.",
-  iqnb: "🚧 Tutorial placeholder — IQ N-Back instructions go here.",
-  motion3d: "🚧 Tutorial placeholder — 3D Motion Tracking instructions go here.",
+  dual: "🚧 Tutorial placeholder: Dual N-Back instructions go here.",
+  quad: "🚧 Tutorial placeholder: Quad N-Back instructions go here.",
+  rrt: "🚧 Tutorial placeholder: Relational Reasoning Training instructions go here.",
+  iqnb: "🚧 Tutorial placeholder: IQ N-Back instructions go here.",
+  motion3d: "🚧 Tutorial placeholder: 3D Motion Tracking instructions go here.",
 };
 
 // Rough draft placeholder leaderboard data — no real backend/accounts yet.
@@ -5197,7 +5197,7 @@ function NBackSessionApp() {
         await safeStorageSet("custom-avatar-image", JSON.stringify(dataUrl), false);
       }
     } catch (err) {
-      setAvatarUploadError("Couldn't load that image — try a different file.");
+      setAvatarUploadError("Couldn't load that image. Try a different file.");
     }
   }, []);
   const removeCustomAvatar = useCallback(() => {
@@ -6833,7 +6833,7 @@ function NBackSessionApp() {
               </button>
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
-                  🧪 Skip to exercise (test) — bypasses regime/Start Training entirely
+                  🧪 Skip to exercise (test): bypasses regime/Start Training entirely
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.values(EXERCISE_LIBRARY).map((e) => (
@@ -7586,7 +7586,7 @@ function NBackSessionApp() {
                   again" stay dismissed even when this is on
                   {Object.values(dismissedTutorials).some(Boolean) && (
                     <>
-                      {" — "}
+                      {". "}
                       <button
                         onClick={() => {
                           setDismissedTutorialsState({});
@@ -7677,7 +7677,7 @@ function NBackSessionApp() {
                 Membership
               </h1>
               <p className="text-slate-500 text-base mt-3">
-                Manage your subscription — switch plans, update your card, pause, or cancel.
+                Manage your subscription: switch plans, update your card, pause, or cancel.
               </p>
             </div>
 
@@ -7687,7 +7687,7 @@ function NBackSessionApp() {
             ) && (
               <div className="bg-emerald-500/10 border border-emerald-500/40 rounded-lg p-5 text-emerald-300 text-base flex items-center gap-3">
                 <span className="text-2xl">🎁</span>
-                <span>Free month applied — 7-Day Regime Streak reward</span>
+                <span>Free month applied for your 7-Day Regime Streak</span>
               </div>
             )}
 
@@ -7715,7 +7715,7 @@ function NBackSessionApp() {
                         and the amber line below explains the timing instead. */}
                     {billingState.scheduledPlan !== "monthly" && (
                       <span className="text-slate-400 text-lg font-normal">
-                        — ${(billingState.amount / 100).toFixed(2)}{" "}
+                        ${(billingState.amount / 100).toFixed(2)}{" "}
                         {billingState.currency?.toUpperCase()}
                       </span>
                     )}
@@ -7758,7 +7758,7 @@ function NBackSessionApp() {
                 {billingState.openInvoiceId && (
                   <div className="bg-amber-950/40 border border-amber-800 rounded-lg p-5 space-y-3">
                     <div className="text-amber-300 text-base">
-                      A recent payment didn't go through — update your card or retry to keep
+                      A recent payment didn't go through. Update your card or retry to keep
                       your membership active.
                     </div>
                     <button
@@ -7833,8 +7833,8 @@ function NBackSessionApp() {
                     {previewData.revert ? (
                       <div className="text-sm text-slate-400 space-y-2">
                         <p>
-                          This cancels your scheduled switch to monthly. Nothing is charged —
-                          you already paid for annual through{" "}
+                          This cancels your scheduled switch to monthly. Nothing is charged,
+                          because you already paid for annual through{" "}
                           <span className="text-slate-200">
                             {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
                           </span>
@@ -7951,7 +7951,7 @@ function NBackSessionApp() {
                   )}
                   {setupClientSecret && typeof BillingCardForm !== "function" && (
                     <div className="text-sm text-slate-500 border border-dashed border-slate-700 rounded-lg p-4">
-                      Card form placeholder — renders as the real embedded Stripe form once
+                      Card form placeholder. Renders as the real embedded Stripe form once
                       deployed (see BillingCardForm.jsx).
                     </div>
                   )}
@@ -7983,7 +7983,7 @@ function NBackSessionApp() {
                       </div>
                       <p className="text-slate-500 text-sm">
                         You keep your streak and history while you are away. Your membership
-                        picks back up on its own when the break ends — this is not a
+                        picks back up on its own when the break ends. This is not a
                         cancellation, and you can come back early any time.
                       </p>
                     </div>
@@ -8105,7 +8105,7 @@ function NBackSessionApp() {
 
         {!switchNotice && levelChangeNotice && (
           <div className="text-base rounded-lg px-5 py-2 mb-6 border text-amber-400 bg-amber-950/40 border-amber-800">
-            Below {PASS_THRESHOLD}% three times in a row — N level dropped to {n}.
+            Below {PASS_THRESHOLD}% three times in a row, so N level dropped to {n}.
           </div>
         )}
 
@@ -8524,7 +8524,7 @@ function NBackSessionApp() {
                       Interference
                     </div>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      Chance a non-match reuses an item from n±1 trials ago — a
+                      Chance a non-match reuses an item from n±1 trials ago. A
                       deliberate near-miss to keep you honest. Higher = trickier.
                     </div>
                   </div>
@@ -8994,7 +8994,7 @@ function NBackSessionApp() {
                 {streak === 0
                   ? "Start a streak with one session"
                   : trainedToday
-                  ? "You trained today — streak's safe!"
+                  ? "You trained today, streak's safe!"
                   : "Train today to keep your streak alive"}
               </div>
 
@@ -10680,7 +10680,7 @@ function HypnosisScreen({ onDone }) {
           </>
         ) : (
           <div className="text-slate-400 text-base">
-            No track loaded yet — add the audio file URL to HYPNOSIS_TRACK.url.
+            No track loaded yet. Add the audio file URL to HYPNOSIS_TRACK.url.
           </div>
         )}
       </div>
@@ -11213,7 +11213,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // tier — not literally every round, or it'd go off constantly since
     // speed adjusts every single round (unlike RRT's 20-in-a-row gate).
     if (nextTier > prevTier) {
-      onLevelUp?.(nextTier, nextSpeedValue, `3D Motion — speed ${nextSpeedValue.toFixed(2)}`);
+      onLevelUp?.(nextTier, nextSpeedValue, `3D Motion speed ${nextSpeedValue.toFixed(2)}`);
     }
     speedRef.current = nextSpeedValue;
     setSpeed(nextSpeedValue);
