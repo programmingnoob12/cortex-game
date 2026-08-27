@@ -5,8 +5,8 @@ import { stripe, getBillingContext, withBillingHandler } from "./_lib.js";
 // "annual", never a raw Stripe price id, so a tampered request can't switch
 // someone onto an arbitrary price.
 const PRICE_IDS = {
-  monthly: "price_REPLACE_WITH_MONTHLY_PRICE_ID",
-  annual: "price_REPLACE_WITH_ANNUAL_PRICE_ID",
+  monthly: process.env.STRIPE_PRICE_MONTHLY,
+  annual: process.env.STRIPE_PRICE_ANNUAL,
 };
 
 export default withBillingHandler(async (req) => {
@@ -23,12 +23,25 @@ export default withBillingHandler(async (req) => {
   const currentItem = subscription.items.data[0];
   const prorationDate = Math.floor(Date.now() / 1000);
 
-  const upcoming = await stripe.invoices.retrieveUpcoming({
-    customer: customerId,
-    subscription: subscriptionId,
-    subscription_items: [{ id: currentItem.id, price: newPriceId }],
-    subscription_proration_date: prorationDate,
-  });
+  // stripe-node v22 removed invoices.retrieveUpcoming in favour of
+  // invoices.createPreview, and moved the subscription_* top-level params
+  // under a subscription_details object. Older versions are kept working
+  // by falling back, so this doesn't break if the SDK is pinned back.
+  const upcoming = stripe.invoices.createPreview
+    ? await stripe.invoices.createPreview({
+        customer: customerId,
+        subscription: subscriptionId,
+        subscription_details: {
+          items: [{ id: currentItem.id, price: newPriceId }],
+          proration_date: prorationDate,
+        },
+      })
+    : await stripe.invoices.retrieveUpcoming({
+        customer: customerId,
+        subscription: subscriptionId,
+        subscription_items: [{ id: currentItem.id, price: newPriceId }],
+        subscription_proration_date: prorationDate,
+      });
 
   return {
     dueNow: upcoming.amount_due,

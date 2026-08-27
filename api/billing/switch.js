@@ -2,8 +2,8 @@
 import { stripe, getBillingContext, buildStateResponse, withBillingHandler } from "./_lib.js";
 
 const PRICE_IDS = {
-  monthly: "price_REPLACE_WITH_MONTHLY_PRICE_ID",
-  annual: "price_REPLACE_WITH_ANNUAL_PRICE_ID",
+  monthly: process.env.STRIPE_PRICE_MONTHLY,
+  annual: process.env.STRIPE_PRICE_ANNUAL,
 };
 
 export default withBillingHandler(async (req) => {

@@ -332,6 +332,7 @@ function AuthGate({ children }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [linkSent, setLinkSent] = useState(false);
+  const [sendingLink, setSendingLink] = useState(false);
   const [authError, setAuthError] = useState("");
   const [membershipOk, setMembershipOk] = useState(null); // null = checking, true/false once known
   // 'magic' | 'password' | 'forgot' | 'forgotSent' | 'recovery' — which
@@ -395,16 +396,24 @@ function AuthGate({ children }) {
 
   const handleSendLink = async (e) => {
     e.preventDefault();
+    if (sendingLink) return;
     setAuthError("");
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    if (error) {
-      setAuthError(error.message);
-      return;
+    setSendingLink(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      if (error) {
+        setAuthError(error.message);
+        return;
+      }
+      setLinkSent(true);
+    } catch (err) {
+      setAuthError(err?.message || "Could not reach the sign-in service.");
+    } finally {
+      setSendingLink(false);
     }
-    setLinkSent(true);
   };
 
   const handlePasswordLogin = async (e) => {
@@ -615,9 +624,10 @@ function AuthGate({ children }) {
                 />
                 <button
                   type="submit"
-                  className="w-full bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+                  disabled={sendingLink}
+                  className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 transition-colors rounded-lg py-3 text-base font-medium"
                 >
-                  Send sign-in link
+                  {sendingLink ? "Sending\u2026" : "Send sign-in link"}
                 </button>
                 {authError && <p className="text-red-400 text-sm">{authError}</p>}
               </form>
@@ -651,6 +661,18 @@ function AuthGate({ children }) {
             This account isn't linked to an active membership. If you just paid, this can take a
             minute to sync — try refreshing.
           </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-lg px-4 py-3 text-base"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => supabase.auth.signOut()}
+            className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"
+          >
+            Sign out
+          </button>
         </div>
       </div>
     );
@@ -4509,6 +4531,7 @@ function NBackSessionApp() {
   const [membershipPlan, setMembershipPlan] = useState("monthly"); // "monthly" | "annual" | "canceled" — mirrors billing.plan for the Account row; the source of truth is `billing` below
   const [billingState, setBillingState] = useState(null); // fetched from /api/billing/state
   const [billingLoading, setBillingLoading] = useState(true);
+  const billingLoadedRef = useRef(false);
   const [billingError, setBillingError] = useState("");
   const [previewData, setPreviewData] = useState(null); // proration preview shown before confirming a plan switch
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -4544,14 +4567,22 @@ function NBackSessionApp() {
     return data;
   }, []);
 
+  // Fetched once as soon as the app is up, then refreshed each time the
+  // Membership screen is opened. Because the first fetch has already
+  // landed by then, opening Membership renders the real numbers straight
+  // away — the refresh happens silently behind the already-drawn page
+  // instead of replacing it with "Loading your subscription…".
   useEffect(() => {
-    if (mainView !== "membership") return;
+    if (mainView !== "membership" && billingLoadedRef.current) return;
     let cancelled = false;
-    setBillingLoading(true);
+    if (!billingLoadedRef.current) setBillingLoading(true);
     setBillingError("");
     callBillingApi("state")
       .then((data) => {
-        if (!cancelled) setBillingState(data);
+        if (!cancelled) {
+          setBillingState(data);
+          billingLoadedRef.current = true;
+        }
       })
       .catch((err) => {
         if (!cancelled) setBillingError(err.message);
@@ -7535,17 +7566,17 @@ function NBackSessionApp() {
               </div>
             )}
 
-            {billingLoading && (
+            {billingLoading && !billingState && (
               <div className="text-slate-500 text-base">Loading your subscription…</div>
             )}
 
-            {!billingLoading && billingError && (
+            {billingError && !billingState && (
               <div className="bg-red-950/40 border border-red-900 rounded-lg p-5 text-red-400 text-base">
                 {billingError}
               </div>
             )}
 
-            {!billingLoading && billingState && (
+            {billingState && (
               <>
                 <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7 space-y-3">
                   <div className="text-slate-400 text-base uppercase tracking-wide">
@@ -7661,7 +7692,7 @@ function NBackSessionApp() {
                   <div className="text-slate-400 text-base uppercase tracking-wide">
                     Payment method
                   </div>
-                  {billingState.card && !setupClientSecret && !cardUpdateSaved && (
+                  {billingState.card && !setupClientSecret && (
                     <div className="text-lg capitalize">
                       {billingState.card.brand} •••• {billingState.card.last4}{" "}
                       <span className="text-slate-500 text-base">
@@ -7672,7 +7703,7 @@ function NBackSessionApp() {
                   {cardUpdateSaved && (
                     <p className="text-emerald-400 text-sm">Payment method updated.</p>
                   )}
-                  {!setupClientSecret && !cardUpdateSaved && (
+                  {!setupClientSecret && (
                     <button
                       onClick={handleStartCardUpdate}
                       disabled={setupLoading}

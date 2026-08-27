@@ -67,6 +67,18 @@ Deno.serve(async (req) => {
       }
     }
 
+    // The checkout creates the Customer before an email exists (the page
+    // has none to send), so stamp it on now that Stripe has one. Keeps the
+    // Stripe dashboard readable and lets create-payment-intent reuse the
+    // customer by email later if the checkout ever collects it up front.
+    if (customerId && email) {
+      try {
+        await stripe.customers.update(customerId, { email });
+      } catch (err) {
+        console.error("customer email update error:", err.message);
+      }
+    }
+
     const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
       email,
       email_confirm: true,
