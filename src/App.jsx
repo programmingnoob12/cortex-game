@@ -6493,7 +6493,11 @@ function NBackSessionApp() {
                   <button
                     key={r.key}
                     onClick={() => chooseRegime(r.key)}
-                    className={`w-full text-left ${acc.bg} border-2 ${acc.border} ${acc.hoverBorderStrong} transition-colors rounded-xl p-8`}
+                    /* hoverBorderStrong swapped the accent border for grey on
+                       hover, which read as the card going duller and darker.
+                       The accent border now stays put and the fill lightens
+                       instead, from the sheen in index.css. */
+                    className={`w-full text-left ${acc.bg} border-2 ${acc.border} transition-colors rounded-xl p-8`}
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
