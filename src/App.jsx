@@ -4577,6 +4577,10 @@ function NBackSessionApp() {
     let cancelled = false;
     if (!billingLoadedRef.current) setBillingLoading(true);
     setBillingError("");
+    // One-shot confirmation — it belongs to the update the person just did,
+    // not to every later visit. Leaving Membership and coming back clears it.
+    setCardUpdateSaved(false);
+    setSetupError("");
     callBillingApi("state")
       .then((data) => {
         if (!cancelled) {
