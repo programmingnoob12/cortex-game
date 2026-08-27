@@ -122,6 +122,47 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Mirrors Stripe's live subscription state into membership_status.
+  //
+  // Without this, pause_collection stops the charges but the subscription
+  // stays "active" in Stripe and nothing ever downgrades the account — a
+  // paused member kept full access to every exercise while paying nothing,
+  // repeatable indefinitely. The same gap let a failed card keep access for
+  // the whole retry window before the subscription was finally cancelled.
+  if (event.type === "customer.subscription.updated") {
+    const subscription = event.data.object as Stripe.Subscription;
+    const customerId =
+      typeof subscription.customer === "string"
+        ? subscription.customer
+        : subscription.customer.id;
+
+    let status: string;
+    if (subscription.pause_collection) {
+      status = "paused";
+    } else if (subscription.status === "past_due" || subscription.status === "unpaid") {
+      status = "past_due";
+    } else if (subscription.status === "canceled" || subscription.status === "incomplete_expired") {
+      status = "inactive";
+    } else if (subscription.status === "active" || subscription.status === "trialing") {
+      status = "active";
+    } else {
+      // incomplete — the first payment has not landed yet, so no access.
+      status = "inactive";
+    }
+
+    const { error: syncErr } = await supabaseAdmin
+      .from("users")
+      .update({
+        membership_status: status,
+        cancel_at_period_end: subscription.cancel_at_period_end ?? false,
+      })
+      .eq("stripe_customer_id", customerId);
+    if (syncErr) {
+      console.error("membership sync error:", syncErr.message);
+      return new Response(`Could not sync membership: ${syncErr.message}`, { status: 500 });
+    }
+  }
+
   // Fires when a subscription actually ends — either cancel_at_period_end
   // reaching its date, or an immediate cancellation. This is the real
   // "membership is now over" moment, distinct from clicking Cancel (which

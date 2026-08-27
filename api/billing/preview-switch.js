@@ -23,6 +23,22 @@ export default withBillingHandler(async (req) => {
   const currentItem = subscription.items.data[0];
   const currentInterval = currentItem?.price?.recurring?.interval;
 
+  // REVERT a pending downgrade. The person is still inside the annual term
+  // they paid for — the price was switched to monthly but no money has
+  // moved and no invoice has been raised. Going back to annual just undoes
+  // the scheduled change. Treating it as a fresh upgrade would charge for a
+  // SECOND year on top of the one already paid for.
+  if (subscription.metadata?.scheduled_plan === "monthly" && plan === "annual") {
+    return {
+      revert: true,
+      deferred: true,
+      dueNow: 0,
+      currency: subscription.currency,
+      effectiveDate: subscription.current_period_end,
+      lines: [],
+    };
+  }
+
   // DOWNGRADE (annual -> monthly): deferred to renewal, never prorated.
   //
   // Switching immediately would refund most of an unused year as account

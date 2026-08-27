@@ -20,6 +20,26 @@ export default withBillingHandler(async (req) => {
   const currentItem = subscription.items.data[0];
   const currentInterval = currentItem?.price?.recurring?.interval;
 
+  const isRevert =
+    subscription.metadata?.scheduled_plan === "monthly" && plan === "annual";
+
+  if (isRevert) {
+    // Put the annual price back and clear the schedule. proration_behavior
+    // "none" means no invoice and no credit — nothing was ever charged for
+    // the pending change, so undoing it must cost nothing either.
+    await stripe.subscriptions.update(subscriptionId, {
+      items: [{ id: currentItem.id, price: PRICE_IDS.annual }],
+      proration_behavior: "none",
+      cancel_at_period_end: false,
+      metadata: {
+        ...subscription.metadata,
+        scheduled_plan: "",
+        scheduled_plan_at: "",
+      },
+    });
+    return buildStateResponse(customerId, subscriptionId);
+  }
+
   const isDowngrade = currentInterval === "year" && plan === "monthly";
 
   if (isDowngrade) {

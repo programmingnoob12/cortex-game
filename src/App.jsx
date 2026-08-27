@@ -16,6 +16,10 @@ import BillingCardForm from "./BillingCardForm";
 const STRIPE_PUBLISHABLE_KEY = "pk_test_51LWmPKIUM9SdKsj1bdD2uLndjdet0b306mTFPXNXRw9lPt6swwW8Ab5F2dLwmvku3jcGL2ur5pHfl6rryakxEmT000QkCO4SuI";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
+// Where a lapsed or failed-payment member is sent to put a card in and
+// start a subscription again.
+const CHECKOUT_URL = "https://cortex-app-beryl.vercel.app/";
+
 // =======================================================================
 // THEME OVERRIDE — dark palette
 // =======================================================================
@@ -335,6 +339,12 @@ function AuthGate({ children }) {
   const [sendingLink, setSendingLink] = useState(false);
   const [authError, setAuthError] = useState("");
   const [membershipOk, setMembershipOk] = useState(null); // null = checking, true/false once known
+  // The raw value behind membershipOk — "paused", "past_due", "inactive" —
+  // so a locked-out person is told which one applies and offered the action
+  // that actually fixes it, instead of a single dead-end message.
+  const [membershipStatus, setMembershipStatus] = useState(null);
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [recoverError, setRecoverError] = useState("");
   // 'magic' | 'password' | 'forgot' | 'forgotSent' | 'recovery' — which
   // form the signed-out screen shows. 'recovery' is a special case:
   // Supabase puts the user into an authenticated-but-recovering session
@@ -370,9 +380,11 @@ function AuthGate({ children }) {
         .maybeSingle();
       if (cancelled) return;
       if (error) {
+        setMembershipStatus(null);
         setMembershipOk(false);
         return;
       }
+      setMembershipStatus(data?.membership_status || null);
       setMembershipOk(data?.membership_status === "active");
     })();
     return () => {
@@ -653,17 +665,81 @@ function AuthGate({ children }) {
   }
 
   if (!membershipOk) {
+    // Each locked-out state gets its own explanation and its own way out.
+    // A paused member especially must be able to come back from here —
+    // otherwise taking a break is a trap, since the Membership screen sits
+    // behind this very gate.
+    const COPY = {
+      paused: {
+        title: "Your membership is paused",
+        body: "Training is on hold until your break ends. Your streak and scores are saved. You can come back any time.",
+        action: "Come back now",
+      },
+      past_due: {
+        title: "There's a problem with your card",
+        body: "We couldn't take the last payment, so training is on hold. Updating your card puts everything back straight away.",
+        action: "Update payment method",
+      },
+      inactive: {
+        title: "Your membership has ended",
+        body: "Your streak and scores are still saved. Rejoin and you'll pick up exactly where you left off.",
+        action: "Rejoin",
+      },
+    };
+    const state = COPY[membershipStatus] || {
+      title: "No active membership found",
+      body: "This account isn't linked to an active membership. If you just joined, this can take a minute to sync.",
+      action: null,
+    };
+
+    const handleRecover = async () => {
+      setRecoverBusy(true);
+      setRecoverError("");
+      try {
+        const {
+          data: { session: authSession },
+        } = await supabase.auth.getSession();
+        if (membershipStatus === "paused") {
+          const res = await fetch("/api/billing/resume", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${authSession?.access_token}`,
+            },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Could not resume");
+          window.location.reload();
+          return;
+        }
+        // past_due and inactive both need the checkout flow, where a card
+        // can be entered and a subscription started or restarted.
+        window.location.href = CHECKOUT_URL;
+      } catch (err) {
+        setRecoverError(err.message);
+      } finally {
+        setRecoverBusy(false);
+      }
+    };
+
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-3 text-center">
-          <h1 className="text-xl font-semibold">No active membership found</h1>
-          <p className="text-slate-400 text-base">
-            This account isn't linked to an active membership. If you just paid, this can take a
-            minute to sync — try refreshing.
-          </p>
+          <h1 className="text-xl font-semibold">{state.title}</h1>
+          <p className="text-slate-400 text-base">{state.body}</p>
+          {recoverError && <p className="text-red-400 text-sm">{recoverError}</p>}
+          {state.action && (
+            <button
+              onClick={handleRecover}
+              disabled={recoverBusy}
+              className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-semibold rounded-lg px-4 py-3 text-base"
+            >
+              {recoverBusy ? "Just a moment…" : state.action}
+            </button>
+          )}
           <button
             onClick={() => window.location.reload()}
-            className="w-full bg-indigo-500 hover:bg-indigo-400 text-white font-semibold rounded-lg px-4 py-3 text-base"
+            className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"
           >
             Refresh
           </button>
@@ -6258,14 +6334,16 @@ function NBackSessionApp() {
           : "items-center justify-center p-12"
       }`}
     >
-      <div
-        className="pointer-events-none absolute -top-40 -left-32 w-[32rem] h-[32rem] rounded-full bg-indigo-600/20 blur-[120px]"
-        aria-hidden="true"
-      />
-      <div
-        className="pointer-events-none absolute -bottom-40 -right-32 w-[32rem] h-[32rem] rounded-full bg-violet-600/15 blur-[120px]"
-        aria-hidden="true"
-      />
+      {/* The decorative glows sit at -top-40 / -bottom-40, i.e. 10rem OUTSIDE
+          this container. An absolutely positioned descendant that overflows
+          the bottom of a scroll container still contributes to its scrollable
+          height, which is where the dead space under every page came from.
+          Clipping them in their own inset-0 overflow-hidden layer keeps the
+          look and removes the phantom 160px. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-40 -left-32 w-[32rem] h-[32rem] rounded-full bg-indigo-600/20 blur-[120px]" />
+        <div className="absolute -bottom-40 -right-32 w-[32rem] h-[32rem] rounded-full bg-violet-600/15 blur-[120px]" />
+      </div>
       <style>{`
         @keyframes auraPulseGlow {
           0%, 100% { box-shadow: 0 0 6px 1px rgba(236,72,153,0.35); }
@@ -7593,11 +7671,17 @@ function NBackSessionApp() {
                     Current plan
                   </div>
                   <div className="text-2xl font-semibold capitalize">
-                    {billingState.plan}{" "}
-                    <span className="text-slate-400 text-lg font-normal">
-                      — ${(billingState.amount / 100).toFixed(2)}{" "}
-                      {billingState.currency?.toUpperCase()}
-                    </span>
+                    {billingState.scheduledPlan === "monthly" ? "annual" : billingState.plan}{" "}
+                    {/* While a downgrade is only scheduled, billingState.amount is
+                        already the FUTURE monthly price. Showing it next to
+                        "annual" would read as $40 for a year, so it is omitted
+                        and the amber line below explains the timing instead. */}
+                    {billingState.scheduledPlan !== "monthly" && (
+                      <span className="text-slate-400 text-lg font-normal">
+                        — ${(billingState.amount / 100).toFixed(2)}{" "}
+                        {billingState.currency?.toUpperCase()}
+                      </span>
+                    )}
                   </div>
                   {billingState.scheduledPlan && billingState.scheduledPlanAt ? (
                     <div className="text-amber-400 text-base">
@@ -7698,7 +7782,18 @@ function NBackSessionApp() {
                     <div className="text-lg font-semibold">
                       Switch to {previewTargetPlan}?
                     </div>
-                    {previewData.deferred ? (
+                    {previewData.revert ? (
+                      <div className="text-sm text-slate-400 space-y-2">
+                        <p>
+                          This cancels your scheduled switch to monthly. Nothing is charged —
+                          you already paid for annual through{" "}
+                          <span className="text-slate-200">
+                            {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
+                          </span>
+                          , and that renewal simply continues as annual.
+                        </p>
+                      </div>
+                    ) : previewData.deferred ? (
                       <div className="text-sm text-slate-400 space-y-2">
                         <p>
                           Nothing is charged today and nothing is refunded. You keep annual
@@ -7839,9 +7934,9 @@ function NBackSessionApp() {
                         ))}
                       </div>
                       <p className="text-slate-500 text-sm">
-                        You keep your streak and history while paused. Billing restarts
-                        automatically on the return date — this is not a cancellation, and
-                        you can resume early at any time.
+                        You keep your streak and history while you are away. Your membership
+                        picks back up on its own when the break ends — this is not a
+                        cancellation, and you can come back early any time.
                       </p>
                     </div>
                   ))}
@@ -7855,6 +7950,7 @@ function NBackSessionApp() {
                     Reactivate membership
                   </button>
                 ) : !showCancelForm ? (
+                  <div className="space-y-3">
                   <button
                     onClick={() => setShowCancelForm(true)}
                     disabled={actionLoading}
@@ -7862,6 +7958,13 @@ function NBackSessionApp() {
                   >
                     Cancel membership
                   </button>
+                  <p className="text-slate-500 text-sm">
+                    You keep access until the end of{" "}
+                    {billingState.plan === "annual" ? "this year" : "this month"}. Your streak
+                    and scores are saved, so you can pick up where you left off if you come
+                    back.
+                  </p>
+                  </div>
                 ) : (
                   <div className="bg-slate-900 border border-red-900/60 rounded-lg p-7 space-y-4">
                     <div className="text-lg font-semibold">Sorry to see you go</div>
