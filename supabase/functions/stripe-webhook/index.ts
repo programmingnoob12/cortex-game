@@ -128,15 +128,24 @@ Deno.serve(async (req) => {
       return new Response(`Could not activate membership: ${upsertErr.message}`, { status: 500 });
     }
 
-    const { error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: "magiclink",
-      email,
-    });
-    if (linkErr) {
-      console.error("generateLink error:", linkErr.message);
-      // Don't fail the whole webhook over this — the account is already
-      // created and active at this point, they can just request a login
-      // link normally instead.
+    // admin.generateLink CREATES a link and returns it. It does not send
+    // anything, which is why nobody ever received a login email after
+    // paying. signInWithOtp on a normal (anon-key) client is what actually
+    // hands the job to the configured SMTP sender.
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+    if (!anonKey) {
+      console.error("SUPABASE_ANON_KEY missing — cannot send the login email");
+    } else {
+      const supabasePublic = createClient(Deno.env.get("SUPABASE_URL")!, anonKey);
+      const { error: mailErr } = await supabasePublic.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: Deno.env.get("APP_URL") || undefined },
+      });
+      if (mailErr) {
+        // Never fail the webhook over this. The account is already created
+        // and active; worst case they request a sign-in link themselves.
+        console.error("login email failed:", mailErr.message);
+      }
     }
   }
 

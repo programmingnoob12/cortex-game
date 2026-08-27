@@ -7692,7 +7692,22 @@ function NBackSessionApp() {
             )}
 
             {billingLoading && !billingState && (
-              <div className="text-slate-500 text-base">Loading your subscription…</div>
+              /* A skeleton in the shape of the real cards, so the page is
+                 drawn the instant it opens instead of showing a line of
+                 text where the content will be. */
+              <div className="space-y-14 animate-pulse">
+                <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7 space-y-4">
+                  <div className="h-4 w-28 bg-slate-800 rounded" />
+                  <div className="h-7 w-56 bg-slate-800 rounded" />
+                  <div className="h-4 w-40 bg-slate-800 rounded" />
+                </div>
+                <div className="h-16 bg-slate-900 border border-slate-700/70 rounded-lg" />
+                <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7 space-y-4">
+                  <div className="h-4 w-36 bg-slate-800 rounded" />
+                  <div className="h-6 w-48 bg-slate-800 rounded" />
+                  <div className="h-14 bg-slate-800 rounded-lg" />
+                </div>
+              </div>
             )}
 
             {billingError && !billingState && (
