@@ -8129,10 +8129,10 @@ function NBackSessionApp() {
                     Cancel membership
                   </button>
                   <p className="text-slate-500 text-sm">
-                    You keep access until the end of{" "}
-                    {billingState.plan === "annual" ? "this year" : "this month"}. Your streak
-                    and scores are saved, so you can pick up where you left off if you come
-                    back.
+                    You keep access until{" "}
+                    {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}. Your
+                    streak and scores are saved, so you can pick up where you left off if you
+                    come back.
                   </p>
                   </div>
                 ) : (
