@@ -742,7 +742,7 @@ function AuthGate({ children }) {
             <button
               onClick={handleRecover}
               disabled={recoverBusy}
-              className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-semibold rounded-lg px-4 py-3 text-base"
+              className="w-full bg-indigo-500 hover:opacity-90 disabled:opacity-50 transition-opacity text-white font-semibold rounded-lg px-4 py-3 text-base"
             >
               {recoverBusy ? "Just a moment…" : state.action}
             </button>
@@ -7698,28 +7698,37 @@ function NBackSessionApp() {
                       </span>
                     )}
                   </div>
-                  {billingState.scheduledPlan && billingState.scheduledPlanAt ? (
+                  {/* These used to be one if/else chain, so a scheduled plan
+                      change hid the pause line entirely. They can all be true
+                      at once, so each renders on its own and only "Renews"
+                      is suppressed when something more specific applies. */}
+                  {billingState.pausedUntil && (
+                    <div className="text-amber-400 text-base">
+                      Paused until{" "}
+                      {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
+                    </div>
+                  )}
+                  {billingState.cancelAtPeriodEnd && (
+                    <div className="text-red-400 text-base">
+                      Cancels on{" "}
+                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
+                    </div>
+                  )}
+                  {billingState.scheduledPlan && billingState.scheduledPlanAt && (
                     <div className="text-amber-400 text-base">
                       Annual until{" "}
                       {new Date(billingState.scheduledPlanAt * 1000).toLocaleDateString()}, then
                       switches to monthly
                     </div>
-                  ) : billingState.pausedUntil ? (
-                    <div className="text-amber-400 text-base">
-                      Paused until{" "}
-                      {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
-                    </div>
-                  ) : billingState.cancelAtPeriodEnd ? (
-                    <div className="text-red-400 text-base">
-                      Cancels on{" "}
-                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
-                    </div>
-                  ) : (
-                    <div className="text-slate-400 text-base">
-                      Renews{" "}
-                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
-                    </div>
                   )}
+                  {!billingState.pausedUntil &&
+                    !billingState.cancelAtPeriodEnd &&
+                    !billingState.scheduledPlan && (
+                      <div className="text-slate-400 text-base">
+                        Renews{" "}
+                        {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
+                      </div>
+                    )}
                 </div>
 
                 {billingState.openInvoiceId && (
