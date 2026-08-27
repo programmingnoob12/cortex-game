@@ -781,7 +781,12 @@ function AuthGate({ children }) {
             </button>
           )}
           <button
-            onClick={() => supabase.auth.signOut()}
+            onClick={() => {
+              try {
+                localStorage.removeItem("cortex.billingState");
+              } catch {}
+              supabase.auth.signOut();
+            }}
             className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-100 rounded-lg px-4 py-3 text-base"
           >
             Sign out
@@ -4642,7 +4647,18 @@ function NBackSessionApp() {
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
   const [membershipPlan, setMembershipPlan] = useState("monthly"); // "monthly" | "annual" | "canceled" — mirrors billing.plan for the Account row; the source of truth is `billing` below
-  const [billingState, setBillingState] = useState(null); // fetched from /api/billing/state
+  // Seeded from the last known state so the Membership screen paints real
+  // numbers the moment it opens, even on the very first visit of a session.
+  // The live fetch still runs and overwrites this; the cache only removes
+  // the empty first frame.
+  const [billingState, setBillingState] = useState(() => {
+    try {
+      const raw = localStorage.getItem("cortex.billingState");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
   const [billingLoading, setBillingLoading] = useState(true);
   const billingLoadedRef = useRef(false);
   const [billingError, setBillingError] = useState("");
@@ -4663,6 +4679,18 @@ function NBackSessionApp() {
   // real Supabase auth token so the backend can verify who's asking and
   // derive their Stripe customer id itself, rather than trusting anything
   // the client claims about which customer/subscription it is.
+  // Wraps setBillingState so every fresh response is also cached for the
+  // next visit. Wrapped in try/catch because private-mode browsers throw
+  // on localStorage rather than just returning null.
+  const applyBillingState = useCallback((data) => {
+    applyBillingState(data);
+    try {
+      if (data) localStorage.setItem("cortex.billingState", JSON.stringify(data));
+    } catch {
+      // storage unavailable, the page still works without the cache
+    }
+  }, []);
+
   const callBillingApi = useCallback(async (path, body) => {
     const {
       data: { session: authSession },
@@ -4697,7 +4725,7 @@ function NBackSessionApp() {
     callBillingApi("state")
       .then((data) => {
         if (!cancelled) {
-          setBillingState(data);
+          applyBillingState(data);
           billingLoadedRef.current = true;
         }
       })
@@ -4736,7 +4764,7 @@ function NBackSessionApp() {
         plan: previewTargetPlan,
         prorationDate: previewData.prorationDate,
       });
-      setBillingState(data);
+      applyBillingState(data);
       setPreviewData(null);
       setPreviewTargetPlan(null);
     } catch (err) {
@@ -4756,7 +4784,7 @@ function NBackSessionApp() {
     setActionError("");
     try {
       const data = await callBillingApi("pause", { months });
-      setBillingState(data);
+      applyBillingState(data);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -4769,7 +4797,7 @@ function NBackSessionApp() {
     setActionError("");
     try {
       const data = await callBillingApi("resume");
-      setBillingState(data);
+      applyBillingState(data);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -4782,7 +4810,7 @@ function NBackSessionApp() {
     setActionError("");
     try {
       const data = await callBillingApi("reactivate");
-      setBillingState(data);
+      applyBillingState(data);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -4798,7 +4826,7 @@ function NBackSessionApp() {
         feedback: cancelFeedback,
         comment: cancelComment,
       });
-      setBillingState(data);
+      applyBillingState(data);
       setShowCancelForm(false);
       setCancelFeedback("");
       setCancelComment("");
@@ -4814,7 +4842,7 @@ function NBackSessionApp() {
     setActionError("");
     try {
       const data = await callBillingApi("retry-invoice");
-      setBillingState(data);
+      applyBillingState(data);
     } catch (err) {
       setActionError(err.message);
     } finally {
@@ -7107,7 +7135,12 @@ function NBackSessionApp() {
                 Account
               </h1>
               <button
-                onClick={() => supabase.auth.signOut()}
+                onClick={() => {
+              try {
+                localStorage.removeItem("cortex.billingState");
+              } catch {}
+              supabase.auth.signOut();
+            }}
                 className="mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
               >
                 Log out
@@ -7958,7 +7991,7 @@ function NBackSessionApp() {
                         // subscription's default and returns fresh state,
                         // so the card line re-renders with the new digits.
                         callBillingApi("confirm-card", { setupIntentId })
-                          .then(setBillingState)
+                          .then(applyBillingState)
                           .catch((err) => setSetupError(err.message));
                       }}
                       onError={(msg) => setSetupError(msg)}
