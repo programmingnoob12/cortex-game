@@ -4763,21 +4763,28 @@ function NBackSessionApp() {
   const previewCacheRef = useRef({});
 
   useEffect(() => {
-    if (mainView !== "membership" || !billingState) return;
-    const target = billingState.plan === "annual" ? "monthly" : "annual";
-    if (previewCacheRef.current[target]) return;
+    // Not gated on the Membership screen being open. Waiting until it opened
+    // left the very first click racing the fetch, which is exactly the
+    // "only the first one lags" behaviour. Both directions are warmed as
+    // soon as the billing state is known, so whichever button is pressed
+    // first already has its numbers.
+    if (!billingState) return;
     let cancelled = false;
-    callBillingApi("preview-switch", { plan: target })
-      .then((data) => {
-        if (!cancelled) previewCacheRef.current[target] = data;
-      })
-      .catch(() => {
-        // Silent. The click-time fetch will surface any real error.
-      });
+    ["monthly", "annual"].forEach((target) => {
+      if (target === billingState.plan) return;
+      if (previewCacheRef.current[target]) return;
+      callBillingApi("preview-switch", { plan: target })
+        .then((data) => {
+          if (!cancelled) previewCacheRef.current[target] = data;
+        })
+        .catch(() => {
+          // Silent. The click-time fetch will surface any real error.
+        });
+    });
     return () => {
       cancelled = true;
     };
-  }, [mainView, billingState, callBillingApi]);
+  }, [billingState, callBillingApi]);
 
   const handlePreviewSwitch = async (plan) => {
     setActionError("");
@@ -4816,7 +4823,9 @@ function NBackSessionApp() {
     if (!previewTargetPlan || !previewData) return;
     setActionLoading(true);
     setActionError("");
-    // Both directions are stale once the plan actually changes.
+    // Stale once the plan changes. Cleared rather than kept, but the effect
+    // above rewarms both directions the moment the new billingState lands,
+    // so the next click is still instant.
     previewCacheRef.current = {};
     try {
       const data = await callBillingApi("switch", {
@@ -7790,9 +7799,6 @@ function NBackSessionApp() {
               <h1 className="text-4xl font-semibold tracking-tight">
                 Membership
               </h1>
-              <p className="text-slate-500 text-base mt-3">
-                Manage your subscription: switch plans, update your card, pause, or cancel.
-              </p>
             </div>
 
             {isAchievementUnlocked(
@@ -7961,28 +7967,16 @@ function NBackSessionApp() {
                     </div>
                     {previewData.revert ? (
                       <div className="text-sm text-slate-400 space-y-2">
-                        <p>
-                          This cancels your scheduled switch to monthly. Nothing is charged,
-                          because you already paid for annual through{" "}
-                          <span className="text-slate-200">
-                            {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
-                          </span>
-                          , and that renewal simply continues as annual.
-                        </p>
+                        <p>This cancels your scheduled switch to monthly.</p>
                       </div>
                     ) : previewData.deferred ? (
                       <div className="text-sm text-slate-400 space-y-2">
                         <p>
-                          Nothing is charged today and nothing is refunded. You keep annual
-                          access until{" "}
+                          Nothing is charged today. You keep annual access until{" "}
                           <span className="text-slate-200">
                             {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
                           </span>
                           , then billing continues monthly at $40.00 NZD.
-                        </p>
-                        <p>
-                          Switching at renewal instead of today means you use the full year
-                          you already paid for.
                         </p>
                       </div>
                     ) : null}
