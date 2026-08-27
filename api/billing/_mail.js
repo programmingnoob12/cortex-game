@@ -53,7 +53,13 @@ export async function sendCancellationEmail({ customerEmail, feedback, comment, 
     from: `"Cortex" <${process.env.GMAIL_USER}>`,
     to,
     replyTo: customerEmail || undefined,
-    subject: `Cancellation — ${reason}`,
+    // Gmail threads by subject line, so two cancellations with the same
+    // reason would collapse into one conversation and the second looks
+    // like it never arrived. The timestamp keeps every one distinct.
+    subject: `Cancellation — ${reason} — ${customerEmail || "unknown"} — ${new Date()
+      .toISOString()
+      .slice(0, 16)
+      .replace("T", " ")}`,
     text: [
       `Someone cancelled their Cortex membership.`,
       ``,

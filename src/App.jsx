@@ -7637,7 +7637,7 @@ function NBackSessionApp() {
 
                 {!billingState.cancelAtPeriodEnd &&
                   !billingState.pausedUntil &&
-                  !(previewData && previewTargetPlan) && (
+                  !previewTargetPlan && (
                   <div className="flex flex-col gap-4">
                     {billingState.plan !== "annual" && (
                       <button
@@ -7657,6 +7657,33 @@ function NBackSessionApp() {
                         Switch to monthly
                       </button>
                     )}
+                  </div>
+                )}
+
+                {previewTargetPlan && !previewData && (
+                  <div className="bg-slate-900 border border-indigo-500/40 rounded-lg p-7 space-y-4">
+                    <div className="text-lg font-semibold">
+                      Switch to {previewTargetPlan}?
+                    </div>
+                    <div className="space-y-2 animate-pulse">
+                      <div className="h-4 bg-slate-800 rounded w-3/4" />
+                      <div className="h-4 bg-slate-800 rounded w-2/3" />
+                      <div className="h-4 bg-slate-800 rounded w-1/3 mt-4" />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleCancelSwitch}
+                        className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 font-medium text-base"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled
+                        className="flex-1 bg-gradient-to-r from-indigo-500 to-violet-500 opacity-50 rounded-lg py-3 font-medium text-base"
+                      >
+                        Calculating…
+                      </button>
+                    </div>
                   </div>
                 )}
 
