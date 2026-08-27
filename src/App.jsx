@@ -4099,11 +4099,24 @@ const ACCENT_HEX = {
 // is referenced by PROFILE_COLOR_OPTIONS, so it has to stay stable) without
 // having to also hand-write a title that could drift out of sync with the
 // tier table.
+const ACHIEVEMENT_EXERCISE_NAMES = {
+  dual: "Dual N-Back",
+  quad: "Quad N-Back",
+  iqnb: "Quad N-Back Prime",
+  rrt: "Relational Reasoning Training",
+  motion3d: "3D Motion Tracking",
+};
+
 function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
   const ex = EXERCISE_LIBRARY[exerciseKey];
   const levelTitle = ex.title.replace("N-Back", `${level}-Back`); // e.g. "Dual 5-Back"
-  const exerciseName = ex.title.replace(" N-Back", ""); // e.g. "Dual"
-  const tierTitle = `${exerciseName} ${gemTierFor(level).label}`; // e.g. "Dual Adept"
+  // Spelled-out names, not the stripped or abbreviated ones. "Dual Adept"
+  // read as a typo and "QNB' Adept" means nothing to a new user, so the
+  // achievement list says which exercise the rank actually belongs to.
+  // Only achievement titles use these; the short labels stay everywhere
+  // space is tight, like the home cards and leaderboard.
+  const exerciseName = ACHIEVEMENT_EXERCISE_NAMES[exerciseKey] || ex.title;
+  const tierTitle = `${exerciseName} ${gemTierFor(level).label}`; // e.g. "Dual N-Back Adept"
   const isMax = level === ex.maxN;
   return {
     id: `${exerciseKey}Level${level}`,
@@ -6849,6 +6862,12 @@ function NBackSessionApp() {
                 Overview
               </button>
               <button
+                onClick={() => setMainView("hypnosis")}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Motivation
+              </button>
+              <button
                 onClick={resetNextSessionForTesting}
                 className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
@@ -8217,11 +8236,17 @@ function NBackSessionApp() {
               >
                 Stats
               </button>
+              {/* Opened from Home this is just a page they were browsing, so
+                  it goes back Home. Reached at the end of a regime it is the
+                  real end of a session, which is the only time the Motivation
+                  track should be offered. */}
               <button
-                onClick={() => setMainView("hypnosis")}
+                onClick={() =>
+                  setMainView(overviewSource === "home" ? "home" : "hypnosis")
+                }
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
-                Done
+                {overviewSource === "home" ? "Home" : "Done"}
               </button>
             </div>
           </div>
