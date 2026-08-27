@@ -21,7 +21,7 @@
 //   supabase functions deploy create-payment-intent --no-verify-jwt
 //
 // Required function secrets:
-//   STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY
+//   STRIPE_SECRET_KEY, STRIPE_PRICE_MONTHLY, STRIPE_PRICE_ANNUAL
 
 import Stripe from "https://esm.sh/stripe@14?target=deno";
 
@@ -42,21 +42,27 @@ const fail = (message: string, status = 400) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
-  const priceId = Deno.env.get("STRIPE_PRICE_MONTHLY");
-  if (!priceId) {
-    return fail("STRIPE_PRICE_MONTHLY is not set as a function secret", 500);
-  }
-
-  // The page sends no body. Accept one anyway so a future checkout can
-  // pass an email up front without needing this function changed again.
   let email: string | undefined;
+  let plan = "monthly";
   try {
     const body = await req.json();
     if (body?.email && typeof body.email === "string") {
       email = body.email.trim().toLowerCase();
     }
+    if (body?.plan === "annual") plan = "annual";
   } catch {
-    // no body — expected from the current checkout page
+    // no body — an older checkout page, defaults to monthly
+  }
+
+  const priceId =
+    plan === "annual"
+      ? Deno.env.get("STRIPE_PRICE_ANNUAL")
+      : Deno.env.get("STRIPE_PRICE_MONTHLY");
+  if (!priceId) {
+    return fail(
+      `Pricing for the ${plan} plan is not configured on this project`,
+      500
+    );
   }
 
   try {
@@ -74,7 +80,7 @@ Deno.serve(async (req) => {
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
-      metadata: { product: "nback-membership", plan: "monthly" },
+      metadata: { product: "nback-membership", plan },
     });
 
     // deno-lint-ignore no-explicit-any
