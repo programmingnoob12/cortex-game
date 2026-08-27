@@ -6439,17 +6439,10 @@ function NBackSessionApp() {
            on small/tightly-packed buttons the subpixel rounding from that
            reads as a visible "jump" on hover. box-shadow doesn't affect
            layout or trigger that recompositing, so it can't cause it. */
-        button:not(:disabled) {
-          transition: box-shadow 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
-        }
-        /* The flat 999px hover fill that used to live here has moved to
-           index.css as a top-lit gradient overlay. Keeping both meant every
-           button got lightened twice, which is why the tinted ones (the
-           Achievements pill especially) blew out on hover. Only the press
-           state stays here. */
-        button:not(:disabled):active {
-          box-shadow: inset 0 0 0 999px rgba(0, 0, 0, 0.12);
-        }
+        /* Hover and press feedback now lives entirely in index.css as a
+           top-lit inset shadow. Keeping a second rule here meant every
+           button was lightened twice, which is why the tinted ones (the
+           Achievements pill especially) blew out on hover. */
         @keyframes gemPop {
           0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
           60% { transform: scale(1.15) rotate(4deg); opacity: 1; }
