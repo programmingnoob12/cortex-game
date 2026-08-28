@@ -42,16 +42,26 @@ const fail = (message: string, status = 400) =>
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  // Currencies the Price actually carries in currency_options. Anything
+  // else falls back to the Price's base currency, which is NZD — a Stripe
+  // error is worse than charging a Brazilian customer in NZD and letting
+  // their bank convert.
+  const SUPPORTED_CURRENCIES = ["nzd", "aud", "usd", "gbp", "eur", "cad"];
+  const DEFAULT_CURRENCY = "nzd";
+
   let email: string | undefined;
   let plan = "monthly";
+  let currency = DEFAULT_CURRENCY;
   try {
     const body = await req.json();
     if (body?.email && typeof body.email === "string") {
       email = body.email.trim().toLowerCase();
     }
     if (body?.plan === "annual") plan = "annual";
+    const wanted = String(body?.currency || "").toLowerCase();
+    if (SUPPORTED_CURRENCIES.includes(wanted)) currency = wanted;
   } catch {
-    // no body — an older checkout page, defaults to monthly
+    // no body — an older checkout page, defaults to monthly in NZD
   }
 
   const priceId =
@@ -76,11 +86,14 @@ Deno.serve(async (req) => {
     // reads to populate stripe_customer_id / stripe_subscription_id.
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
+      // Without this Stripe uses the Price's base currency and the
+      // currency_options set on it are never reached.
+      currency,
       items: [{ price: priceId }],
       payment_behavior: "default_incomplete",
       payment_settings: { save_default_payment_method: "on_subscription" },
       expand: ["latest_invoice.payment_intent"],
-      metadata: { product: "nback-membership", plan },
+      metadata: { product: "nback-membership", plan, currency },
     });
 
     // deno-lint-ignore no-explicit-any
@@ -95,6 +108,7 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({
         clientSecret,
+        currency,
         subscriptionId: subscription.id,
         customerId: customer.id,
       }),
