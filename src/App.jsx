@@ -6260,6 +6260,42 @@ function NBackSessionApp() {
     sessionOpenedRef.current &&
     exercise.key !== "overview";
 
+  // Drops straight back into whichever exercise they left, at the screen
+  // and elapsed time they left it on — nothing about the session is reset.
+  const continueSession = () => setMainView("app");
+
+  // Spreadsheet paging — one page number per exercise, 20 rows a page.
+  const [historyPage, setHistoryPage] = useState({});
+  const HISTORY_PAGE_SIZE = 20;
+
+  // Dev/test only: fills every exercise with ~90 days of plausible history
+  // so the table and graph can be judged at a realistic size rather than
+  // with three rows in them.
+  const seedFakeHistory = () => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    Object.keys(EXERCISE_LIBRARY).forEach((key) => {
+      const ex = EXERCISE_LIBRARY[key];
+      if (!ex || key === "overview") return;
+      const entries = [];
+      let level = 2;
+      for (let back = 90; back >= 0; back--) {
+        // A believable gap rate, so the table shows real missed days.
+        if (Math.random() < 0.22) continue;
+        level = Math.min(9, level + (Math.random() < 0.06 ? 1 : 0));
+        entries.push({
+          ts: now - back * dayMs,
+          accuracy: Math.round(55 + Math.random() * 40),
+          n: level,
+          durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
+        });
+      }
+      setExerciseHistory((prev) => ({ ...prev, [key]: entries }));
+      safeStorageSet(`history-${key}`, JSON.stringify(entries), false);
+    });
+    setHistoryPage({});
+  };
+
   function totalSessionTimeRemainingMs() {
     const now = Date.now();
     let remaining = 0;
@@ -7043,14 +7079,14 @@ function NBackSessionApp() {
 
             <div className="flex flex-col gap-5 pt-4">
               <button
-                onClick={sessionParked ? goToOverview : startFromHome}
+                onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
                 className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
               >
                 {sessionInProgress
                   ? "Resume Training"
                   : sessionParked
-                  ? "Finish Session"
+                  ? "Continue Session"
                   : trainedToday
                   ? "Done for Today"
                   : "Start Training"}
@@ -8564,6 +8600,12 @@ function NBackSessionApp() {
               : overviewExercises.map((e) => {
               const rows = buildExerciseDailyRows(exerciseHistory[e.key]);
               const isAccuracy = e.scoreType === "accuracy";
+              const pageCount = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
+              const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
+              const pageRows = rows.slice(
+                page * HISTORY_PAGE_SIZE,
+                page * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
+              );
               return (
                 <div key={e.key} className="space-y-4">
                   <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
@@ -8591,7 +8633,7 @@ function NBackSessionApp() {
                           </tr>
                         </thead>
                         <tbody>
-                          {rows.map((row) => {
+                          {pageRows.map((row) => {
                             const d = new Date(row.ts);
                             return (
                               <tr
@@ -8626,9 +8668,47 @@ function NBackSessionApp() {
                       </table>
                     </div>
                   )}
+                  {pageCount > 1 && (
+                    <div className="flex items-center justify-between gap-4">
+                      <button
+                        onClick={() =>
+                          setHistoryPage((prev) => ({
+                            ...prev,
+                            [e.key]: Math.max(0, page - 1),
+                          }))
+                        }
+                        disabled={page === 0}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                      >
+                        Newer
+                      </button>
+                      <span className="text-slate-400 text-sm tabular-nums">
+                        Page {page + 1} of {pageCount}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setHistoryPage((prev) => ({
+                            ...prev,
+                            [e.key]: Math.min(pageCount - 1, page + 1),
+                          }))
+                        }
+                        disabled={page >= pageCount - 1}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                      >
+                        Older
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
+
+            <button
+              onClick={seedFakeHistory}
+              className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
+            >
+              🧪 Test: fill 90 days of fake history
+            </button>
 
             <button
               onClick={() => setOverviewView("summary")}
@@ -8895,7 +8975,7 @@ function NBackSessionApp() {
             <div className="text-center">
               <div className="text-2xl font-semibold tracking-tight text-slate-100">
                 {exercise.key === "iqnb"
-                  ? `${exercise.abbrev}${qnbPrimeLevel.toFixed(2)}`
+                  ? `${exercise.abbrev} ${qnbPrimeLevel.toFixed(2)}`
                   : `${exercise.abbrev}${n}B`}
               </div>
               <div className="text-slate-400 text-base mt-0.5">
@@ -9023,8 +9103,13 @@ function NBackSessionApp() {
             </div>
 
             {exercise.key === "iqnb" && qnbPrimeLastDelta != null && (
-              <div className="text-base rounded-lg px-5 py-2 border text-slate-200 bg-slate-800/40 border-slate-700">
-                {qnbPrimeLevel.toFixed(2)}
+              <div className="bg-slate-900 border border-slate-700/60 rounded-lg p-6">
+                <div className="text-slate-100 text-lg font-semibold uppercase tracking-wide">
+                  Level
+                </div>
+                <div className="text-base font-medium mt-2 text-slate-200">
+                  {exercise.abbrev} {qnbPrimeLevel.toFixed(2)}
+                </div>
               </div>
             )}
 
