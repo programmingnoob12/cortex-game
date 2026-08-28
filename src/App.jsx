@@ -6266,7 +6266,7 @@ function NBackSessionApp() {
 
   // Spreadsheet paging — one page number per exercise, 20 rows a page.
   const [historyPage, setHistoryPage] = useState({});
-  const HISTORY_PAGE_SIZE = 20;
+  const HISTORY_PAGE_SIZE = 7;
 
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
@@ -8485,7 +8485,15 @@ function NBackSessionApp() {
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
           <div className="space-y-14">
-            <div className="flex items-start justify-between gap-4">
+            <div>
+              <button
+                onClick={() => setOverviewView("summary")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+              >
+                ‹ Back
+              </button>
+            </div>
+            <div className="flex items-start justify-between gap-4 -mt-12">
               <h1 className="text-4xl font-semibold tracking-tight">
                 Stats
               </h1>
@@ -8680,7 +8688,7 @@ function NBackSessionApp() {
                         disabled={page === 0}
                         className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
                       >
-                        Newer
+                        Back
                       </button>
                       <span className="text-slate-400 text-sm tabular-nums">
                         Page {page + 1} of {pageCount}
@@ -8695,7 +8703,7 @@ function NBackSessionApp() {
                         disabled={page >= pageCount - 1}
                         className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
                       >
-                        Older
+                        Next
                       </button>
                     </div>
                   )}
@@ -9089,6 +9097,13 @@ function NBackSessionApp() {
               </div>
             )}
 
+            <button
+              onClick={() => setMainView("home")}
+              className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium -mb-8"
+            >
+              ‹ Home
+            </button>
+
             <h1 className="text-4xl font-semibold tracking-tight">
               Round {Math.max(1, roundNumber - 1)}
             </h1>
@@ -9104,10 +9119,7 @@ function NBackSessionApp() {
 
             {exercise.key === "iqnb" && qnbPrimeLastDelta != null && (
               <div className="bg-slate-900 border border-slate-700/60 rounded-lg p-6">
-                <div className="text-slate-100 text-lg font-semibold uppercase tracking-wide">
-                  Level
-                </div>
-                <div className="text-base font-medium mt-2 text-slate-200">
+                <div className="text-3xl font-semibold tracking-tight text-slate-100">
                   {exercise.abbrev} {qnbPrimeLevel.toFixed(2)}
                 </div>
               </div>
