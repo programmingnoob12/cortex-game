@@ -1124,8 +1124,8 @@ const BUTTON_PULSE = "bg-emerald-500";
 // near-black background.
 const EXERCISE_COLORS = {
   dual: "#136DEC",      // blue
-  quad: "#7537E2",      // purple
-  iqnb: "#EB3223",      // red
+  quad: "#EB3223",      // red
+  iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
   motion3d: "#E8158F",  // pink
   cct: "#A6E900",       // lime, reserved for the Anti-brainrot regime
