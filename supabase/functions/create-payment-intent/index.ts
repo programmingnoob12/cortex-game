@@ -84,6 +84,24 @@ Deno.serve(async (req) => {
     // the browser confirming the first invoice's PaymentIntent. That intent
     // carries customer + invoice, which is exactly what stripe-webhook
     // reads to populate stripe_customer_id / stripe_subscription_id.
+    // Going Back on the card step and forward again asks for a new
+    // subscription each time, so without this a hesitant customer leaves a
+    // trail of half-made ones. Stripe expires incomplete subscriptions
+    // after about a day anyway, but the dashboard is unreadable in the
+    // meantime and a stale one can be confirmed by a stale client secret.
+    try {
+      const incomplete = await stripe.subscriptions.list({
+        customer: customer.id,
+        status: "incomplete",
+        limit: 10,
+      });
+      for (const old of incomplete.data) {
+        await stripe.subscriptions.cancel(old.id);
+      }
+    } catch (err) {
+      console.error("could not clear incomplete subscriptions:", err);
+    }
+
     const subscription = await stripe.subscriptions.create({
       customer: customer.id,
       // Without this Stripe uses the Price's base currency and the
