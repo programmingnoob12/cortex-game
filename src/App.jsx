@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback, useEffect, useMemo, Fragment, Component } from "react";
 import * as THREE from "three";
 import {
+  AreaChart,
+  Area,
   LineChart,
   Line,
   XAxis,
@@ -1127,7 +1129,7 @@ const EXERCISE_COLORS = {
   quad: "#8A0736",      // maroon
   iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
-  motion3d: "#A6E900",  // lime
+  motion3d: "#1DB954",  // green
   // TODO: pick a colour for CCT when the Anti-brainrot regime is built.
 };
 
@@ -8431,7 +8433,27 @@ function NBackSessionApp() {
                   {chartData.length > 0 ? (
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-64">
                       <ResponsiveContainer width="100%" height="100%">
-                        <LineChart data={chartData}>
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient
+                              id={`exFill-${e.key}`}
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor={EXERCISE_COLORS[e.key] || "#4CB9D8"}
+                                stopOpacity={0.45}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor={EXERCISE_COLORS[e.key] || "#4CB9D8"}
+                                stopOpacity={0}
+                              />
+                            </linearGradient>
+                          </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
                           <XAxis
                             dataKey="session"
@@ -8464,14 +8486,20 @@ function NBackSessionApp() {
                               isAccuracy ? "Accuracy" : "Score",
                             ]}
                           />
-                          <Line
+                          <Area
                             type="monotone"
                             dataKey="accuracy"
-                            stroke="#8FD8EC"
-                            strokeWidth={2}
-                            dot={{ r: 3, fill: "#8FD8EC" }}
+                            stroke={EXERCISE_COLORS[e.key] || "#4CB9D8"}
+                            strokeWidth={2.5}
+                            fill={`url(#exFill-${e.key})`}
+                            dot={{
+                              r: 3,
+                              fill: EXERCISE_COLORS[e.key] || "#4CB9D8",
+                              stroke: "none",
+                            }}
+                            activeDot={{ r: 5 }}
                           />
-                        </LineChart>
+                        </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   ) : (

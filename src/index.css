@@ -80,7 +80,7 @@ button.bg-gradient-to-r:not(:disabled) {
      gains a lot and an already-light one gains a little instead of
      bleaching. */
   --ob-from: color-mix(in srgb, var(--ex) 88%, white);
-  --ob-from: hsl(from var(--ex) h s calc(l + (100 - l) * 0.06));
+  --ob-from: hsl(from var(--ex) calc(h + 4) s calc(l + (100 - l) * 0.07));
   --ob-to: var(--ex);
   background-image: linear-gradient(100deg, var(--ob-from), var(--ob-to));
   color: #fff;
@@ -92,9 +92,9 @@ button.bg-gradient-to-r:not(:disabled) {
 
 button.bg-gradient-to-r:hover:not(:disabled) {
   --ob-from: color-mix(in srgb, var(--ex) 78%, white);
-  --ob-from: hsl(from var(--ex) h calc(s + 4) calc(l + (100 - l) * 0.2));
+  --ob-from: hsl(from var(--ex) calc(h + 4) calc(s + 4) calc(l + (100 - l) * 0.21));
   --ob-to: color-mix(in srgb, var(--ex) 88%, white);
-  --ob-to: hsl(from var(--ex) h calc(s + 4) calc(l + (100 - l) * 0.13));
+  --ob-to: hsl(from var(--ex) calc(h + 2) calc(s + 4) calc(l + (100 - l) * 0.14));
   box-shadow: inset 0 1px #ffffff66, inset 0 -1px #0000001f;
   transform: translateY(-1px);
 }
