@@ -1127,8 +1127,8 @@ const EXERCISE_COLORS = {
   quad: "#8A0736",      // maroon
   iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
-  motion3d: "#E8158F",  // pink
-  cct: "#A6E900",       // lime, reserved for the Anti-brainrot regime
+  motion3d: "#A6E900",  // lime
+  // TODO: pick a colour for CCT when the Anti-brainrot regime is built.
 };
 
 // The cards need four values from one hex: a faint fill, a visible border,
