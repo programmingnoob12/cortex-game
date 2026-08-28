@@ -11046,7 +11046,15 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(MOT_CAMERA_FOV, width / height, 0.1, 100);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    // A refused context throws here. Bailing out quietly beats taking the
+    // whole app down: the exercise just doesn't paint and everything else
+    // stays usable.
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    } catch {
+      return undefined;
+    }
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     // Real-time shadows are the biggest single fix for "two balls near the
@@ -11371,7 +11379,21 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       boundaryParts.edges.dispose();
       boundaryParts.mat.dispose();
       balls.forEach((b) => b.mesh.material.dispose());
+      // dispose() frees Three's own GPU objects but leaves the WebGL
+      // context itself alive. Browsers cap how many live contexts a page
+      // may hold (~16 in Chrome), so leaving and re-entering 3D MOT enough
+      // times exhausted the pool and the next mount threw "Error creating
+      // WebGL context", which took the whole app to the error boundary.
+      // forceContextLoss() hands the context back, and dropping the canvas
+      // out of the DOM lets it be collected.
       renderer.dispose();
+      try {
+        renderer.forceContextLoss();
+      } catch {
+        // Not implemented on every backend; the dispose above still stands.
+      }
+      const canvas = renderer.domElement;
+      if (canvas && canvas.parentNode) canvas.parentNode.removeChild(canvas);
       host.innerHTML = "";
       sceneRef.current = null;
     };
