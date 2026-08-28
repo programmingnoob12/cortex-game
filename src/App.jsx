@@ -1114,6 +1114,30 @@ const BUTTON_PULSE = "bg-emerald-500";
 // A visual identity color per exercise, used for card borders/tints,
 // leaderboard tab highlights, and header accents so each exercise reads as
 // its own thing rather than everything sharing one flat indigo.
+// Per-exercise colour, used only on the Home cards for now so the rest of
+// the app is untouched while the direction is being judged. Written as hex
+// rather than Tailwind classes because these are one-off values that no
+// utility covers, and inline styles cannot be missed by a purge.
+//
+// Chosen to sit apart on the hue wheel so five cards never read as a
+// gradient of the same colour, and desaturated enough not to glare on the
+// near-black background.
+const EXERCISE_COLORS = {
+  dual: "#4CB9D8",      // cyan, the app's existing accent
+  quad: "#45CFA4",      // mint, sibling to cyan without being it
+  iqnb: "#9B87F5",      // purple
+  rrt: "#F2C94C",       // yellow
+  motion3d: "#F2836B",  // coral
+};
+
+// The cards need four values from one hex: a faint fill, a visible border,
+// a solid dot, and text bright enough to read. Derived rather than listed
+// so adding an exercise means adding one colour, not four.
+function exerciseTint(hex, alpha) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
 const ACCENT_STYLES = {
   indigo: {
     border: "border-indigo-500/40",
@@ -6874,20 +6898,28 @@ function NBackSessionApp() {
                   mockYouLevel || level
                 );
                 const acc = ACCENT_STYLES[e.accent];
+                const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
                 return (
                   <div
                     key={e.key}
-                    className={`${acc.bg} border ${acc.border} rounded-xl p-7`}
+                    className="rounded-xl p-7"
+                    style={{
+                      backgroundColor: exerciseTint(exColor, 0.07),
+                      border: `1px solid ${exerciseTint(exColor, 0.34)}`,
+                    }}
                   >
                     <div className="flex items-center gap-2">
-                      <span className={`w-2 h-2 rounded-full ${acc.dot}`} />
+                      <span
+                        className="w-2 h-2 rounded-full"
+                        style={{ backgroundColor: exColor }}
+                      />
                       <div className="text-xl font-semibold text-slate-100">
                         {e.title}
                       </div>
                     </div>
                     <div className="flex items-center gap-5 mt-3">
                       <LevelGem level={bestLevel} size={36} />
-                      <div className={`text-lg font-medium ${acc.text}`}>
+                      <div className="text-lg font-medium" style={{ color: exColor }}>
                         {isAccuracy
                           ? `${e.abbrev}${bestLevel}B`
                           : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
@@ -7850,8 +7882,7 @@ function NBackSessionApp() {
                         and the amber line below explains the timing instead. */}
                     {billingState.scheduledPlan !== "monthly" && (
                       <span className="text-slate-400 text-lg font-normal">
-                        ${(billingState.amount / 100).toFixed(2)}{" "}
-                        {billingState.currency?.toUpperCase()}
+                        ${(billingState.amount / 100).toFixed(2)}
                       </span>
                     )}
                   </div>
@@ -7976,7 +8007,7 @@ function NBackSessionApp() {
                           <span className="text-slate-200">
                             {new Date(previewData.effectiveDate * 1000).toLocaleDateString()}
                           </span>
-                          , then billing continues monthly at $40.00 NZD.
+                          , then billing continues monthly at $40.00.
                         </p>
                       </div>
                     ) : null}
@@ -8009,8 +8040,7 @@ function NBackSessionApp() {
                     >
                       <span>Due now</span>
                       <span>
-                        ${(previewData.dueNow / 100).toFixed(2)}{" "}
-                        {previewData.currency?.toUpperCase()}
+                        ${(previewData.dueNow / 100).toFixed(2)}
                       </span>
                     </div>
                     <div className="flex gap-3">
