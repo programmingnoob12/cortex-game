@@ -1133,6 +1133,15 @@ const EXERCISE_COLORS = {
   // TODO: pick a colour for CCT when the Anti-brainrot regime is built.
 };
 
+// Each regime on the landing page borrows the colour of the exercise that
+// defines it: Quick is Dual N-Back, Balanced leads with RRT, Deep is built
+// around QNB'.
+const REGIME_COLORS = {
+  low: EXERCISE_COLORS.dual,
+  medium: EXERCISE_COLORS.rrt,
+  high: EXERCISE_COLORS.iqnb,
+};
+
 // The cards need four values from one hex: a faint fill, a visible border,
 // a solid dot, and text bright enough to read. Derived rather than listed
 // so adding an exercise means adding one colour, not four.
@@ -6604,7 +6613,7 @@ function NBackSessionApp() {
 
             <div className="flex flex-col gap-6">
               {REGIMES.map((r) => {
-                const acc = ACCENT_STYLES[r.accent];
+                const rc = REGIME_COLORS[r.key] || "#4CB9D8";
                 return (
                   <button
                     key={r.key}
@@ -6613,16 +6622,26 @@ function NBackSessionApp() {
                        hover, which read as the card going duller and darker.
                        The accent border now stays put and the fill lightens
                        instead, from the sheen in index.css. */
-                    className={`w-full text-left ${acc.bg} border-2 ${acc.border} transition-colors rounded-xl p-8`}
+                    style={{
+                      backgroundColor: exerciseTint(rc, 0.1),
+                      borderColor: exerciseTint(rc, 0.4),
+                    }}
+                    className="w-full text-left border-2 transition-colors rounded-xl p-8"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <span className={`w-2.5 h-2.5 rounded-full ${acc.dot}`} />
+                        <span
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: rc }}
+                        />
                         <div className="text-2xl font-semibold text-slate-100">
                           {r.title}
                         </div>
                         {r.key === "medium" && (
-                          <span className={`italic text-sm font-medium ${acc.text}`}>
+                          <span
+                            className="italic text-sm font-medium"
+                            style={{ color: rc }}
+                          >
                             Recommended
                           </span>
                         )}
@@ -6910,7 +6929,10 @@ function NBackSessionApp() {
                   }`}
                 >
                   <span className="text-lg">🔥</span>
-                  <span>{achievementState.streak} Days</span>
+                  <span>
+                    {achievementState.streak}{" "}
+                    {achievementState.streak === 1 ? "Day" : "Days"}
+                  </span>
                 </button>
                 <button
                   onClick={() => bumpTestStreak(regimeKey)}
