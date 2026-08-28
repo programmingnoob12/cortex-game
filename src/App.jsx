@@ -1125,7 +1125,7 @@ const BUTTON_PULSE = "bg-emerald-500";
 const EXERCISE_COLORS = {
   dual: "#4CB9D8",      // cyan, the app's existing accent
   quad: "#45CFA4",      // mint, sibling to cyan without being it
-  iqnb: "#9B87F5",      // purple
+  iqnb: "#8B5CF6",      // purple
   rrt: "#F2C94C",       // yellow
   motion3d: "#F2836B",  // coral
 };
@@ -6478,8 +6478,18 @@ function NBackSessionApp() {
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
+  // Drives --ex, which every accent button reads from. Only set while an
+  // exercise is actually on screen; the Overview step and every screen
+  // outside training stay on the app's cyan so the colour means "you are
+  // in this exercise" rather than being decoration.
+  const themeColor =
+    mainView === "app" && exercise.key !== "overview"
+      ? EXERCISE_COLORS[exercise.key] || "#4CB9D8"
+      : "#4CB9D8";
+
   return (
     <div
+      style={{ "--ex": themeColor }}
       className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
