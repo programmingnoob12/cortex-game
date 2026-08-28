@@ -1110,7 +1110,7 @@ const MODALITY_META = {
   shape: { label: "Shape" },
   color: { label: "Color" },
 };
-const BUTTON_BASE = "no-sheen bg-slate-700 hover:bg-slate-600";
+const BUTTON_BASE = "no-sheen bg-slate-700";
 const BUTTON_PULSE = "no-sheen bg-emerald-500";
 
 // A visual identity color per exercise, used for card borders/tints,
@@ -1302,7 +1302,7 @@ const REGIMES = [
     key: "low",
     title: "Quick",
     subtitle: "25 min",
-    summary: "Dual N-Back only",
+    summary: "Dual N-Back",
     accent: "indigo",
     steps: [{ key: "dual", minutes: 25 }],
   },
