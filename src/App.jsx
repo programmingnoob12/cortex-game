@@ -1123,11 +1123,12 @@ const BUTTON_PULSE = "bg-emerald-500";
 // gradient of the same colour, and desaturated enough not to glare on the
 // near-black background.
 const EXERCISE_COLORS = {
-  dual: "#4CB9D8",      // cyan, the app's existing accent
-  quad: "#45CFA4",      // mint, sibling to cyan without being it
-  iqnb: "#8B5CF6",      // purple
-  rrt: "#E58B09",       // amber
-  motion3d: "#F2836B",  // coral
+  dual: "#136DEC",      // blue
+  quad: "#7537E2",      // purple
+  iqnb: "#EB3223",      // red
+  rrt: "#E58B09",       // orange
+  motion3d: "#E8158F",  // pink
+  cct: "#A6E900",       // lime, reserved for the Anti-brainrot regime
 };
 
 // The cards need four values from one hex: a faint fill, a visible border,
@@ -6649,6 +6650,30 @@ function NBackSessionApp() {
                 </button>
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
                   Achievement required: 1 month streak
+                </div>
+              </div>
+
+              {/* Placeholder for the CCT regime, not built yet. Same locked
+                  treatment as Custom so it reads as coming soon rather than
+                  broken. */}
+              <div className="relative group">
+                <button
+                  disabled
+                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl p-8 cursor-not-allowed"
+                >
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex items-center gap-3">
+                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                      <div className="text-2xl font-semibold text-slate-500 flex items-center gap-2">
+                        🔒 Anti-brainrot
+                      </div>
+                    </div>
+                    <div className="text-lg font-medium text-slate-600">—</div>
+                  </div>
+                  <div className="text-slate-600 text-base mt-2">CCT</div>
+                </button>
+                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
+                  Coming soon
                 </div>
               </div>
             </div>
