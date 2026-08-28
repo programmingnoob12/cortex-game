@@ -6244,6 +6244,22 @@ function NBackSessionApp() {
     Object.keys(sessionStartedRef.current).length > 0 &&
     exercise.key !== "overview";
 
+  // Opening an exercise and backing straight out to Home leaves no timer
+  // running, so sessionInProgress stays false and Home still offered
+  // "Start Training" for a session already underway. This covers that gap:
+  // the person is parked on an exercise, so the useful action is ending the
+  // session rather than starting one.
+  const sessionOpenedRef = useRef(false);
+  useEffect(() => {
+    if (mainView === "app" && exercise.key !== "overview") {
+      sessionOpenedRef.current = true;
+    }
+  }, [mainView, exercise.key]);
+  const sessionParked =
+    !sessionInProgress &&
+    sessionOpenedRef.current &&
+    exercise.key !== "overview";
+
   function totalSessionTimeRemainingMs() {
     const now = Date.now();
     let remaining = 0;
@@ -6280,6 +6296,7 @@ function NBackSessionApp() {
     sessionTimersRef.current = {};
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
+    sessionOpenedRef.current = false;
     const today = new Date().toDateString();
     setRegimeCompletionDatesState((prev) => {
       const next = prev.filter((d) => d !== today);
@@ -6377,6 +6394,7 @@ function NBackSessionApp() {
     sessionTimersRef.current = {};
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
+    sessionOpenedRef.current = false;
     setRegimeKey(key);
     setActiveExercises(built);
     setExerciseIndex(0);
@@ -7025,12 +7043,14 @@ function NBackSessionApp() {
 
             <div className="flex flex-col gap-5 pt-4">
               <button
-                onClick={startFromHome}
-                disabled={trainedToday && !sessionInProgress}
+                onClick={sessionParked ? goToOverview : startFromHome}
+                disabled={trainedToday && !sessionInProgress && !sessionParked}
                 className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
               >
                 {sessionInProgress
                   ? "Resume Training"
+                  : sessionParked
+                  ? "Finish Session"
                   : trainedToday
                   ? "Done for Today"
                   : "Start Training"}
@@ -8733,7 +8753,7 @@ function NBackSessionApp() {
                 {exercise.title}
               </h1>
               {exercise.key === "iqnb" && (
-                <p className="text-slate-500 text-base mt-3">Incremental N-back version</p>
+                <p className="text-slate-500 text-base mt-3">Incremental N-back</p>
               )}
               {exercise.sessionDurationMs && (
                 <p className="text-slate-500 text-base mt-3">
