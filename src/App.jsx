@@ -1947,6 +1947,57 @@ function formatScoreValue(exercise, value) {
 // fills in every day between the first recorded session and today that has
 // NO session, so the spreadsheet can flag missed days rather than only ever
 // showing days something was actually played.
+// One comparable number per session so "is this a personal best?" is a single
+// > test. Accuracy exercises rank by level first and accuracy as the
+// tiebreak; everything else ranks on the raw score.
+function prScoreOf(entry, isAccuracy) {
+  if (!entry || entry.accuracy == null) return null;
+  return isAccuracy ? (entry.n || 0) * 1000 + entry.accuracy : entry.accuracy;
+}
+
+// Walks oldest to newest and flags the entries that beat everything before
+// them. The first session is never a PR — there is nothing to beat yet.
+function markPersonalBests(list, isAccuracy) {
+  let best = null;
+  return list.map((item) => {
+    const score = prScoreOf(item, isAccuracy);
+    if (score == null) return { ...item, isPR: false };
+    const isPR = best !== null && score > best;
+    if (best === null || score > best) best = score;
+    return { ...item, isPR };
+  });
+}
+
+const PR_YELLOW = "#F2C200";
+
+// Recharts hands every point through here. Ordinary sessions get the small
+// exercise-coloured dot they always had; a personal best gets a yellow ring
+// around a yellow core, which reads at a glance without adding a label to
+// every peak and cluttering the line.
+function renderPRDot(props, color) {
+  const { cx, cy, payload, index } = props;
+  if (cx == null || cy == null) return null;
+  if (!payload || !payload.isPR) {
+    return (
+      <circle key={`d${index}`} cx={cx} cy={cy} r={3} fill={color} />
+    );
+  }
+  return (
+    <g key={`pr${index}`}>
+      <circle cx={cx} cy={cy} r={7} fill={PR_YELLOW} fillOpacity={0.18} />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={5}
+        fill="none"
+        stroke={PR_YELLOW}
+        strokeWidth={1.75}
+      />
+      <circle cx={cx} cy={cy} r={2.5} fill={PR_YELLOW} />
+    </g>
+  );
+}
+
 function buildExerciseDailyRows(entries) {
   const dayMap = new Map();
   (entries || []).forEach((h) => {
@@ -6267,6 +6318,7 @@ function NBackSessionApp() {
   // Spreadsheet paging — one page number per exercise, 20 rows a page.
   const [historyPage, setHistoryPage] = useState({});
   const HISTORY_PAGE_SIZE = 7;
+  const SHEET_ROW_H = 44;
 
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
@@ -8511,11 +8563,14 @@ function NBackSessionApp() {
               ? overviewExercises.map((e) => {
               const history = exerciseHistory[e.key] || [];
               const isAccuracy = e.scoreType === "accuracy";
-              const chartData = history.map((h, i) => ({
-                session: i + 1,
-                accuracy: h.accuracy,
-                n: h.n,
-              }));
+              const chartData = markPersonalBests(
+                history.map((h, i) => ({
+                  session: i + 1,
+                  accuracy: h.accuracy,
+                  n: h.n,
+                })),
+                isAccuracy
+              );
               return (
                 <div key={e.key} className="space-y-4">
                   <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
@@ -8526,7 +8581,7 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-64">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-80">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                           <defs>
@@ -8587,17 +8642,25 @@ function NBackSessionApp() {
                             stroke={EXERCISE_COLORS[e.key] || "#4CB9D8"}
                             strokeWidth={2.5}
                             fill={`url(#exFill-${e.key})`}
-                            dot={{
-                              r: 3,
-                              fill: EXERCISE_COLORS[e.key] || "#4CB9D8",
-                              stroke: "none",
-                            }}
+                            dot={(props) =>
+                              renderPRDot(props, EXERCISE_COLORS[e.key] || "#4CB9D8")
+                            }
                             activeDot={{ r: 5 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
-                  ) : (
+                  ) : null}
+                  {chartData.some((d) => d.isPR) ? (
+                    <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                        <circle cx="7" cy="7" r="6" fill="none" stroke={PR_YELLOW} strokeWidth="1.5" />
+                        <circle cx="7" cy="7" r="2.5" fill={PR_YELLOW} />
+                      </svg>
+                      New personal best
+                    </div>
+                  ) : null}
+                  {chartData.length === 0 && (
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-8 text-center text-slate-500 text-base">
                       No completed sessions yet.
                     </div>
@@ -8606,8 +8669,12 @@ function NBackSessionApp() {
               );
             })
               : overviewExercises.map((e) => {
-              const rows = buildExerciseDailyRows(exerciseHistory[e.key]);
               const isAccuracy = e.scoreType === "accuracy";
+              // Flag PRs oldest-first, then flip back to newest-first for display.
+              const rows = markPersonalBests(
+                buildExerciseDailyRows(exerciseHistory[e.key]).slice().reverse(),
+                isAccuracy
+              ).reverse();
               const pageCount = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
               const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
               const pageRows = rows.slice(
@@ -8628,10 +8695,14 @@ function NBackSessionApp() {
                       No completed sessions yet.
                     </div>
                   ) : (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
+                    <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0 bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-slate-700/70 text-left text-slate-100">
+                          <tr
+                            className="border-b border-slate-700/70 text-left text-slate-100"
+                            style={{ height: SHEET_ROW_H }}
+                          >
                             <th className="px-4 py-2.5 font-medium">Day</th>
                             <th className="px-4 py-2.5 font-medium">Date</th>
                             <th className="px-4 py-2.5 font-medium">Time</th>
@@ -8648,6 +8719,7 @@ function NBackSessionApp() {
                                 key={row.dateKey}
                                 className="border-b border-slate-800/70 last:border-0"
                                 style={{
+                                  height: SHEET_ROW_H,
                                   backgroundColor: row.missed
                                     ? "rgba(151,20,38,0.14)"
                                     : "rgba(30,152,43,0.12)",
@@ -8662,7 +8734,18 @@ function NBackSessionApp() {
                                 <td className="px-4 py-2.5 text-slate-100">
                                   {row.missed ? "—" : formatDuration(row.durationMs)}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-100 font-medium">
+                                <td
+                                  className="px-4 py-2.5 font-medium"
+                                  style={
+                                    row.isPR
+                                      ? {
+                                          color: PR_YELLOW,
+                                          backgroundColor: `${PR_YELLOW}26`,
+                                          boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
+                                        }
+                                      : { color: "#F7F8F8" }
+                                  }
+                                >
                                   {row.missed
                                     ? "—"
                                     : isAccuracy
@@ -8674,6 +8757,31 @@ function NBackSessionApp() {
                           })}
                         </tbody>
                       </table>
+                    </div>
+                    {/* Gutter outside the table. Every row is a fixed height,
+                        so a marker can be placed at exactly its row without
+                        measuring the DOM. */}
+                    <div
+                      className="hidden sm:block w-28 shrink-0 relative"
+                      style={{ height: SHEET_ROW_H * (pageRows.length + 1) }}
+                    >
+                      {pageRows.map((row, i) =>
+                        row.isPR ? (
+                          <div
+                            key={row.dateKey}
+                            className="absolute left-0 right-0 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
+                            style={{
+                              top: SHEET_ROW_H * (i + 1),
+                              height: SHEET_ROW_H,
+                              color: PR_YELLOW,
+                            }}
+                          >
+                            <span aria-hidden="true">←</span>
+                            New PR!
+                          </div>
+                        ) : null
+                      )}
+                    </div>
                     </div>
                   )}
                   {pageCount > 1 && (
@@ -8718,12 +8826,6 @@ function NBackSessionApp() {
               🧪 Test: fill 90 days of fake history
             </button>
 
-            <button
-              onClick={() => setOverviewView("summary")}
-              className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-            >
-              Back
-            </button>
           </div>
         )}
 
@@ -9099,7 +9201,7 @@ function NBackSessionApp() {
 
             <button
               onClick={() => setMainView("home")}
-              className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium -mb-8"
+              className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium -mb-5"
             >
               ‹ Home
             </button>
