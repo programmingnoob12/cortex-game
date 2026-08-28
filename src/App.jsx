@@ -6335,9 +6335,16 @@ function NBackSessionApp() {
         // A believable gap rate, so the table shows real missed days.
         if (Math.random() < 0.22) continue;
         level = Math.min(9, level + (Math.random() < 0.06 ? 1 : 0));
+        // Drifts upward with noise on top, the way real practice does, so
+        // personal bests keep landing instead of all clustering in week one.
+        const progress = (90 - back) / 90;
+        const base = 52 + progress * 34;
         entries.push({
           ts: now - back * dayMs,
-          accuracy: Math.round(55 + Math.random() * 40),
+          accuracy: Math.max(
+            30,
+            Math.min(99, Math.round(base + (Math.random() - 0.5) * 18))
+          ),
           n: level,
           durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
         });
@@ -8581,7 +8588,7 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-80">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-96">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                           <defs>
@@ -8695,8 +8702,8 @@ function NBackSessionApp() {
                       No completed sessions yet.
                     </div>
                   ) : (
-                    <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0 bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
+                    <div className="relative">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr
@@ -8751,6 +8758,11 @@ function NBackSessionApp() {
                                     : isAccuracy
                                     ? `${e.abbrev}${row.n}B ${row.accuracy}%`
                                     : formatScoreValue(e, row.accuracy)}
+                                  {row.isPR && (
+                                    <span className="lg:hidden ml-2 text-xs font-semibold">
+                                      New PR!
+                                    </span>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -8762,7 +8774,7 @@ function NBackSessionApp() {
                         so a marker can be placed at exactly its row without
                         measuring the DOM. */}
                     <div
-                      className="hidden sm:block w-28 shrink-0 relative"
+                      className="hidden lg:block absolute top-0 left-full ml-3 w-24 pointer-events-none"
                       style={{ height: SHEET_ROW_H * (pageRows.length + 1) }}
                     >
                       {pageRows.map((row, i) =>
