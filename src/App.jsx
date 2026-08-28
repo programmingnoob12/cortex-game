@@ -153,7 +153,7 @@ html,body{background-color:#08090A;color:#F7F8F8;}
 .from-teal-500{--tw-gradient-from:var(--ex) !important}
 .from-violet-500{--tw-gradient-from:#8B7FE8 !important}
 .from-violet-500\\/20{--tw-gradient-from:rgba(139,127,232,0.2) !important}
-.group:hover .group-hover\\:text-indigo-300{color:hsl(from var(--ex) h s calc(l + (100 - l) * 0.42)) !important}
+.group:hover .group-hover\\:text-indigo-300{color:var(--ex) !important}
 .hover\\:bg-emerald-500:hover{background-color:#4CB782 !important}
 .hover\\:bg-indigo-400:hover{background-color:var(--ex) !important}
 .hover\\:bg-red-950\\/60:hover{background-color:rgba(42,20,22,0.6) !important}
@@ -185,7 +185,7 @@ html,body{background-color:#08090A;color:#F7F8F8;}
 .hover\\:shadow-indigo-500\\/10:hover{--tw-shadow-color:color-mix(in srgb, var(--ex) 10%, transparent) !important;--tw-shadow:var(--tw-shadow-colored) !important}
 .hover\\:shadow-teal-500\\/10:hover{--tw-shadow-color:color-mix(in srgb, var(--ex) 10%, transparent) !important;--tw-shadow:var(--tw-shadow-colored) !important}
 .hover\\:shadow-violet-500\\/30:hover{--tw-shadow-color:rgba(139,127,232,0.3) !important;--tw-shadow:var(--tw-shadow-colored) !important}
-.hover\\:text-indigo-300:hover{color:hsl(from var(--ex) h s calc(l + (100 - l) * 0.42)) !important}
+.hover\\:text-indigo-300:hover{color:var(--ex) !important}
 .hover\\:text-slate-200:hover{color:#F7F8F8 !important}
 .hover\\:text-slate-300:hover{color:#8A8F98 !important}
 .hover\\:to-fuchsia-500\\/30:hover{--tw-gradient-to:rgba(139,127,232,0.3) !important}
@@ -200,8 +200,8 @@ html,body{background-color:#08090A;color:#F7F8F8;}
 .text-emerald-300{color:#4CB782 !important}
 .text-emerald-400{color:#4CB782 !important}
 .text-green-400{color:#4CB782 !important}
-.text-indigo-300{color:hsl(from var(--ex) h s calc(l + (100 - l) * 0.42)) !important}
-.text-indigo-400{color:hsl(from var(--ex) h s calc(l + (100 - l) * 0.42)) !important}
+.text-indigo-300{color:var(--ex) !important}
+.text-indigo-400{color:var(--ex) !important}
 .text-lime-300{color:#68CC58 !important}
 .text-orange-100{color:#D9B65A !important}
 .text-orange-400{color:#D9B65A !important}
@@ -1110,8 +1110,8 @@ const MODALITY_META = {
   shape: { label: "Shape" },
   color: { label: "Color" },
 };
-const BUTTON_BASE = "bg-slate-700 hover:bg-slate-600";
-const BUTTON_PULSE = "bg-emerald-500";
+const BUTTON_BASE = "no-sheen bg-slate-700 hover:bg-slate-600";
+const BUTTON_PULSE = "no-sheen bg-emerald-500";
 
 // A visual identity color per exercise, used for card borders/tints,
 // leaderboard tab highlights, and header accents so each exercise reads as
@@ -8874,7 +8874,7 @@ function NBackSessionApp() {
                   : "square";
                 const color = exercise.modalities.includes("color")
                   ? sequence.color?.[index]
-                  : "#8FD8EC";
+                  : themeColor;
                 const hasShapeOrColor =
                   exercise.modalities.includes("shape") ||
                   exercise.modalities.includes("color");
@@ -8913,7 +8913,7 @@ function NBackSessionApp() {
                 const state = feedback[m];
                 const cls =
                   state === "wrong"
-                    ? "bg-red-500"
+                    ? "no-sheen bg-red-500"
                     : state === "correct"
                     ? BUTTON_PULSE
                     : BUTTON_BASE;
@@ -10135,7 +10135,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                             : RRT_RED,
                         }}
                       >
-                        {missed ? "Timed out" : entry.userAnswer ? "TRUE" : "FALSE"}
+                        {missed ? "Missed" : entry.userAnswer ? "TRUE" : "FALSE"}
                       </span>
                       <span className="text-slate-400 text-sm font-semibold uppercase" style={{ letterSpacing: "0.12em" }}>
                         Correct
@@ -10398,7 +10398,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           backgroundColor: `${flashColor}`,
         }}
       >
-        {flash === "correct" ? "Correct" : flash === "wrong" ? "Wrong" : "Timed out"}
+        {flash === "correct" ? "Correct" : flash === "wrong" ? "Wrong" : "Missed"}
       </div>
     </div>
   );
@@ -10562,13 +10562,15 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             <div className="flex gap-3">
               <button
                 onClick={() => answer(true)}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-500 transition-colors rounded-lg py-2 text-base font-medium"
+                style={{ backgroundColor: RRT_GREEN }}
+                className="flex-1 transition-colors rounded-lg py-2 text-base font-medium"
               >
                 True
               </button>
               <button
                 onClick={() => answer(false)}
-                className="flex-1 bg-rose-600 hover:bg-rose-500 transition-colors rounded-lg py-2 text-base font-medium"
+                style={{ backgroundColor: RRT_RED }}
+                className="flex-1 transition-colors rounded-lg py-2 text-base font-medium"
               >
                 False
               </button>
