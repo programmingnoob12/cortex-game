@@ -4611,6 +4611,9 @@ function NBackSessionApp() {
   const [index, setIndex] = useState(0);
   const [activeCell, setActiveCell] = useState(null);
   const [results, setResults] = useState([]);
+  // Which block of the current sitting the Results screen is reporting on.
+  // Resets whenever the exercise changes so each one counts from 1.
+  const [roundNumber, setRoundNumber] = useState(1);
   const [feedback, setFeedback] = useState({});
   const [lowScoreStreak, setLowScoreStreak] = useState({});
   const [levelChangeNotice, setLevelChangeNotice] = useState(null); // { direction: "down" } — level dropped after 3 failing runs
@@ -5816,6 +5819,7 @@ function NBackSessionApp() {
           : 0;
       stopRunTimer(exerciseKey);
       setResults(resultsSoFar);
+      setRoundNumber((r) => r + 1);
       setScreen("results");
 
       const overallAcc = overallSignalAccuracy(resultsSoFar, modalities);
@@ -6478,6 +6482,11 @@ function NBackSessionApp() {
   };
 
   const cancelRestDayTraining = () => setRestDayConfirm(null);
+
+  // Each exercise counts its own rounds from 1.
+  useEffect(() => {
+    setRoundNumber(1);
+  }, [exercise.key]);
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
@@ -8842,10 +8851,10 @@ function NBackSessionApp() {
         {!switchNotice && screen === "running" && (
           <div className="flex flex-col items-center gap-3 w-full">
             <div className="text-center">
-              <div className={`text-2xl font-semibold tracking-tight ${ACCENT_STYLES[exercise.accent].text}`}>
+              <div className="text-2xl font-semibold tracking-tight text-slate-100">
                 {exercise.key === "iqnb"
-                  ? `${exercise.title} ${qnbPrimeLevel.toFixed(2)}`
-                  : exercise.title.replace("N-Back", `${n}-Back`)}
+                  ? `${exercise.abbrev}${qnbPrimeLevel.toFixed(2)}`
+                  : `${exercise.abbrev}${n}B`}
               </div>
               <div className="text-slate-400 text-base mt-0.5">
                 {trialCount - index}
@@ -8958,7 +8967,9 @@ function NBackSessionApp() {
               </div>
             )}
 
-            <h1 className="text-4xl font-semibold tracking-tight">Results</h1>
+            <h1 className="text-4xl font-semibold tracking-tight">
+              Round {Math.max(1, roundNumber - 1)}
+            </h1>
             <div className="text-slate-400 text-lg -mt-6">
               Accuracy:{" "}
               <span
@@ -8983,7 +8994,6 @@ function NBackSessionApp() {
                   label={MODALITY_META[m].label}
                   value={`${accuracyFor(m)}%`}
                   color={accuracyColor(accuracyFor(m))}
-                  accent={ACCENT_STYLES[exercise.accent]}
                 />
               ))}
             </div>
