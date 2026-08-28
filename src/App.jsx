@@ -1126,7 +1126,7 @@ const EXERCISE_COLORS = {
   dual: "#4CB9D8",      // cyan, the app's existing accent
   quad: "#45CFA4",      // mint, sibling to cyan without being it
   iqnb: "#8B5CF6",      // purple
-  rrt: "#F2C94C",       // yellow
+  rrt: "#E58B09",       // amber
   motion3d: "#F2836B",  // coral
 };
 
