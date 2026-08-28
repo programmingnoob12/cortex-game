@@ -60,7 +60,7 @@ html,body{background-color:#08090A;color:#F7F8F8;}
 .bg-indigo-400{background-color:var(--ex) !important}
 .bg-indigo-500{background-color:var(--ex) !important}
 .bg-indigo-500\\/10{background-color:color-mix(in srgb, var(--ex) 10%, transparent) !important}
-.bg-indigo-600\\/20{background-color:color-mix(in srgb, var(--ex) 20%, transparent) !important}
+.bg-indigo-600\\/20{background-color:rgba(76,185,216,0.2) !important}
 .bg-indigo-950\\/40{background-color:rgba(16,35,42,0.4) !important}
 .bg-lime-400{background-color:#68CC58 !important}
 .bg-lime-500\\/10{background-color:rgba(104,204,88,0.1) !important}
@@ -1124,7 +1124,7 @@ const BUTTON_PULSE = "bg-emerald-500";
 // near-black background.
 const EXERCISE_COLORS = {
   dual: "#136DEC",      // blue
-  quad: "#EB3223",      // red
+  quad: "#8A0736",      // maroon
   iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
   motion3d: "#E8158F",  // pink
@@ -6721,7 +6721,10 @@ function NBackSessionApp() {
                     aria-expanded={groupOpen}
                     className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${groupAccent.dot}`} />
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                    />
                     <h2 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
                       {topSection.label}
                     </h2>
@@ -6757,7 +6760,10 @@ function NBackSessionApp() {
                       aria-expanded={isOpen}
                       className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
                     >
-                      <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${groupAccent.dot}`} />
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                      />
                       <h3 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
                         {section.label}
                       </h3>
