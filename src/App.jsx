@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 28;
+const BUILD_VERSION = 29;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:09 PM";
+const BUILD_TIME = "11:20 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2495,11 +2495,16 @@ function SongVisualizer({ className, style }) {
       // Only the lower half of the spectrum carries anything worth drawing
       // in music; the top bins are near-silent and would render as a flat
       // dead stretch at both ends.
-      const bars = 48;
+      const bars = 40;
       const usable = Math.floor(data.length * 0.62);
-      const half = w / 2;
+      // A band along the bottom rather than a wall behind the content: the
+      // full-height version buried the gem and the text.
+      const bandW = Math.min(w * 0.62, 760);
+      const left = (w - bandW) / 2;
+      const half = bandW / 2;
       const barW = half / bars;
-      const mid = h / 2;
+      const baseline = h - Math.min(h * 0.08, 64);
+      const maxH = Math.min(h * 0.16, 120);
 
       for (let i = 0; i < bars; i++) {
         // Logarithmic bin spacing, so the low end is not crammed into two
@@ -2507,14 +2512,14 @@ function SongVisualizer({ className, style }) {
         const t = i / bars;
         const bin = Math.floor(Math.pow(t, 1.7) * usable);
         const v = data[bin] / 255;
-        const barH = Math.max(2, v * v * h * 0.42);
-        const alpha = 0.1 + v * 0.55;
+        const barH = Math.max(2, v * v * maxH);
+        // Fades out toward the edges so the band has no hard ends.
+        const edge = 1 - Math.pow(t, 2.2);
+        const alpha = (0.08 + v * 0.4) * edge;
         ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
-        const x1 = half + i * barW;
-        const x2 = half - (i + 1) * barW;
-        const wid = Math.max(1, barW - 2);
-        ctx2d.fillRect(x1, mid - barH, wid, barH * 2);
-        ctx2d.fillRect(x2, mid - barH, wid, barH * 2);
+        const wid = Math.max(1, barW - 3);
+        ctx2d.fillRect(left + half + i * barW, baseline - barH, wid, barH);
+        ctx2d.fillRect(left + half - (i + 1) * barW, baseline - barH, wid, barH);
       }
     };
     frame = requestAnimationFrame(draw);
@@ -7658,7 +7663,8 @@ function NBackSessionApp() {
         /* Rings pushing outward through the wait. */
         @keyframes prRing {
           0% { opacity: 0; transform: scale(0.2); }
-          18% { opacity: 1; }
+          22% { opacity: 1; }
+          72% { opacity: 0.45; }
           100% { opacity: 0; transform: scale(5.5); }
         }
         /* Full black, held a beat, then lifting to reveal the scene. */
@@ -7708,7 +7714,8 @@ function NBackSessionApp() {
         /* A ring closing in on the centre, against the outward pulses. */
         @keyframes prRingIn {
           0% { opacity: 0; transform: scale(1.5); }
-          20% { opacity: 0.8; }
+          25% { opacity: 0.6; }
+          75% { opacity: 0.3; }
           100% { opacity: 0; transform: scale(0.18); }
         }
         /* A glow gathering where the gem will appear. */
@@ -10540,14 +10547,12 @@ function NBackSessionApp() {
                   and a wake rather than being a single hard outline. They
                   scale out past the viewport edge. */}
               {[
-                { d: 0, size: 30, w: 1.5, blur: 0 },
-                { d: 0.18, size: 30, w: 7, blur: 12 },
-                { d: 0.85, size: 24, w: 1.5, blur: 0 },
-                { d: 1.03, size: 24, w: 7, blur: 12 },
-                { d: 1.7, size: 34, w: 1.5, blur: 0 },
-                { d: 1.88, size: 34, w: 7, blur: 12 },
-                { d: 2.55, size: 27, w: 1.5, blur: 0 },
-                { d: 2.73, size: 27, w: 7, blur: 12 },
+                { d: 0, size: 30, w: 1, blur: 0 },
+                { d: 0.28, size: 30, w: 9, blur: 18 },
+                { d: 1.3, size: 24, w: 1, blur: 0 },
+                { d: 1.58, size: 24, w: 9, blur: 18 },
+                { d: 2.6, size: 34, w: 1, blur: 0 },
+                { d: 2.88, size: 34, w: 9, blur: 18 },
               ].map(({ d, size, w, blur }, i) => (
                 <div
                   key={`r${i}`}
@@ -10555,24 +10560,24 @@ function NBackSessionApp() {
                   style={{
                     width: `${size}vmax`,
                     height: `${size}vmax`,
-                    border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
+                    border: `${w}px solid ${PR_YELLOW}${blur ? "18" : "55"}`,
                     filter: blur ? `blur(${blur}px)` : undefined,
-                    boxShadow: blur ? undefined : `0 0 26px ${PR_YELLOW}33`,
-                    animation: `prRing 3.1s ${d}s cubic-bezier(0.12,0.9,0.2,1) both`,
+                    boxShadow: blur ? undefined : `0 0 34px ${PR_YELLOW}26`,
+                    animation: `prRing 4.6s ${d}s cubic-bezier(0.19,0.75,0.28,1) both`,
                   }}
                 />
               ))}
               {/* Rings travelling the other way, tightening inward from
                   beyond the edges, so the motion is not all one direction. */}
-              {[0.4, 1.6, 2.8].map((d) => (
+              {[0.5, 2.4].map((d) => (
                 <div
                   key={`i${d}`}
                   className="absolute rounded-full"
                   style={{
                     width: "72vmax",
                     height: "72vmax",
-                    border: `1px solid ${PR_YELLOW}44`,
-                    animation: `prRingIn 2.6s ${d}s cubic-bezier(0.4,0,0.2,1) both`,
+                    border: `1px solid ${PR_YELLOW}2e`,
+                    animation: `prRingIn 4s ${d}s cubic-bezier(0.33,0,0.25,1) both`,
                   }}
                 />
               ))}
@@ -10725,7 +10730,7 @@ function NBackSessionApp() {
             </div>
 
             <div
-              className="relative flex flex-col items-center text-center gap-8 max-w-sm"
+              className="relative flex flex-col items-center text-center gap-10 max-w-md px-6 py-4"
               style={{ animation: "celebrationPop 0.6s cubic-bezier(0.34,1.56,0.64,1)" }}
             >
               <div className="text-base uppercase tracking-wide text-indigo-300 font-semibold">
@@ -10733,12 +10738,12 @@ function NBackSessionApp() {
               </div>
 
               <div
-                className={`w-28 h-28 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad} shadow-2xl shadow-black/40`}
+                className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad} shadow-2xl shadow-black/40`}
               >
                 {current.icon}
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <AchievementTitle
                   achievement={current}
                   className="text-3xl font-semibold tracking-tight"
