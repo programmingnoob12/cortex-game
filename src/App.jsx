@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 31;
+const BUILD_VERSION = 32;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:42 PM";
+const BUILD_TIME = "11:53 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2393,8 +2393,8 @@ function playCelebrationSong() {
     // gain -> analyser -> speakers. The analyser is a pass-through; it only
     // reads what goes past it, so this does not change what is heard.
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.78;
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.62;
     gain.connect(analyser);
     analyser.connect(ctx.destination);
     songAnalyser = analyser;
@@ -2482,6 +2482,11 @@ function SongVisualizer({ className, style }) {
     resize();
     window.addEventListener("resize", resize);
 
+    // Auto-gain. Music that never peaks would otherwise sit as a flat line;
+    // dividing by a decaying running maximum keeps the bars using their full
+    // range whatever the track's level is.
+    let peak = 0.15;
+
     const draw = () => {
       frame = requestAnimationFrame(draw);
       const w = canvas.clientWidth;
@@ -2494,47 +2499,82 @@ function SongVisualizer({ className, style }) {
       }
       analyser.getByteFrequencyData(data);
 
-      // Only the lower half of the spectrum carries anything worth drawing
-      // in music; the top bins are near-silent and would render as a flat
-      // dead stretch at both ends.
       const bars = 56;
       const usable = Math.floor(data.length * 0.62);
-      // A band along the bottom rather than a wall behind the content: the
-      // full-height version buried the gem and the text.
-      const bandW = Math.min(w * 0.62, 760);
+      const bandW = Math.min(w * 0.66, 820);
       const left = (w - bandW) / 2;
       const half = bandW / 2;
       const barW = half / bars;
       const baseline = h - Math.min(h * 0.08, 64);
-      const maxH = Math.min(h * 0.13, 96);
+      const maxH = Math.min(h * 0.15, 110);
+
+      // Track the loudest bin this frame so the scale follows the music.
+      let frameMax = 0;
+      for (let i = 0; i < usable; i++) {
+        if (data[i] > frameMax) frameMax = data[i];
+      }
+      frameMax /= 255;
+      peak = Math.max(frameMax, peak * 0.985);
+      const scale = 1 / Math.max(0.12, peak);
+
+      // Bass energy drives the ambient bloom behind everything.
+      let bass = 0;
+      const bassBins = Math.max(4, Math.floor(usable * 0.12));
+      for (let i = 0; i < bassBins; i++) bass += data[i];
+      bass = (bass / bassBins / 255) * scale;
+
+      const bloom = ctx2d.createRadialGradient(
+        w / 2,
+        baseline,
+        0,
+        w / 2,
+        baseline,
+        Math.max(120, bandW * 0.55 * (0.6 + bass * 0.7))
+      );
+      bloom.addColorStop(0, `rgba(242, 194, 0, ${(0.05 + bass * 0.09).toFixed(3)})`);
+      bloom.addColorStop(1, "rgba(242, 194, 0, 0)");
+      ctx2d.fillStyle = bloom;
+      ctx2d.fillRect(0, 0, w, h);
 
       for (let i = 0; i < bars; i++) {
         // Logarithmic bin spacing, so the low end is not crammed into two
         // bars while the highs get forty.
         const t = i / bars;
         const bin = Math.floor(Math.pow(t, 1.7) * usable);
-        const v = data[bin] / 255;
-        const barH = Math.max(2, v * v * maxH);
+        // ^1.35 rather than squared: squaring flattened everything below a
+        // shout into nothing, which is why it looked static.
+        const v = Math.min(1, Math.pow((data[bin] / 255) * scale, 1.35));
+        const barH = Math.max(2, v * maxH);
         // Fades out toward the edges so the band has no hard ends.
         const edge = 1 - Math.pow(t, 1.8);
-        const alpha = (0.03 + v * 0.16) * edge;
-        ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
-        // Rounded caps and a wide glow, so it reads as light rather than as
-        // a bar chart sitting on the screen.
-        ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.8).toFixed(3)})`;
-        ctx2d.shadowBlur = 18;
+        const alpha = (0.04 + v * 0.3) * edge;
         const wid = Math.max(1.5, barW - 4);
         const r = Math.min(wid / 2, 3);
+        const xr = left + half + i * barW;
+        const xl = left + half - (i + 1) * barW;
+
+        ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
+        ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.9).toFixed(3)})`;
+        ctx2d.shadowBlur = 16;
         if (ctx2d.roundRect) {
           ctx2d.beginPath();
-          ctx2d.roundRect(left + half + i * barW, baseline - barH, wid, barH, r);
-          ctx2d.roundRect(left + half - (i + 1) * barW, baseline - barH, wid, barH, r);
+          ctx2d.roundRect(xr, baseline - barH, wid, barH, r);
+          ctx2d.roundRect(xl, baseline - barH, wid, barH, r);
           ctx2d.fill();
         } else {
-          ctx2d.fillRect(left + half + i * barW, baseline - barH, wid, barH);
-          ctx2d.fillRect(left + half - (i + 1) * barW, baseline - barH, wid, barH);
+          ctx2d.fillRect(xr, baseline - barH, wid, barH);
+          ctx2d.fillRect(xl, baseline - barH, wid, barH);
         }
         ctx2d.shadowBlur = 0;
+
+        // A short reflection under the baseline, fading away — it gives the
+        // band a surface to stand on instead of floating.
+        const refl = ctx2d.createLinearGradient(0, baseline, 0, baseline + barH * 0.55);
+        refl.addColorStop(0, `rgba(242, 194, 0, ${(alpha * 0.35).toFixed(3)})`);
+        refl.addColorStop(1, "rgba(242, 194, 0, 0)");
+        ctx2d.fillStyle = refl;
+        ctx2d.fillRect(xr, baseline, wid, barH * 0.55);
+        ctx2d.fillRect(xl, baseline, wid, barH * 0.55);
       }
     };
     frame = requestAnimationFrame(draw);
