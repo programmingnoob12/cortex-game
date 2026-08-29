@@ -2052,13 +2052,34 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
+// Achievement titles read "Quad N-Back Apprentice". Only the rank at the
+// end takes the tier colour — colouring the whole line made the exercise
+// name look like it belonged to the rank.
+function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
+  const { title, tierLabel, tierColor } = achievement || {};
+  if (!tierLabel || !tierColor || !title.endsWith(tierLabel)) {
+    return (
+      <div className={className} style={{ color: baseColor }}>
+        {title}
+      </div>
+    );
+  }
+  const prefix = title.slice(0, title.length - tierLabel.length);
+  return (
+    <div className={className} style={{ color: baseColor }}>
+      {prefix}
+      <span style={{ color: tierColor }}>{tierLabel}</span>
+    </div>
+  );
+}
+
 // Bumped by hand on every change that gets pushed. Shown on the regime
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 10;
+const BUILD_VERSION = 11;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:25 PM";
+const BUILD_TIME = "7:29 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -4873,6 +4894,7 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
     // The rank in the title is the same rank the leaderboard shows, so it
     // carries the same colour there as it does here.
     tierColor: gemTierFor(level).color,
+    tierLabel: gemTierFor(level).label,
     group: "Performance",
     icon: exerciseKey === "dual" ? "🧠" : "🧩",
     title: tierTitle,
@@ -7819,20 +7841,11 @@ function NBackSessionApp() {
                               {a.icon}
                             </div>
                             <div className="flex-1">
-                              <div
+                              <AchievementTitle
+                                achievement={a}
                                 className="text-lg font-semibold"
-                                style={{
-                                  color: a.tierColor
-                                    ? isUnlocked
-                                      ? a.tierColor
-                                      : exerciseTint(a.tierColor, 0.55)
-                                    : isUnlocked
-                                    ? "#F7F8F8"
-                                    : "#8A8F98",
-                                }}
-                              >
-                                {a.title}
-                              </div>
+                                baseColor={isUnlocked ? "#F7F8F8" : "#8A8F98"}
+                              />
                               <div className="text-sm text-slate-500 mt-0.5">
                                 {a.description}
                               </div>
@@ -10275,7 +10288,7 @@ function NBackSessionApp() {
              fully formed while the track is still coming up. */
           style={
             unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-              ? { animation: "prBackdrop 1.1s ease-out both" }
+              ? { animation: "prBackdrop 1.5s ease-out both" }
               : undefined
           }
         >
@@ -10283,7 +10296,7 @@ function NBackSessionApp() {
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
             style={
               unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-                ? { animation: "prReveal 2.4s cubic-bezier(0.22,1,0.36,1) both" }
+                ? { animation: "prReveal 3.6s cubic-bezier(0.22,1,0.36,1) both" }
                 : undefined
             }
           >
@@ -10410,12 +10423,10 @@ function NBackSessionApp() {
               </div>
 
               <div className="space-y-2">
-                <div
+                <AchievementTitle
+                  achievement={current}
                   className="text-3xl font-semibold tracking-tight"
-                  style={{ color: current.tierColor || "#F7F8F8" }}
-                >
-                  {current.title}
-                </div>
+                />
                 <div className="text-slate-400 text-base">{current.description}</div>
                 {current.reward && (
                   <div className={`italic text-sm mt-1 ${groupAccent.text}`}>
@@ -10462,12 +10473,10 @@ function NBackSessionApp() {
                 <div className={`text-xs uppercase tracking-wide font-semibold ${groupAccent.text}`}>
                   {a.group}
                 </div>
-                <div
+                <AchievementTitle
+                  achievement={a}
                   className="text-2xl font-semibold tracking-tight"
-                  style={{ color: a.tierColor || "#F7F8F8" }}
-                >
-                  {a.title}
-                </div>
+                />
                 <div className="text-slate-400 text-base">{a.description}</div>
                 {a.reward && (
                   <div className={`italic text-sm mt-1 ${groupAccent.text}`}>
