@@ -2012,7 +2012,7 @@ function playClick() {
     noise.buffer = noiseBuf;
     const hp = ctx.createBiquadFilter();
     hp.type = "highpass";
-    hp.frequency.value = 3800;
+    hp.frequency.value = 1800;
     const noiseGain = ctx.createGain();
     noiseGain.gain.value = 0.7;
     noise.connect(hp);
@@ -2022,14 +2022,14 @@ function playClick() {
 
     // Two fixed inharmonic partials ringing out over it. No pitch slide:
     // that was what made the previous version sound like it was falling.
-    [5200, 7900].forEach((freq, i) => {
+    [2400, 3550].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, now);
       gain.gain.linearRampToValueAtTime(i === 0 ? 0.9 : 0.35, now + 0.002);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.07 : 0.045));
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.09 : 0.055));
       osc.connect(gain);
       gain.connect(master);
       osc.start(now);
@@ -2037,6 +2037,58 @@ function playClick() {
     });
   } catch {
     // No audio available; a missing click is not worth surfacing.
+  }
+}
+
+// Level-up flourish. A rising major triad — root, third, fifth, then the
+// octave — on soft triangle waves, each note fading into the next. Written
+// out as oscillators rather than shipped as a file, so there is no licence
+// attached to it and nothing to attribute. Deliberately quiet: it plays on
+// top of the level-up overlay, which is already carrying the moment.
+function playLevelUp() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!clickAudioCtx) clickAudioCtx = new Ctx();
+    const ctx = clickAudioCtx;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.1;
+    master.connect(ctx.destination);
+
+    // C5 E5 G5 C6. The octave lands last and rings roughly twice as long,
+    // which is what makes it read as an arrival rather than a sequence that
+    // simply stopped.
+    const notes = [
+      { freq: 523.25, at: 0, len: 0.5 },
+      { freq: 659.25, at: 0.075, len: 0.5 },
+      { freq: 783.99, at: 0.15, len: 0.55 },
+      { freq: 1046.5, at: 0.235, len: 0.95 },
+    ];
+    notes.forEach(({ freq, at, len }, i) => {
+      const start = now + at;
+      // Each note is a triangle plus a quiet sine an octave up: the triangle
+      // gives it body, the sine keeps it from sounding muffled.
+      [
+        { type: "triangle", mult: 1, level: 1 },
+        { type: "sine", mult: 2, level: 0.16 },
+      ].forEach(({ type, mult, level }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq * mult;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(level * (i === 3 ? 0.85 : 0.6), start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + len);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(start);
+        osc.stop(start + len + 0.05);
+      });
+    });
+  } catch {
+    // No audio available; a silent level-up is still a level-up.
   }
 }
 
@@ -6929,6 +6981,12 @@ function NBackSessionApp() {
   useEffect(() => {
     exerciseElapsedMsRef.current = exerciseElapsedMs;
   }, [exerciseElapsedMs]);
+
+  // The one sound in the app that celebrates something. Fires when the
+  // level-up overlay opens, and nowhere else.
+  useEffect(() => {
+    if (unlockInfo) playLevelUp();
+  }, [unlockInfo]);
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
