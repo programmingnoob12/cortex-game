@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 29;
+const BUILD_VERSION = 30;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:20 PM";
+const BUILD_TIME = "11:36 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2269,6 +2269,7 @@ let songSource = null; // the one currently playing, so a second level-up cuts t
 // Frequency data for the on-screen visualiser. Lives at module scope so the
 // component can pick it up without the audio code knowing anything about React.
 let songAnalyser = null;
+let songGain = null; // so a dismissal can fade the track out early
 function getSongAnalyser() {
   return songAnalyser;
 }
@@ -2407,6 +2408,7 @@ function playCelebrationSong() {
     src.onended = () => {
       if (songSource === src) songSource = null;
       if (songAnalyser === analyser) songAnalyser = null;
+      if (songGain === gain) songGain = null;
     };
     songSource = src;
     return true;
@@ -2495,7 +2497,7 @@ function SongVisualizer({ className, style }) {
       // Only the lower half of the spectrum carries anything worth drawing
       // in music; the top bins are near-silent and would render as a flat
       // dead stretch at both ends.
-      const bars = 40;
+      const bars = 56;
       const usable = Math.floor(data.length * 0.62);
       // A band along the bottom rather than a wall behind the content: the
       // full-height version buried the gem and the text.
@@ -2504,7 +2506,7 @@ function SongVisualizer({ className, style }) {
       const half = bandW / 2;
       const barW = half / bars;
       const baseline = h - Math.min(h * 0.08, 64);
-      const maxH = Math.min(h * 0.16, 120);
+      const maxH = Math.min(h * 0.13, 96);
 
       for (let i = 0; i < bars; i++) {
         // Logarithmic bin spacing, so the low end is not crammed into two
@@ -2514,12 +2516,25 @@ function SongVisualizer({ className, style }) {
         const v = data[bin] / 255;
         const barH = Math.max(2, v * v * maxH);
         // Fades out toward the edges so the band has no hard ends.
-        const edge = 1 - Math.pow(t, 2.2);
-        const alpha = (0.08 + v * 0.4) * edge;
+        const edge = 1 - Math.pow(t, 1.8);
+        const alpha = (0.03 + v * 0.16) * edge;
         ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
-        const wid = Math.max(1, barW - 3);
-        ctx2d.fillRect(left + half + i * barW, baseline - barH, wid, barH);
-        ctx2d.fillRect(left + half - (i + 1) * barW, baseline - barH, wid, barH);
+        // Rounded caps and a wide glow, so it reads as light rather than as
+        // a bar chart sitting on the screen.
+        ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.8).toFixed(3)})`;
+        ctx2d.shadowBlur = 18;
+        const wid = Math.max(1.5, barW - 4);
+        const r = Math.min(wid / 2, 3);
+        if (ctx2d.roundRect) {
+          ctx2d.beginPath();
+          ctx2d.roundRect(left + half + i * barW, baseline - barH, wid, barH, r);
+          ctx2d.roundRect(left + half - (i + 1) * barW, baseline - barH, wid, barH, r);
+          ctx2d.fill();
+        } else {
+          ctx2d.fillRect(left + half + i * barW, baseline - barH, wid, barH);
+          ctx2d.fillRect(left + half - (i + 1) * barW, baseline - barH, wid, barH);
+        }
+        ctx2d.shadowBlur = 0;
       }
     };
     frame = requestAnimationFrame(draw);
@@ -2529,6 +2544,25 @@ function SongVisualizer({ className, style }) {
     };
   }, []);
   return <canvas ref={canvasRef} className={className} style={style} />;
+}
+
+// Brings the track down early — when someone dismisses the screen the music
+// should follow them out rather than being cut mid-bar or left playing over
+// whatever they do next.
+function fadeOutCelebrationSong(seconds = 1.4) {
+  const ctx = letterAudioCtx;
+  if (!ctx || !songGain || !songSource) return;
+  try {
+    const now = ctx.currentTime;
+    const g = songGain.gain;
+    // Cancel the scheduled hold/fade and ramp from wherever it is now.
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(Math.max(g.value, 0.0001), now);
+    g.exponentialRampToValueAtTime(0.0001, now + seconds);
+    songSource.stop(now + seconds + 0.05);
+  } catch {
+    // Already stopped.
+  }
 }
 
 // Level-up flourish. A rising major triad — root, third, fifth, then the
@@ -7646,6 +7680,10 @@ function NBackSessionApp() {
           55%, 88% { transform: translateY(0); opacity: 1; }
           100% { opacity: 0; }
         }
+        /* Tailwind's tracking-tight is -0.025em, which reads as cramped at
+           the display sizes the headings use. Halved. */
+        .tracking-tight { letter-spacing: -0.011em !important; }
+
         /* Also in index.css. Repeated here because the pointer cursor kept
            not appearing in the deployed build, and a style tag rendered by
            the component itself is the one place it cannot be missed. */
@@ -10667,6 +10705,9 @@ function NBackSessionApp() {
                 immediately, rather than possibly trailing in later. */}
             <button
               onClick={() => {
+                // Take the music out with the screen rather than cutting it
+                // dead or leaving it running over whatever comes next.
+                fadeOutCelebrationSong();
                 setUnlockInfo(null);
                 checkForNewAchievements();
               }}
