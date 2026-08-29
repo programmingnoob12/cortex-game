@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 38;
+const BUILD_VERSION = 39;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2392,7 +2392,7 @@ function playCelebrationSong() {
     // reads what goes past it, so this does not change what is heard.
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.3;
+    analyser.smoothingTimeConstant = 0.22;
     gain.connect(analyser);
     analyser.connect(ctx.destination);
     songAnalyser = analyser;
@@ -2480,10 +2480,14 @@ function SongVisualizer({ className, style }) {
     resize();
     window.addEventListener("resize", resize);
 
-    // Auto-gain. Music that never peaks would otherwise sit as a flat line;
-    // dividing by a decaying running maximum keeps the bars using their full
-    // range whatever the track's level is.
-    let peak = 0.15;
+    const BARS = 40;
+    // Every band keeps its own running peak. Bass is naturally 20-30dB
+    // louder than treble in mastered music, so a single global scale leaves
+    // the top two thirds of the spectrum flat no matter how busy the track
+    // is. Normalising each band against itself is what gives the display
+    // actual depth instead of a bass-shaped wiggle.
+    const peaks = new Array(BARS).fill(0.06);
+    const levels = new Array(BARS).fill(0);
 
     const draw = () => {
       frame = requestAnimationFrame(draw);
@@ -2497,81 +2501,70 @@ function SongVisualizer({ className, style }) {
       }
       analyser.getByteFrequencyData(data);
 
-      const bars = 6;
-      const usable = Math.floor(data.length * 0.62);
+      // Real frequency band edges, spaced logarithmically the way hearing
+      // works: each band covers the same musical interval rather than the
+      // same number of hertz. 40Hz to 14kHz spans sub-bass to air.
+      const nyquist = (analyser.context.sampleRate || 44100) / 2;
+      const binHz = nyquist / data.length;
+      const F_LOW = 40;
+      const F_HIGH = 14000;
+      const ratio = F_HIGH / F_LOW;
+
       const bandW = Math.min(w * 0.92, 1500);
       const left = (w - bandW) / 2;
       const half = bandW / 2;
-      const barW = half / bars;
+      const barW = half / BARS;
       const baseline = h - Math.min(h * 0.05, 40);
       const maxH = h * 0.3;
 
-      // Track the loudest bin this frame so the scale follows the music.
-      let frameMax = 0;
-      for (let i = 0; i < usable; i++) {
-        if (data[i] > frameMax) frameMax = data[i];
-      }
-      frameMax /= 255;
-      peak = Math.max(frameMax, peak * 0.94);
-      const scale = 1 / Math.max(0.12, peak);
-
-      // Bass energy drives the ambient bloom behind everything.
       let bass = 0;
-      const bassBins = Math.max(4, Math.floor(usable * 0.12));
-      for (let i = 0; i < bassBins; i++) bass += data[i];
-      bass = (bass / bassBins / 255) * scale;
 
-      const bloom = ctx2d.createRadialGradient(
-        w / 2,
-        baseline,
-        0,
-        w / 2,
-        baseline,
-        Math.max(160, bandW * 0.6 * (0.6 + bass * 0.7))
-      );
-      bloom.addColorStop(0, `rgba(242, 194, 0, ${(0.05 + bass * 0.09).toFixed(3)})`);
-      bloom.addColorStop(1, "rgba(242, 194, 0, 0)");
-      ctx2d.fillStyle = bloom;
-      ctx2d.fillRect(0, 0, w, h);
+      for (let i = 0; i < BARS; i++) {
+        const f0 = F_LOW * Math.pow(ratio, i / BARS);
+        const f1 = F_LOW * Math.pow(ratio, (i + 1) / BARS);
+        const b0 = Math.max(0, Math.floor(f0 / binHz));
+        const b1 = Math.min(data.length - 1, Math.max(b0 + 1, Math.ceil(f1 / binHz)));
 
-      for (let i = 0; i < bars; i++) {
-        // Logarithmic bin spacing, so the low end is not crammed into two
-        // bars while the highs get forty.
-        const t = i / bars;
-        const bin = Math.floor(Math.pow(t, 1.7) * usable);
-        // ^1.35 rather than squared: squaring flattened everything below a
-        // shout into nothing, which is why it looked static.
-        // Mostly the loudest bin in this bar's range, with a little of the
-        // average mixed in. A wide bar covers dozens of bins, and averaging
-        // them buries exactly the peaks that make the bar move — which is
-        // why loud hits sometimes barely registered.
-        const binNext = Math.max(
-          bin + 1,
-          Math.floor(Math.pow((i + 1) / bars, 1.7) * usable)
-        );
+        // Mostly the loudest bin in the band, with some of the mean mixed
+        // in: averaging alone buries the transients that make a bar move.
         let sum = 0;
         let top = 0;
-        let count = 0;
-        for (let b = bin; b < binNext && b < usable; b++) {
+        for (let b = b0; b <= b1; b++) {
           sum += data[b];
           if (data[b] > top) top = data[b];
-          count++;
         }
-        const mean = count ? sum / count : 0;
-        const raw = (top * 0.75 + mean * 0.25) / 255;
-        const v = Math.min(1, Math.pow(raw * scale, 1.05));
+        const mean = sum / (b1 - b0 + 1);
+        const raw = (top * 0.7 + mean * 0.3) / 255;
+
+        // Per-band auto-gain, with a slow decay so a band that goes quiet
+        // does not immediately rescale itself back to full.
+        peaks[i] = Math.max(raw, peaks[i] * 0.992);
+        const norm = Math.min(1, raw / Math.max(0.06, peaks[i]));
+
+        // Attack fast, release slow — how a level meter behaves, and what
+        // stops the bars flickering between frames.
+        const target = Math.pow(norm, 1.1);
+        levels[i] =
+          target > levels[i]
+            ? levels[i] + (target - levels[i]) * 0.55
+            : levels[i] + (target - levels[i]) * 0.14;
+
+        if (i < BARS * 0.15) bass += levels[i];
+
+        const v = levels[i];
         const barH = Math.max(2, v * maxH);
         // Fades out toward the edges so the band has no hard ends.
-        const edge = 1 - Math.pow(t, 1.8);
+        const t = i / BARS;
+        const edge = 1 - Math.pow(t, 2.4);
         const alpha = (0.04 + v * 0.3) * edge;
-        const wid = Math.max(4, barW - 8);
-        const r = Math.min(wid / 2, 6);
+        const wid = Math.max(3, barW - 6);
+        const r = Math.min(wid / 2, 5);
         const xr = left + half + i * barW;
         const xl = left + half - (i + 1) * barW;
 
         ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
         ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.9).toFixed(3)})`;
-        ctx2d.shadowBlur = 26;
+        ctx2d.shadowBlur = 22;
         if (ctx2d.roundRect) {
           ctx2d.beginPath();
           ctx2d.roundRect(xr, baseline - barH, wid, barH, r);
@@ -2583,8 +2576,7 @@ function SongVisualizer({ className, style }) {
         }
         ctx2d.shadowBlur = 0;
 
-        // A short reflection under the baseline, fading away — it gives the
-        // band a surface to stand on instead of floating.
+        // A short reflection under the baseline, fading away.
         const refl = ctx2d.createLinearGradient(0, baseline, 0, baseline + barH * 0.55);
         refl.addColorStop(0, `rgba(242, 194, 0, ${(alpha * 0.35).toFixed(3)})`);
         refl.addColorStop(1, "rgba(242, 194, 0, 0)");
@@ -2592,6 +2584,23 @@ function SongVisualizer({ className, style }) {
         ctx2d.fillRect(xr, baseline, wid, barH * 0.55);
         ctx2d.fillRect(xl, baseline, wid, barH * 0.55);
       }
+
+      // Bloom behind the band, driven by the low bands only.
+      bass /= Math.max(1, Math.floor(BARS * 0.15));
+      const bloom = ctx2d.createRadialGradient(
+        w / 2,
+        baseline,
+        0,
+        w / 2,
+        baseline,
+        Math.max(160, bandW * 0.6 * (0.6 + bass * 0.7))
+      );
+      bloom.addColorStop(0, `rgba(242, 194, 0, ${(0.04 + bass * 0.08).toFixed(3)})`);
+      bloom.addColorStop(1, "rgba(242, 194, 0, 0)");
+      ctx2d.globalCompositeOperation = "lighter";
+      ctx2d.fillStyle = bloom;
+      ctx2d.fillRect(0, 0, w, h);
+      ctx2d.globalCompositeOperation = "source-over";
     };
     frame = requestAnimationFrame(draw);
     return () => {
@@ -2605,16 +2614,20 @@ function SongVisualizer({ className, style }) {
 // Brings the track down early — when someone dismisses the screen the music
 // should follow them out rather than being cut mid-bar or left playing over
 // whatever they do next.
-function fadeOutCelebrationSong(seconds = 1.4) {
+function fadeOutCelebrationSong(seconds = 3) {
   const ctx = letterAudioCtx;
   if (!ctx || !songGain || !songSource) return;
   try {
     const now = ctx.currentTime;
     const g = songGain.gain;
     // Cancel the scheduled hold/fade and ramp from wherever it is now.
+    const from = Math.max(g.value, 0.0001);
     g.cancelScheduledValues(now);
-    g.setValueAtTime(Math.max(g.value, 0.0001), now);
-    g.exponentialRampToValueAtTime(0.0001, now + seconds);
+    g.setValueAtTime(from, now);
+    // Down to a whisper over most of it, then out — the same shape as the
+    // natural ending, rather than a straight drop.
+    g.exponentialRampToValueAtTime(from * 0.08, now + seconds * 0.7);
+    g.linearRampToValueAtTime(0.0001, now + seconds);
     songSource.stop(now + seconds + 0.05);
   } catch {
     // Already stopped.
@@ -7817,10 +7830,6 @@ function NBackSessionApp() {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
-        @keyframes prCore {
-          0%, 100% { opacity: 0.55; transform: scale(0.85); }
-          50% { opacity: 1; transform: scale(1.25); }
-        }
         /* A ring closing in on the centre, against the outward pulses. */
         @keyframes prRingIn {
           0% { opacity: 0; transform: scale(1.5); }
@@ -10623,16 +10632,6 @@ function NBackSessionApp() {
                   height: "78vmax",
                   background: `radial-gradient(closest-side, ${PR_YELLOW}22, ${PR_YELLOW}0b 42%, transparent 70%)`,
                   animation: "prGather 3.4s ease-out both",
-                }}
-              />
-              {/* A core that breathes where the gem will land. */}
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: "9vmax",
-                  height: "9vmax",
-                  background: `radial-gradient(closest-side, ${PR_YELLOW}55, transparent 70%)`,
-                  animation: "prCore 1.9s ease-in-out infinite, prGather 1.2s ease-out both",
                 }}
               />
               {/* Sparkles across the whole field, at irregular positions. */}
