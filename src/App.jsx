@@ -2080,9 +2080,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 18;
+const BUILD_VERSION = 19;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:00 PM";
+const BUILD_TIME = "8:04 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7583,6 +7583,12 @@ function NBackSessionApp() {
         .recharts-wrapper *:focus,
         .recharts-surface:focus { outline: none !important; }
 
+        /* Sections grow into place instead of snapping open. */
+        @keyframes sectionExpand {
+          0% { opacity: 0; transform: translateY(-8px) scaleY(0.96); }
+          100% { opacity: 1; transform: translateY(0) scaleY(1); }
+        }
+
         @keyframes prBlackout {
           0%, 34% { opacity: 1; }
           100% { opacity: 0; }
@@ -7830,7 +7836,10 @@ function NBackSessionApp() {
                     </span>
                   </button>
                   {groupOpen && (
-                  <div className="space-y-5">
+                  <div
+                    className="space-y-5"
+                    style={{ animation: "sectionExpand 0.28s ease-out both" }}
+                  >
                   {/* Within a group, anything tagged with an exercise is
                       split out under that exercise's own header, in
                       EXERCISE_LIBRARY order, so the Performance list reads as
@@ -7842,6 +7851,7 @@ function NBackSessionApp() {
                   const unlockedCount = section.items.filter((a) =>
                     isAchievementUnlocked(a, achievementState)
                   ).length;
+                  const sectionColor = EXERCISE_COLORS[group] || "#4CB9D8";
                   return (
                   <div key={section.key} className="space-y-4">
                   {section.label && (
@@ -7870,7 +7880,10 @@ function NBackSessionApp() {
                     </button>
                   )}
                   {isOpen && (
-                  <div className="grid grid-cols-1 gap-4">
+                  <div
+                    className="grid grid-cols-1 gap-4 overflow-hidden"
+                    style={{ animation: "sectionExpand 0.28s ease-out both" }}
+                  >
                     {section.items.map((a) => {
                       const isUnlocked = isAchievementUnlocked(a, achievementState);
                       const progressText =
@@ -7883,19 +7896,37 @@ function NBackSessionApp() {
                       return (
                         <div
                           key={a.id}
-                          className={`rounded-lg p-5 border transition-colors ${
+                          /* Unlocked cards take the exercise's own colour,
+                             tinted with a solid bar down the left edge —
+                             the same treatment the regime cards use. Locked
+                             ones stay neutral so progress reads at a
+                             glance. */
+                          className="rounded-lg p-5 border border-l-4 transition-colors"
+                          style={
                             isUnlocked
-                              ? `${groupAccent.bg} ${groupAccent.border}`
-                              : "bg-slate-900 border-slate-800"
-                          }`}
+                              ? {
+                                  backgroundColor: exerciseTint(sectionColor, 0.1),
+                                  borderColor: exerciseTint(sectionColor, 0.38),
+                                  borderLeftColor: sectionColor,
+                                }
+                              : {
+                                  backgroundColor: "#101112",
+                                  borderColor: "#23252A",
+                                  borderLeftColor: "#2E3138",
+                                }
+                          }
                         >
                           <div className="flex items-center gap-5">
                             <div
-                              className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl ${
+                              className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl"
+                              style={
                                 isUnlocked
-                                  ? `bg-gradient-to-br ${groupAccent.grad} shadow-lg shadow-black/30`
-                                  : "bg-slate-800 grayscale opacity-50"
-                              }`}
+                                  ? {
+                                      backgroundImage: exerciseDeepFill(sectionColor),
+                                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
+                                    }
+                                  : { backgroundColor: "#18191B", filter: "grayscale(1)", opacity: 0.5 }
+                              }
                             >
                               {a.icon}
                             </div>
@@ -10398,7 +10429,7 @@ function NBackSessionApp() {
                   width: 320,
                   height: 320,
                   background: `radial-gradient(closest-side, ${PR_YELLOW}26, ${PR_YELLOW}0d 45%, transparent 72%)`,
-                  animation: "prGather 3.4s ease-out both",
+                  animation: "prGather 3.4s 1.2s ease-out both",
                 }}
               />
               {/* A core that breathes where the gem will land. */}
@@ -10408,7 +10439,7 @@ function NBackSessionApp() {
                   width: 54,
                   height: 54,
                   background: `radial-gradient(closest-side, ${PR_YELLOW}55, transparent 70%)`,
-                  animation: "prCore 1.9s ease-in-out infinite, prGather 1.2s ease-out both",
+                  animation: "prCore 1.9s 1.2s ease-in-out infinite, prGather 1.2s 1.2s ease-out both",
                 }}
               />
               {/* Sparkles catching at odd intervals, so the field is never
@@ -10427,7 +10458,7 @@ function NBackSessionApp() {
                     width: 10,
                     height: 10,
                     background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
-                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite`,
+                    animation: `prSparkle 2.2s ${1.2 + delay}s ease-in-out infinite`,
                   }}
                 />
               ))}
@@ -10453,7 +10484,7 @@ function NBackSessionApp() {
                     border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
                     filter: blur ? `blur(${blur}px)` : undefined,
                     boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
-                    animation: `prRing 3.1s ${d}s cubic-bezier(0.12,0.9,0.2,1) both`,
+                    animation: `prRing 3.1s ${d + 1.2}s cubic-bezier(0.12,0.9,0.2,1) both`,
                   }}
                 />
               ))}
@@ -10467,7 +10498,7 @@ function NBackSessionApp() {
                     width: 320,
                     height: 320,
                     border: `1px solid ${PR_YELLOW}44`,
-                    animation: `prRingIn 2.6s ${d}s cubic-bezier(0.4,0,0.2,1) both`,
+                    animation: `prRingIn 2.6s ${d + 1.2}s cubic-bezier(0.4,0,0.2,1) both`,
                   }}
                 />
               ))}
@@ -10486,7 +10517,7 @@ function NBackSessionApp() {
                       background: PR_YELLOW,
                       "--mx": `${Math.cos(angle) * dist}px`,
                       "--my": `${Math.sin(angle) * dist}px`,
-                      animation: `prMote 2.4s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
+                      animation: `prMote 2.4s ${1.2 + (i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
                     }}
                   />
                 );
@@ -10501,7 +10532,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 4.8s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 4.5s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
