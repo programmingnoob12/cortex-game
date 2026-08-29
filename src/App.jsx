@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 27;
+const BUILD_VERSION = 28;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:39 PM";
+const BUILD_TIME = "11:09 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2266,6 +2266,12 @@ const SONG_PEAK = 0.08;
 let songBuffer = null;
 let songLoadStarted = false;
 let songSource = null; // the one currently playing, so a second level-up cuts the first
+// Frequency data for the on-screen visualiser. Lives at module scope so the
+// component can pick it up without the audio code knowing anything about React.
+let songAnalyser = null;
+function getSongAnalyser() {
+  return songAnalyser;
+}
 
 let songBytes = null;
 
@@ -2382,7 +2388,15 @@ function playCelebrationSong() {
       now + playFor + SONG_FADE_OUT * 0.75
     );
     gain.gain.linearRampToValueAtTime(0.0001, now + playFor + SONG_FADE_OUT);
-    gain.connect(ctx.destination);
+
+    // gain -> analyser -> speakers. The analyser is a pass-through; it only
+    // reads what goes past it, so this does not change what is heard.
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.78;
+    gain.connect(analyser);
+    analyser.connect(ctx.destination);
+    songAnalyser = analyser;
 
     const src = ctx.createBufferSource();
     src.buffer = songBuffer;
@@ -2392,6 +2406,7 @@ function playCelebrationSong() {
     src.stop(now + playFor + SONG_FADE_OUT + 0.05);
     src.onended = () => {
       if (songSource === src) songSource = null;
+      if (songAnalyser === analyser) songAnalyser = null;
     };
     songSource = src;
     return true;
@@ -2439,6 +2454,76 @@ function playSessionDone() {
   } catch {
     // No audio available; the animation still plays.
   }
+}
+
+// A spectrum drawn from whatever the celebration track is doing right now.
+// Bars run outward from the centre in both directions, low frequencies in
+// the middle where the energy is, mirrored top and bottom so the screen
+// reads as a band rather than a chart. Pure canvas: 64 bars a frame is
+// nothing, and it costs no DOM.
+function SongVisualizer({ className, style }) {
+  const canvasRef = useRef(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    const ctx2d = canvas.getContext("2d");
+    if (!ctx2d) return undefined;
+    let frame = 0;
+    let data = null;
+
+    const resize = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(canvas.clientWidth * dpr);
+      canvas.height = Math.floor(canvas.clientHeight * dpr);
+      ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+
+    const draw = () => {
+      frame = requestAnimationFrame(draw);
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      ctx2d.clearRect(0, 0, w, h);
+      const analyser = getSongAnalyser();
+      if (!analyser) return;
+      if (!data || data.length !== analyser.frequencyBinCount) {
+        data = new Uint8Array(analyser.frequencyBinCount);
+      }
+      analyser.getByteFrequencyData(data);
+
+      // Only the lower half of the spectrum carries anything worth drawing
+      // in music; the top bins are near-silent and would render as a flat
+      // dead stretch at both ends.
+      const bars = 48;
+      const usable = Math.floor(data.length * 0.62);
+      const half = w / 2;
+      const barW = half / bars;
+      const mid = h / 2;
+
+      for (let i = 0; i < bars; i++) {
+        // Logarithmic bin spacing, so the low end is not crammed into two
+        // bars while the highs get forty.
+        const t = i / bars;
+        const bin = Math.floor(Math.pow(t, 1.7) * usable);
+        const v = data[bin] / 255;
+        const barH = Math.max(2, v * v * h * 0.42);
+        const alpha = 0.1 + v * 0.55;
+        ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
+        const x1 = half + i * barW;
+        const x2 = half - (i + 1) * barW;
+        const wid = Math.max(1, barW - 2);
+        ctx2d.fillRect(x1, mid - barH, wid, barH * 2);
+        ctx2d.fillRect(x2, mid - barH, wid, barH * 2);
+      }
+    };
+    frame = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+  return <canvas ref={canvasRef} className={className} style={style} />;
 }
 
 // Level-up flourish. A rising major triad — root, third, fifth, then the
@@ -7611,6 +7696,11 @@ function NBackSessionApp() {
           70% { opacity: 0.75; }
           100% { opacity: 0; transform: translateX(-50%) translateY(-28vh) scale(1.5); }
         }
+        /* The spectrum arrives with the content, not before it. */
+        @keyframes prVisualiser {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
         @keyframes prCore {
           0%, 100% { opacity: 0.55; transform: scale(0.85); }
           50% { opacity: 1; transform: scale(1.25); }
@@ -10506,6 +10596,12 @@ function NBackSessionApp() {
                 );
               })}
             </div>
+          )}
+          {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
+            <SongVisualizer
+              className="pointer-events-none absolute inset-0 w-full h-full"
+              style={{ animation: "prVisualiser 2s 4.7s ease-out both" }}
+            />
           )}
           <div
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
