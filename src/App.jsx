@@ -1995,6 +1995,58 @@ function formatLevelValue(exercise, value) {
   }
 }
 
+// Collapses a long history into a readable number of points. Under the
+// session threshold every session is its own point; past it they group by
+// week, and past a year by month. Each bucket reports the best level reached
+// in it with the mean underneath, so the shape of years of training stays
+// legible instead of turning into a solid band of noise.
+function bucketKeyFor(ts, grain) {
+  const d = new Date(ts);
+  if (grain === "month") {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  // Week starting Monday.
+  const day = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return `w${d.getTime()}`;
+}
+
+function bucketLabel(ts, grain) {
+  const d = new Date(ts);
+  if (grain === "month") {
+    return `${d.toLocaleDateString(undefined, { month: "short" })} ${String(
+      d.getFullYear()
+    ).slice(2)}`;
+  }
+  return `${d.getDate()} ${d.toLocaleDateString(undefined, { month: "short" })}`;
+}
+
+function aggregateSessions(sessions, grain) {
+  if (grain === "session") return sessions;
+  const buckets = new Map();
+  sessions.forEach((sn) => {
+    if (sn.level == null) return;
+    const key = bucketKeyFor(sn.ts, grain);
+    const b = buckets.get(key) || { ts: sn.ts, sum: 0, count: 0, best: null };
+    b.ts = Math.min(b.ts, sn.ts);
+    b.sum += sn.level;
+    b.count += 1;
+    b.best = b.best === null ? sn.level : Math.max(b.best, sn.level);
+    buckets.set(key, b);
+  });
+  return Array.from(buckets.values())
+    .sort((a, b) => a.ts - b.ts)
+    .map((b, i) => ({
+      session: i + 1,
+      label: bucketLabel(b.ts, grain),
+      ts: b.ts,
+      level: b.best,
+      avg: b.sum / b.count,
+      sessions: b.count,
+    }));
+}
+
 // Table records, walked oldest to newest: a day sets a score record when its
 // best level beats every earlier day, and an average record when that day's
 // mean level beats every earlier day's. They move independently — a single
@@ -4800,6 +4852,7 @@ function NBackSessionApp() {
   const sessionTimerStartRef = useRef({}); // { [exerciseKey]: timestamp } — when that exercise's session timer began, for the "time left" readout
 
   const [exerciseElapsedMs, setExerciseElapsedMs] = useState({}); // { [key]: ms }, updated once per finished/aborted session
+  const exerciseElapsedMsRef = useRef({}); // mirrors the above for callbacks that need it synchronously
   const [exerciseStats, setExerciseStats] = useState({}); // { [key]: { sessions, totalAccuracy, bestAccuracy, bestN, lastAccuracy } } — persisted long-term via window.storage
   const exerciseStatsRef = useRef({}); // mirrors exerciseStats, read synchronously to know the PRE-session bestN for "new PR" checks
   useEffect(() => {
@@ -5126,7 +5179,9 @@ function NBackSessionApp() {
   const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false); // this run's checkbox state — reset to unchecked each time a fresh tutorial starts
   const currentRunStartRef = useRef(null);
   const avatarFileInputRef = useRef(null);
-  const MAX_HISTORY_ENTRIES = 200;
+  // Was 200, which silently discarded a daily trainer's history after about
+  // six months. The chart buckets long ranges now, so it can hold years.
+  const MAX_HISTORY_ENTRIES = 5000;
 
   // Load previously saved best/avg accuracy stats + session history (persists across sessions/days)
   useEffect(() => {
@@ -5880,12 +5935,57 @@ function NBackSessionApp() {
     if (currentRunStartRef.current != null) {
       const elapsed = Date.now() - currentRunStartRef.current;
       currentRunStartRef.current = null;
-      setExerciseElapsedMs((prev) => ({
-        ...prev,
-        [exerciseKey]: (prev[exerciseKey] || 0) + elapsed,
-      }));
+      setExerciseElapsedMs((prev) => {
+        const next = {
+          ...prev,
+          [exerciseKey]: (prev[exerciseKey] || 0) + elapsed,
+        };
+        exerciseElapsedMsRef.current = next;
+        return next;
+      });
+      // A finished run writes its own duration into history, so that time
+      // must not be logged again as abandoned.
+      loggedElapsedRef.current[exerciseKey] =
+        (exerciseElapsedMsRef.current[exerciseKey] || 0) + 0;
     }
   }, []);
+
+  // How much of each exercise's elapsed time has already been written into
+  // exerciseHistory by a completed run, so an abandoned session only logs
+  // the part nobody has counted yet.
+  const loggedElapsedRef = useRef({});
+
+  // Someone who trains for twenty minutes and walks away before finishing
+  // still did twenty minutes. Log it as a session with time but no score:
+  // the spreadsheet shows it red, with the duration intact, instead of
+  // pretending the day never happened.
+  const logPartialSession = useCallback(
+    (exerciseKey) => {
+      if (!exerciseKey || exerciseKey === "overview") return;
+      const total = exerciseElapsedMsRef.current[exerciseKey] || 0;
+      const alreadyLogged = loggedElapsedRef.current[exerciseKey] || 0;
+      const unlogged = total - alreadyLogged;
+      // Below a minute is a glance, not a session.
+      if (unlogged < 60 * 1000) return;
+      loggedElapsedRef.current[exerciseKey] = total;
+      setExerciseHistory((prev) => {
+        const prevHistory = prev[exerciseKey] || [];
+        const newHistory = [
+          ...prevHistory,
+          {
+            ts: Date.now(),
+            accuracy: null,
+            n: null,
+            durationMs: unlogged,
+            partial: true,
+          },
+        ].slice(-MAX_HISTORY_ENTRIES);
+        safeStorageSet(`history-${exerciseKey}`, JSON.stringify(newHistory), false);
+        return { ...prev, [exerciseKey]: newHistory };
+      });
+    },
+    []
+  );
 
   const recordSessionResult = useCallback((overallAcc, exerciseKey, levelUsed, statsSnapshot) => {
     const ex = EXERCISE_LIBRARY[exerciseKey];
@@ -6416,6 +6516,14 @@ function NBackSessionApp() {
   const [historyPage, setHistoryPage] = useState({});
   const HISTORY_PAGE_SIZE = 7;
   const SHEET_ROW_H = 44;
+  // Chart window. 90 days plots every session; anything wider is grouped so
+  // the point count stays readable no matter how many years are logged.
+  const [statsRange, setStatsRange] = useState("90d");
+  const STATS_RANGES = [
+    { key: "90d", label: "90 days", days: 90 },
+    { key: "1y", label: "1 year", days: 365 },
+    { key: "all", label: "All", days: null },
+  ];
 
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
@@ -6734,6 +6842,10 @@ function NBackSessionApp() {
   useEffect(() => {
     setRoundNumber(1);
   }, [exercise.key]);
+
+  useEffect(() => {
+    exerciseElapsedMsRef.current = exerciseElapsedMs;
+  }, [exerciseElapsedMs]);
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
@@ -8537,7 +8649,10 @@ function NBackSessionApp() {
                 !(exercise.key === "iqnb" && sessionStartedRef.current.iqnb) &&
                 exercise.key !== "motion3d" && (
                 <button
-                  onClick={() => setMainView("home")}
+                  onClick={() => {
+                    logPartialSession(exercise.key);
+                    setMainView("home");
+                  }}
                   className="text-slate-500 hover:text-slate-300 transition-colors text-base"
                 >
                   ← Home
@@ -8681,14 +8796,30 @@ function NBackSessionApp() {
               <h1 className="text-4xl font-semibold tracking-tight">
                 Stats
               </h1>
-              <button
-                onClick={() =>
-                  setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
-                }
-                className="shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
-              >
-                {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
-              </button>
+              <div className="shrink-0 flex items-center gap-2">
+                {statsDisplay === "chart" &&
+                  STATS_RANGES.map((r) => (
+                    <button
+                      key={r.key}
+                      onClick={() => setStatsRange(r.key)}
+                      className={`rounded-lg py-2 px-4 text-sm font-medium transition-colors ${
+                        statsRange === r.key
+                          ? "bg-slate-700 text-slate-100"
+                          : "bg-slate-900 border border-slate-700/70 text-slate-400 hover:text-slate-200"
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  ))}
+                <button
+                  onClick={() =>
+                    setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
+                  }
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                >
+                  {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
+                </button>
+              </div>
             </div>
 
             {statsDisplay === "chart"
@@ -8696,13 +8827,30 @@ function NBackSessionApp() {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
+              const rangeDef =
+                STATS_RANGES.find((r) => r.key === statsRange) || STATS_RANGES[0];
+              const cutoff = rangeDef.days
+                ? Date.now() - rangeDef.days * 24 * 60 * 60 * 1000
+                : null;
+              const windowed = history.filter(
+                (h) => sessionLevel(e, h) != null && (cutoff === null || h.ts >= cutoff)
+              );
+              const spanDays = windowed.length
+                ? (windowed[windowed.length - 1].ts - windowed[0].ts) / 86400000
+                : 0;
+              // Every session up to 90 days, then weeks, then months.
+              const grain =
+                spanDays > 400 ? "month" : windowed.length > 90 ? "week" : "session";
               const chartData = withRunningAverage(
-                history.map((h, i) => ({
-                  session: i + 1,
-                  ts: h.ts,
-                  level: sessionLevel(e, h),
-                  accuracy: h.accuracy,
-                }))
+                aggregateSessions(
+                  windowed.map((h, i) => ({
+                    session: i + 1,
+                    label: String(i + 1),
+                    ts: h.ts,
+                    level: sessionLevel(e, h),
+                  })),
+                  grain
+                )
               );
               return (
                 <div key={e.key} className="space-y-4">
@@ -8742,12 +8890,17 @@ function NBackSessionApp() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#23252A" />
                           <XAxis
-                            dataKey="session"
+                            dataKey="label"
                             stroke="#6E7178"
                             tick={{ fill: "#6E7178", fontSize: 12 }}
                             minTickGap={24}
                             label={{
-                              value: "Session",
+                              value:
+                                grain === "month"
+                                  ? "Month"
+                                  : grain === "week"
+                                  ? "Week"
+                                  : "Session",
                               position: "insideBottom",
                               offset: -8,
                               fill: "#6E7178",
@@ -8783,6 +8936,13 @@ function NBackSessionApp() {
                                     .join(" ")
                                     .replace(/,/g, "")
                                 : null;
+                              const count =
+                                payload && payload[0] && payload[0].payload.sessions;
+                              if (grain !== "session") {
+                                return count
+                                  ? `${when} · ${count} session${count === 1 ? "" : "s"}`
+                                  : when;
+                              }
                               return when
                                 ? `${when} · Session ${label}`
                                 : `Session ${label}`;
@@ -8910,9 +9070,13 @@ function NBackSessionApp() {
                                 className="border-b border-slate-800/70 last:border-0"
                                 style={{
                                   height: SHEET_ROW_H,
-                                  backgroundColor: row.missed
-                                    ? "rgba(151,20,38,0.14)"
-                                    : "rgba(30,152,43,0.12)",
+                                  // Red covers both "did not train" and
+                                  // "started but never finished a run" —
+                                  // either way no score was set that day.
+                                  backgroundColor:
+                                    row.level == null
+                                      ? "rgba(151,20,38,0.14)"
+                                      : "rgba(30,152,43,0.12)",
                                 }}
                               >
                                 <td className="px-4 py-2.5 text-slate-100">
@@ -8922,7 +9086,7 @@ function NBackSessionApp() {
                                   {d.toLocaleDateString()}
                                 </td>
                                 <td className="px-4 py-2.5 text-slate-100">
-                                  {row.missed ? "—" : formatDuration(row.durationMs)}
+                                  {row.durationMs ? formatDuration(row.durationMs) : "—"}
                                 </td>
                                 <td
                                   className="px-4 py-2.5 font-medium"
@@ -8936,7 +9100,7 @@ function NBackSessionApp() {
                                       : { color: "#F7F8F8" }
                                   }
                                 >
-                                  {row.missed ? "—" : formatScoreCell(e, row)}
+                                  {formatScoreCell(e, row)}
                                   {row.isPR && (
                                     <span className="lg:hidden ml-2 text-xs font-semibold">
                                       New PR!
@@ -9408,7 +9572,10 @@ function NBackSessionApp() {
             )}
 
             <button
-              onClick={() => setMainView("home")}
+              onClick={() => {
+                logPartialSession(exercise.key);
+                setMainView("home");
+              }}
               className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium -mb-5"
             >
               ‹ Home
