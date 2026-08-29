@@ -2052,8 +2052,6 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
-// How long the record screen sits black and silent before the music starts.
-const PR_SILENCE_MS = 1200;
 
 // Achievement titles read "Quad N-Back Apprentice". Only the rank at the
 // end takes the tier colour — colouring the whole line made the exercise
@@ -2080,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 22;
+const BUILD_VERSION = 23;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:19 PM";
+const BUILD_TIME = "8:26 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7405,15 +7403,10 @@ function NBackSessionApp() {
   useEffect(() => {
     if (!unlockInfo) return;
     if (unlockInfo.isNewPR) {
-      // Silence first. The screen goes black and the vapour gathers with
-      // nothing on the soundtrack, so the music arriving is itself part of
-      // the reveal rather than something that was always playing.
-      const t = setTimeout(() => {
-        const playing = playCelebrationSong();
-        if (!playing && songFailed) playLevelUp();
-        playCheer();
-      }, PR_SILENCE_MS);
-      return () => clearTimeout(t);
+      const playing = playCelebrationSong();
+      if (!playing && songFailed) playLevelUp();
+      playCheer();
+      return;
     }
     playLevelUp();
   }, [unlockInfo]);
@@ -7589,6 +7582,21 @@ function NBackSessionApp() {
           100% { opacity: 1; transform: translateY(0) scaleY(1); }
         }
 
+        /* Full black, held a beat, then lifting to reveal the scene. */
+        @keyframes prBlackout {
+          0%, 22% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        /* Motes travelling inward from the edge to the centre. */
+        @keyframes prMote {
+          0% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.6); }
+          20% { opacity: 1; }
+          100% { opacity: 0; transform: translate(0, 0) scale(0.2); }
+        }
+        @keyframes prSparkle {
+          0%, 100% { opacity: 0; transform: scale(0.3); }
+          45% { opacity: 1; transform: scale(1); }
+        }
         /* Vapour drifting upward and thinning as it goes. */
         @keyframes prVapour {
           0% { opacity: 0; transform: translateY(140px) scale(0.6); }
@@ -10339,39 +10347,40 @@ function NBackSessionApp() {
 
       {unlockInfo && (
         <div
-          className={`fixed inset-0 z-50 flex items-center justify-center p-8 ${
-            unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-              ? "bg-slate-950/80 backdrop-blur-xl"
-              : "bg-slate-950/90 backdrop-blur-sm"
-          }`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8"
           /* Trial, Quad N-Back records only: the screen builds over the
              stretch before the track's drop, rather than cutting in fully
              formed while the music is still climbing. */
           style={
             unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-              ? { animation: "prBackdrop 0.9s ease-out both" }
+              ? { animation: "prBackdrop 2s ease-out both" }
               : undefined
           }
         >
           {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
             /* Pre-roll. Something has to occupy the wait or the dark screen
-               reads as a hang. Four layers, all built from the PR yellow:
-               a gathering glow, a slowly turning ring of light, rings
-               pushing outward, and motes drawn inward toward the point the
-               gem will occupy. Everything clears as the content resolves. */
+               reads as a hang: black first, then vapour, a gathering glow,
+               a breathing core, expanding rings, sparkles and motes. */
             <div
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
-              style={{ animation: "prPrerollFade 8.7s ease-out both" }}
+              style={{ animation: "prPrerollFade 7.2s ease-out both" }}
             >
+              {/* A beat of true black first. The backdrop behind this is
+                  only 90% opaque, so without it the page still shows
+                  through and nothing feels like it stopped. */}
+              <div
+                className="absolute inset-0 bg-black"
+                style={{ animation: "prBlackout 3.4s ease-out both" }}
+              />
               {/* Vapour. Four large, heavily blurred masses drifting up and
                   apart at different rates — slow enough to read as
                   atmosphere rather than as objects moving. */}
               {[
-                { x: -180, s: 1, d: 0.15, dur: 7, c: "#ffffff12" },
-                { x: 150, s: 1.25, d: 0.5, dur: 8, c: "#ffffff10" },
-                { x: -40, s: 0.85, d: 1.5, dur: 6.5, c: `${PR_YELLOW}1a` },
-                { x: 240, s: 1.1, d: 2.3, dur: 8, c: `${PR_YELLOW}14` },
+                { x: -180, s: 1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
+                { x: 150, s: 1.25, d: 1.2, dur: 7.5, c: "#ffffff14" },
+                { x: -40, s: 0.85, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
+                { x: 240, s: 1.1, d: 2.6, dur: 8, c: "#ffffff0f" },
               ].map(({ x, s: scale, d, dur, c }, i) => (
                 <div
                   key={`v${i}`}
@@ -10393,7 +10402,7 @@ function NBackSessionApp() {
                   width: 320,
                   height: 320,
                   background: `radial-gradient(closest-side, ${PR_YELLOW}26, ${PR_YELLOW}0d 45%, transparent 72%)`,
-                  animation: "prGather 3.4s 1.2s ease-out both",
+                  animation: "prGather 3.4s ease-out both",
                 }}
               />
               {/* A core that breathes where the gem will land. */}
@@ -10403,9 +10412,29 @@ function NBackSessionApp() {
                   width: 54,
                   height: 54,
                   background: `radial-gradient(closest-side, ${PR_YELLOW}55, transparent 70%)`,
-                  animation: "prCore 1.9s 1.2s ease-in-out infinite, prGather 1.2s 1.2s ease-out both",
+                  animation: "prCore 1.9s ease-in-out infinite, prGather 1.2s ease-out both",
                 }}
               />
+              {/* Sparkles catching at odd intervals, so the field is never
+                  perfectly regular. */}
+              {[
+                [-140, -96, 0], [128, -118, 0.5], [-172, 54, 1.1],
+                [156, 72, 0.35], [-64, -160, 0.8], [82, 148, 1.4],
+                [188, -28, 0.95], [-118, 136, 0.6],
+              ].map(([x, y, delay], i) => (
+                <div
+                  key={`s${i}`}
+                  className="absolute"
+                  style={{
+                    left: `calc(50% + ${x}px)`,
+                    top: `calc(50% + ${y}px)`,
+                    width: 10,
+                    height: 10,
+                    background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
+                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite`,
+                  }}
+                />
+              ))}
               {/* Rings in pairs: a bright thin one with a soft wide one
                   chasing it a beat behind, so each pulse has a leading edge
                   and a wake rather than being a single hard outline. */}
@@ -10428,7 +10457,7 @@ function NBackSessionApp() {
                     border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
                     filter: blur ? `blur(${blur}px)` : undefined,
                     boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
-                    animation: `prRing 3.1s ${d + 1.2}s cubic-bezier(0.12,0.9,0.2,1) both`,
+                    animation: `prRing 3.1s ${d}s cubic-bezier(0.12,0.9,0.2,1) both`,
                   }}
                 />
               ))}
@@ -10442,50 +10471,30 @@ function NBackSessionApp() {
                     width: 320,
                     height: 320,
                     border: `1px solid ${PR_YELLOW}44`,
-                    animation: `prRingIn 2.6s ${d + 1.2}s cubic-bezier(0.4,0,0.2,1) both`,
+                    animation: `prRingIn 2.6s ${d}s cubic-bezier(0.4,0,0.2,1) both`,
                   }}
                 />
               ))}
-              {/* Rings in pairs: a bright thin one with a soft wide one
-                  chasing it a beat behind, so each pulse has a leading edge
-                  and a wake rather than being a single hard outline. */}
-              {[
-                { d: 0, size: 150, w: 1.5, blur: 0 },
-                { d: 0.18, size: 150, w: 6, blur: 10 },
-                { d: 0.85, size: 128, w: 1.5, blur: 0 },
-                { d: 1.03, size: 128, w: 6, blur: 10 },
-                { d: 1.7, size: 172, w: 1.5, blur: 0 },
-                { d: 1.88, size: 172, w: 6, blur: 10 },
-                { d: 2.55, size: 140, w: 1.5, blur: 0 },
-                { d: 2.73, size: 140, w: 6, blur: 10 },
-              ].map(({ d, size, w, blur }, i) => (
-                <div
-                  key={`r${i}`}
-                  className="absolute rounded-full"
-                  style={{
-                    width: size,
-                    height: size,
-                    border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
-                    filter: blur ? `blur(${blur}px)` : undefined,
-                    boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
-                    animation: `prRing 3.1s ${d + 1.2}s cubic-bezier(0.12,0.9,0.2,1) both`,
-                  }}
-                />
-              ))}
-              {/* One ring travelling the other way, tightening inward, so
-                  the motion is not all in a single direction. */}
-              {[0.4, 1.6].map((d) => (
-                <div
-                  key={`i${d}`}
-                  className="absolute rounded-full"
-                  style={{
-                    width: 320,
-                    height: 320,
-                    border: `1px solid ${PR_YELLOW}44`,
-                    animation: `prRingIn 2.6s ${d + 1.2}s cubic-bezier(0.4,0,0.2,1) both`,
-                  }}
-                />
-              ))}
+              {/* Motes converging. Twelve is enough to read as movement
+                  without turning into confetti. */}
+              {Array.from({ length: 12 }).map((_, i) => {
+                const angle = (i / 12) * Math.PI * 2;
+                const dist = 190 + (i % 3) * 34;
+                return (
+                  <div
+                    key={`m${i}`}
+                    className="absolute rounded-full"
+                    style={{
+                      width: 3,
+                      height: 3,
+                      background: PR_YELLOW,
+                      "--mx": `${Math.cos(angle) * dist}px`,
+                      "--my": `${Math.sin(angle) * dist}px`,
+                      animation: `prMote 2.4s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
           <div
@@ -10496,7 +10505,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 5.2s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 3.9s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
