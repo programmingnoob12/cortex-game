@@ -2056,7 +2056,9 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 8;
+const BUILD_VERSION = 9;
+// Local NZ time this version was pushed, set by hand alongside the number.
+const BUILD_TIME = "7:12 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2238,7 +2240,7 @@ const SONG_START = 56; // seconds into the track
 const SONG_FADE_OUT_AT = 77; // seconds into the track
 const SONG_FADE_IN = 2.6; // seconds
 const SONG_FADE_OUT = 7; // seconds
-const SONG_PEAK = 0.1;
+const SONG_PEAK = 0.08;
 let songBuffer = null;
 let songLoadStarted = false;
 let songSource = null; // the one currently playing, so a second level-up cuts the first
@@ -2345,8 +2347,8 @@ function playCelebrationSong() {
     // late, climbs quickly to about half, then eases the rest of the way
     // over a longer stretch — which is what stops the entry sounding like a
     // switch being flipped.
-    gain.gain.setValueAtTime(SONG_PEAK * 0.06, now);
-    gain.gain.exponentialRampToValueAtTime(SONG_PEAK * 0.45, now + SONG_FADE_IN * 0.35);
+    gain.gain.setValueAtTime(SONG_PEAK * 0.025, now);
+    gain.gain.exponentialRampToValueAtTime(SONG_PEAK * 0.35, now + SONG_FADE_IN * 0.4);
     gain.gain.exponentialRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
     // Hold until the fade-out point, then ease down to silence.
     gain.gain.setValueAtTime(SONG_PEAK, now + playFor);
@@ -4297,7 +4299,7 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
 // so e.g. "D6B" (Dual 6-Back) and "Q6B" (Quad 6-Back) both carry the same name.
 const GEM_TIERS = {
   1: { color: "#94a3b8", glow: false, label: "Novice" },
-  2: { color: "#4ade80", glow: true, label: "Apprentice" },
+  2: { color: "#008000", glow: true, label: "Apprentice" },
   3: { color: "#38bdf8", glow: true, label: "Adept" },
   4: { color: "#E8EDF5", glow: true, label: "Proficient" },
   5: { color: "#22d3ee", glow: true, label: "Bright" },
@@ -7577,7 +7579,7 @@ function NBackSessionApp() {
           <div className="space-y-14">
             <div>
               <div className="text-slate-100 text-lg font-semibold mb-4">
-                VERSION {BUILD_VERSION}
+                VERSION {BUILD_VERSION} · {BUILD_TIME}
               </div>
               <h1 className="text-5xl font-semibold tracking-tight">
                 Choose your regime
@@ -10377,7 +10379,10 @@ function NBackSessionApp() {
               </div>
 
               <div className="space-y-2">
-                <div className="text-3xl font-semibold tracking-tight text-slate-100">
+                <div
+                  className="text-3xl font-semibold tracking-tight"
+                  style={{ color: current.tierColor || "#F7F8F8" }}
+                >
                   {current.title}
                 </div>
                 <div className="text-slate-400 text-base">{current.description}</div>
