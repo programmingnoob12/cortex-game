@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 40;
+const BUILD_VERSION = 41;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2111,6 +2111,11 @@ if (typeof window !== "undefined") {
     if (!ctx) return;
     if (ctx.state === "suspended") ctx.resume();
     decodePendingClips();
+    // Fetch and decode the letter voices on the very first interaction with
+    // the page. Waiting until an exercise starts meant the first trial or
+    // two fired before the buffers existed and fell back to the browser's
+    // own text-to-speech, which is why the first letter sounded different.
+    preloadLetterAudio();
   };
   ["pointerdown", "keydown", "touchstart"].forEach((evt) =>
     window.addEventListener(evt, unlock, { capture: true })
@@ -7599,6 +7604,12 @@ function NBackSessionApp() {
   useEffect(() => {
     setRoundNumber(1);
   }, [exercise.key]);
+
+  // Second chance to have the recordings ready: sitting on an exercise's
+  // setup screen is a good few seconds before Start is pressed.
+  useEffect(() => {
+    if (mainView === "app" && exercise.key !== "overview") preloadLetterAudio();
+  }, [mainView, exercise.key]);
 
   useEffect(() => {
     exerciseElapsedMsRef.current = exerciseElapsedMs;
