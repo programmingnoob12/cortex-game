@@ -7041,10 +7041,13 @@ function NBackSessionApp() {
   // column. Modalities alternate sides in their declared order, so Dual
   // N-Back gets one button per hand and Quad gets two.
   const nbackSideButtons = useMemo(() => {
-    const columns = { left: [], right: [] };
-    (exercise.modalities || []).forEach((m, i) => {
-      columns[i % 2 === 0 ? "left" : "right"].push(m);
-    });
+    // Fixed sides, so a modality never moves between exercises: the visual
+    // streams sit on the left, the audio stream on the right, each column
+    // ordered top to bottom. Anything the exercise doesn't use drops out and
+    // the rest keep their places.
+    const LEFT = ["color", "pos"];
+    const RIGHT = ["shape", "audio"];
+    const active = exercise.modalities || [];
     const render = (m) => {
       const meta = MODALITY_META[m];
       const state = feedback[m];
@@ -7058,18 +7061,20 @@ function NBackSessionApp() {
         <button
           key={m}
           onClick={() => handlePress(m)}
-          className={`transition-colors duration-150 rounded-lg py-4 px-2 font-semibold text-base leading-tight ${cls}`}
+          className={`w-full transition-colors duration-150 rounded-lg py-6 px-2 flex flex-col items-center justify-center gap-1 ${cls}`}
         >
-          <span className="block">{meta.label}</span>
-          <span className="block text-sm font-normal opacity-70">
-            ({MODALITY_KEY_LABEL[m]})
+          <span className="text-xs font-medium uppercase tracking-wide opacity-70">
+            {meta.label}
+          </span>
+          <span className="text-3xl font-semibold leading-none">
+            {MODALITY_KEY_LABEL[m]}
           </span>
         </button>
       );
     };
     return {
-      left: columns.left.map(render),
-      right: columns.right.map(render),
+      left: LEFT.filter((m) => active.includes(m)).map(render),
+      right: RIGHT.filter((m) => active.includes(m)).map(render),
     };
   }, [exercise.modalities, feedback, handlePress]);
 
