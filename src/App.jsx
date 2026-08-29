@@ -7329,7 +7329,26 @@ function NBackSessionApp() {
                   >
                     <div className="text-xl font-semibold">{e.title}</div>
                     <div className="flex items-center gap-5 mt-3">
-                      <LevelGem level={bestLevel} size={36} />
+                      {/* A soft pool of shadow under the gem. The gem's own
+                          drop-shadow is tuned for the near-black page and
+                          all but vanishes against a coloured card, so it
+                          gets a darkened patch to sit on instead. */}
+                      <span className="relative flex items-center justify-center">
+                        <span
+                          aria-hidden="true"
+                          className="absolute rounded-full pointer-events-none"
+                          style={{
+                            width: 58,
+                            height: 58,
+                            top: 3,
+                            background:
+                              "radial-gradient(closest-side, rgba(0,0,0,0.5), rgba(0,0,0,0.22) 55%, rgba(0,0,0,0) 78%)",
+                          }}
+                        />
+                        <span className="relative">
+                          <LevelGem level={bestLevel} size={36} />
+                        </span>
+                      </span>
                       <div className="text-lg font-medium">
                         {isAccuracy
                           ? `${e.abbrev}${bestLevel}B`
