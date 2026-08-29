@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 41;
+const BUILD_VERSION = 42;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -7640,6 +7640,14 @@ function NBackSessionApp() {
 
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
+  // Achievements get the short tune. Reaching a level for the first time is
+  // the only thing that gets the track and the full reveal, so the two never
+  // fight over the moment.
+  const pendingAchievement = achievementCelebrationQueue[0];
+  useEffect(() => {
+    if (pendingAchievement) playLevelUp();
+  }, [pendingAchievement]);
+
   // Reaching a level for the FIRST time gets the celebration track and the
   // applause. Climbing back to a level already reached before gets the short
   // tune instead, so the big moment stays rare enough to mean something.
@@ -9787,12 +9795,7 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
-          <div
-            className="space-y-14"
-            onClickCapture={(ev) => {
-              if (ev.target.closest("button")) playClick();
-            }}
-          >
+          <div className="space-y-14">
             <div>
               <button
                 onClick={() => setOverviewView("summary")}
@@ -10827,7 +10830,7 @@ function NBackSessionApp() {
                 ACCENT_STYLES.indigo.grad
               } hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
             >
-              Accept
+              Nice!
             </button>
           </div>
         </div>
@@ -10914,7 +10917,7 @@ function NBackSessionApp() {
                 }}
                 className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
               >
-                Accept
+                Nice!
               </button>
             </div>
           </div>
