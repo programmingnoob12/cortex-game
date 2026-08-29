@@ -6981,21 +6981,35 @@ function NBackSessionApp() {
                     /* Same filled treatment as an exercise's Start button,
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
-                    style={{ "--ex": rc }}
-                    className="w-full text-left deep-fill rounded-xl px-7 py-5 shadow-lg shadow-black/30"
+                    style={{
+                      "--ex": rc,
+                      backgroundColor: exerciseTint(rc, 0.1),
+                      borderColor: exerciseTint(rc, 0.38),
+                      borderLeftColor: rc,
+                    }}
+                    className="w-full text-left rounded-xl px-7 py-5 border border-l-4"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <div className="text-2xl font-semibold">{r.title}</div>
+                        <div className="text-2xl font-semibold text-slate-100">
+                          {r.title}
+                        </div>
                         {r.key === "medium" && (
-                          <span className="italic text-sm font-semibold">
+                          <span
+                            className="italic text-sm font-semibold"
+                            style={{ color: rc }}
+                          >
                             Recommended
                           </span>
                         )}
                       </div>
-                      <div className="text-lg font-medium">{r.subtitle}</div>
+                      <div className="text-lg font-medium text-slate-100">
+                        {r.subtitle}
+                      </div>
                     </div>
-                    <div className="text-base font-medium mt-1">{r.summary}</div>
+                    <div className="text-base font-medium mt-1" style={{ color: rc }}>
+                      {r.summary}
+                    </div>
                   </button>
                 );
               })}
@@ -7006,7 +7020,7 @@ function NBackSessionApp() {
               <div className="relative group">
                 <button
                   disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl p-8 cursor-not-allowed"
+                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-5 cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-3">
@@ -7017,7 +7031,7 @@ function NBackSessionApp() {
                     </div>
                     <div className="text-lg font-medium text-slate-600">—</div>
                   </div>
-                  <div className="text-slate-600 text-base mt-2">
+                  <div className="text-slate-600 text-base mt-1">
                     Build your own regime.
                   </div>
                 </button>
@@ -7032,7 +7046,7 @@ function NBackSessionApp() {
               <div className="relative group">
                 <button
                   disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl p-8 cursor-not-allowed"
+                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-5 cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-3">
@@ -7043,7 +7057,7 @@ function NBackSessionApp() {
                     </div>
                     <div className="text-lg font-medium text-slate-600">—</div>
                   </div>
-                  <div className="text-slate-600 text-base mt-2">CCT</div>
+                  <div className="text-slate-600 text-base mt-1">CCT</div>
                 </button>
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
                   Coming soon
@@ -7319,18 +7333,19 @@ function NBackSessionApp() {
                 return (
                   <div
                     key={e.key}
-                    className="rounded-xl p-6 text-white"
+                    className="rounded-xl p-6 border border-l-4"
                     style={{
-                      backgroundImage: exerciseDeepFill(exColor),
-                      boxShadow:
-                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                      backgroundColor: exerciseTint(exColor, 0.1),
+                      borderColor: exerciseTint(exColor, 0.38),
+                      borderLeftColor: exColor,
                     }}
                   >
-                    <div className="text-xl font-semibold">{e.title}</div>
+                    <div className="text-xl font-semibold text-slate-100">
+                      {e.title}
+                    </div>
                     <div className="flex items-center gap-5 mt-3">
                       <LevelGem level={bestLevel} size={36} />
-                      <div className="text-lg font-medium">
+                      <div className="text-lg font-medium" style={{ color: exColor }}>
                         {isAccuracy
                           ? `${e.abbrev}${bestLevel}B`
                           : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
