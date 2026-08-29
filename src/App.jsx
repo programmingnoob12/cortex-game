@@ -8161,28 +8161,21 @@ function NBackSessionApp() {
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
               <div>
                 <div className="text-xl font-medium">Show tutorials</div>
-                <div className="text-slate-500 text-base mt-1">
-                  Shown before training when this is on. Exercises you
-                  individually dismissed with "Don't show this tutorial
-                  again" stay dismissed even when this is on
-                  {Object.values(dismissedTutorials).some(Boolean) && (
-                    <>
-                      {". "}
-                      <button
-                        onClick={() => {
-                          setDismissedTutorialsState({});
-                          if (window.storage) {
-                            safeStorageSet("dismissed-tutorials", JSON.stringify({}), false);
-                          }
-                        }}
-                        className="text-indigo-400 hover:text-indigo-300 underline"
-                      >
-                        reset those
-                      </button>
-                    </>
-                  )}
-                  .
-                </div>
+                {Object.values(dismissedTutorials).some(Boolean) && (
+                  <div className="text-slate-500 text-base mt-1">
+                    <button
+                      onClick={() => {
+                        setDismissedTutorialsState({});
+                        if (window.storage) {
+                          safeStorageSet("dismissed-tutorials", JSON.stringify({}), false);
+                        }
+                      }}
+                      className="text-indigo-400 hover:text-indigo-300 underline"
+                    >
+                      Reset dismissed tutorials
+                    </button>
+                  </div>
+                )}
               </div>
               <Toggle
                 on={!hideTutorials}
@@ -8246,22 +8239,19 @@ function NBackSessionApp() {
             {/* Placeholder legal/contact footer. The three policy pages are
                 what a subscription business is expected to make reachable;
                 the links are dead until those pages exist. */}
-            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-500">
+            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-500">
               <span>© {new Date().getFullYear()} Cortex</span>
               <a
                 href="mailto:hello@cortex.app"
                 className="hover:text-slate-300 transition-colors"
               >
-                Contact
+                Contact hello@cortex.app
               </a>
               <a href="#" className="hover:text-slate-300 transition-colors">
                 Privacy Policy
               </a>
               <a href="#" className="hover:text-slate-300 transition-colors">
                 Terms of Service
-              </a>
-              <a href="#" className="hover:text-slate-300 transition-colors">
-                Refund Policy
               </a>
             </div>
           </div>
