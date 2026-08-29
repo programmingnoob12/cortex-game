@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 16;
+const BUILD_VERSION = 17;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:51 PM";
+const BUILD_TIME = "7:55 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7571,11 +7571,17 @@ function NBackSessionApp() {
           18% { opacity: 1; }
           100% { opacity: 0; transform: scale(3.6); }
         }
-        @keyframes prSpinCW {
-          to { transform: rotate(360deg); }
+        /* Full black, held a beat, then lifting to reveal the scene. */
+        @keyframes prBlackout {
+          0%, 22% { opacity: 1; }
+          100% { opacity: 0; }
         }
-        @keyframes prSpinCCW {
-          to { transform: rotate(-360deg); }
+        /* Vapour drifting upward and thinning as it goes. */
+        @keyframes prVapour {
+          0% { opacity: 0; transform: translateY(140px) scale(0.6); }
+          25% { opacity: 1; }
+          70% { opacity: 0.75; }
+          100% { opacity: 0; transform: translateY(-180px) scale(1.5); }
         }
         @keyframes prCore {
           0%, 100% { opacity: 0.55; transform: scale(0.85); }
@@ -10345,6 +10351,36 @@ function NBackSessionApp() {
               aria-hidden="true"
               style={{ animation: "prPrerollFade 7.2s ease-out both" }}
             >
+              {/* A beat of true black first. The backdrop behind this is
+                  only 90% opaque, so without it the page still shows
+                  through and nothing feels like it stopped. */}
+              <div
+                className="absolute inset-0 bg-black"
+                style={{ animation: "prBlackout 3.4s ease-out both" }}
+              />
+              {/* Vapour. Four large, heavily blurred masses drifting up and
+                  apart at different rates — slow enough to read as
+                  atmosphere rather than as objects moving. */}
+              {[
+                { x: -180, s: 1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
+                { x: 150, s: 1.25, d: 1.2, dur: 7.5, c: "#ffffff14" },
+                { x: -40, s: 0.85, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
+                { x: 240, s: 1.1, d: 2.6, dur: 8, c: "#ffffff0f" },
+              ].map(({ x, s: scale, d, dur, c }, i) => (
+                <div
+                  key={`v${i}`}
+                  className="absolute rounded-full"
+                  style={{
+                    width: 420 * scale,
+                    height: 300 * scale,
+                    left: `calc(50% + ${x}px)`,
+                    marginLeft: -210 * scale,
+                    background: `radial-gradient(closest-side, ${c}, transparent 70%)`,
+                    filter: "blur(46px)",
+                    animation: `prVapour ${dur}s ${d}s ease-out both`,
+                  }}
+                />
+              ))}
               <div
                 className="absolute rounded-full"
                 style={{
@@ -10352,27 +10388,6 @@ function NBackSessionApp() {
                   height: 320,
                   background: `radial-gradient(closest-side, ${PR_YELLOW}26, ${PR_YELLOW}0d 45%, transparent 72%)`,
                   animation: "prGather 3.4s ease-out both",
-                }}
-              />
-              {/* Two dashed rings turning against each other. Even, so
-                  there is no bright arc reading as a crescent, and slow
-                  enough to sit under the pulses rather than compete. */}
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: 216,
-                  height: 216,
-                  border: `1px dashed ${PR_YELLOW}44`,
-                  animation: "prSpinCW 14s linear infinite, prGather 1.6s ease-out both",
-                }}
-              />
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: 268,
-                  height: 268,
-                  border: `1px dashed ${PR_YELLOW}2e`,
-                  animation: "prSpinCCW 20s linear infinite, prGather 2s ease-out both",
                 }}
               />
               {/* A core that breathes where the gem will land. */}
@@ -10475,7 +10490,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 4.2s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 3.9s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
