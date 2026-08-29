@@ -1174,7 +1174,7 @@ const EXERCISE_COLORS = {
   quad: "#8A0736",      // maroon
   iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
-  motion3d: "#1DB954",  // green
+  motion3d: "#008000",  // green
   // TODO: pick a colour for CCT when the Anti-brainrot regime is built.
 };
 
@@ -2056,9 +2056,9 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 9;
+const BUILD_VERSION = 10;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:12 PM";
+const BUILD_TIME = "7:25 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -4299,7 +4299,7 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
 // so e.g. "D6B" (Dual 6-Back) and "Q6B" (Quad 6-Back) both carry the same name.
 const GEM_TIERS = {
   1: { color: "#94a3b8", glow: false, label: "Novice" },
-  2: { color: "#008000", glow: true, label: "Apprentice" },
+  2: { color: "#4ade80", glow: true, label: "Apprentice" },
   3: { color: "#38bdf8", glow: true, label: "Adept" },
   4: { color: "#E8EDF5", glow: true, label: "Proficient" },
   5: { color: "#22d3ee", glow: true, label: "Bright" },
@@ -7541,6 +7541,20 @@ function NBackSessionApp() {
         button:disabled,
         [role="button"][aria-disabled="true"] { cursor: not-allowed !important; }
 
+        /* The backdrop darkens first, on its own, so the content has
+           something to arrive onto. */
+        @keyframes prBackdrop {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+        /* Then the content rises and resolves, over roughly the length of
+           the music's fade-in. Blur going to zero is what makes it read as
+           coming into focus rather than simply appearing. */
+        @keyframes prReveal {
+          0% { opacity: 0; transform: translateY(26px) scale(0.94); filter: blur(14px); }
+          35% { opacity: 0.65; filter: blur(6px); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
         @keyframes prPop {
           0% { transform: scale(0.7); opacity: 0; }
           60% { transform: scale(1.08); opacity: 1; }
@@ -10254,8 +10268,25 @@ function NBackSessionApp() {
       </div>
 
       {unlockInfo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8">
-          <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8"
+          /* Trial, Quad N-Back records only: the screen arrives over the
+             same stretch the music takes to swell, instead of cutting in
+             fully formed while the track is still coming up. */
+          style={
+            unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
+              ? { animation: "prBackdrop 1.1s ease-out both" }
+              : undefined
+          }
+        >
+          <div
+            className="relative flex flex-col items-center text-center gap-14 max-w-sm"
+            style={
+              unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
+                ? { animation: "prReveal 2.4s cubic-bezier(0.22,1,0.36,1) both" }
+                : undefined
+            }
+          >
             {unlockInfo.isNewPR ? (
               <div
                 className="text-2xl font-semibold uppercase tracking-widest mb-2"
