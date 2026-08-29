@@ -1145,25 +1145,18 @@ const REGIME_COLORS = {
 // The cards need four values from one hex: a faint fill, a visible border,
 // a solid dot, and text bright enough to read. Derived rather than listed
 // so adding an exercise means adding one colour, not four.
-// The button fill as an inline value, for the places that need it on a
-// non-button element. Mirrors the rule in index.css: the left end is a
-// lightness lift of the same hue, sized to the headroom the colour has, so
-// a pale colour never bleaches.
-function exerciseFill(hex) {
+// The colour laid over the page's own
+// near-black rather than at full strength, for large surfaces where a
+// button-brightness fill is too much.
+function exerciseDeepFill(hex) {
   const n = parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255;
-  const g = ((n >> 8) & 255) / 255;
-  const b = (n & 255) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  const lifted = l + (1 - l) * 0.07;
-  const scale = l > 0 ? lifted / l : 1;
-  const to255 = (v) => Math.round(Math.min(1, v * scale) * 255);
-  const light = `#${[to255(r), to255(g), to255(b)]
-    .map((v) => v.toString(16).padStart(2, "0"))
-    .join("")}`;
-  return `linear-gradient(100deg, ${light}, ${hex})`;
+  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const base = [11, 13, 16];
+  const mix = (amount) =>
+    `rgb(${rgb
+      .map((c, i) => Math.round(c * amount + base[i] * (1 - amount)))
+      .join(", ")})`;
+  return `linear-gradient(100deg, ${mix(0.86)}, ${mix(0.58)})`;
 }
 
 function exerciseTint(hex, alpha) {
@@ -6989,7 +6982,7 @@ function NBackSessionApp() {
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
                     style={{ "--ex": rc }}
-                    className="w-full text-left bg-gradient-to-r rounded-xl px-7 py-5 shadow-lg shadow-black/30"
+                    className="w-full text-left deep-fill rounded-xl px-7 py-5 shadow-lg shadow-black/30"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
@@ -7328,10 +7321,10 @@ function NBackSessionApp() {
                     key={e.key}
                     className="rounded-xl p-6 text-white"
                     style={{
-                      backgroundImage: exerciseFill(exColor),
+                      backgroundImage: exerciseDeepFill(exColor),
                       boxShadow:
-                        "inset 0 1px rgba(255,255,255,0.3), inset 0 -1px rgba(0,0,0,0.12), 0 10px 15px -3px rgba(0,0,0,0.3)",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
+                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                     }}
                   >
                     <div className="text-xl font-semibold">{e.title}</div>
