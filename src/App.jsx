@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 11;
+const BUILD_VERSION = 12;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:29 PM";
+const BUILD_TIME = "7:34 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -4322,7 +4322,7 @@ const GEM_TIERS = {
   1: { color: "#94a3b8", glow: false, label: "Novice" },
   2: { color: "#4ade80", glow: true, label: "Apprentice" },
   3: { color: "#38bdf8", glow: true, label: "Adept" },
-  4: { color: "#E8EDF5", glow: true, label: "Proficient" },
+  4: { color: "#818CF8", glow: true, label: "Proficient" },
   5: { color: "#22d3ee", glow: true, label: "Bright" },
   6: { color: "#fb7185", glow: true, label: "Radiant" },
   7: { color: "#c084fc", glow: true, label: "Brilliant" },
@@ -10288,7 +10288,7 @@ function NBackSessionApp() {
              fully formed while the track is still coming up. */
           style={
             unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-              ? { animation: "prBackdrop 1.5s ease-out both" }
+              ? { animation: "prBackdrop 2s ease-out both" }
               : undefined
           }
         >
@@ -10296,7 +10296,7 @@ function NBackSessionApp() {
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
             style={
               unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-                ? { animation: "prReveal 3.6s cubic-bezier(0.22,1,0.36,1) both" }
+                ? { animation: "prReveal 4.8s cubic-bezier(0.22,1,0.36,1) both" }
                 : undefined
             }
           >
