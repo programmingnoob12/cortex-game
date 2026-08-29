@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 15;
+const BUILD_VERSION = 16;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:47 PM";
+const BUILD_TIME = "7:51 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7571,8 +7571,19 @@ function NBackSessionApp() {
           18% { opacity: 1; }
           100% { opacity: 0; transform: scale(3.6); }
         }
-        @keyframes prSweep {
+        @keyframes prSpinCW {
           to { transform: rotate(360deg); }
+        }
+        @keyframes prSpinCCW {
+          to { transform: rotate(-360deg); }
+        }
+        @keyframes prCore {
+          0%, 100% { opacity: 0.55; transform: scale(0.85); }
+          50% { opacity: 1; transform: scale(1.25); }
+        }
+        @keyframes prSparkle {
+          0%, 100% { opacity: 0; transform: scale(0.3); }
+          45% { opacity: 1; transform: scale(1); }
         }
         /* A ring closing in on the centre, against the outward pulses. */
         @keyframes prRingIn {
@@ -10332,7 +10343,7 @@ function NBackSessionApp() {
             <div
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
-              style={{ animation: "prPrerollFade 6.1s ease-out both" }}
+              style={{ animation: "prPrerollFade 7.2s ease-out both" }}
             >
               <div
                 className="absolute rounded-full"
@@ -10343,20 +10354,57 @@ function NBackSessionApp() {
                   animation: "prGather 3.4s ease-out both",
                 }}
               />
-              {/* A conic sweep, masked to a hairline, turning slowly. It is
-                  what stops the wait feeling static between ring pulses. */}
+              {/* Two dashed rings turning against each other. Even, so
+                  there is no bright arc reading as a crescent, and slow
+                  enough to sit under the pulses rather than compete. */}
               <div
                 className="absolute rounded-full"
                 style={{
-                  width: 200,
-                  height: 200,
-                  background: `conic-gradient(from 0deg, transparent 0deg, ${PR_YELLOW}00 200deg, ${PR_YELLOW}cc 330deg, transparent 360deg)`,
-                  WebkitMask:
-                    "radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))",
-                  mask: "radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))",
-                  animation: "prSweep 2.6s linear infinite, prGather 1.4s ease-out both",
+                  width: 216,
+                  height: 216,
+                  border: `1px dashed ${PR_YELLOW}44`,
+                  animation: "prSpinCW 14s linear infinite, prGather 1.6s ease-out both",
                 }}
               />
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: 268,
+                  height: 268,
+                  border: `1px dashed ${PR_YELLOW}2e`,
+                  animation: "prSpinCCW 20s linear infinite, prGather 2s ease-out both",
+                }}
+              />
+              {/* A core that breathes where the gem will land. */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: 54,
+                  height: 54,
+                  background: `radial-gradient(closest-side, ${PR_YELLOW}55, transparent 70%)`,
+                  animation: "prCore 1.9s ease-in-out infinite, prGather 1.2s ease-out both",
+                }}
+              />
+              {/* Sparkles catching at odd intervals, so the field is never
+                  perfectly regular. */}
+              {[
+                [-140, -96, 0], [128, -118, 0.5], [-172, 54, 1.1],
+                [156, 72, 0.35], [-64, -160, 0.8], [82, 148, 1.4],
+                [188, -28, 0.95], [-118, 136, 0.6],
+              ].map(([x, y, delay], i) => (
+                <div
+                  key={`s${i}`}
+                  className="absolute"
+                  style={{
+                    left: `calc(50% + ${x}px)`,
+                    top: `calc(50% + ${y}px)`,
+                    width: 10,
+                    height: 10,
+                    background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
+                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite`,
+                  }}
+                />
+              ))}
               {/* Rings in pairs: a bright thin one with a soft wide one
                   chasing it a beat behind, so each pulse has a leading edge
                   and a wake rather than being a single hard outline. */}
@@ -10427,7 +10475,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 3.2s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 4.2s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
