@@ -1024,6 +1024,8 @@ function letterAudioContext() {
   letterAudioCtx = new Ctx();
   letterAudioGain = letterAudioCtx.createGain();
   letterAudioGain.connect(letterAudioCtx.destination);
+  // Anything fetched before a context existed can be decoded now.
+  if (typeof decodePendingClips === "function") decodePendingClips();
   return letterAudioCtx;
 }
 
@@ -2060,16 +2062,24 @@ let clickAudioCtx = null;
 // which gameplay has unlocked, so a sound never lands on a suspended
 // context and silently does nothing.
 function uiAudioContext() {
-  const existing = letterAudioContext();
-  if (existing) {
-    if (existing.state === "suspended") existing.resume();
-    return existing;
-  }
-  const Ctx = window.AudioContext || window.webkitAudioContext;
-  if (!Ctx) return null;
-  if (!clickAudioCtx) clickAudioCtx = new Ctx();
-  if (clickAudioCtx.state === "suspended") clickAudioCtx.resume();
-  return clickAudioCtx;
+  const ctx = letterAudioContext();
+  if (!ctx) return null;
+  if (ctx.state === "suspended") ctx.resume();
+  return ctx;
+}
+
+// A context created before the person has interacted with the page starts
+// suspended, and resume() outside a gesture is refused — which silences
+// everything, letters included. So: never create one at load, and resume
+// the moment a real gesture arrives.
+if (typeof window !== "undefined") {
+  const unlock = () => {
+    if (!letterAudioCtx) return;
+    if (letterAudioCtx.state === "suspended") letterAudioCtx.resume();
+  };
+  ["pointerdown", "keydown", "touchstart"].forEach((evt) =>
+    window.addEventListener(evt, unlock, { capture: true })
+  );
 }
 
 // Button click. Three layers, which is what separates a designed UI sound
@@ -2146,16 +2156,21 @@ const CHEER_FADE_IN = 0.45; // seconds
 let cheerBuffer = null; // decoded clip
 let cheerLoadStarted = false;
 
+let cheerBytes = null;
+
+// Fetching needs no audio context, so it happens at load. Decoding does, so
+// it waits until there is one — creating a context here would create it
+// suspended and take the rest of the app's audio down with it.
 function preloadCheer() {
   if (cheerLoadStarted) return;
-  const ctx = uiAudioContext();
-  if (!ctx) return;
   cheerLoadStarted = true;
   fetch(CHEER_URL)
     .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
-    .then((buf) => ctx.decodeAudioData(buf))
-    .then((decoded) => {
-      cheerBuffer = decoded;
+    .then((buf) => {
+      cheerBytes = buf;
+      const ctx = letterAudioCtx;
+      if (ctx) return ctx.decodeAudioData(buf.slice(0)).then((d) => (cheerBuffer = d));
+      return null;
     })
     .catch(() => {
       // No clip present. Nothing to do.
@@ -2167,8 +2182,14 @@ function playCheer() {
     const ctx = uiAudioContext();
     if (!ctx) return;
     if (!cheerBuffer) {
-      // Not loaded yet: start it now so the next one lands.
-      preloadCheer();
+      // Bytes may be in hand with no context to decode them at the time.
+      if (cheerBytes) {
+        ctx.decodeAudioData(cheerBytes.slice(0)).then((d) => {
+          cheerBuffer = d;
+        });
+      } else {
+        preloadCheer();
+      }
       return;
     }
     const now = ctx.currentTime;
@@ -2211,16 +2232,41 @@ let songBuffer = null;
 let songLoadStarted = false;
 let songSource = null; // the one currently playing, so a second level-up cuts the first
 
+let songBytes = null;
+
+// Called the moment a context comes into being, for clips whose bytes
+// arrived first.
+function decodePendingClips() {
+  const ctx = letterAudioCtx;
+  if (!ctx) return;
+  if (cheerBytes && !cheerBuffer) {
+    ctx.decodeAudioData(cheerBytes.slice(0)).then(
+      (d) => {
+        cheerBuffer = d;
+      },
+      () => {}
+    );
+  }
+  if (songBytes && !songBuffer) {
+    ctx.decodeAudioData(songBytes.slice(0)).then(
+      (d) => {
+        songBuffer = d;
+      },
+      () => {}
+    );
+  }
+}
+
 function preloadSong() {
   if (songLoadStarted) return;
-  const ctx = uiAudioContext();
-  if (!ctx) return;
   songLoadStarted = true;
   fetch(SONG_URL)
     .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
-    .then((buf) => ctx.decodeAudioData(buf))
-    .then((decoded) => {
-      songBuffer = decoded;
+    .then((buf) => {
+      songBytes = buf;
+      const ctx = letterAudioCtx;
+      if (ctx) return ctx.decodeAudioData(buf.slice(0)).then((d) => (songBuffer = d));
+      return null;
     })
     .catch(() => {
       // No track present; playLevelUp's tune covers it.
@@ -2229,8 +2275,15 @@ function preloadSong() {
 
 function playCelebrationSong() {
   const ctx = uiAudioContext();
-  if (!ctx || !songBuffer) {
-    preloadSong();
+  if (!ctx) return false;
+  if (!songBuffer) {
+    if (songBytes) {
+      ctx.decodeAudioData(songBytes.slice(0)).then((d) => {
+        songBuffer = d;
+      });
+    } else {
+      preloadSong();
+    }
     return false;
   }
   try {
