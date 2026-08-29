@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 23;
+const BUILD_VERSION = 24;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:26 PM";
+const BUILD_TIME = "8:30 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -6759,6 +6759,13 @@ function NBackSessionApp() {
 
   const startTask = useCallback(
     (exerciseForStart, nForStart) => {
+      // Every route into an exercise passes through here — the setup
+      // screen's Start, Continue on the results screen, the switch to the
+      // next exercise in a regime, and the dev jump. Previously only
+      // "Start Training" from Home unlocked and preloaded the recordings,
+      // so any other entry fell back to speech synthesis for the whole
+      // session.
+      unlockLetterAudio();
       const ex = exerciseForStart || exercise;
       const isQnbPrime = ex.key === "iqnb";
       const qnbStep = isQnbPrime ? qnbPrimeLevelParts(qnbPrimeLevelRef.current).step : null;
@@ -10505,7 +10512,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 3.9s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 4.2s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
