@@ -2056,7 +2056,7 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 6;
+const BUILD_VERSION = 7;
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2080,8 +2080,13 @@ function uiAudioContext() {
 // the moment a real gesture arrives.
 if (typeof window !== "undefined") {
   const unlock = () => {
-    if (!letterAudioCtx) return;
-    if (letterAudioCtx.state === "suspended") letterAudioCtx.resume();
+    // Create the context on the first gesture rather than waiting for
+    // gameplay, and decode the celebration track straight away — otherwise
+    // the first level-up is the one that has to wait for a 3MB decode.
+    const ctx = letterAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
+    decodePendingClips();
   };
   ["pointerdown", "keydown", "touchstart"].forEach((evt) =>
     window.addEventListener(evt, unlock, { capture: true })
@@ -2230,7 +2235,7 @@ function playCheer() {
 // space in the name is fine, it just has to be encoded in the URL below.
 const SONG_URL = "/audio/celebration%20song.mp3";
 const SONG_START = 56; // seconds into the track
-const SONG_FADE_OUT_AT = 84; // seconds into the track
+const SONG_FADE_OUT_AT = 77; // seconds into the track
 const SONG_FADE_IN = 1.2; // seconds
 const SONG_FADE_OUT = 3.5; // seconds
 const SONG_PEAK = 0.1;
@@ -7507,6 +7512,18 @@ function NBackSessionApp() {
           55%, 88% { transform: translateY(0); opacity: 1; }
           100% { opacity: 0; }
         }
+        /* Also in index.css. Repeated here because the pointer cursor kept
+           not appearing in the deployed build, and a style tag rendered by
+           the component itself is the one place it cannot be missed. */
+        button:not(:disabled),
+        [role="button"]:not([aria-disabled="true"]),
+        label[for],
+        summary,
+        select,
+        a[href] { cursor: pointer !important; }
+        button:disabled,
+        [role="button"][aria-disabled="true"] { cursor: not-allowed !important; }
+
         @keyframes prPop {
           0% { transform: scale(0.7); opacity: 0; }
           60% { transform: scale(1.08); opacity: 1; }
@@ -10217,14 +10234,14 @@ function NBackSessionApp() {
           <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
             {unlockInfo.isNewPR ? (
               <div
-                className="text-3xl font-semibold uppercase tracking-widest mb-2"
+                className="text-2xl font-semibold uppercase tracking-widest mb-2"
                 style={{
                   color: PR_YELLOW,
                   textShadow: `0 0 24px ${PR_YELLOW}66`,
                   animation: "prPop 0.6s cubic-bezier(0.34,1.56,0.64,1)",
                 }}
               >
-                New PR!
+                New personal record
               </div>
             ) : (
               <div className="text-base uppercase tracking-wide text-slate-400">
