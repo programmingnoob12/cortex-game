@@ -1438,9 +1438,9 @@ const REGIMES = [
     accent: "indigo",
     steps: [
       { key: "rrt", minutes: 10 },
-      { key: "dual", minutes: 20 },
+      { key: "dual", minutes: 25 },
       { key: "iqnb", minutes: 20 },
-      { key: "quad", minutes: 25 },
+      { key: "quad", minutes: 20 },
     ],
   },
 ];
@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 34;
+const BUILD_VERSION = 35;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:03 AM";
+const BUILD_TIME = "12:07 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2190,6 +2190,228 @@ function playClick() {
     body.stop(now + 0.1);
   } catch {
     // No audio available; a missing click is not worth surfacing.
+  }
+}
+
+// Applause, from a recording.
+//
+// TO ADD THE FILE: drop it at `public/audio/cheer.mp3`. Vite serves
+// `public/` from the site root, so it is fetched as `/audio/cheer.mp3` —
+// no import and no build step. If the file is absent nothing plays and the
+// rest of the app is unaffected, so it can be added or swapped any time.
+//
+// The clip is faded in over its first stretch and held below full: applause
+// arriving at full volume on the first frame is startling, and this plays
+// right after a run when someone has headphones on.
+const CHEER_URL = "/audio/cheer.mp3";
+const CHEER_PEAK = 0.34; // never louder than this, whatever the file's own level
+const CHEER_FADE_IN = 0.45; // seconds
+let cheerBuffer = null; // decoded clip
+let cheerLoadStarted = false;
+let cheerBytes = null;
+
+// Fetching needs no audio context, so it happens at load. Decoding does, so
+// it waits until there is one — creating a context here would create it
+// suspended and take the rest of the app's audio down with it.
+function preloadCheer() {
+  if (cheerLoadStarted) return;
+  cheerLoadStarted = true;
+  fetch(CHEER_URL)
+    .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
+    .then((buf) => {
+      cheerBytes = buf;
+      const ctx = letterAudioCtx;
+      if (ctx) return ctx.decodeAudioData(buf.slice(0)).then((d) => (cheerBuffer = d));
+      return null;
+    })
+    .catch(() => {
+      // No clip present. Nothing to do.
+    });
+}
+
+function playCheer() {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    if (!cheerBuffer) {
+      // Bytes may be in hand with no context to decode them at the time.
+      if (cheerBytes) {
+        ctx.decodeAudioData(cheerBytes.slice(0)).then((d) => {
+          cheerBuffer = d;
+        });
+      } else {
+        preloadCheer();
+      }
+      return;
+    }
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(CHEER_PEAK, now + CHEER_FADE_IN);
+    gain.connect(ctx.destination);
+
+    const src = ctx.createBufferSource();
+    src.buffer = cheerBuffer;
+    src.connect(gain);
+    src.start(now);
+
+    const end = now + cheerBuffer.duration;
+    gain.gain.setValueAtTime(CHEER_PEAK, Math.max(now + CHEER_FADE_IN, end - 0.35));
+    gain.gain.linearRampToValueAtTime(0.0001, end);
+    src.stop(end + 0.05);
+  } catch {
+    // No audio available; the overlay still says what happened.
+  }
+}
+
+// Celebration music, from a recording. Only the chorus is used: playback
+// starts partway in, fades up, holds, then fades away again.
+//
+// TO ADD OR REPLACE THE FILE: `public/audio/celebration song.mp3`. The
+// space in the name is fine, it just has to be encoded in the URL below.
+const SONG_URL = "/audio/celebration%20song.mp3";
+const SONG_START = 56; // seconds into the track
+const SONG_FADE_OUT_AT = 74; // seconds into the track
+const SONG_FADE_IN = 2.6; // seconds
+const SONG_FADE_OUT = 7; // seconds
+const SONG_PEAK = 0.08;
+let songBuffer = null;
+let songLoadStarted = false;
+let songSource = null; // the one currently playing, so a second level-up cuts the first
+// Frequency data for the on-screen visualiser. Lives at module scope so the
+// component can pick it up without the audio code knowing anything about React.
+let songAnalyser = null;
+let songGain = null; // so a dismissal can fade the track out early
+function getSongAnalyser() {
+  return songAnalyser;
+}
+let songBytes = null;
+let songFailed = false;
+let songWantedAt = 0; // when a level-up asked for it but it was not ready yet
+
+// Called the moment a context comes into being, for clips whose bytes
+// arrived first.
+function decodePendingClips() {
+  const ctx = letterAudioCtx;
+  if (!ctx) return;
+  if (cheerBytes && !cheerBuffer) {
+    ctx.decodeAudioData(cheerBytes.slice(0)).then(
+      (d) => {
+        cheerBuffer = d;
+      },
+      () => {}
+    );
+  }
+  decodeSong();
+}
+
+function preloadSong() {
+  if (songLoadStarted) return;
+  songLoadStarted = true;
+  fetch(SONG_URL)
+    .then((res) =>
+      res.ok ? res.arrayBuffer() : Promise.reject(new Error(`HTTP ${res.status}`))
+    )
+    .then((buf) => {
+      songBytes = buf;
+      return decodeSong();
+    })
+    .catch((err) => {
+      songFailed = true;
+      logClientError("celebration song failed to load", err);
+    });
+}
+
+// Decoding needs a context, which may not exist when the bytes arrive. This
+// is called both on arrival and the moment a context is created.
+function decodeSong() {
+  const ctx = letterAudioCtx;
+  if (!ctx || !songBytes || songBuffer) return Promise.resolve(null);
+  return ctx
+    .decodeAudioData(songBytes.slice(0))
+    .then((decoded) => {
+      songBuffer = decoded;
+      if (songWantedAt && Date.now() - songWantedAt < 8000) {
+        songWantedAt = 0;
+        playCelebrationSong();
+      }
+      return decoded;
+    })
+    .catch((err) => {
+      songFailed = true;
+      logClientError("celebration song failed to decode", err);
+      return null;
+    });
+}
+
+function playCelebrationSong() {
+  const ctx = uiAudioContext();
+  if (!ctx) return false;
+  if (!songBuffer) {
+    // Remember that it was wanted, so it still plays a moment later once
+    // decoding finishes, instead of being dropped.
+    songWantedAt = Date.now();
+    if (songBytes) decodeSong();
+    else preloadSong();
+    return false;
+  }
+  try {
+    // Two level-ups in quick succession should not stack.
+    if (songSource) {
+      try {
+        songSource.stop();
+      } catch {
+        // Already finished.
+      }
+      songSource = null;
+    }
+    const now = ctx.currentTime;
+    const playFor = Math.max(
+      0,
+      Math.min(songBuffer.duration, SONG_FADE_OUT_AT) - SONG_START
+    );
+    if (playFor <= 0) return false;
+
+    const gain = ctx.createGain();
+    songGain = gain;
+    // Starts at a fraction of full rather than at silence. An exponential
+    // ramp from near-zero spends most of its length inaudible, which reads
+    // as the music being late rather than fading in.
+    gain.gain.setValueAtTime(SONG_PEAK * 0.01, now);
+    gain.gain.exponentialRampToValueAtTime(SONG_PEAK * 0.35, now + SONG_FADE_IN * 0.4);
+    gain.gain.exponentialRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
+    // Hold until the fade-out point, then ease down to silence.
+    gain.gain.setValueAtTime(SONG_PEAK, now + playFor);
+    gain.gain.exponentialRampToValueAtTime(
+      SONG_PEAK * 0.06,
+      now + playFor + SONG_FADE_OUT * 0.75
+    );
+    gain.gain.linearRampToValueAtTime(0.0001, now + playFor + SONG_FADE_OUT);
+
+    // gain -> analyser -> speakers. The analyser is a pass-through; it only
+    // reads what goes past it, so this does not change what is heard.
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.42;
+    gain.connect(analyser);
+    analyser.connect(ctx.destination);
+    songAnalyser = analyser;
+
+    const src = ctx.createBufferSource();
+    src.buffer = songBuffer;
+    src.connect(gain);
+    // Offset playback into the track rather than trimming the file.
+    src.start(now, SONG_START);
+    src.stop(now + playFor + SONG_FADE_OUT + 0.05);
+    src.onended = () => {
+      if (songSource === src) songSource = null;
+      if (songAnalyser === analyser) songAnalyser = null;
+      if (songGain === gain) songGain = null;
+    };
+    songSource = src;
+    return true;
+  } catch {
+    return false;
   }
 }
 
