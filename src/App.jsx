@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 39;
+const BUILD_VERSION = 40;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2392,7 +2392,13 @@ function playCelebrationSong() {
     // reads what goes past it, so this does not change what is heard.
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.22;
+    // The byte data is a dB mapping between these two bounds. The defaults
+    // (-100 to -30) spread the range across a lot of near-silence, which is
+    // why the bars sat in a narrow band and barely moved. Tightening them
+    // around where music actually lives expands the contrast enormously.
+    analyser.minDecibels = -72;
+    analyser.maxDecibels = -18;
+    analyser.smoothingTimeConstant = 0.16;
     gain.connect(analyser);
     analyser.connect(ctx.destination);
     songAnalyser = analyser;
@@ -2486,7 +2492,7 @@ function SongVisualizer({ className, style }) {
     // the top two thirds of the spectrum flat no matter how busy the track
     // is. Normalising each band against itself is what gives the display
     // actual depth instead of a bass-shaped wiggle.
-    const peaks = new Array(BARS).fill(0.06);
+    const peaks = new Array(BARS).fill(0.12);
     const levels = new Array(BARS).fill(0);
 
     const draw = () => {
@@ -2536,18 +2542,28 @@ function SongVisualizer({ className, style }) {
         const mean = sum / (b1 - b0 + 1);
         const raw = (top * 0.7 + mean * 0.3) / 255;
 
-        // Per-band auto-gain, with a slow decay so a band that goes quiet
-        // does not immediately rescale itself back to full.
-        peaks[i] = Math.max(raw, peaks[i] * 0.992);
-        const norm = Math.min(1, raw / Math.max(0.06, peaks[i]));
+        // A long-memory reference level per band, not a fast-following one.
+        // At the previous decay the reference chased the signal so closely
+        // that every band sat pinned near its own maximum, which is exactly
+        // why the bars hardly moved.
+        peaks[i] = Math.max(raw, peaks[i] * 0.9993);
+
+        // Spectral tilt. Music rolls off steeply with frequency, so without
+        // a compensating boost the upper half of the display never leaves
+        // the floor.
+        const t0 = i / BARS;
+        const tilt = 1 + t0 * 3.2;
+        const gated = Math.max(0, raw * tilt - 0.05);
+        const norm = Math.min(1, gated / Math.max(0.1, peaks[i] * tilt));
 
         // Attack fast, release slow — how a level meter behaves, and what
-        // stops the bars flickering between frames.
-        const target = Math.pow(norm, 1.1);
+        // stops the bars flickering between frames while still letting them
+        // punch on a hit.
+        const target = Math.pow(norm, 0.85);
         levels[i] =
           target > levels[i]
-            ? levels[i] + (target - levels[i]) * 0.55
-            : levels[i] + (target - levels[i]) * 0.14;
+            ? levels[i] + (target - levels[i]) * 0.85
+            : levels[i] + (target - levels[i]) * 0.09;
 
         if (i < BARS * 0.15) bass += levels[i];
 
