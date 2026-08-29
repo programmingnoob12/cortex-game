@@ -1963,6 +1963,45 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
+// A short synthesized "clink" for button presses. Generated with WebAudio
+// rather than shipped as a file: it is a few hundred bytes of code instead
+// of an asset, and the pitch and decay can be tuned by editing numbers.
+// Currently wired only to the Overview and Stats screens, as a trial.
+let clickAudioCtx = null;
+function playClick() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!clickAudioCtx) clickAudioCtx = new Ctx();
+    const ctx = clickAudioCtx;
+    // Browsers start the context suspended until a gesture; a click is one.
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.09;
+    master.connect(ctx.destination);
+    // Two detuned partials give it the glassy quality of a tap on metal;
+    // one sine alone just sounds like a beep.
+    [2400, 3610].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now);
+      // A slight downward slide is what stops it sounding electronic.
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.86, now + 0.09);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(i === 0 ? 1 : 0.45, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.13 : 0.07));
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(now);
+      osc.stop(now + 0.16);
+    });
+  } catch {
+    // No audio available; a missing click is not worth surfacing.
+  }
+}
+
 // The number the graphs and the Score column actually plot: the LEVEL
 // reached, not the hit rate. N-back exercises carry that in `n`; QNB' and
 // 3D MOT store their own float level in `accuracy`; RRT stores points and
@@ -3963,7 +4002,7 @@ function Dropdown({ options, value, onChange, accent, label }) {
   return (
     <div ref={containerRef} className="relative">
       {label && (
-        <div className="text-sm uppercase tracking-wide text-slate-500 mb-2">
+        <div className="text-sm font-medium uppercase tracking-wide text-slate-300 mb-2">
           {label}
         </div>
       )}
@@ -8715,7 +8754,12 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div className="space-y-14">
+          <div
+            className="space-y-14"
+            onClickCapture={(ev) => {
+              if (ev.target.closest("button")) playClick();
+            }}
+          >
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Overview
@@ -8807,7 +8851,12 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
-          <div className="space-y-14">
+          <div
+            className="space-y-14"
+            onClickCapture={(ev) => {
+              if (ev.target.closest("button")) playClick();
+            }}
+          >
             <div>
               <button
                 onClick={() => setOverviewView("summary")}
