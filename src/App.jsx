@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 30;
+const BUILD_VERSION = 31;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:36 PM";
+const BUILD_TIME = "11:42 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7519,6 +7519,22 @@ function NBackSessionApp() {
     exerciseElapsedMsRef.current = exerciseElapsedMs;
   }, [exerciseElapsedMs]);
 
+  // Quad N-Back record reveal, driven by a timer rather than a long CSS
+  // animation-delay. A delay that big is fragile: any re-render restarts it
+  // and the screen sits in its blurred opening frame indefinitely.
+  const [prRevealed, setPrRevealed] = useState(false);
+  const prCinematic =
+    !!unlockInfo && unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad";
+  useEffect(() => {
+    if (!prCinematic) {
+      setPrRevealed(false);
+      return undefined;
+    }
+    setPrRevealed(false);
+    const t = setTimeout(() => setPrRevealed(true), 4700);
+    return () => clearTimeout(t);
+  }, [prCinematic, unlockInfo]);
+
   // Fetch and decode the applause once, up front, so the first record of a
   // session is not the one that misses it.
   useEffect(() => {
@@ -10499,7 +10515,7 @@ function NBackSessionApp() {
               : undefined
           }
         >
-          {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
+          {prCinematic && (
             /* Pre-roll. Sized in viewport units throughout so it fills the
                screen on any display, rather than being a small scene in the
                middle of a large dark rectangle. */
@@ -10640,21 +10656,30 @@ function NBackSessionApp() {
               })}
             </div>
           )}
-          {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
+          {prCinematic && (
             <SongVisualizer
               className="pointer-events-none absolute inset-0 w-full h-full"
-              style={{ animation: "prVisualiser 2s 4.7s ease-out both" }}
+              style={{
+                opacity: prRevealed ? 1 : 0,
+                transition: "opacity 2s ease-out",
+              }}
             />
           )}
           <div
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
             style={
-              unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
+              prCinematic
                 ? {
-                    // Starts well after the pre-roll has established itself,
-                    // so the content resolves ON the drop rather than before.
-                    animation:
-                      "prReveal 3.9s 4.7s cubic-bezier(0.22,1,0.36,1) both",
+                    // Resolves ON the drop. A transition rather than an
+                    // animation, so its end state is simply the element's
+                    // normal appearance and it cannot be left mid-way.
+                    opacity: prRevealed ? 1 : 0,
+                    transform: prRevealed
+                      ? "translateY(0) scale(1)"
+                      : "translateY(26px) scale(0.94)",
+                    filter: prRevealed ? "blur(0px)" : "blur(14px)",
+                    transition:
+                      "opacity 3.9s cubic-bezier(0.22,1,0.36,1), transform 3.9s cubic-bezier(0.22,1,0.36,1), filter 3.2s cubic-bezier(0.22,1,0.36,1)",
                   }
                 : undefined
             }
