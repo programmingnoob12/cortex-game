@@ -993,7 +993,7 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 760px, calc(100vh - 200px)))";
+const NBACK_BOX_SIZE = "max(240px, min(100%, 900px, calc(100vh - 190px)))";
 
 
 // ---------------------------------------------------------------------
@@ -1191,7 +1191,7 @@ const REGIME_COLORS = {
 // The colour laid over the page's own
 // near-black rather than at full strength, for large surfaces where a
 // button-brightness fill is too much.
-function exerciseDeepFill(hex) {
+function hexToHsl(hex) {
   const n = parseInt(hex.slice(1), 16);
   const r = ((n >> 16) & 255) / 255;
   const g = ((n >> 8) & 255) / 255;
@@ -1200,23 +1200,50 @@ function exerciseDeepFill(hex) {
   const min = Math.min(r, g, b);
   const l = (max + min) / 2;
   const d = max - min;
-  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
-  let hue = 0;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let h = 0;
   if (d !== 0) {
-    if (max === r) hue = ((g - b) / d) % 6;
-    else if (max === g) hue = (b - r) / d + 2;
-    else hue = (r - g) / d + 4;
-    hue *= 60;
-    if (hue < 0) hue += 360;
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
   }
+  return { h, s, l };
+}
+
+function exerciseDeepFill(hex) {
+  const { h, s, l } = hexToHsl(hex);
   // This used to mix toward near-black by a fixed ratio, which pushed the
   // hues that sit lower in HSL lightness (orange, green) much darker than
   // purple and blue. Capping lightness instead, with hue and saturation
   // untouched, lands every card at the same weight.
   const cap = Math.min(l, 0.44);
   const css = (lightness) =>
-    `hsl(${hue.toFixed(1)} ${(sat * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
+    `hsl(${h.toFixed(1)} ${(s * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
   return `linear-gradient(100deg, ${css(cap)}, ${css(cap * 0.76)})`;
+}
+
+// The gem's shadow, in the card's own hue rather than black. A flat black
+// shadow reads far heavier on the hues that carry more luminance at the same
+// HSL lightness (orange, green) than on purple or blue; shading the card's
+// own colour down by a fixed proportion keeps the depth looking equal
+// whatever the card underneath is.
+function exerciseShadowColor(hex, alpha) {
+  const { h, s } = hexToHsl(hex);
+  const { l } = hexToHsl(hex);
+  const base = Math.min(l, 0.44) * 0.3;
+  return `hsl(${h.toFixed(1)} ${(s * 60).toFixed(1)}% ${(base * 100).toFixed(1)}% / ${alpha})`;
+}
+
+// A shadow colour for content sitting on a deep-fill card: the card's hue
+// taken most of the way to black, so the shadow belongs to the surface
+// instead of being a flat black patch whose weight changes with the fill.
+function exerciseShadow(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${Math.round(((n >> 16) & 255) * 0.12)}, ${Math.round(
+    ((n >> 8) & 255) * 0.12
+  )}, ${Math.round((n & 255) * 0.12)}, 0.55)`;
 }
 
 function exerciseTint(hex, alpha) {
@@ -2147,7 +2174,48 @@ function playLevelUp() {
 // rises fast and falls away over about a second and a half. No recording
 // means no licence and nothing to attribute, and it stays a few hundred
 // bytes instead of a downloaded asset.
+// A real crowd is one of the few sounds that does not synthesize well —
+// the version below is a decent stand-in, but a recording is better. Drop
+// an applause clip at `public/audio/cheer.mp3` and it is used instead, no
+// code change needed. Keep it under about two seconds and trim the front.
+const CHEER_URL = "/audio/cheer.mp3";
+let cheerBuffer = null; // decoded clip, or false once known to be missing
+
 function playCheer() {
+  const ctx = letterAudioContext();
+  if (ctx && cheerBuffer === null) {
+    // First call: try to fetch the recording, and fall through to the
+    // synthesized crowd for this one play while it loads.
+    cheerBuffer = false;
+    fetch(CHEER_URL)
+      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject()))
+      .then((buf) => ctx.decodeAudioData(buf))
+      .then((decoded) => {
+        cheerBuffer = decoded;
+      })
+      .catch(() => {
+        // No file. The synthesized version stands.
+      });
+  }
+  if (ctx && cheerBuffer) {
+    try {
+      if (ctx.state === "suspended") ctx.resume();
+      const gain = ctx.createGain();
+      gain.gain.value = 0.5;
+      gain.connect(ctx.destination);
+      const src = ctx.createBufferSource();
+      src.buffer = cheerBuffer;
+      src.connect(gain);
+      src.start(ctx.currentTime);
+      return;
+    } catch {
+      // Fall through to the synthesized crowd.
+    }
+  }
+  playSynthCheer();
+}
+
+function playSynthCheer() {
   try {
     const ctx = letterAudioContext() || (() => {
       const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -2168,8 +2236,8 @@ function playCheer() {
     // low end turns it into rain and the top into static.
     const band = ctx.createBiquadFilter();
     band.type = "bandpass";
-    band.frequency.value = 1900;
-    band.Q.value = 0.7;
+    band.frequency.value = 1500;
+    band.Q.value = 0.45;
     band.connect(master);
 
     // The swell. Real applause ramps over a beat rather than starting at
@@ -2186,8 +2254,8 @@ function playCheer() {
     const data = buf.getChannelData(0);
     // Each clap is a ~6ms burst with a sharp attack. Density falls off over
     // the tail so the crowd thins out rather than stopping dead.
-    const clapFrames = Math.floor(rate * 0.006);
-    const claps = 900;
+    const clapFrames = Math.floor(rate * 0.009);
+    const claps = 1400;
     for (let c = 0; c < claps; c++) {
       const t = Math.pow(Math.random(), 0.75) * DURATION * 0.85;
       const start = Math.floor(t * rate);
@@ -6295,7 +6363,11 @@ function NBackSessionApp() {
       setN(nextN);
       setExerciseLevel(exerciseKey, nextN);
       const prevBestN = baseStats[exerciseKey]?.bestN || 0;
-      const isNewPR = levelUsed > prevBestN;
+      // The record is reaching a level they have never reached, so it must
+      // compare the level they are being promoted TO. Comparing the level
+      // they just played meant the very next promotion never counted:
+      // bestN had already been bumped to that number last time.
+      const isNewPR = nextN > prevBestN;
       const title = ex.title.replace("N-Back", `${nextN}-Back`);
       if (isNewPR) {
         // Small banner on the Results screen — stays PR-only, separate from
@@ -7138,6 +7210,11 @@ function NBackSessionApp() {
     const LEFT = ["color", "pos"];
     const RIGHT = ["shape", "audio"];
     const active = exercise.modalities || [];
+    // Nothing can match until N items have gone by, so until then a press
+    // can only ever be wrong. The buttons stay visible but inert rather
+    // than letting someone throw away a trial on a guess that was never
+    // answerable.
+    const armed = index >= n;
     const render = (m) => {
       const meta = MODALITY_META[m];
       const state = feedback[m];
@@ -7151,22 +7228,30 @@ function NBackSessionApp() {
         <button
           key={m}
           onClick={() => handlePress(m)}
-          className={`w-full transition-colors duration-150 rounded-lg py-6 px-2 flex flex-col items-center justify-center gap-1 ${cls}`}
+          disabled={!armed}
+          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
         >
-          <span className="text-xs font-medium uppercase tracking-wide opacity-70">
+          <span className="text-sm font-medium uppercase tracking-wide opacity-70">
             {meta.label}
           </span>
-          <span className="text-3xl font-semibold leading-none">
+          <span className="text-4xl font-semibold leading-none">
             {MODALITY_KEY_LABEL[m]}
           </span>
         </button>
       );
     };
+    const spaced = (list) =>
+      list.map((el, i) => (
+        <Fragment key={el.key}>
+          {i > 0 && <div className="h-6 sm:h-10 shrink-0" />}
+          {el}
+        </Fragment>
+      ));
     return {
-      left: LEFT.filter((m) => active.includes(m)).map(render),
-      right: RIGHT.filter((m) => active.includes(m)).map(render),
+      left: spaced(LEFT.filter((m) => active.includes(m)).map(render)),
+      right: spaced(RIGHT.filter((m) => active.includes(m)).map(render)),
     };
-  }, [exercise.modalities, feedback, handlePress]);
+  }, [exercise.modalities, feedback, handlePress, index, n]);
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
@@ -7282,7 +7367,7 @@ function NBackSessionApp() {
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
                 maxWidth:
-                  mainView === "app" && screen === "running" ? "62rem" : "42rem",
+                  mainView === "app" && screen === "running" ? "76rem" : "42rem",
               }
         }
       >
@@ -7667,8 +7752,10 @@ function NBackSessionApp() {
                       <span
                         className="inline-flex"
                         style={{
-                          filter:
-                            "drop-shadow(0 4px 5px rgba(0,0,0,0.65)) drop-shadow(0 1px 2px rgba(0,0,0,0.5))",
+                          filter: `drop-shadow(0 4px 5px ${exerciseShadowColor(
+                            exColor,
+                            0.85
+                          )}) drop-shadow(0 1px 2px ${exerciseShadowColor(exColor, 0.7)})`,
                         }}
                       >
                         <LevelGem level={bestLevel} size={36} />
@@ -9810,8 +9897,8 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            <div className="flex items-center justify-center gap-4 w-full">
-            <div className="flex flex-col gap-3 w-24 sm:w-28 shrink-0">
+            <div className="flex items-stretch justify-center gap-8 sm:gap-12 w-full">
+            <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
@@ -9865,7 +9952,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="flex flex-col gap-3 w-24 sm:w-28 shrink-0">
+            <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>
