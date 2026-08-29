@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 42;
+const BUILD_VERSION = 43;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2492,11 +2492,10 @@ function SongVisualizer({ className, style }) {
     window.addEventListener("resize", resize);
 
     const BARS = 40;
-    // Every band keeps its own running peak. Bass is naturally 20-30dB
-    // louder than treble in mastered music, so a single global scale leaves
-    // the top two thirds of the spectrum flat no matter how busy the track
-    // is. Normalising each band against itself is what gives the display
-    // actual depth instead of a bass-shaped wiggle.
+    // Kept as bands even though nothing draws them individually: the glow
+    // responds to the low end specifically, and reading that from real
+    // frequency bands is what makes it move with the music rather than with
+    // overall loudness.
     const peaks = new Array(BARS).fill(0.12);
     const levels = new Array(BARS).fill(0);
 
@@ -2512,23 +2511,15 @@ function SongVisualizer({ className, style }) {
       }
       analyser.getByteFrequencyData(data);
 
-      // Real frequency band edges, spaced logarithmically the way hearing
-      // works: each band covers the same musical interval rather than the
-      // same number of hertz. 40Hz to 14kHz spans sub-bass to air.
       const nyquist = (analyser.context.sampleRate || 44100) / 2;
       const binHz = nyquist / data.length;
       const F_LOW = 40;
       const F_HIGH = 14000;
       const ratio = F_HIGH / F_LOW;
 
-      const bandW = Math.min(w * 0.92, 1500);
-      const left = (w - bandW) / 2;
-      const half = bandW / 2;
-      const barW = half / BARS;
-      const baseline = h - Math.min(h * 0.05, 40);
-      const maxH = h * 0.3;
-
+      let energy = 0;
       let bass = 0;
+      const bassBands = Math.max(1, Math.floor(BARS * 0.2));
 
       for (let i = 0; i < BARS; i++) {
         const f0 = F_LOW * Math.pow(ratio, i / BARS);
@@ -2536,8 +2527,6 @@ function SongVisualizer({ className, style }) {
         const b0 = Math.max(0, Math.floor(f0 / binHz));
         const b1 = Math.min(data.length - 1, Math.max(b0 + 1, Math.ceil(f1 / binHz)));
 
-        // Mostly the loudest bin in the band, with some of the mean mixed
-        // in: averaging alone buries the transients that make a bar move.
         let sum = 0;
         let top = 0;
         for (let b = b0; b <= b1; b++) {
@@ -2547,79 +2536,52 @@ function SongVisualizer({ className, style }) {
         const mean = sum / (b1 - b0 + 1);
         const raw = (top * 0.7 + mean * 0.3) / 255;
 
-        // A long-memory reference level per band, not a fast-following one.
-        // At the previous decay the reference chased the signal so closely
-        // that every band sat pinned near its own maximum, which is exactly
-        // why the bars hardly moved.
         peaks[i] = Math.max(raw, peaks[i] * 0.9993);
-
-        // Spectral tilt. Music rolls off steeply with frequency, so without
-        // a compensating boost the upper half of the display never leaves
-        // the floor.
         const t0 = i / BARS;
         const tilt = 1 + t0 * 3.2;
         const gated = Math.max(0, raw * tilt - 0.05);
         const norm = Math.min(1, gated / Math.max(0.1, peaks[i] * tilt));
 
-        // Attack fast, release slow — how a level meter behaves, and what
-        // stops the bars flickering between frames while still letting them
-        // punch on a hit.
         const target = Math.pow(norm, 0.85);
         levels[i] =
           target > levels[i]
             ? levels[i] + (target - levels[i]) * 0.85
             : levels[i] + (target - levels[i]) * 0.09;
 
-        if (i < BARS * 0.15) bass += levels[i];
-
-        const v = levels[i];
-        const barH = Math.max(2, v * maxH);
-        // Fades out toward the edges so the band has no hard ends.
-        const t = i / BARS;
-        const edge = 1 - Math.pow(t, 2.4);
-        const alpha = (0.04 + v * 0.3) * edge;
-        const wid = Math.max(3, barW - 6);
-        const r = Math.min(wid / 2, 5);
-        const xr = left + half + i * barW;
-        const xl = left + half - (i + 1) * barW;
-
-        ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
-        ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.9).toFixed(3)})`;
-        ctx2d.shadowBlur = 22;
-        if (ctx2d.roundRect) {
-          ctx2d.beginPath();
-          ctx2d.roundRect(xr, baseline - barH, wid, barH, r);
-          ctx2d.roundRect(xl, baseline - barH, wid, barH, r);
-          ctx2d.fill();
-        } else {
-          ctx2d.fillRect(xr, baseline - barH, wid, barH);
-          ctx2d.fillRect(xl, baseline - barH, wid, barH);
-        }
-        ctx2d.shadowBlur = 0;
-
-        // A short reflection under the baseline, fading away.
-        const refl = ctx2d.createLinearGradient(0, baseline, 0, baseline + barH * 0.55);
-        refl.addColorStop(0, `rgba(242, 194, 0, ${(alpha * 0.35).toFixed(3)})`);
-        refl.addColorStop(1, "rgba(242, 194, 0, 0)");
-        ctx2d.fillStyle = refl;
-        ctx2d.fillRect(xr, baseline, wid, barH * 0.55);
-        ctx2d.fillRect(xl, baseline, wid, barH * 0.55);
+        energy += levels[i];
+        if (i < bassBands) bass += levels[i];
       }
 
-      // Bloom behind the band, driven by the low bands only.
-      bass /= Math.max(1, Math.floor(BARS * 0.15));
-      const bloom = ctx2d.createRadialGradient(
+      energy /= BARS;
+      bass /= bassBands;
+
+      // Two blooms: a wide one over the whole screen breathing with overall
+      // energy, and a stronger one low down that pumps with the bass.
+      const wide = ctx2d.createRadialGradient(
         w / 2,
-        baseline,
+        h * 0.62,
         0,
         w / 2,
-        baseline,
-        Math.max(160, bandW * 0.6 * (0.6 + bass * 0.7))
+        h * 0.62,
+        Math.max(w, h) * (0.45 + energy * 0.3)
       );
-      bloom.addColorStop(0, `rgba(242, 194, 0, ${(0.04 + bass * 0.08).toFixed(3)})`);
-      bloom.addColorStop(1, "rgba(242, 194, 0, 0)");
+      wide.addColorStop(0, `rgba(242, 194, 0, ${(0.02 + energy * 0.05).toFixed(3)})`);
+      wide.addColorStop(1, "rgba(242, 194, 0, 0)");
       ctx2d.globalCompositeOperation = "lighter";
-      ctx2d.fillStyle = bloom;
+      ctx2d.fillStyle = wide;
+      ctx2d.fillRect(0, 0, w, h);
+
+      const low = ctx2d.createRadialGradient(
+        w / 2,
+        h * 0.95,
+        0,
+        w / 2,
+        h * 0.95,
+        Math.max(260, w * 0.55 * (0.5 + bass * 0.8))
+      );
+      low.addColorStop(0, `rgba(242, 194, 0, ${(0.04 + bass * 0.12).toFixed(3)})`);
+      low.addColorStop(1, "rgba(242, 194, 0, 0)");
+      ctx2d.fillStyle = low;
       ctx2d.fillRect(0, 0, w, h);
       ctx2d.globalCompositeOperation = "source-over";
     };
@@ -7298,47 +7260,59 @@ function NBackSessionApp() {
       if (!ex || key === "overview") return;
       const entries = [];
       let level = 2;
+
+      // One session's score, generated per exercise in that exercise's own
+      // format. Each session is generated whole rather than by nudging a
+      // day's value, which was corrupting RRT's packed points-and-seconds
+      // (a ±0.4 nudge pushed the decimals past .59 and rolled the points)
+      // and pushing QNB' and 3D MOT past their real ranges.
+      const sessionScore = (progress) => {
+        if (ex.scoreType === "points") {
+          // Premises solved in the whole part, round length in seconds in
+          // the decimals — so the decimals must stay inside 0-59.
+          const points = Math.max(
+            1,
+            Math.min(ex.maxN, Math.round(2 + progress * 5 + (Math.random() - 0.5) * 2))
+          );
+          const seconds = 10 + Math.floor(Math.random() * 40); // 10-49s
+          return points + seconds / 100;
+        }
+        if (key === "iqnb") {
+          // QNB' climbs in hundredths from its starting level.
+          const lvl = 2.5 + progress * 2.5 + (Math.random() - 0.5) * 0.5;
+          return Math.round(Math.min(ex.maxN, Math.max(1, lvl)) * 100) / 100;
+        }
+        if (key === "motion3d") {
+          // 3D MOT is a ball speed, and a low one — it was reading as a
+          // level number before, which is why it looked far too high.
+          const spd = 0.6 + progress * 1.5 + (Math.random() - 0.5) * 0.35;
+          return Math.round(Math.max(0.2, spd) * 100) / 100;
+        }
+        // N-back exercises score a hit rate.
+        return Math.max(
+          30,
+          Math.min(99, Math.round(52 + progress * 34 + (Math.random() - 0.5) * 16))
+        );
+      };
+
       for (let back = 90; back >= 0; back--) {
         // A believable gap rate, so the table shows real missed days.
         if (Math.random() < 0.22) continue;
-        level = Math.min(9, level + (Math.random() < 0.06 ? 1 : 0));
-        // Drifts upward with noise on top, the way real practice does, so
-        // personal bests keep landing instead of all clustering in week one.
-        // Real practice plateaus. A smooth ramp made every day a new record,
-        // which is not what the highlighting is meant to show.
+        level = Math.min(ex.maxN, level + (Math.random() < 0.06 ? 1 : 0));
+        // Real practice plateaus, so the ramp tails off rather than rising
+        // smoothly to the end and making every day a new record.
         const progress = Math.min(1, ((90 - back) / 90) * 1.25);
-        let accuracy;
-        if (ex.scoreType === "points") {
-          // RRT packs premises solved into the integer part and seconds
-          // into the decimals, so it can never exceed maxN.
-          const points = Math.max(
-            1,
-            Math.min(ex.maxN, Math.round(2 + progress * 6 + (Math.random() - 0.5) * 2))
-          );
-          accuracy = points + Math.round(Math.random() * 59) / 100;
-        } else if (ex.scoreType === "decimal") {
-          accuracy =
-            Math.round((2.5 + progress * 3.5 + (Math.random() - 0.5) * 0.8) * 100) / 100;
-        } else {
-          accuracy = Math.max(
-            30,
-            Math.min(99, Math.round(52 + progress * 34 + (Math.random() - 0.5) * 18))
-          );
-        }
         // Some days get two sessions, so a day's average is genuinely
         // different from its best and the two record columns can diverge.
         const sessionsToday = Math.random() < 0.3 ? 2 : 1;
         for (let k = 0; k < sessionsToday; k++) {
           entries.push({
             ts: now - back * dayMs + k * 60 * 60 * 1000,
-            accuracy:
-              ex.scoreType === "accuracy"
-                ? Math.max(30, Math.min(99, Math.round(accuracy + (Math.random() - 0.5) * 8)))
-                : Math.round((accuracy + (Math.random() - 0.5) * 0.8) * 100) / 100,
+            accuracy: sessionScore(progress),
             n: level,
             streak:
               ex.scoreType === "points"
-                ? Math.max(0, Math.round(4 + progress * 12 + (Math.random() - 0.5) * 6))
+                ? Math.max(0, Math.min(20, Math.round(4 + progress * 12 + (Math.random() - 0.5) * 6)))
                 : undefined,
             durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
           });
@@ -7893,11 +7867,6 @@ function NBackSessionApp() {
           0% { opacity: 0; transform: translateY(26px) scale(0.94); filter: blur(14px); }
           35% { opacity: 0.65; filter: blur(6px); }
           100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-        }
-        @keyframes prPop {
-          0% { transform: scale(0.7); opacity: 0; }
-          60% { transform: scale(1.08); opacity: 1; }
-          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes gemPop {
           0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
@@ -10460,7 +10429,7 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            <div className="flex items-stretch justify-center gap-8 sm:gap-12 w-full">
+            <div className="flex items-stretch justify-center gap-14 sm:gap-24 w-full">
             <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
@@ -10766,8 +10735,12 @@ function NBackSessionApp() {
                       ? "translateY(0) scale(1)"
                       : "translateY(26px) scale(0.94)",
                     filter: prRevealed ? "blur(0px)" : "blur(14px)",
+                    // Long, and eased so almost all the movement happens
+                    // early and it drifts into place — an abrupt arrival is
+                    // usually a curve that finishes fast, not one that is
+                    // too short.
                     transition:
-                      "opacity 3.9s cubic-bezier(0.22,1,0.36,1), transform 3.9s cubic-bezier(0.22,1,0.36,1), filter 3.2s cubic-bezier(0.22,1,0.36,1)",
+                      "opacity 5s cubic-bezier(0.16,0.8,0.24,1), transform 5s cubic-bezier(0.16,0.8,0.24,1), filter 4.2s cubic-bezier(0.16,0.8,0.24,1)",
                   }
                 : undefined
             }
@@ -10778,7 +10751,6 @@ function NBackSessionApp() {
                 style={{
                   color: PR_YELLOW,
                   textShadow: `0 0 24px ${PR_YELLOW}66`,
-                  animation: "prPop 0.6s cubic-bezier(0.34,1.56,0.64,1)",
                 }}
               >
                 New personal record
