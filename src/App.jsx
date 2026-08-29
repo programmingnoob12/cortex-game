@@ -2080,9 +2080,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 21;
+const BUILD_VERSION = 22;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:16 PM";
+const BUILD_TIME = "8:19 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7600,21 +7600,11 @@ function NBackSessionApp() {
           0%, 100% { opacity: 0.55; transform: scale(0.85); }
           50% { opacity: 1; transform: scale(1.25); }
         }
-        @keyframes prSparkle {
-          0%, 100% { opacity: 0; transform: scale(0.3); }
-          45% { opacity: 1; transform: scale(1); }
-        }
         /* A ring closing in on the centre, against the outward pulses. */
         @keyframes prRingIn {
           0% { opacity: 0; transform: scale(1.5); }
           20% { opacity: 0.8; }
           100% { opacity: 0; transform: scale(0.18); }
-        }
-        /* Motes travelling inward from the edge to the centre. */
-        @keyframes prMote {
-          0% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.6); }
-          20% { opacity: 1; }
-          100% { opacity: 0; transform: translate(0, 0) scale(0.2); }
         }
         /* A glow gathering where the gem will appear. */
         @keyframes prGather {
@@ -10416,23 +10406,43 @@ function NBackSessionApp() {
                   animation: "prCore 1.9s 1.2s ease-in-out infinite, prGather 1.2s 1.2s ease-out both",
                 }}
               />
-              {/* Sparkles catching at odd intervals, so the field is never
-                  perfectly regular. */}
+              {/* Rings in pairs: a bright thin one with a soft wide one
+                  chasing it a beat behind, so each pulse has a leading edge
+                  and a wake rather than being a single hard outline. */}
               {[
-                [-140, -96, 0], [128, -118, 0.5], [-172, 54, 1.1],
-                [156, 72, 0.35], [-64, -160, 0.8], [82, 148, 1.4],
-                [188, -28, 0.95], [-118, 136, 0.6],
-              ].map(([x, y, delay], i) => (
+                { d: 0, size: 150, w: 1.5, blur: 0 },
+                { d: 0.18, size: 150, w: 6, blur: 10 },
+                { d: 0.85, size: 128, w: 1.5, blur: 0 },
+                { d: 1.03, size: 128, w: 6, blur: 10 },
+                { d: 1.7, size: 172, w: 1.5, blur: 0 },
+                { d: 1.88, size: 172, w: 6, blur: 10 },
+                { d: 2.55, size: 140, w: 1.5, blur: 0 },
+                { d: 2.73, size: 140, w: 6, blur: 10 },
+              ].map(({ d, size, w, blur }, i) => (
                 <div
-                  key={`s${i}`}
-                  className="absolute"
+                  key={`r${i}`}
+                  className="absolute rounded-full"
                   style={{
-                    left: `calc(50% + ${x}px)`,
-                    top: `calc(50% + ${y}px)`,
-                    width: 10,
-                    height: 10,
-                    background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
-                    animation: `prSparkle 2.2s ${1.2 + delay}s ease-in-out infinite`,
+                    width: size,
+                    height: size,
+                    border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
+                    filter: blur ? `blur(${blur}px)` : undefined,
+                    boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
+                    animation: `prRing 3.1s ${d + 1.2}s cubic-bezier(0.12,0.9,0.2,1) both`,
+                  }}
+                />
+              ))}
+              {/* One ring travelling the other way, tightening inward, so
+                  the motion is not all in a single direction. */}
+              {[0.4, 1.6].map((d) => (
+                <div
+                  key={`i${d}`}
+                  className="absolute rounded-full"
+                  style={{
+                    width: 320,
+                    height: 320,
+                    border: `1px solid ${PR_YELLOW}44`,
+                    animation: `prRingIn 2.6s ${d + 1.2}s cubic-bezier(0.4,0,0.2,1) both`,
                   }}
                 />
               ))}
@@ -10476,26 +10486,6 @@ function NBackSessionApp() {
                   }}
                 />
               ))}
-              {/* Motes converging. Twelve is enough to read as movement
-                  without turning into confetti. */}
-              {Array.from({ length: 12 }).map((_, i) => {
-                const angle = (i / 12) * Math.PI * 2;
-                const dist = 190 + (i % 3) * 34;
-                return (
-                  <div
-                    key={`m${i}`}
-                    className="absolute rounded-full"
-                    style={{
-                      width: 3,
-                      height: 3,
-                      background: PR_YELLOW,
-                      "--mx": `${Math.cos(angle) * dist}px`,
-                      "--my": `${Math.sin(angle) * dist}px`,
-                      animation: `prMote 2.4s ${1.2 + (i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
-                    }}
-                  />
-                );
-              })}
             </div>
           )}
           <div
@@ -10506,7 +10496,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 5.4s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 5.2s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
