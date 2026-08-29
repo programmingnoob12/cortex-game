@@ -2056,7 +2056,7 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 5;
+const BUILD_VERSION = 6;
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2230,10 +2230,10 @@ function playCheer() {
 // space in the name is fine, it just has to be encoded in the URL below.
 const SONG_URL = "/audio/celebration%20song.mp3";
 const SONG_START = 56; // seconds into the track
-const SONG_FADE_OUT_AT = 74; // seconds into the track
-const SONG_FADE_IN = 3; // seconds
+const SONG_FADE_OUT_AT = 84; // seconds into the track
+const SONG_FADE_IN = 1.2; // seconds
 const SONG_FADE_OUT = 3.5; // seconds
-const SONG_PEAK = 0.15;
+const SONG_PEAK = 0.1;
 let songBuffer = null;
 let songLoadStarted = false;
 let songSource = null; // the one currently playing, so a second level-up cuts the first
@@ -2332,10 +2332,11 @@ function playCelebrationSong() {
     if (playFor <= 0) return false;
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    // Exponential rather than linear, matching the fade-out: loudness is
-    // perceived logarithmically, so a linear ramp arrives most of the way
-    // up in the first moment and barely reads as a fade at all.
+    // Starts at a fraction of full rather than at silence. An exponential
+    // ramp from near-zero spends most of its length inaudible, which reads
+    // as the music being late rather than fading in — so it comes in
+    // immediately at a low level and swells from there.
+    gain.gain.setValueAtTime(SONG_PEAK * 0.18, now);
     gain.gain.exponentialRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
     // Hold until the fade-out point, then ease down to silence.
     gain.gain.setValueAtTime(SONG_PEAK, now + playFor);
