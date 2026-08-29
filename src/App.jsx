@@ -8770,16 +8770,21 @@ function NBackSessionApp() {
                             }}
                             labelFormatter={(label, payload) => {
                               const ts = payload && payload[0] && payload[0].payload.ts;
-                              const when = ts
-                                ? new Date(ts).toLocaleDateString(undefined, {
-                                    weekday: "short",
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  })
+                              // Built from parts rather than toLocaleDateString
+                              // so no locale slips a comma back in.
+                              const d = ts ? new Date(ts) : null;
+                              const when = d
+                                ? [
+                                    d.toLocaleDateString(undefined, { weekday: "short" }),
+                                    d.getDate(),
+                                    d.toLocaleDateString(undefined, { month: "short" }),
+                                    d.getFullYear(),
+                                  ]
+                                    .join(" ")
+                                    .replace(/,/g, "")
                                 : null;
                               return when
-                                ? `${when} · session ${label}`
+                                ? `${when} · Session ${label}`
                                 : `Session ${label}`;
                             }}
                             formatter={(value, name) => [
@@ -8839,7 +8844,7 @@ function NBackSessionApp() {
                           <circle cx="7" cy="7" r="6" fill="none" stroke={PR_YELLOW} strokeWidth="1.5" />
                           <circle cx="7" cy="7" r="2.5" fill={PR_YELLOW} />
                         </svg>
-                        New personal best
+                        New personal record
                       </span>
                     </div>
                   ) : null}
@@ -8892,7 +8897,7 @@ function NBackSessionApp() {
                             <th className="px-4 py-2.5 font-medium">Day</th>
                             <th className="px-4 py-2.5 font-medium">Date</th>
                             <th className="px-4 py-2.5 font-medium">Time</th>
-                            <th className="px-4 py-2.5 font-medium">Score</th>
+                            <th className="px-4 py-2.5 font-medium">Best score</th>
                             <th className="px-4 py-2.5 font-medium">Avg</th>
                           </tr>
                         </thead>
@@ -8947,7 +8952,7 @@ function NBackSessionApp() {
                                           backgroundColor: `${PR_YELLOW}26`,
                                           boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
                                         }
-                                      : { color: "#8A8F98" }
+                                      : { color: "#F7F8F8" }
                                   }
                                 >
                                   {formatLevelValue(e, row.dayAvg)}
@@ -8982,11 +8987,7 @@ function NBackSessionApp() {
                             }}
                           >
                             <span aria-hidden="true">←</span>
-                            {row.isPR && row.isAvgPR
-                              ? "PR + avg!"
-                              : row.isPR
-                              ? "New PR!"
-                              : "Best avg!"}
+                            {row.isPR ? "New PR!" : "Best avg!"}
                           </div>
                         ) : null
                       )}
@@ -9007,9 +9008,7 @@ function NBackSessionApp() {
                       >
                         Back
                       </button>
-                      <span className="text-slate-400 text-sm tabular-nums">
-                        Page {page + 1} of {pageCount}
-                      </span>
+                      <span aria-hidden="true" />
                       <button
                         onClick={() =>
                           setHistoryPage((prev) => ({
