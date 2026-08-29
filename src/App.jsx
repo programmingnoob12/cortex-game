@@ -7513,10 +7513,10 @@ function NBackSessionApp() {
       >
         {mainView === "regime" && (
           <div className="space-y-14">
-            <div className="fixed top-4 left-5 z-40 text-slate-400 text-sm font-medium tabular-nums pointer-events-none">
-              v{BUILD_VERSION}
-            </div>
             <div>
+              <div className="text-slate-100 text-lg font-semibold mb-4">
+                VERSION {BUILD_VERSION}
+              </div>
               <h1 className="text-5xl font-semibold tracking-tight">
                 Choose your regime
               </h1>
