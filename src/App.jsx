@@ -8239,18 +8239,21 @@ function NBackSessionApp() {
             {/* Placeholder legal/contact footer. The three policy pages are
                 what a subscription business is expected to make reachable;
                 the links are dead until those pages exist. */}
-            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-500">
+            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
-              <a
-                href="mailto:hello@cortex.app"
-                className="hover:text-slate-300 transition-colors"
-              >
-                Contact: hello@cortex.app
-              </a>
-              <a href="#" className="hover:text-slate-300 transition-colors">
+              <span>
+                Contact:{" "}
+                <a
+                  href="mailto:hello@cortex.app"
+                  className="underline underline-offset-2 hover:text-slate-400 transition-colors"
+                >
+                  hello@cortex.app
+                </a>
+              </span>
+              <a href="#" className="hover:text-slate-400 transition-colors">
                 Privacy Policy
               </a>
-              <a href="#" className="hover:text-slate-300 transition-colors">
+              <a href="#" className="hover:text-slate-400 transition-colors">
                 Terms of Service
               </a>
             </div>
