@@ -2056,7 +2056,7 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 2;
+const BUILD_VERSION = 3;
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7513,8 +7513,8 @@ function NBackSessionApp() {
       >
         {mainView === "regime" && (
           <div className="space-y-14">
-            <div className="fixed top-4 left-5 z-40 text-slate-700 text-xs tabular-nums pointer-events-none">
-              {BUILD_VERSION}
+            <div className="fixed top-4 left-5 z-40 text-slate-400 text-sm font-medium tabular-nums pointer-events-none">
+              v{BUILD_VERSION}
             </div>
             <div>
               <h1 className="text-5xl font-semibold tracking-tight">
