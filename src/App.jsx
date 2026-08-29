@@ -6981,35 +6981,21 @@ function NBackSessionApp() {
                     /* Same filled treatment as an exercise's Start button,
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
-                    style={{
-                      "--ex": rc,
-                      backgroundColor: exerciseTint(rc, 0.1),
-                      borderColor: exerciseTint(rc, 0.38),
-                      borderLeftColor: rc,
-                    }}
-                    className="w-full text-left rounded-xl px-7 py-6 border border-l-4"
+                    style={{ "--ex": rc }}
+                    className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <div className="text-2xl font-semibold text-slate-100">
-                          {r.title}
-                        </div>
+                        <div className="text-2xl font-semibold">{r.title}</div>
                         {r.key === "medium" && (
-                          <span
-                            className="italic text-sm font-semibold"
-                            style={{ color: rc }}
-                          >
+                          <span className="italic text-sm font-semibold">
                             Recommended
                           </span>
                         )}
                       </div>
-                      <div className="text-lg font-medium text-slate-100">
-                        {r.subtitle}
-                      </div>
+                      <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-base font-medium mt-1" style={{ color: rc }}>
-                      {r.summary}
-                    </div>
+                    <div className="text-base font-medium mt-1">{r.summary}</div>
                   </button>
                 );
               })}
@@ -7333,19 +7319,18 @@ function NBackSessionApp() {
                 return (
                   <div
                     key={e.key}
-                    className="rounded-xl p-6 border border-l-4"
+                    className="rounded-xl p-6 text-white"
                     style={{
-                      backgroundColor: exerciseTint(exColor, 0.1),
-                      borderColor: exerciseTint(exColor, 0.38),
-                      borderLeftColor: exColor,
+                      backgroundImage: exerciseDeepFill(exColor),
+                      boxShadow:
+                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                     }}
                   >
-                    <div className="text-xl font-semibold text-slate-100">
-                      {e.title}
-                    </div>
+                    <div className="text-xl font-semibold">{e.title}</div>
                     <div className="flex items-center gap-5 mt-3">
                       <LevelGem level={bestLevel} size={36} />
-                      <div className="text-lg font-medium" style={{ color: exColor }}>
+                      <div className="text-lg font-medium">
                         {isAccuracy
                           ? `${e.abbrev}${bestLevel}B`
                           : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
@@ -8243,12 +8228,7 @@ function NBackSessionApp() {
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
-                <a
-                  href="mailto:hello@cortex.app"
-                  className="underline underline-offset-2 hover:text-slate-400 transition-colors"
-                >
-                  hello@cortex.app
-                </a>
+                <span className="underline underline-offset-2">hello@cortex.app</span>
               </span>
               <a href="#" className="hover:text-slate-400 transition-colors">
                 Privacy Policy
