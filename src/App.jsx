@@ -2141,6 +2141,93 @@ function playLevelUp() {
   }
 }
 
+// Applause, synthesized. A crowd clapping is, acoustically, a few hundred
+// short broadband bursts scattered in time — so that is what this builds:
+// randomly placed noise impulses through a band-pass, under a swell that
+// rises fast and falls away over about a second and a half. No recording
+// means no licence and nothing to attribute, and it stays a few hundred
+// bytes instead of a downloaded asset.
+function playCheer() {
+  try {
+    const ctx = letterAudioContext() || (() => {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      if (!clickAudioCtx) clickAudioCtx = new Ctx();
+      return clickAudioCtx;
+    })();
+    if (!ctx) return;
+    if (ctx.state === "suspended") ctx.resume();
+    const now = ctx.currentTime;
+    const DURATION = 1.9;
+
+    const master = ctx.createGain();
+    master.gain.value = 0.13;
+    master.connect(ctx.destination);
+
+    // Band-pass keeps it in the range hands actually occupy; without it the
+    // low end turns it into rain and the top into static.
+    const band = ctx.createBiquadFilter();
+    band.type = "bandpass";
+    band.frequency.value = 1900;
+    band.Q.value = 0.7;
+    band.connect(master);
+
+    // The swell. Real applause ramps over a beat rather than starting at
+    // full strength, and that ramp is most of what makes it read as people.
+    const swell = ctx.createGain();
+    swell.gain.setValueAtTime(0, now);
+    swell.gain.linearRampToValueAtTime(1, now + 0.18);
+    swell.gain.setValueAtTime(1, now + 0.7);
+    swell.gain.exponentialRampToValueAtTime(0.0001, now + DURATION);
+    swell.connect(band);
+
+    const rate = ctx.sampleRate;
+    const buf = ctx.createBuffer(1, Math.floor(rate * DURATION), rate);
+    const data = buf.getChannelData(0);
+    // Each clap is a ~6ms burst with a sharp attack. Density falls off over
+    // the tail so the crowd thins out rather than stopping dead.
+    const clapFrames = Math.floor(rate * 0.006);
+    const claps = 900;
+    for (let c = 0; c < claps; c++) {
+      const t = Math.pow(Math.random(), 0.75) * DURATION * 0.85;
+      const start = Math.floor(t * rate);
+      const amp = 0.35 + Math.random() * 0.65;
+      for (let i = 0; i < clapFrames && start + i < data.length; i++) {
+        const fade = 1 - i / clapFrames;
+        data[start + i] += (Math.random() * 2 - 1) * amp * fade * fade;
+      }
+    }
+    // Keep it inside the rails: 900 overlapping bursts can sum well past 1.
+    let peak = 0;
+    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
+    if (peak > 1) for (let i = 0; i < data.length; i++) data[i] /= peak;
+
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(swell);
+    src.start(now);
+
+    // A short bright chime on top, so the moment has a point of arrival
+    // rather than being only texture.
+    [1046.5, 1318.5].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      const start = now + i * 0.08;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.5 - i * 0.15, start + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.8);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(start);
+      osc.stop(start + 0.85);
+    });
+  } catch {
+    // No audio available; the overlay still says what happened.
+  }
+}
+
 // The number the graphs and the Score column actually plot: the LEVEL
 // reached, not the hit rate. N-back exercises carry that in `n`; QNB' and
 // 3D MOT store their own float level in `accuracy`; RRT stores points and
@@ -7033,8 +7120,11 @@ function NBackSessionApp() {
 
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
+  // A personal record gets the crowd; a routine level-up gets the tune.
   useEffect(() => {
-    if (unlockInfo) playLevelUp();
+    if (!unlockInfo) return;
+    if (unlockInfo.isNewPR) playCheer();
+    else playLevelUp();
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
@@ -7161,6 +7251,11 @@ function NBackSessionApp() {
           0%, 25% { transform: translateY(10px); opacity: 0; }
           55%, 88% { transform: translateY(0); opacity: 1; }
           100% { opacity: 0; }
+        }
+        @keyframes prPop {
+          0% { transform: scale(0.7); opacity: 0; }
+          60% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes gemPop {
           0% { transform: scale(0.3) rotate(-12deg); opacity: 0; }
@@ -9859,9 +9954,22 @@ function NBackSessionApp() {
       {unlockInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8">
           <div className="relative flex flex-col items-center text-center gap-10 max-w-sm">
-            <div className="text-base uppercase tracking-wide text-slate-400">
-              {unlockInfo.isNewPR ? "New personal record" : "Level up"}
-            </div>
+            {unlockInfo.isNewPR ? (
+              <div
+                className="text-3xl font-semibold uppercase tracking-widest"
+                style={{
+                  color: PR_YELLOW,
+                  textShadow: `0 0 24px ${PR_YELLOW}66`,
+                  animation: "prPop 0.6s cubic-bezier(0.34,1.56,0.64,1)",
+                }}
+              >
+                New PR!
+              </div>
+            ) : (
+              <div className="text-base uppercase tracking-wide text-slate-400">
+                Level up
+              </div>
+            )}
 
             <div className="relative" style={{ animation: "gemPop 0.7s cubic-bezier(0.34,1.56,0.64,1)" }}>
               <LevelGem level={unlockInfo.level} size={168} glowPulse={gemTierFor(unlockInfo.level).glow} />
