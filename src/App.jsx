@@ -2056,7 +2056,7 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 7;
+const BUILD_VERSION = 8;
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2236,8 +2236,8 @@ function playCheer() {
 const SONG_URL = "/audio/celebration%20song.mp3";
 const SONG_START = 56; // seconds into the track
 const SONG_FADE_OUT_AT = 77; // seconds into the track
-const SONG_FADE_IN = 1.2; // seconds
-const SONG_FADE_OUT = 3.5; // seconds
+const SONG_FADE_IN = 2.6; // seconds
+const SONG_FADE_OUT = 7; // seconds
 const SONG_PEAK = 0.1;
 let songBuffer = null;
 let songLoadStarted = false;
@@ -2341,10 +2341,22 @@ function playCelebrationSong() {
     // ramp from near-zero spends most of its length inaudible, which reads
     // as the music being late rather than fading in — so it comes in
     // immediately at a low level and swells from there.
-    gain.gain.setValueAtTime(SONG_PEAK * 0.18, now);
+    // Two stages. It arrives immediately at a low level so nothing feels
+    // late, climbs quickly to about half, then eases the rest of the way
+    // over a longer stretch — which is what stops the entry sounding like a
+    // switch being flipped.
+    gain.gain.setValueAtTime(SONG_PEAK * 0.06, now);
+    gain.gain.exponentialRampToValueAtTime(SONG_PEAK * 0.45, now + SONG_FADE_IN * 0.35);
     gain.gain.exponentialRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
     // Hold until the fade-out point, then ease down to silence.
     gain.gain.setValueAtTime(SONG_PEAK, now + playFor);
+    // Down to a whisper over most of the fade, then out. A straight line to
+    // zero drops away fast and then lingers barely audible; this goes quiet
+    // first and reaches silence properly.
+    gain.gain.exponentialRampToValueAtTime(
+      SONG_PEAK * 0.06,
+      now + playFor + SONG_FADE_OUT * 0.75
+    );
     gain.gain.linearRampToValueAtTime(0.0001, now + playFor + SONG_FADE_OUT);
     gain.connect(ctx.destination);
 
@@ -4856,6 +4868,9 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
   return {
     id: `${exerciseKey}Level${level}`,
     exercise: exerciseKey,
+    // The rank in the title is the same rank the leaderboard shows, so it
+    // carries the same colour there as it does here.
+    tierColor: gemTierFor(level).color,
     group: "Performance",
     icon: exerciseKey === "dual" ? "🧠" : "🧩",
     title: tierTitle,
@@ -7789,9 +7804,16 @@ function NBackSessionApp() {
                             </div>
                             <div className="flex-1">
                               <div
-                                className={`text-lg font-semibold ${
-                                  isUnlocked ? "text-slate-100" : "text-slate-400"
-                                }`}
+                                className="text-lg font-semibold"
+                                style={{
+                                  color: a.tierColor
+                                    ? isUnlocked
+                                      ? a.tierColor
+                                      : exerciseTint(a.tierColor, 0.55)
+                                    : isUnlocked
+                                    ? "#F7F8F8"
+                                    : "#8A8F98",
+                                }}
                               >
                                 {a.title}
                               </div>
@@ -10404,7 +10426,10 @@ function NBackSessionApp() {
                 <div className={`text-xs uppercase tracking-wide font-semibold ${groupAccent.text}`}>
                   {a.group}
                 </div>
-                <div className="text-2xl font-semibold tracking-tight text-slate-100">
+                <div
+                  className="text-2xl font-semibold tracking-tight"
+                  style={{ color: a.tierColor || "#F7F8F8" }}
+                >
                   {a.title}
                 </div>
                 <div className="text-slate-400 text-base">{a.description}</div>
