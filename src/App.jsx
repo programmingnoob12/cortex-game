@@ -7267,13 +7267,17 @@ function NBackSessionApp() {
 
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
-  // Every level-up gets the celebration track; the synthesized tune is the
-  // fallback for when the file has not loaded. A personal record adds the
-  // applause on top of it.
+  // Reaching a level for the FIRST time gets the celebration track and the
+  // applause. Climbing back to a level already reached before gets the short
+  // tune instead, so the big moment stays rare enough to mean something.
   useEffect(() => {
     if (!unlockInfo) return;
-    if (!playCelebrationSong()) playLevelUp();
-    if (unlockInfo.isNewPR) playCheer();
+    if (unlockInfo.isNewPR) {
+      if (!playCelebrationSong()) playLevelUp();
+      playCheer();
+    } else {
+      playLevelUp();
+    }
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
