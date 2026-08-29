@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 25;
+const BUILD_VERSION = 26;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:59 PM";
+const BUILD_TIME = "10:30 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7572,9 +7572,9 @@ function NBackSessionApp() {
            something to arrive onto. */
         /* Rings pushing outward through the wait. */
         @keyframes prRing {
-          0% { opacity: 0; transform: scale(0.25); }
+          0% { opacity: 0; transform: scale(0.2); }
           18% { opacity: 1; }
-          100% { opacity: 0; transform: scale(3.6); }
+          100% { opacity: 0; transform: scale(5.5); }
         }
         /* Full black, held a beat, then lifting to reveal the scene. */
         /* Recharts puts a tabindex on its wrapper, so clicking a chart
@@ -7606,10 +7606,10 @@ function NBackSessionApp() {
         }
         /* Vapour drifting upward and thinning as it goes. */
         @keyframes prVapour {
-          0% { opacity: 0; transform: translateY(140px) scale(0.6); }
+          0% { opacity: 0; transform: translateX(-50%) translateY(22vh) scale(0.6); }
           25% { opacity: 1; }
           70% { opacity: 0.75; }
-          100% { opacity: 0; transform: translateY(-180px) scale(1.5); }
+          100% { opacity: 0; transform: translateX(-50%) translateY(-28vh) scale(1.5); }
         }
         @keyframes prCore {
           0%, 100% { opacity: 0.55; transform: scale(0.85); }
@@ -10365,11 +10365,11 @@ function NBackSessionApp() {
           }
         >
           {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
-            /* Pre-roll. Something has to occupy the wait or the dark screen
-               reads as a hang: black first, then vapour, a gathering glow,
-               a breathing core, expanding rings, sparkles and motes. */
+            /* Pre-roll. Sized in viewport units throughout so it fills the
+               screen on any display, rather than being a small scene in the
+               middle of a large dark rectangle. */
             <div
-              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
               aria-hidden="true"
               style={{ animation: "prPrerollFade 7.2s ease-out both" }}
             >
@@ -10380,25 +10380,28 @@ function NBackSessionApp() {
                 className="absolute inset-0 bg-black"
                 style={{ animation: "prBlackout 3.4s ease-out both" }}
               />
-              {/* Vapour. Four large, heavily blurred masses drifting up and
-                  apart at different rates — slow enough to read as
+              {/* Vapour. Six masses spread the full width, heavily blurred
+                  and drifting at different rates — slow enough to read as
                   atmosphere rather than as objects moving. */}
               {[
-                { x: -180, s: 1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
-                { x: 150, s: 1.25, d: 1.2, dur: 7.5, c: "#ffffff14" },
-                { x: -40, s: 0.85, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
-                { x: 240, s: 1.1, d: 2.6, dur: 8, c: "#ffffff0f" },
+                { x: -46, s: 1.1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
+                { x: -22, s: 0.85, d: 1.6, dur: 7, c: "#ffffff10" },
+                { x: 0, s: 1.3, d: 1.2, dur: 7.5, c: "#ffffff14" },
+                { x: 20, s: 0.9, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
+                { x: 42, s: 1.15, d: 2.6, dur: 8, c: "#ffffff0f" },
+                { x: 58, s: 1, d: 3.2, dur: 7, c: `${PR_YELLOW}14` },
               ].map(({ x, s: scale, d, dur, c }, i) => (
                 <div
                   key={`v${i}`}
-                  className="absolute rounded-full"
+                  className="absolute"
                   style={{
-                    width: 420 * scale,
-                    height: 300 * scale,
-                    left: `calc(50% + ${x}px)`,
-                    marginLeft: -210 * scale,
+                    width: `${52 * scale}vw`,
+                    height: `${46 * scale}vh`,
+                    left: `calc(50% + ${x}vw)`,
+                    transform: "translateX(-50%)",
+                    borderRadius: "50%",
                     background: `radial-gradient(closest-side, ${c}, transparent 70%)`,
-                    filter: "blur(46px)",
+                    filter: "blur(60px)",
                     animation: `prVapour ${dur}s ${d}s ease-out both`,
                   }}
                 />
@@ -10406,9 +10409,9 @@ function NBackSessionApp() {
               <div
                 className="absolute rounded-full"
                 style={{
-                  width: 320,
-                  height: 320,
-                  background: `radial-gradient(closest-side, ${PR_YELLOW}26, ${PR_YELLOW}0d 45%, transparent 72%)`,
+                  width: "78vmax",
+                  height: "78vmax",
+                  background: `radial-gradient(closest-side, ${PR_YELLOW}22, ${PR_YELLOW}0b 42%, transparent 70%)`,
                   animation: "prGather 3.4s ease-out both",
                 }}
               />
@@ -10416,27 +10419,27 @@ function NBackSessionApp() {
               <div
                 className="absolute rounded-full"
                 style={{
-                  width: 54,
-                  height: 54,
+                  width: "9vmax",
+                  height: "9vmax",
                   background: `radial-gradient(closest-side, ${PR_YELLOW}55, transparent 70%)`,
                   animation: "prCore 1.9s ease-in-out infinite, prGather 1.2s ease-out both",
                 }}
               />
-              {/* Sparkles catching at odd intervals, so the field is never
-                  perfectly regular. */}
+              {/* Sparkles across the whole field, at irregular positions. */}
               {[
-                [-140, -96, 0], [128, -118, 0.5], [-172, 54, 1.1],
-                [156, 72, 0.35], [-64, -160, 0.8], [82, 148, 1.4],
-                [188, -28, 0.95], [-118, 136, 0.6],
+                [-42, -34, 0], [38, -38, 0.5], [-46, 22, 1.1],
+                [44, 26, 0.35], [-18, -42, 0.8], [22, 40, 1.4],
+                [47, -12, 0.95], [-33, 38, 0.6], [8, -30, 1.25],
+                [-8, 33, 0.15], [30, 8, 1.55], [-28, -8, 0.75],
               ].map(([x, y, delay], i) => (
                 <div
                   key={`s${i}`}
                   className="absolute"
                   style={{
-                    left: `calc(50% + ${x}px)`,
-                    top: `calc(50% + ${y}px)`,
-                    width: 10,
-                    height: 10,
+                    left: `calc(50% + ${x}vw)`,
+                    top: `calc(50% + ${y}vh)`,
+                    width: 12,
+                    height: 12,
                     background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
                     animation: `prSparkle 2.2s ${delay}s ease-in-out infinite`,
                   }}
@@ -10444,60 +10447,60 @@ function NBackSessionApp() {
               ))}
               {/* Rings in pairs: a bright thin one with a soft wide one
                   chasing it a beat behind, so each pulse has a leading edge
-                  and a wake rather than being a single hard outline. */}
+                  and a wake rather than being a single hard outline. They
+                  scale out past the viewport edge. */}
               {[
-                { d: 0, size: 150, w: 1.5, blur: 0 },
-                { d: 0.18, size: 150, w: 6, blur: 10 },
-                { d: 0.85, size: 128, w: 1.5, blur: 0 },
-                { d: 1.03, size: 128, w: 6, blur: 10 },
-                { d: 1.7, size: 172, w: 1.5, blur: 0 },
-                { d: 1.88, size: 172, w: 6, blur: 10 },
-                { d: 2.55, size: 140, w: 1.5, blur: 0 },
-                { d: 2.73, size: 140, w: 6, blur: 10 },
+                { d: 0, size: 30, w: 1.5, blur: 0 },
+                { d: 0.18, size: 30, w: 7, blur: 12 },
+                { d: 0.85, size: 24, w: 1.5, blur: 0 },
+                { d: 1.03, size: 24, w: 7, blur: 12 },
+                { d: 1.7, size: 34, w: 1.5, blur: 0 },
+                { d: 1.88, size: 34, w: 7, blur: 12 },
+                { d: 2.55, size: 27, w: 1.5, blur: 0 },
+                { d: 2.73, size: 27, w: 7, blur: 12 },
               ].map(({ d, size, w, blur }, i) => (
                 <div
                   key={`r${i}`}
                   className="absolute rounded-full"
                   style={{
-                    width: size,
-                    height: size,
+                    width: `${size}vmax`,
+                    height: `${size}vmax`,
                     border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
                     filter: blur ? `blur(${blur}px)` : undefined,
-                    boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
+                    boxShadow: blur ? undefined : `0 0 26px ${PR_YELLOW}33`,
                     animation: `prRing 3.1s ${d}s cubic-bezier(0.12,0.9,0.2,1) both`,
                   }}
                 />
               ))}
-              {/* One ring travelling the other way, tightening inward, so
-                  the motion is not all in a single direction. */}
-              {[0.4, 1.6].map((d) => (
+              {/* Rings travelling the other way, tightening inward from
+                  beyond the edges, so the motion is not all one direction. */}
+              {[0.4, 1.6, 2.8].map((d) => (
                 <div
                   key={`i${d}`}
                   className="absolute rounded-full"
                   style={{
-                    width: 320,
-                    height: 320,
+                    width: "72vmax",
+                    height: "72vmax",
                     border: `1px solid ${PR_YELLOW}44`,
                     animation: `prRingIn 2.6s ${d}s cubic-bezier(0.4,0,0.2,1) both`,
                   }}
                 />
               ))}
-              {/* Motes converging. Twelve is enough to read as movement
-                  without turning into confetti. */}
-              {Array.from({ length: 12 }).map((_, i) => {
-                const angle = (i / 12) * Math.PI * 2;
-                const dist = 190 + (i % 3) * 34;
+              {/* Motes converging from off-screen toward the centre. */}
+              {Array.from({ length: 18 }).map((_, i) => {
+                const angle = (i / 18) * Math.PI * 2;
+                const dist = 46 + (i % 3) * 9;
                 return (
                   <div
                     key={`m${i}`}
                     className="absolute rounded-full"
                     style={{
-                      width: 3,
-                      height: 3,
+                      width: 4,
+                      height: 4,
                       background: PR_YELLOW,
-                      "--mx": `${Math.cos(angle) * dist}px`,
-                      "--my": `${Math.sin(angle) * dist}px`,
-                      animation: `prMote 2.4s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
+                      "--mx": `${(Math.cos(angle) * dist).toFixed(2)}vw`,
+                      "--my": `${(Math.sin(angle) * dist).toFixed(2)}vh`,
+                      animation: `prMote 2.6s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
                     }}
                   />
                 );
