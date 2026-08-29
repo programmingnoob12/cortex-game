@@ -2130,6 +2130,71 @@ function playClick() {
   }
 }
 
+// Applause, from a recording.
+//
+// TO ADD THE FILE: drop it at `public/audio/cheer.mp3`. Vite serves
+// `public/` from the site root, so it is fetched as `/audio/cheer.mp3` —
+// no import and no build step. If the file is absent nothing plays and the
+// rest of the app is unaffected, so it can be added or swapped any time.
+//
+// The clip is faded in over its first stretch and held below full: applause
+// arriving at full volume on the first frame is startling, and this plays
+// right after a run when someone has headphones on.
+const CHEER_URL = "/audio/cheer.mp3";
+const CHEER_PEAK = 0.34; // never louder than this, whatever the file's own level
+const CHEER_FADE_IN = 0.45; // seconds
+let cheerBuffer = null; // decoded clip
+let cheerLoadStarted = false;
+
+function preloadCheer() {
+  if (cheerLoadStarted) return;
+  const ctx = uiAudioContext();
+  if (!ctx) return;
+  cheerLoadStarted = true;
+  fetch(CHEER_URL)
+    .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
+    .then((buf) => ctx.decodeAudioData(buf))
+    .then((decoded) => {
+      cheerBuffer = decoded;
+    })
+    .catch(() => {
+      // No clip present. Nothing to do.
+    });
+}
+
+function playCheer() {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    if (!cheerBuffer) {
+      // Not loaded yet: start it now so the next one lands.
+      preloadCheer();
+      return;
+    }
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    // Ramps up rather than starting at level, then holds. Linear, not
+    // exponential, because a crowd swelling in should feel steady.
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(CHEER_PEAK, now + CHEER_FADE_IN);
+    gain.connect(ctx.destination);
+
+    const src = ctx.createBufferSource();
+    src.buffer = cheerBuffer;
+    src.connect(gain);
+    src.start(now);
+
+    // Fade the tail out too, so a clip that was cut abruptly does not end
+    // with a click.
+    const end = now + cheerBuffer.duration;
+    gain.gain.setValueAtTime(CHEER_PEAK, Math.max(now + CHEER_FADE_IN, end - 0.35));
+    gain.gain.linearRampToValueAtTime(0.0001, end);
+    src.stop(end + 0.05);
+  } catch {
+    // No audio available; the overlay still says what happened.
+  }
+}
+
 // End of a session. A settled two-note fall — the opposite shape to the
 // level-up rise, so finishing reads as completion rather than as another
 // reward. Quiet, and over in under a second and a half.
@@ -7114,11 +7179,20 @@ function NBackSessionApp() {
     exerciseElapsedMsRef.current = exerciseElapsedMs;
   }, [exerciseElapsedMs]);
 
+  // Fetch and decode the applause once, up front, so the first record of a
+  // session is not the one that misses it.
+  useEffect(() => {
+    preloadCheer();
+  }, []);
+
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
-  // One sound for reaching a new level, personal record or not.
+  // A personal record gets the applause clip; every other level-up keeps
+  // the tune. Swap the branch if you want one or the other everywhere.
   useEffect(() => {
-    if (unlockInfo) playLevelUp();
+    if (!unlockInfo) return;
+    if (unlockInfo.isNewPR) playCheer();
+    else playLevelUp();
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
