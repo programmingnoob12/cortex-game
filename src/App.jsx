@@ -2052,6 +2052,12 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
+// Bumped by hand on every change that gets pushed. Shown on the regime
+// screen so it is obvious at a glance whether the deploy actually carries
+// the latest code, rather than guessing from whether a change "looks"
+// applied.
+const BUILD_VERSION = 1;
+
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
 // of an asset, and the pitch and decay can be tuned by editing numbers.
@@ -7514,6 +7520,9 @@ function NBackSessionApp() {
               <p className="text-slate-400 text-base mt-3">
                 You'll ease into it gradually, starting with a few minutes each session.
               </p>
+              <p className="text-slate-700 text-xs mt-4 tabular-nums">
+                build {BUILD_VERSION}
+              </p>
             </div>
 
             <div className="flex flex-col gap-6">
@@ -10175,10 +10184,10 @@ function NBackSessionApp() {
 
       {unlockInfo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8">
-          <div className="relative flex flex-col items-center text-center gap-10 max-w-sm">
+          <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
             {unlockInfo.isNewPR ? (
               <div
-                className="text-3xl font-semibold uppercase tracking-widest"
+                className="text-3xl font-semibold uppercase tracking-widest mb-2"
                 style={{
                   color: PR_YELLOW,
                   textShadow: `0 0 24px ${PR_YELLOW}66`,
