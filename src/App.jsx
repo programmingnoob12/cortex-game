@@ -6987,7 +6987,7 @@ function NBackSessionApp() {
                       borderColor: exerciseTint(rc, 0.38),
                       borderLeftColor: rc,
                     }}
-                    className="w-full text-left rounded-xl px-7 py-5 border border-l-4"
+                    className="w-full text-left rounded-xl px-7 py-6 border border-l-4"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
@@ -7020,7 +7020,7 @@ function NBackSessionApp() {
               <div className="relative group">
                 <button
                   disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-5 cursor-not-allowed"
+                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-6 cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-3">
@@ -7046,7 +7046,7 @@ function NBackSessionApp() {
               <div className="relative group">
                 <button
                   disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-5 cursor-not-allowed"
+                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-6 cursor-not-allowed"
                 >
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-3">
@@ -7379,7 +7379,7 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
-                className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
+                className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {sessionInProgress
                   ? "Resume Training"
@@ -8245,7 +8245,7 @@ function NBackSessionApp() {
                 href="mailto:hello@cortex.app"
                 className="hover:text-slate-300 transition-colors"
               >
-                Contact hello@cortex.app
+                Contact: hello@cortex.app
               </a>
               <a href="#" className="hover:text-slate-300 transition-colors">
                 Privacy Policy
