@@ -4270,15 +4270,15 @@ function exerciseKeyFor(a) {
 function achievementExerciseSections() {
   const sections = [];
   const general = ACHIEVEMENTS_CATALOG.filter((a) => !exerciseKeyFor(a));
+  if (general.length) {
+    sections.push({ key: "general", label: "General", items: general });
+  }
   Object.keys(EXERCISE_LIBRARY).forEach((key) => {
     const items = ACHIEVEMENTS_CATALOG.filter((a) => exerciseKeyFor(a) === key);
     if (items.length) {
       sections.push({ key, label: EXERCISE_LIBRARY[key].title, items });
     }
   });
-  if (general.length) {
-    sections.push({ key: "general", label: "General", items: general });
-  }
   return sections;
 }
 
@@ -7338,7 +7338,7 @@ function NBackSessionApp() {
                         className="inline-flex"
                         style={{
                           filter:
-                            "drop-shadow(0 3px 3px rgba(0,0,0,0.45)) drop-shadow(0 1px 1px rgba(0,0,0,0.35))",
+                            "drop-shadow(0 4px 5px rgba(0,0,0,0.65)) drop-shadow(0 1px 2px rgba(0,0,0,0.5))",
                         }}
                       >
                         <LevelGem level={bestLevel} size={36} />
@@ -7421,6 +7421,20 @@ function NBackSessionApp() {
                   ))}
                 </div>
               </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+              <span>© {new Date().getFullYear()} Cortex</span>
+              <span>
+                Contact:{" "}
+                <span className="underline underline-offset-2">hello@cortex.app</span>
+              </span>
+              <a href="#" className="hover:text-slate-400 transition-colors">
+                Privacy Policy
+              </a>
+              <a href="#" className="hover:text-slate-400 transition-colors">
+                Terms of Service
+              </a>
             </div>
           </div>
         )}
