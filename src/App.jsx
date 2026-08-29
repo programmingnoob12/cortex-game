@@ -1150,13 +1150,30 @@ const REGIME_COLORS = {
 // button-brightness fill is too much.
 function exerciseDeepFill(hex) {
   const n = parseInt(hex.slice(1), 16);
-  const rgb = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-  const base = [11, 13, 16];
-  const mix = (amount) =>
-    `rgb(${rgb
-      .map((c, i) => Math.round(c * amount + base[i] * (1 - amount)))
-      .join(", ")})`;
-  return `linear-gradient(100deg, ${mix(0.86)}, ${mix(0.58)})`;
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  const sat = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  let hue = 0;
+  if (d !== 0) {
+    if (max === r) hue = ((g - b) / d) % 6;
+    else if (max === g) hue = (b - r) / d + 2;
+    else hue = (r - g) / d + 4;
+    hue *= 60;
+    if (hue < 0) hue += 360;
+  }
+  // This used to mix toward near-black by a fixed ratio, which pushed the
+  // hues that sit lower in HSL lightness (orange, green) much darker than
+  // purple and blue. Capping lightness instead, with hue and saturation
+  // untouched, lands every card at the same weight.
+  const cap = Math.min(l, 0.44);
+  const css = (lightness) =>
+    `hsl(${hue.toFixed(1)} ${(sat * 100).toFixed(1)}% ${(lightness * 100).toFixed(1)}%)`;
+  return `linear-gradient(100deg, ${css(cap)}, ${css(cap * 0.76)})`;
 }
 
 function exerciseTint(hex, alpha) {
@@ -1978,24 +1995,45 @@ function playClick() {
     if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     const master = ctx.createGain();
-    master.gain.value = 0.09;
+    master.gain.value = 0.16;
     master.connect(ctx.destination);
-    // Two detuned partials give it the glassy quality of a tap on metal;
-    // one sine alone just sounds like a beep.
-    [2400, 3610].forEach((freq, i) => {
+
+    // The transient. A few milliseconds of high-passed noise is what the ear
+    // reads as "something was struck". Without it a tone alone sounds like a
+    // notification beep however short it is.
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
+    const noiseBuf = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const data = noiseBuf.getChannelData(0);
+    for (let i = 0; i < frames; i++) {
+      const fade = 1 - i / frames;
+      data[i] = (Math.random() * 2 - 1) * fade * fade * fade;
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = noiseBuf;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 3800;
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.value = 0.7;
+    noise.connect(hp);
+    hp.connect(noiseGain);
+    noiseGain.connect(master);
+    noise.start(now);
+
+    // Two fixed inharmonic partials ringing out over it. No pitch slide:
+    // that was what made the previous version sound like it was falling.
+    [5200, 7900].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, now);
-      // A slight downward slide is what stops it sounding electronic.
-      osc.frequency.exponentialRampToValueAtTime(freq * 0.86, now + 0.09);
+      osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(i === 0 ? 1 : 0.45, now + 0.004);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.13 : 0.07));
+      gain.gain.linearRampToValueAtTime(i === 0 ? 0.9 : 0.35, now + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.07 : 0.045));
       osc.connect(gain);
       gain.connect(master);
       osc.start(now);
-      osc.stop(now + 0.16);
+      osc.stop(now + 0.09);
     });
   } catch {
     // No audio available; a missing click is not worth surfacing.
