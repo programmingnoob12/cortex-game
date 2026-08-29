@@ -2056,7 +2056,7 @@ const PR_YELLOW = "#F2C200";
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 3;
+const BUILD_VERSION = 4;
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2253,29 +2253,53 @@ function decodePendingClips() {
       () => {}
     );
   }
-  if (songBytes && !songBuffer) {
-    ctx.decodeAudioData(songBytes.slice(0)).then(
-      (d) => {
-        songBuffer = d;
-      },
-      () => {}
-    );
-  }
+  decodeSong();
 }
+
+let songFailed = false;
+let songWantedAt = 0; // when a level-up asked for it but it was not ready yet
 
 function preloadSong() {
   if (songLoadStarted) return;
   songLoadStarted = true;
   fetch(SONG_URL)
-    .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
+    .then((res) =>
+      res.ok ? res.arrayBuffer() : Promise.reject(new Error(`HTTP ${res.status}`))
+    )
     .then((buf) => {
       songBytes = buf;
-      const ctx = letterAudioCtx;
-      if (ctx) return ctx.decodeAudioData(buf.slice(0)).then((d) => (songBuffer = d));
-      return null;
+      return decodeSong();
     })
-    .catch(() => {
-      // No track present; playLevelUp's tune covers it.
+    .catch((err) => {
+      songFailed = true;
+      // Surfaced in Diagnostics rather than failing silently: a missing or
+      // undecodable track is otherwise indistinguishable from "the sound
+      // just doesn't work".
+      logClientError("celebration song failed to load", err);
+    });
+}
+
+// Decoding needs a context, which may not exist when the bytes arrive. This
+// is called both on arrival and the moment a context is created.
+function decodeSong() {
+  const ctx = letterAudioCtx;
+  if (!ctx || !songBytes || songBuffer) return Promise.resolve(null);
+  return ctx
+    .decodeAudioData(songBytes.slice(0))
+    .then((decoded) => {
+      songBuffer = decoded;
+      // If a level-up fired while this was still loading, honour it now
+      // rather than making the person miss the one moment it exists for.
+      if (songWantedAt && Date.now() - songWantedAt < 8000) {
+        songWantedAt = 0;
+        playCelebrationSong();
+      }
+      return decoded;
+    })
+    .catch((err) => {
+      songFailed = true;
+      logClientError("celebration song failed to decode", err);
+      return null;
     });
 }
 
@@ -2283,13 +2307,11 @@ function playCelebrationSong() {
   const ctx = uiAudioContext();
   if (!ctx) return false;
   if (!songBuffer) {
-    if (songBytes) {
-      ctx.decodeAudioData(songBytes.slice(0)).then((d) => {
-        songBuffer = d;
-      });
-    } else {
-      preloadSong();
-    }
+    // Remember that it was wanted, so it still plays a moment later once
+    // decoding finishes, instead of being dropped.
+    songWantedAt = Date.now();
+    if (songBytes) decodeSong();
+    else preloadSong();
     return false;
   }
   try {
@@ -7332,7 +7354,11 @@ function NBackSessionApp() {
   useEffect(() => {
     if (!unlockInfo) return;
     if (unlockInfo.isNewPR) {
-      if (!playCelebrationSong()) playLevelUp();
+      // The song takes precedence. The tune only stands in when the track
+      // is known to be unavailable — if it is merely still decoding, the
+      // song plays a moment later rather than both firing.
+      const playing = playCelebrationSong();
+      if (!playing && songFailed) playLevelUp();
       playCheer();
     } else {
       playLevelUp();
