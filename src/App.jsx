@@ -1947,28 +1947,66 @@ function formatScoreValue(exercise, value) {
 // fills in every day between the first recorded session and today that has
 // NO session, so the spreadsheet can flag missed days rather than only ever
 // showing days something was actually played.
-// One comparable number per session so "is this a personal best?" is a single
-// > test. Accuracy exercises rank by level first and accuracy as the
-// tiebreak; everything else ranks on the raw score.
-function prScoreOf(entry, isAccuracy) {
+const PR_YELLOW = "#F2C200";
+
+// The number the graphs and the Score column actually plot: the LEVEL
+// reached, not the hit rate. N-back exercises carry that in `n`; QNB' and
+// 3D MOT store their own float level in `accuracy`; RRT stores points and
+// seconds packed into one float.
+function sessionLevel(exercise, entry) {
   if (!entry || entry.accuracy == null) return null;
-  return isAccuracy ? (entry.n || 0) * 1000 + entry.accuracy : entry.accuracy;
+  return exercise.scoreType === "accuracy" ? entry.n ?? null : entry.accuracy;
 }
 
-// Walks oldest to newest and flags the entries that beat everything before
-// them. The first session is never a PR — there is nothing to beat yet.
-function markPersonalBests(list, isAccuracy) {
-  let best = null;
+// Short form for a Y-axis tick — full labels are far too wide stacked down
+// the side of a chart.
+function formatLevelTick(exercise, value) {
+  if (value == null || Number.isNaN(value)) return "";
+  switch (exercise.scoreType) {
+    case "points":
+      return `${Math.floor(value)}p`;
+    case "decimal":
+      return value.toFixed(2);
+    default:
+      return `${Math.round(value)}B`;
+  }
+}
+
+// Full form, used in tooltips and the table.
+function formatLevelValue(exercise, value) {
+  if (value == null || Number.isNaN(value)) return "—";
+  switch (exercise.scoreType) {
+    case "points":
+      return formatScoreValue(exercise, value);
+    case "decimal":
+      return `${exercise.abbrev} ${value.toFixed(2)}`;
+    default:
+      return `${exercise.abbrev}${Math.round(value)}B`;
+  }
+}
+
+// Running average of every session up to and including each point, plus a
+// flag for the sessions where that average reached a new high. Both the
+// score and the average can set a record, and they set them independently.
+function withRunningAverage(list) {
+  let sum = 0;
+  let count = 0;
+  let bestAvg = null;
+  let bestScore = null;
   return list.map((item) => {
-    const score = prScoreOf(item, isAccuracy);
-    if (score == null) return { ...item, isPR: false };
-    const isPR = best !== null && score > best;
-    if (best === null || score > best) best = score;
-    return { ...item, isPR };
+    if (item.level == null) {
+      return { ...item, avg: count ? sum / count : null, isPR: false, isAvgPR: false };
+    }
+    const isPR = bestScore !== null && item.level > bestScore;
+    if (bestScore === null || item.level > bestScore) bestScore = item.level;
+    sum += item.level;
+    count += 1;
+    const avg = sum / count;
+    const isAvgPR = bestAvg !== null && avg > bestAvg;
+    if (bestAvg === null || avg > bestAvg) bestAvg = avg;
+    return { ...item, avg, isPR, isAvgPR };
   });
 }
-
-const PR_YELLOW = "#F2C200";
 
 // Recharts hands every point through here. Ordinary sessions get the small
 // exercise-coloured dot they always had; a personal best gets a yellow ring
@@ -6338,13 +6376,27 @@ function NBackSessionApp() {
         // Drifts upward with noise on top, the way real practice does, so
         // personal bests keep landing instead of all clustering in week one.
         const progress = (90 - back) / 90;
-        const base = 52 + progress * 34;
+        let accuracy;
+        if (ex.scoreType === "points") {
+          // RRT packs premises solved into the integer part and seconds
+          // into the decimals, so it can never exceed maxN.
+          const points = Math.max(
+            1,
+            Math.min(ex.maxN, Math.round(2 + progress * 6 + (Math.random() - 0.5) * 2))
+          );
+          accuracy = points + Math.round(Math.random() * 59) / 100;
+        } else if (ex.scoreType === "decimal") {
+          accuracy =
+            Math.round((2.5 + progress * 3.5 + (Math.random() - 0.5) * 0.8) * 100) / 100;
+        } else {
+          accuracy = Math.max(
+            30,
+            Math.min(99, Math.round(52 + progress * 34 + (Math.random() - 0.5) * 18))
+          );
+        }
         entries.push({
           ts: now - back * dayMs,
-          accuracy: Math.max(
-            30,
-            Math.min(99, Math.round(base + (Math.random() - 0.5) * 18))
-          ),
+          accuracy,
           n: level,
           durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
         });
@@ -8569,14 +8621,15 @@ function NBackSessionApp() {
             {statsDisplay === "chart"
               ? overviewExercises.map((e) => {
               const history = exerciseHistory[e.key] || [];
-              const isAccuracy = e.scoreType === "accuracy";
-              const chartData = markPersonalBests(
+              const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
+              const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
+              const chartData = withRunningAverage(
                 history.map((h, i) => ({
                   session: i + 1,
+                  ts: h.ts,
+                  level: sessionLevel(e, h),
                   accuracy: h.accuracy,
-                  n: h.n,
-                })),
-                isAccuracy
+                }))
               );
               return (
                 <div key={e.key} className="space-y-4">
@@ -8588,7 +8641,7 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-96">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-[30rem]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                           <defs>
@@ -8616,18 +8669,21 @@ function NBackSessionApp() {
                             dataKey="session"
                             stroke="#6E7178"
                             tick={{ fill: "#6E7178", fontSize: 12 }}
+                            minTickGap={24}
                             label={{
                               value: "Session",
                               position: "insideBottom",
-                              offset: -4,
+                              offset: -8,
                               fill: "#6E7178",
                               fontSize: 12,
                             }}
                           />
                           <YAxis
-                            domain={isAccuracy ? [0, 100] : ["auto", "auto"]}
+                            domain={["auto", "auto"]}
                             stroke="#6E7178"
+                            width={56}
                             tick={{ fill: "#6E7178", fontSize: 12 }}
+                            tickFormatter={(v) => formatLevelTick(e, v)}
                           />
                           <Tooltip
                             contentStyle={{
@@ -8636,35 +8692,79 @@ function NBackSessionApp() {
                               borderRadius: 8,
                               color: "#F7F8F8",
                             }}
-                            formatter={(value, name, props) => [
-                              isAccuracy
-                                ? `${value}% (N${props.payload.n})`
-                                : formatScoreValue(e, value),
-                              isAccuracy ? "Accuracy" : "Score",
+                            labelFormatter={(label, payload) => {
+                              const ts = payload && payload[0] && payload[0].payload.ts;
+                              const when = ts
+                                ? new Date(ts).toLocaleDateString(undefined, {
+                                    weekday: "short",
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : null;
+                              return when
+                                ? `${when} · session ${label}`
+                                : `Session ${label}`;
+                            }}
+                            formatter={(value, name) => [
+                              formatLevelValue(e, value),
+                              name === "avg" ? "Average" : "Level",
                             ]}
                           />
                           <Area
                             type="monotone"
-                            dataKey="accuracy"
-                            stroke={EXERCISE_COLORS[e.key] || "#4CB9D8"}
+                            dataKey="level"
+                            name="level"
+                            stroke={exColor}
                             strokeWidth={2.5}
                             fill={`url(#exFill-${e.key})`}
-                            dot={(props) =>
-                              renderPRDot(props, EXERCISE_COLORS[e.key] || "#4CB9D8")
-                            }
+                            dot={(props) => renderPRDot(props, exColor)}
                             activeDot={{ r: 5 }}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="avg"
+                            name="avg"
+                            stroke={avgColor}
+                            strokeWidth={2}
+                            strokeDasharray="5 4"
+                            fill="none"
+                            dot={false}
+                            activeDot={{ r: 4 }}
                           />
                         </AreaChart>
                       </ResponsiveContainer>
                     </div>
                   ) : null}
-                  {chartData.some((d) => d.isPR) ? (
-                    <div className="flex items-center gap-2 text-sm text-slate-400">
-                      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-                        <circle cx="7" cy="7" r="6" fill="none" stroke={PR_YELLOW} strokeWidth="1.5" />
-                        <circle cx="7" cy="7" r="2.5" fill={PR_YELLOW} />
-                      </svg>
-                      New personal best
+                  {chartData.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
+                      <span className="flex items-center gap-2">
+                        <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
+                          <line x1="0" y1="5" x2="22" y2="5" stroke={exColor} strokeWidth="2.5" />
+                        </svg>
+                        Level this session
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
+                          <line
+                            x1="0"
+                            y1="5"
+                            x2="22"
+                            y2="5"
+                            stroke={avgColor}
+                            strokeWidth="2"
+                            strokeDasharray="5 4"
+                          />
+                        </svg>
+                        Average so far
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                          <circle cx="7" cy="7" r="6" fill="none" stroke={PR_YELLOW} strokeWidth="1.5" />
+                          <circle cx="7" cy="7" r="2.5" fill={PR_YELLOW} />
+                        </svg>
+                        New personal best
+                      </span>
                     </div>
                   ) : null}
                   {chartData.length === 0 && (
@@ -8676,11 +8776,14 @@ function NBackSessionApp() {
               );
             })
               : overviewExercises.map((e) => {
-              const isAccuracy = e.scoreType === "accuracy";
-              // Flag PRs oldest-first, then flip back to newest-first for display.
-              const rows = markPersonalBests(
-                buildExerciseDailyRows(exerciseHistory[e.key]).slice().reverse(),
-                isAccuracy
+              const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
+              // Averages and records only make sense oldest-first, so build
+              // them that way and flip back to newest-first for display.
+              const rows = withRunningAverage(
+                buildExerciseDailyRows(exerciseHistory[e.key])
+                  .slice()
+                  .reverse()
+                  .map((r) => ({ ...r, level: sessionLevel(e, r) }))
               ).reverse();
               const pageCount = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
               const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
@@ -8713,9 +8816,8 @@ function NBackSessionApp() {
                             <th className="px-4 py-2.5 font-medium">Day</th>
                             <th className="px-4 py-2.5 font-medium">Date</th>
                             <th className="px-4 py-2.5 font-medium">Time</th>
-                            <th className="px-4 py-2.5 font-medium">
-                              {isAccuracy ? "Level" : "Score"}
-                            </th>
+                            <th className="px-4 py-2.5 font-medium">Score</th>
+                            <th className="px-4 py-2.5 font-medium">Avg</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -8753,14 +8855,29 @@ function NBackSessionApp() {
                                       : { color: "#F7F8F8" }
                                   }
                                 >
-                                  {row.missed
-                                    ? "—"
-                                    : isAccuracy
-                                    ? `${e.abbrev}${row.n}B ${row.accuracy}%`
-                                    : formatScoreValue(e, row.accuracy)}
+                                  {row.missed ? "—" : formatLevelValue(e, row.level)}
                                   {row.isPR && (
                                     <span className="lg:hidden ml-2 text-xs font-semibold">
                                       New PR!
+                                    </span>
+                                  )}
+                                </td>
+                                <td
+                                  className="px-4 py-2.5 font-medium"
+                                  style={
+                                    row.isAvgPR
+                                      ? {
+                                          color: PR_YELLOW,
+                                          backgroundColor: `${PR_YELLOW}26`,
+                                          boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
+                                        }
+                                      : { color: "#8A8F98" }
+                                  }
+                                >
+                                  {formatLevelValue(e, row.avg)}
+                                  {row.isAvgPR && (
+                                    <span className="lg:hidden ml-2 text-xs font-semibold">
+                                      Best avg!
                                     </span>
                                   )}
                                 </td>
@@ -8778,7 +8895,7 @@ function NBackSessionApp() {
                       style={{ height: SHEET_ROW_H * (pageRows.length + 1) }}
                     >
                       {pageRows.map((row, i) =>
-                        row.isPR ? (
+                        row.isPR || row.isAvgPR ? (
                           <div
                             key={row.dateKey}
                             className="absolute left-0 right-0 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
@@ -8789,7 +8906,7 @@ function NBackSessionApp() {
                             }}
                           >
                             <span aria-hidden="true">←</span>
-                            New PR!
+                            {row.isPR ? "New PR!" : "Best avg!"}
                           </div>
                         ) : null
                       )}
