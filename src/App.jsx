@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 35;
+const BUILD_VERSION = 36;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:07 AM";
+const BUILD_TIME = "12:12 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2497,14 +2497,14 @@ function SongVisualizer({ className, style }) {
       }
       analyser.getByteFrequencyData(data);
 
-      const bars = 26;
+      const bars = 6;
       const usable = Math.floor(data.length * 0.62);
       const bandW = Math.min(w * 0.92, 1500);
       const left = (w - bandW) / 2;
       const half = bandW / 2;
       const barW = half / bars;
       const baseline = h - Math.min(h * 0.05, 40);
-      const maxH = h * 0.5;
+      const maxH = h * 0.4;
 
       // Track the loudest bin this frame so the scale follows the music.
       let frameMax = 0;
@@ -2560,14 +2560,14 @@ function SongVisualizer({ className, style }) {
         // Fades out toward the edges so the band has no hard ends.
         const edge = 1 - Math.pow(t, 1.8);
         const alpha = (0.04 + v * 0.3) * edge;
-        const wid = Math.max(4, barW - 7);
-        const r = Math.min(wid / 2, 5);
+        const wid = Math.max(8, barW - 14);
+        const r = Math.min(wid / 2, 10);
         const xr = left + half + i * barW;
         const xl = left + half - (i + 1) * barW;
 
         ctx2d.fillStyle = `rgba(242, 194, 0, ${alpha.toFixed(3)})`;
         ctx2d.shadowColor = `rgba(242, 194, 0, ${(alpha * 0.9).toFixed(3)})`;
-        ctx2d.shadowBlur = 16;
+        ctx2d.shadowBlur = 26;
         if (ctx2d.roundRect) {
           ctx2d.beginPath();
           ctx2d.roundRect(xr, baseline - barH, wid, barH, r);
