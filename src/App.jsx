@@ -6516,14 +6516,6 @@ function NBackSessionApp() {
   const [historyPage, setHistoryPage] = useState({});
   const HISTORY_PAGE_SIZE = 7;
   const SHEET_ROW_H = 44;
-  // Chart window. 90 days plots every session; anything wider is grouped so
-  // the point count stays readable no matter how many years are logged.
-  const [statsRange, setStatsRange] = useState("90d");
-  const STATS_RANGES = [
-    { key: "90d", label: "90 days", days: 90 },
-    { key: "1y", label: "1 year", days: 365 },
-    { key: "all", label: "All", days: null },
-  ];
 
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
@@ -6972,37 +6964,24 @@ function NBackSessionApp() {
                        hover, which read as the card going duller and darker.
                        The accent border now stays put and the fill lightens
                        instead, from the sheen in index.css. */
-                    style={{
-                      backgroundColor: exerciseTint(rc, 0.1),
-                      borderColor: exerciseTint(rc, 0.4),
-                    }}
-                    className="w-full text-left border-2 transition-colors rounded-xl p-8"
+                    /* Same filled treatment as an exercise's Start button,
+                       carrying that exercise's colour, so the choice looks
+                       like the thing it starts. */
+                    style={{ "--ex": rc }}
+                    className="w-full text-left bg-gradient-to-r rounded-xl p-8 shadow-lg shadow-black/30"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full"
-                          style={{ backgroundColor: rc }}
-                        />
-                        <div className="text-2xl font-semibold text-slate-100">
-                          {r.title}
-                        </div>
+                        <div className="text-2xl font-semibold">{r.title}</div>
                         {r.key === "medium" && (
-                          <span
-                            className="italic text-sm font-medium"
-                            style={{ color: rc }}
-                          >
+                          <span className="italic text-sm font-medium opacity-80">
                             Recommended
                           </span>
                         )}
                       </div>
-                      <div className="text-lg font-medium text-slate-100">
-                        {r.subtitle}
-                      </div>
+                      <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-slate-400 text-base mt-2">
-                      {r.summary}
-                    </div>
+                    <div className="text-base mt-2 opacity-80">{r.summary}</div>
                   </button>
                 );
               })}
@@ -8796,30 +8775,14 @@ function NBackSessionApp() {
               <h1 className="text-4xl font-semibold tracking-tight">
                 Stats
               </h1>
-              <div className="shrink-0 flex items-center gap-2">
-                {statsDisplay === "chart" &&
-                  STATS_RANGES.map((r) => (
-                    <button
-                      key={r.key}
-                      onClick={() => setStatsRange(r.key)}
-                      className={`rounded-lg py-2 px-4 text-sm font-medium transition-colors ${
-                        statsRange === r.key
-                          ? "bg-slate-700 text-slate-100"
-                          : "bg-slate-900 border border-slate-700/70 text-slate-400 hover:text-slate-200"
-                      }`}
-                    >
-                      {r.label}
-                    </button>
-                  ))}
-                <button
-                  onClick={() =>
-                    setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
-                  }
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
-                >
-                  {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
-                </button>
-              </div>
+              <button
+                onClick={() =>
+                  setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
+                }
+                className="shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
+              >
+                {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
+              </button>
             </div>
 
             {statsDisplay === "chart"
@@ -8827,20 +8790,15 @@ function NBackSessionApp() {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
-              const rangeDef =
-                STATS_RANGES.find((r) => r.key === statsRange) || STATS_RANGES[0];
-              const cutoff = rangeDef.days
-                ? Date.now() - rangeDef.days * 24 * 60 * 60 * 1000
-                : null;
-              const windowed = history.filter(
-                (h) => sessionLevel(e, h) != null && (cutoff === null || h.ts >= cutoff)
-              );
+              const windowed = history.filter((h) => sessionLevel(e, h) != null);
               const spanDays = windowed.length
                 ? (windowed[windowed.length - 1].ts - windowed[0].ts) / 86400000
                 : 0;
-              // Every session up to 90 days, then weeks, then months.
+              // Chooses itself from how much history there is: every session
+              // for the first 90 days, then one point a week, then one a
+              // month past a year. Nothing for anyone to set.
               const grain =
-                spanDays > 400 ? "month" : windowed.length > 90 ? "week" : "session";
+                spanDays > 400 ? "month" : spanDays > 90 ? "week" : "session";
               const chartData = withRunningAverage(
                 aggregateSessions(
                   windowed.map((h, i) => ({
