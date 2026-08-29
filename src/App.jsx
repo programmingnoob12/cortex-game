@@ -993,7 +993,7 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 900px, calc(100vh - 190px)))";
+const NBACK_BOX_SIZE = "max(240px, min(100%, 1040px, calc(100vh - 150px)))";
 
 
 // ---------------------------------------------------------------------
@@ -2055,23 +2055,37 @@ const PR_YELLOW = "#F2C200";
 // of an asset, and the pitch and decay can be tuned by editing numbers.
 // Currently wired only to the Overview and Stats screens, as a trial.
 let clickAudioCtx = null;
+
+// The shared context. Prefers the one the letter audio already runs on,
+// which gameplay has unlocked, so a sound never lands on a suspended
+// context and silently does nothing.
+function uiAudioContext() {
+  const existing = letterAudioContext();
+  if (existing) {
+    if (existing.state === "suspended") existing.resume();
+    return existing;
+  }
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!clickAudioCtx) clickAudioCtx = new Ctx();
+  if (clickAudioCtx.state === "suspended") clickAudioCtx.resume();
+  return clickAudioCtx;
+}
+
+// Button click. Three layers, which is what separates a designed UI sound
+// from a beep: a filtered noise transient for the strike, a low partial for
+// body so it has weight rather than only sparkle, and a higher partial for
+// definition. Short enough to fire repeatedly without becoming annoying.
 function playClick() {
   try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    if (!clickAudioCtx) clickAudioCtx = new Ctx();
-    const ctx = clickAudioCtx;
-    // Browsers start the context suspended until a gesture; a click is one.
-    if (ctx.state === "suspended") ctx.resume();
+    const ctx = uiAudioContext();
+    if (!ctx) return;
     const now = ctx.currentTime;
     const master = ctx.createGain();
-    master.gain.value = 0.075;
+    master.gain.value = 0.22;
     master.connect(ctx.destination);
 
-    // The transient. A few milliseconds of high-passed noise is what the ear
-    // reads as "something was struck". Without it a tone alone sounds like a
-    // notification beep however short it is.
-    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.014));
     const noiseBuf = ctx.createBuffer(1, frames, ctx.sampleRate);
     const data = noiseBuf.getChannelData(0);
     for (let i = 0; i < frames; i++) {
@@ -2080,33 +2094,80 @@ function playClick() {
     }
     const noise = ctx.createBufferSource();
     noise.buffer = noiseBuf;
-    const hp = ctx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 1400;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2600;
+    bp.Q.value = 0.9;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.35;
-    noise.connect(hp);
-    hp.connect(noiseGain);
+    noiseGain.gain.value = 0.5;
+    noise.connect(bp);
+    bp.connect(noiseGain);
     noiseGain.connect(master);
     noise.start(now);
 
-    // Two fixed inharmonic partials ringing out over it. No pitch slide:
-    // that was what made the previous version sound like it was falling.
-    [1900, 2820].forEach((freq, i) => {
+    // 660 gives it a body you feel rather than hear; 1980 (a perfect
+    // twelfth above) gives it the edge that reads as a click. Tuned
+    // intervals rather than arbitrary numbers, so the two never beat
+    // against each other.
+    [
+      { freq: 660, level: 0.85, len: 0.11 },
+      { freq: 1980, level: 0.3, len: 0.055 },
+    ].forEach(({ freq, level, len }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
       osc.frequency.value = freq;
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(i === 0 ? 0.9 : 0.35, now + 0.002);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + (i === 0 ? 0.09 : 0.055));
+      gain.gain.linearRampToValueAtTime(level, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + len);
       osc.connect(gain);
       gain.connect(master);
       osc.start(now);
-      osc.stop(now + 0.09);
+      osc.stop(now + len + 0.02);
     });
   } catch {
     // No audio available; a missing click is not worth surfacing.
+  }
+}
+
+// End of a session. A settled two-note fall — the opposite shape to the
+// level-up rise, so finishing reads as completion rather than as another
+// reward. Quiet, and over in under a second and a half.
+function playSessionDone() {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.11;
+    master.connect(ctx.destination);
+
+    // G5 down to C5: a perfect fourth resolving to the tonic, which is the
+    // most settled two notes there are.
+    [
+      { freq: 783.99, at: 0, len: 0.7 },
+      { freq: 523.25, at: 0.22, len: 1.2 },
+    ].forEach(({ freq, at, len }, i) => {
+      const start = now + at;
+      [
+        { type: "triangle", mult: 1, level: 0.7 },
+        { type: "sine", mult: 2, level: 0.12 },
+      ].forEach(({ type, mult, level }) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq * mult;
+        gain.gain.setValueAtTime(0, start);
+        gain.gain.linearRampToValueAtTime(level * (i === 1 ? 1 : 0.8), start + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + len);
+        osc.connect(gain);
+        gain.connect(master);
+        osc.start(start);
+        osc.stop(start + len + 0.05);
+      });
+    });
+  } catch {
+    // No audio available; the animation still plays.
   }
 }
 
@@ -2117,17 +2178,8 @@ function playClick() {
 // top of the level-up overlay, which is already carrying the moment.
 function playLevelUp() {
   try {
-    // Prefer the context the letter audio already runs on: it has been
-    // unlocked by gameplay, whereas a fresh one created here can still be
-    // suspended when a level-up fires with no click right before it.
-    const ctx = letterAudioContext() || (() => {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
-      if (!clickAudioCtx) clickAudioCtx = new Ctx();
-      return clickAudioCtx;
-    })();
+    const ctx = uiAudioContext();
     if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     const master = ctx.createGain();
     master.gain.value = 0.1;
@@ -2165,134 +2217,6 @@ function playLevelUp() {
     });
   } catch {
     // No audio available; a silent level-up is still a level-up.
-  }
-}
-
-// Applause, synthesized. A crowd clapping is, acoustically, a few hundred
-// short broadband bursts scattered in time — so that is what this builds:
-// randomly placed noise impulses through a band-pass, under a swell that
-// rises fast and falls away over about a second and a half. No recording
-// means no licence and nothing to attribute, and it stays a few hundred
-// bytes instead of a downloaded asset.
-// A real crowd is one of the few sounds that does not synthesize well —
-// the version below is a decent stand-in, but a recording is better. Drop
-// an applause clip at `public/audio/cheer.mp3` and it is used instead, no
-// code change needed. Keep it under about two seconds and trim the front.
-const CHEER_URL = "/audio/cheer.mp3";
-let cheerBuffer = null; // decoded clip, or false once known to be missing
-
-function playCheer() {
-  const ctx = letterAudioContext();
-  if (ctx && cheerBuffer === null) {
-    // First call: try to fetch the recording, and fall through to the
-    // synthesized crowd for this one play while it loads.
-    cheerBuffer = false;
-    fetch(CHEER_URL)
-      .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject()))
-      .then((buf) => ctx.decodeAudioData(buf))
-      .then((decoded) => {
-        cheerBuffer = decoded;
-      })
-      .catch(() => {
-        // No file. The synthesized version stands.
-      });
-  }
-  if (ctx && cheerBuffer) {
-    try {
-      if (ctx.state === "suspended") ctx.resume();
-      const gain = ctx.createGain();
-      gain.gain.value = 0.5;
-      gain.connect(ctx.destination);
-      const src = ctx.createBufferSource();
-      src.buffer = cheerBuffer;
-      src.connect(gain);
-      src.start(ctx.currentTime);
-      return;
-    } catch {
-      // Fall through to the synthesized crowd.
-    }
-  }
-  playSynthCheer();
-}
-
-function playSynthCheer() {
-  try {
-    const ctx = letterAudioContext() || (() => {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return null;
-      if (!clickAudioCtx) clickAudioCtx = new Ctx();
-      return clickAudioCtx;
-    })();
-    if (!ctx) return;
-    if (ctx.state === "suspended") ctx.resume();
-    const now = ctx.currentTime;
-    const DURATION = 1.9;
-
-    const master = ctx.createGain();
-    master.gain.value = 0.13;
-    master.connect(ctx.destination);
-
-    // Band-pass keeps it in the range hands actually occupy; without it the
-    // low end turns it into rain and the top into static.
-    const band = ctx.createBiquadFilter();
-    band.type = "bandpass";
-    band.frequency.value = 1500;
-    band.Q.value = 0.45;
-    band.connect(master);
-
-    // The swell. Real applause ramps over a beat rather than starting at
-    // full strength, and that ramp is most of what makes it read as people.
-    const swell = ctx.createGain();
-    swell.gain.setValueAtTime(0, now);
-    swell.gain.linearRampToValueAtTime(1, now + 0.18);
-    swell.gain.setValueAtTime(1, now + 0.7);
-    swell.gain.exponentialRampToValueAtTime(0.0001, now + DURATION);
-    swell.connect(band);
-
-    const rate = ctx.sampleRate;
-    const buf = ctx.createBuffer(1, Math.floor(rate * DURATION), rate);
-    const data = buf.getChannelData(0);
-    // Each clap is a ~6ms burst with a sharp attack. Density falls off over
-    // the tail so the crowd thins out rather than stopping dead.
-    const clapFrames = Math.floor(rate * 0.009);
-    const claps = 1400;
-    for (let c = 0; c < claps; c++) {
-      const t = Math.pow(Math.random(), 0.75) * DURATION * 0.85;
-      const start = Math.floor(t * rate);
-      const amp = 0.35 + Math.random() * 0.65;
-      for (let i = 0; i < clapFrames && start + i < data.length; i++) {
-        const fade = 1 - i / clapFrames;
-        data[start + i] += (Math.random() * 2 - 1) * amp * fade * fade;
-      }
-    }
-    // Keep it inside the rails: 900 overlapping bursts can sum well past 1.
-    let peak = 0;
-    for (let i = 0; i < data.length; i++) peak = Math.max(peak, Math.abs(data[i]));
-    if (peak > 1) for (let i = 0; i < data.length; i++) data[i] /= peak;
-
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(swell);
-    src.start(now);
-
-    // A short bright chime on top, so the moment has a point of arrival
-    // rather than being only texture.
-    [1046.5, 1318.5].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = freq;
-      const start = now + i * 0.08;
-      gain.gain.setValueAtTime(0, start);
-      gain.gain.linearRampToValueAtTime(0.5 - i * 0.15, start + 0.015);
-      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.8);
-      osc.connect(gain);
-      gain.connect(master);
-      osc.start(start);
-      osc.stop(start + 0.85);
-    });
-  } catch {
-    // No audio available; the overlay still says what happened.
   }
 }
 
@@ -7192,11 +7116,9 @@ function NBackSessionApp() {
 
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
-  // A personal record gets the crowd; a routine level-up gets the tune.
+  // One sound for reaching a new level, personal record or not.
   useEffect(() => {
-    if (!unlockInfo) return;
-    if (unlockInfo.isNewPR) playCheer();
-    else playLevelUp();
+    if (unlockInfo) playLevelUp();
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
@@ -7274,7 +7196,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-center justify-center px-4 py-4"
+          ? "items-center justify-center px-4 py-2"
           : "items-center justify-center p-12"
       }`}
     >
@@ -9213,6 +9135,7 @@ function NBackSessionApp() {
                     return;
                   }
                   setSessionCompleteAnim(true);
+                  playSessionDone();
                   setTimeout(() => {
                     setSessionCompleteAnim(false);
                     setMainView("hypnosis");
@@ -9881,7 +9804,7 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && screen === "running" && (
-          <div className="flex flex-col items-center gap-3 w-full">
+          <div className="flex flex-col items-center gap-2 w-full">
             <div className="text-center">
               <div className="text-2xl font-semibold tracking-tight text-slate-100">
                 {exercise.key === "iqnb"
