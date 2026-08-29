@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 12;
+const BUILD_VERSION = 13;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:34 PM";
+const BUILD_TIME = "7:40 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2258,7 +2258,7 @@ function playCheer() {
 // space in the name is fine, it just has to be encoded in the URL below.
 const SONG_URL = "/audio/celebration%20song.mp3";
 const SONG_START = 56; // seconds into the track
-const SONG_FADE_OUT_AT = 77; // seconds into the track
+const SONG_FADE_OUT_AT = 74; // seconds into the track
 const SONG_FADE_IN = 2.6; // seconds
 const SONG_FADE_OUT = 7; // seconds
 const SONG_PEAK = 0.08;
@@ -7565,6 +7565,22 @@ function NBackSessionApp() {
 
         /* The backdrop darkens first, on its own, so the content has
            something to arrive onto. */
+        /* Rings pushing outward through the wait. */
+        @keyframes prRing {
+          0% { opacity: 0; transform: scale(0.3); }
+          25% { opacity: 0.9; }
+          100% { opacity: 0; transform: scale(3.4); }
+        }
+        /* A glow gathering where the gem will appear. */
+        @keyframes prGather {
+          0% { opacity: 0; transform: scale(0.5); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        /* The whole pre-roll clears as the content takes over. */
+        @keyframes prPrerollFade {
+          0%, 60% { opacity: 1; }
+          100% { opacity: 0; }
+        }
         @keyframes prBackdrop {
           0% { opacity: 0; }
           100% { opacity: 1; }
@@ -10283,20 +10299,58 @@ function NBackSessionApp() {
       {unlockInfo && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8"
-          /* Trial, Quad N-Back records only: the screen arrives over the
-             same stretch the music takes to swell, instead of cutting in
-             fully formed while the track is still coming up. */
+          /* Trial, Quad N-Back records only: the screen builds over the
+             stretch before the track's drop, rather than cutting in fully
+             formed while the music is still climbing. */
           style={
             unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
               ? { animation: "prBackdrop 2s ease-out both" }
               : undefined
           }
         >
+          {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
+            /* Pre-roll. Something has to occupy the wait or the dark screen
+               reads as a hang: a ring expands out of the centre and a glow
+               gathers behind where the gem will land, both fading out as
+               the content itself starts to resolve. */
+            <div
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+              aria-hidden="true"
+              style={{ animation: "prPrerollFade 4.4s ease-out both" }}
+            >
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: 260,
+                  height: 260,
+                  background: `radial-gradient(closest-side, ${PR_YELLOW}22, transparent 70%)`,
+                  animation: "prGather 3.2s ease-out both",
+                }}
+              />
+              {[0, 0.9, 1.8].map((delay) => (
+                <div
+                  key={delay}
+                  className="absolute rounded-full"
+                  style={{
+                    width: 120,
+                    height: 120,
+                    border: `1px solid ${PR_YELLOW}55`,
+                    animation: `prRing 2.6s ${delay}s cubic-bezier(0.22,1,0.36,1) both`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <div
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
             style={
               unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-                ? { animation: "prReveal 4.8s cubic-bezier(0.22,1,0.36,1) both" }
+                ? {
+                    // Starts well after the pre-roll has established itself,
+                    // so the content resolves ON the drop rather than before.
+                    animation:
+                      "prReveal 4.4s 2.4s cubic-bezier(0.22,1,0.36,1) both",
+                  }
                 : undefined
             }
           >
