@@ -1972,6 +1972,16 @@ function formatLevelTick(exercise, value) {
   }
 }
 
+// RRT's day score reads the same way it does everywhere else in the app:
+// premises solved, round length, then the run of correct answers out of 20.
+function formatScoreCell(exercise, row) {
+  if (row.level == null) return "—";
+  if (exercise.scoreType === "points") {
+    return `${formatScoreValue(exercise, row.level)} ${row.streak ?? 0}/20`;
+  }
+  return formatLevelValue(exercise, row.level);
+}
+
 // Full form, used in tooltips and the table.
 function formatLevelValue(exercise, value) {
   if (value == null || Number.isNaN(value)) return "—";
@@ -1983,6 +1993,27 @@ function formatLevelValue(exercise, value) {
     default:
       return `${exercise.abbrev}${Math.round(value)}B`;
   }
+}
+
+// Table records, walked oldest to newest: a day sets a score record when its
+// best level beats every earlier day, and an average record when that day's
+// mean level beats every earlier day's. They move independently — a single
+// blinding session can set a score PR on an otherwise mediocre day, and a
+// consistent day can set an average PR without any single standout run.
+function markDayRecords(list) {
+  let bestScore = null;
+  let bestAvg = null;
+  return list.map((item) => {
+    const isPR = item.level != null && bestScore !== null && item.level > bestScore;
+    if (item.level != null && (bestScore === null || item.level > bestScore)) {
+      bestScore = item.level;
+    }
+    const isAvgPR = item.dayAvg != null && bestAvg !== null && item.dayAvg > bestAvg;
+    if (item.dayAvg != null && (bestAvg === null || item.dayAvg > bestAvg)) {
+      bestAvg = item.dayAvg;
+    }
+    return { ...item, isPR, isAvgPR };
+  });
 }
 
 // Running average of every session up to and including each point, plus a
@@ -2036,18 +2067,34 @@ function renderPRDot(props, color) {
   );
 }
 
-function buildExerciseDailyRows(entries) {
+function buildExerciseDailyRows(entries, exercise) {
   const dayMap = new Map();
   (entries || []).forEach((h) => {
     const dateKey = new Date(h.ts).toDateString();
-    const prev = dayMap.get(dateKey) || { durationMs: 0, accuracy: null, n: null, lastTs: 0, ts: h.ts };
+    const prev = dayMap.get(dateKey) || {
+      durationMs: 0,
+      accuracy: null,
+      n: null,
+      streak: null,
+      lastTs: 0,
+      ts: h.ts,
+      levelSum: 0,
+      levelCount: 0,
+    };
     dayMap.set(dateKey, {
       dateKey,
       ts: Math.max(prev.ts, h.ts),
       durationMs: prev.durationMs + (h.durationMs || 0),
       accuracy: h.ts >= prev.lastTs ? h.accuracy : prev.accuracy,
       n: h.ts >= prev.lastTs ? h.n : prev.n,
+      streak: h.ts >= prev.lastTs ? h.streak ?? prev.streak : prev.streak,
       lastTs: Math.max(prev.lastTs, h.ts),
+      // The day's own average level, across however many sessions were run
+      // that day — not a running total. "Best average" then means the best
+      // day, which is a record worth flagging, instead of a number that
+      // creeps up on almost every row while someone is improving.
+      levelSum: prev.levelSum + (exercise ? sessionLevel(exercise, h) ?? 0 : 0),
+      levelCount: prev.levelCount + (sessionLevel(exercise, h) == null ? 0 : 1),
     });
   });
   if (dayMap.size === 0) return [];
@@ -2063,7 +2110,11 @@ function buildExerciseDailyRows(entries) {
     const dateKey = cursor.toDateString();
     const existing = dayMap.get(dateKey);
     if (existing) {
-      rows.push({ ...existing, missed: false });
+      rows.push({
+        ...existing,
+        dayAvg: existing.levelCount ? existing.levelSum / existing.levelCount : null,
+        missed: false,
+      });
     } else {
       rows.push({
         dateKey,
@@ -2071,6 +2122,8 @@ function buildExerciseDailyRows(entries) {
         durationMs: 0,
         accuracy: null,
         n: null,
+        streak: null,
+        dayAvg: null,
         missed: true,
       });
     }
@@ -5650,7 +5703,13 @@ function NBackSessionApp() {
         const prevHistory = prev.rrt || [];
         const newHistory = [
           ...prevHistory,
-          { ts: Date.now(), accuracy: scoreValue, n: levelReached, durationMs },
+          {
+            ts: Date.now(),
+            accuracy: scoreValue,
+            n: levelReached,
+            streak: streakReached ?? 0,
+            durationMs,
+          },
         ].slice(-MAX_HISTORY_ENTRIES);
         if (window.storage) {
           safeStorageSet("history-rrt", JSON.stringify(newHistory), false);
@@ -6375,7 +6434,9 @@ function NBackSessionApp() {
         level = Math.min(9, level + (Math.random() < 0.06 ? 1 : 0));
         // Drifts upward with noise on top, the way real practice does, so
         // personal bests keep landing instead of all clustering in week one.
-        const progress = (90 - back) / 90;
+        // Real practice plateaus. A smooth ramp made every day a new record,
+        // which is not what the highlighting is meant to show.
+        const progress = Math.min(1, ((90 - back) / 90) * 1.25);
         let accuracy;
         if (ex.scoreType === "points") {
           // RRT packs premises solved into the integer part and seconds
@@ -6394,12 +6455,24 @@ function NBackSessionApp() {
             Math.min(99, Math.round(52 + progress * 34 + (Math.random() - 0.5) * 18))
           );
         }
-        entries.push({
-          ts: now - back * dayMs,
-          accuracy,
-          n: level,
-          durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
-        });
+        // Some days get two sessions, so a day's average is genuinely
+        // different from its best and the two record columns can diverge.
+        const sessionsToday = Math.random() < 0.3 ? 2 : 1;
+        for (let k = 0; k < sessionsToday; k++) {
+          entries.push({
+            ts: now - back * dayMs + k * 60 * 60 * 1000,
+            accuracy:
+              ex.scoreType === "accuracy"
+                ? Math.max(30, Math.min(99, Math.round(accuracy + (Math.random() - 0.5) * 8)))
+                : Math.round((accuracy + (Math.random() - 0.5) * 0.8) * 100) / 100,
+            n: level,
+            streak:
+              ex.scoreType === "points"
+                ? Math.max(0, Math.round(4 + progress * 12 + (Math.random() - 0.5) * 6))
+                : undefined,
+            durationMs: Math.round((8 + Math.random() * 22) * 60 * 1000),
+          });
+        }
       }
       setExerciseHistory((prev) => ({ ...prev, [key]: entries }));
       safeStorageSet(`history-${key}`, JSON.stringify(entries), false);
@@ -8643,7 +8716,10 @@ function NBackSessionApp() {
                   {chartData.length > 0 ? (
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-[30rem]">
                       <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
+                        <AreaChart
+                          data={chartData}
+                          margin={{ top: 8, right: 16, bottom: 24, left: 0 }}
+                        >
                           <defs>
                             <linearGradient
                               id={`exFill-${e.key}`}
@@ -8708,7 +8784,7 @@ function NBackSessionApp() {
                             }}
                             formatter={(value, name) => [
                               formatLevelValue(e, value),
-                              name === "avg" ? "Average" : "Level",
+                              name === "avg" ? "Avg score" : "Best score",
                             ]}
                           />
                           <Area
@@ -8742,7 +8818,7 @@ function NBackSessionApp() {
                         <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
                           <line x1="0" y1="5" x2="22" y2="5" stroke={exColor} strokeWidth="2.5" />
                         </svg>
-                        Level this session
+                        Best score
                       </span>
                       <span className="flex items-center gap-2">
                         <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
@@ -8756,7 +8832,7 @@ function NBackSessionApp() {
                             strokeDasharray="5 4"
                           />
                         </svg>
-                        Average so far
+                        Avg score
                       </span>
                       <span className="flex items-center gap-2">
                         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
@@ -8779,8 +8855,8 @@ function NBackSessionApp() {
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               // Averages and records only make sense oldest-first, so build
               // them that way and flip back to newest-first for display.
-              const rows = withRunningAverage(
-                buildExerciseDailyRows(exerciseHistory[e.key])
+              const rows = markDayRecords(
+                buildExerciseDailyRows(exerciseHistory[e.key], e)
                   .slice()
                   .reverse()
                   .map((r) => ({ ...r, level: sessionLevel(e, r) }))
@@ -8855,7 +8931,7 @@ function NBackSessionApp() {
                                       : { color: "#F7F8F8" }
                                   }
                                 >
-                                  {row.missed ? "—" : formatLevelValue(e, row.level)}
+                                  {row.missed ? "—" : formatScoreCell(e, row)}
                                   {row.isPR && (
                                     <span className="lg:hidden ml-2 text-xs font-semibold">
                                       New PR!
@@ -8874,7 +8950,7 @@ function NBackSessionApp() {
                                       : { color: "#8A8F98" }
                                   }
                                 >
-                                  {formatLevelValue(e, row.avg)}
+                                  {formatLevelValue(e, row.dayAvg)}
                                   {row.isAvgPR && (
                                     <span className="lg:hidden ml-2 text-xs font-semibold">
                                       Best avg!
@@ -8906,7 +8982,11 @@ function NBackSessionApp() {
                             }}
                           >
                             <span aria-hidden="true">←</span>
-                            {row.isPR ? "New PR!" : "Best avg!"}
+                            {row.isPR && row.isAvgPR
+                              ? "PR + avg!"
+                              : row.isPR
+                              ? "New PR!"
+                              : "Best avg!"}
                           </div>
                         ) : null
                       )}
