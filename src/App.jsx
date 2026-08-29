@@ -2195,6 +2195,85 @@ function playCheer() {
   }
 }
 
+// Celebration music, from a recording. Only the chorus is used: playback
+// starts partway in, fades up, holds, then fades away again, so the moment
+// gets the best part of the track rather than its intro.
+//
+// TO ADD OR REPLACE THE FILE: `public/audio/celebration song.mp3`. The
+// space in the name is fine, it just has to be encoded in the URL below.
+const SONG_URL = "/audio/celebration%20song.mp3";
+const SONG_START = 56; // seconds into the track
+const SONG_FADE_OUT_AT = 74; // seconds into the track
+const SONG_FADE_IN = 1.6; // seconds
+const SONG_FADE_OUT = 3.5; // seconds
+const SONG_PEAK = 0.4;
+let songBuffer = null;
+let songLoadStarted = false;
+let songSource = null; // the one currently playing, so a second level-up cuts the first
+
+function preloadSong() {
+  if (songLoadStarted) return;
+  const ctx = uiAudioContext();
+  if (!ctx) return;
+  songLoadStarted = true;
+  fetch(SONG_URL)
+    .then((res) => (res.ok ? res.arrayBuffer() : Promise.reject(new Error("no file"))))
+    .then((buf) => ctx.decodeAudioData(buf))
+    .then((decoded) => {
+      songBuffer = decoded;
+    })
+    .catch(() => {
+      // No track present; playLevelUp's tune covers it.
+    });
+}
+
+function playCelebrationSong() {
+  const ctx = uiAudioContext();
+  if (!ctx || !songBuffer) {
+    preloadSong();
+    return false;
+  }
+  try {
+    // Two level-ups in quick succession should not stack.
+    if (songSource) {
+      try {
+        songSource.stop();
+      } catch {
+        // Already finished.
+      }
+      songSource = null;
+    }
+    const now = ctx.currentTime;
+    const playFor = Math.max(
+      0,
+      Math.min(songBuffer.duration, SONG_FADE_OUT_AT) - SONG_START
+    );
+    if (playFor <= 0) return false;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
+    // Hold until the fade-out point, then ease down to silence.
+    gain.gain.setValueAtTime(SONG_PEAK, now + playFor);
+    gain.gain.linearRampToValueAtTime(0.0001, now + playFor + SONG_FADE_OUT);
+    gain.connect(ctx.destination);
+
+    const src = ctx.createBufferSource();
+    src.buffer = songBuffer;
+    src.connect(gain);
+    // Offset playback into the track rather than trimming the file.
+    src.start(now, SONG_START);
+    src.stop(now + playFor + SONG_FADE_OUT + 0.05);
+    src.onended = () => {
+      if (songSource === src) songSource = null;
+    };
+    songSource = src;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // End of a session. A settled two-note fall — the opposite shape to the
 // level-up rise, so finishing reads as completion rather than as another
 // reward. Quiet, and over in under a second and a half.
@@ -7183,16 +7262,18 @@ function NBackSessionApp() {
   // session is not the one that misses it.
   useEffect(() => {
     preloadCheer();
+    preloadSong();
   }, []);
 
   // The one sound in the app that celebrates something. Fires when the
   // level-up overlay opens, and nowhere else.
-  // A personal record gets the applause clip; every other level-up keeps
-  // the tune. Swap the branch if you want one or the other everywhere.
+  // Every level-up gets the celebration track; the synthesized tune is the
+  // fallback for when the file has not loaded. A personal record adds the
+  // applause on top of it.
   useEffect(() => {
     if (!unlockInfo) return;
+    if (!playCelebrationSong()) playLevelUp();
     if (unlockInfo.isNewPR) playCheer();
-    else playLevelUp();
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
