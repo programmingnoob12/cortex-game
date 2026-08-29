@@ -950,7 +950,7 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 760px, calc(100vh - 250px)))";
+const NBACK_BOX_SIZE = "max(240px, min(100%, 760px, calc(100vh - 200px)))";
 
 
 // ---------------------------------------------------------------------
@@ -1995,7 +1995,7 @@ function playClick() {
     if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     const master = ctx.createGain();
-    master.gain.value = 0.16;
+    master.gain.value = 0.075;
     master.connect(ctx.destination);
 
     // The transient. A few milliseconds of high-passed noise is what the ear
@@ -2012,9 +2012,9 @@ function playClick() {
     noise.buffer = noiseBuf;
     const hp = ctx.createBiquadFilter();
     hp.type = "highpass";
-    hp.frequency.value = 1800;
+    hp.frequency.value = 1400;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.value = 0.7;
+    noiseGain.gain.value = 0.35;
     noise.connect(hp);
     hp.connect(noiseGain);
     noiseGain.connect(master);
@@ -2022,7 +2022,7 @@ function playClick() {
 
     // Two fixed inharmonic partials ringing out over it. No pitch slide:
     // that was what made the previous version sound like it was falling.
-    [2400, 3550].forEach((freq, i) => {
+    [1900, 2820].forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = "sine";
@@ -2047,10 +2047,16 @@ function playClick() {
 // top of the level-up overlay, which is already carrying the moment.
 function playLevelUp() {
   try {
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if (!Ctx) return;
-    if (!clickAudioCtx) clickAudioCtx = new Ctx();
-    const ctx = clickAudioCtx;
+    // Prefer the context the letter audio already runs on: it has been
+    // unlocked by gameplay, whereas a fresh one created here can still be
+    // suspended when a level-up fires with no click right before it.
+    const ctx = letterAudioContext() || (() => {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return null;
+      if (!clickAudioCtx) clickAudioCtx = new Ctx();
+      return clickAudioCtx;
+    })();
+    if (!ctx) return;
     if (ctx.state === "suspended") ctx.resume();
     const now = ctx.currentTime;
     const master = ctx.createGain();
@@ -6988,6 +6994,42 @@ function NBackSessionApp() {
     if (unlockInfo) playLevelUp();
   }, [unlockInfo]);
 
+  // The running screen's answer buttons, split into a left and a right
+  // column. Modalities alternate sides in their declared order, so Dual
+  // N-Back gets one button per hand and Quad gets two.
+  const nbackSideButtons = useMemo(() => {
+    const columns = { left: [], right: [] };
+    (exercise.modalities || []).forEach((m, i) => {
+      columns[i % 2 === 0 ? "left" : "right"].push(m);
+    });
+    const render = (m) => {
+      const meta = MODALITY_META[m];
+      const state = feedback[m];
+      const cls =
+        state === "wrong"
+          ? "no-sheen bg-red-500"
+          : state === "correct"
+          ? BUTTON_PULSE
+          : BUTTON_BASE;
+      return (
+        <button
+          key={m}
+          onClick={() => handlePress(m)}
+          className={`transition-colors duration-150 rounded-lg py-4 px-2 font-semibold text-base leading-tight ${cls}`}
+        >
+          <span className="block">{meta.label}</span>
+          <span className="block text-sm font-normal opacity-70">
+            ({MODALITY_KEY_LABEL[m]})
+          </span>
+        </button>
+      );
+    };
+    return {
+      left: columns.left.map(render),
+      right: columns.right.map(render),
+    };
+  }, [exercise.modalities, feedback, handlePress]);
+
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
   // Drives --ex, which every accent button reads from. Only set while an
@@ -7089,7 +7131,17 @@ function NBackSessionApp() {
       `}</style>
       <div
         className="relative w-full"
-        style={isMotion3dApp ? undefined : { maxWidth: "42rem" }}
+        style={
+          isMotion3dApp
+            ? undefined
+            : {
+                // The running screen carries a column of answer buttons on
+                // each side of the grid, so it needs more room than the
+                // reading-width screens.
+                maxWidth:
+                  mainView === "app" && screen === "running" ? "62rem" : "42rem",
+              }
+        }
       >
         {mainView === "regime" && (
           <div className="space-y-14">
@@ -8850,12 +8902,7 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div
-            className="space-y-14"
-            onClickCapture={(ev) => {
-              if (ev.target.closest("button")) playClick();
-            }}
-          >
+          <div className="space-y-14">
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Overview
@@ -9613,9 +9660,14 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            {/* Plain 3x3 lattice: shared hairlines, no gaps, no rounded
-                corners and no accent colour, so the stimulus is the only
-                thing in the grid carrying any colour. */}
+            {/* Answer buttons flank the grid rather than sitting under it.
+                That buys the lattice the vertical space the button row used
+                to take, so the stimulus is bigger on the same screen, and it
+                puts the two hands' targets where the hands already are. */}
+            <div className="flex items-center justify-center gap-4 w-full">
+            <div className="flex flex-col gap-3 w-24 sm:w-28 shrink-0">
+              {nbackSideButtons.left}
+            </div>
             <div
               style={{
                 width: NBACK_BOX_SIZE,
@@ -9667,30 +9719,9 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-
-            <div className="grid grid-cols-2 gap-3" style={{ width: NBACK_BOX_SIZE }}>
-              {exercise.modalities.map((m) => {
-                const meta = MODALITY_META[m];
-                const state = feedback[m];
-                const cls =
-                  state === "wrong"
-                    ? "no-sheen bg-red-500"
-                    : state === "correct"
-                    ? BUTTON_PULSE
-                    : BUTTON_BASE;
-                return (
-                  <button
-                    key={m}
-                    onClick={() => handlePress(m)}
-                    className={`transition-colors duration-150 rounded-lg py-3 font-semibold text-xl ${cls}`}
-                  >
-                    {meta.label}{" "}
-                    <span className="text-base font-normal opacity-70">
-                      ({MODALITY_KEY_LABEL[m]})
-                    </span>
-                  </button>
-                );
-              })}
+            <div className="flex flex-col gap-3 w-24 sm:w-28 shrink-0">
+              {nbackSideButtons.right}
+            </div>
             </div>
 
             {exercise.sessionDurationMs && activeExercises[exerciseIndex + 1] && (
