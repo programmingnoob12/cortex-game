@@ -213,9 +213,9 @@ html,body{background-color:#08090A;color:#F7F8F8;}
 .text-slate-100{color:#F7F8F8 !important}
 .text-slate-200{color:#F7F8F8 !important}
 .text-slate-300{color:#8A8F98 !important}
-.text-slate-400{color:#8A8F98 !important}
-.text-slate-500{color:#6E7178 !important}
-.text-slate-600{color:#6E7178 !important}
+.text-slate-400{color:#A7AEB9 !important}
+.text-slate-500{color:#98A0AB !important}
+.text-slate-600{color:#89909B !important}
 .text-violet-100{color:#8B7FE8 !important}
 .text-violet-300{color:#8B7FE8 !important}
 .to-blue-700\\/40{--tw-gradient-to:color-mix(in srgb, var(--ex) 40%, transparent) !important}
@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 14;
+const BUILD_VERSION = 15;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:44 PM";
+const BUILD_TIME = "7:47 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7574,6 +7574,12 @@ function NBackSessionApp() {
         @keyframes prSweep {
           to { transform: rotate(360deg); }
         }
+        /* A ring closing in on the centre, against the outward pulses. */
+        @keyframes prRingIn {
+          0% { opacity: 0; transform: scale(1.5); }
+          20% { opacity: 0.8; }
+          100% { opacity: 0; transform: scale(0.18); }
+        }
         /* Motes travelling inward from the edge to the centre. */
         @keyframes prMote {
           0% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.6); }
@@ -10326,7 +10332,7 @@ function NBackSessionApp() {
             <div
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
-              style={{ animation: "prPrerollFade 5s ease-out both" }}
+              style={{ animation: "prPrerollFade 6.1s ease-out both" }}
             >
               <div
                 className="absolute rounded-full"
@@ -10351,21 +10357,43 @@ function NBackSessionApp() {
                   animation: "prSweep 2.6s linear infinite, prGather 1.4s ease-out both",
                 }}
               />
+              {/* Rings in pairs: a bright thin one with a soft wide one
+                  chasing it a beat behind, so each pulse has a leading edge
+                  and a wake rather than being a single hard outline. */}
               {[
-                { d: 0, size: 150 },
-                { d: 0.7, size: 130 },
-                { d: 1.4, size: 170 },
-                { d: 2.1, size: 140 },
-              ].map(({ d, size }) => (
+                { d: 0, size: 150, w: 1.5, blur: 0 },
+                { d: 0.18, size: 150, w: 6, blur: 10 },
+                { d: 0.85, size: 128, w: 1.5, blur: 0 },
+                { d: 1.03, size: 128, w: 6, blur: 10 },
+                { d: 1.7, size: 172, w: 1.5, blur: 0 },
+                { d: 1.88, size: 172, w: 6, blur: 10 },
+                { d: 2.55, size: 140, w: 1.5, blur: 0 },
+                { d: 2.73, size: 140, w: 6, blur: 10 },
+              ].map(({ d, size, w, blur }, i) => (
                 <div
-                  key={d}
+                  key={`r${i}`}
                   className="absolute rounded-full"
                   style={{
                     width: size,
                     height: size,
-                    border: `1px solid ${PR_YELLOW}66`,
-                    boxShadow: `0 0 18px ${PR_YELLOW}22`,
-                    animation: `prRing 2.8s ${d}s cubic-bezier(0.16,1,0.3,1) both`,
+                    border: `${w}px solid ${PR_YELLOW}${blur ? "22" : "88"}`,
+                    filter: blur ? `blur(${blur}px)` : undefined,
+                    boxShadow: blur ? undefined : `0 0 22px ${PR_YELLOW}33`,
+                    animation: `prRing 3.1s ${d}s cubic-bezier(0.12,0.9,0.2,1) both`,
+                  }}
+                />
+              ))}
+              {/* One ring travelling the other way, tightening inward, so
+                  the motion is not all in a single direction. */}
+              {[0.4, 1.6].map((d) => (
+                <div
+                  key={`i${d}`}
+                  className="absolute rounded-full"
+                  style={{
+                    width: 320,
+                    height: 320,
+                    border: `1px solid ${PR_YELLOW}44`,
+                    animation: `prRingIn 2.6s ${d}s cubic-bezier(0.4,0,0.2,1) both`,
                   }}
                 />
               ))}
@@ -10399,7 +10427,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 2.2s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 3.2s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
