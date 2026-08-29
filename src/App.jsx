@@ -2052,6 +2052,9 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
+// How long the record screen sits black and silent before the music starts.
+const PR_SILENCE_MS = 1200;
+
 // Achievement titles read "Quad N-Back Apprentice". Only the rank at the
 // end takes the tier colour — colouring the whole line made the exercise
 // name look like it belonged to the rank.
@@ -2077,9 +2080,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 17;
+const BUILD_VERSION = 18;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:55 PM";
+const BUILD_TIME = "8:00 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7402,15 +7405,17 @@ function NBackSessionApp() {
   useEffect(() => {
     if (!unlockInfo) return;
     if (unlockInfo.isNewPR) {
-      // The song takes precedence. The tune only stands in when the track
-      // is known to be unavailable — if it is merely still decoding, the
-      // song plays a moment later rather than both firing.
-      const playing = playCelebrationSong();
-      if (!playing && songFailed) playLevelUp();
-      playCheer();
-    } else {
-      playLevelUp();
+      // Silence first. The screen goes black and the vapour gathers with
+      // nothing on the soundtrack, so the music arriving is itself part of
+      // the reveal rather than something that was always playing.
+      const t = setTimeout(() => {
+        const playing = playCelebrationSong();
+        if (!playing && songFailed) playLevelUp();
+        playCheer();
+      }, PR_SILENCE_MS);
+      return () => clearTimeout(t);
     }
+    playLevelUp();
   }, [unlockInfo]);
 
   // The running screen's answer buttons, split into a left and a right
@@ -7572,8 +7577,14 @@ function NBackSessionApp() {
           100% { opacity: 0; transform: scale(3.6); }
         }
         /* Full black, held a beat, then lifting to reveal the scene. */
+        /* Recharts puts a tabindex on its wrapper, so clicking a chart
+           left a blue focus rectangle around the plot area. */
+        .recharts-wrapper:focus,
+        .recharts-wrapper *:focus,
+        .recharts-surface:focus { outline: none !important; }
+
         @keyframes prBlackout {
-          0%, 22% { opacity: 1; }
+          0%, 34% { opacity: 1; }
           100% { opacity: 0; }
         }
         /* Vapour drifting upward and thinning as it goes. */
@@ -9502,7 +9513,7 @@ function NBackSessionApp() {
                     return;
                   }
                   setSessionCompleteAnim(true);
-                  playSessionDone();
+                  playLevelUp();
                   setTimeout(() => {
                     setSessionCompleteAnim(false);
                     setMainView("hypnosis");
@@ -10349,14 +10360,14 @@ function NBackSessionApp() {
             <div
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
-              style={{ animation: "prPrerollFade 7.2s ease-out both" }}
+              style={{ animation: "prPrerollFade 8.7s ease-out both" }}
             >
               {/* A beat of true black first. The backdrop behind this is
                   only 90% opaque, so without it the page still shows
                   through and nothing feels like it stopped. */}
               <div
                 className="absolute inset-0 bg-black"
-                style={{ animation: "prBlackout 3.4s ease-out both" }}
+                style={{ animation: "prBlackout 4.6s ease-out both" }}
               />
               {/* Vapour. Four large, heavily blurred masses drifting up and
                   apart at different rates — slow enough to read as
@@ -10490,7 +10501,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 3.9s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 4.8s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
