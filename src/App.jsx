@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 36;
+const BUILD_VERSION = 37;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2392,7 +2392,7 @@ function playCelebrationSong() {
     // reads what goes past it, so this does not change what is heard.
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 1024;
-    analyser.smoothingTimeConstant = 0.42;
+    analyser.smoothingTimeConstant = 0.3;
     gain.connect(analyser);
     analyser.connect(ctx.destination);
     songAnalyser = analyser;
@@ -2541,26 +2541,30 @@ function SongVisualizer({ className, style }) {
         const bin = Math.floor(Math.pow(t, 1.7) * usable);
         // ^1.35 rather than squared: squaring flattened everything below a
         // shout into nothing, which is why it looked static.
-        // Averaged across the bins this bar covers, rather than sampling a
-        // single one — with 26 wide bars a lone bin misses most of what the
-        // music is doing in that range.
+        // Mostly the loudest bin in this bar's range, with a little of the
+        // average mixed in. A wide bar covers dozens of bins, and averaging
+        // them buries exactly the peaks that make the bar move — which is
+        // why loud hits sometimes barely registered.
         const binNext = Math.max(
           bin + 1,
           Math.floor(Math.pow((i + 1) / bars, 1.7) * usable)
         );
         let sum = 0;
+        let top = 0;
         let count = 0;
         for (let b = bin; b < binNext && b < usable; b++) {
           sum += data[b];
+          if (data[b] > top) top = data[b];
           count++;
         }
-        const raw = count ? sum / count / 255 : 0;
-        const v = Math.min(1, Math.pow(raw * scale, 1.1));
+        const mean = count ? sum / count : 0;
+        const raw = (top * 0.75 + mean * 0.25) / 255;
+        const v = Math.min(1, Math.pow(raw * scale, 1.05));
         const barH = Math.max(2, v * maxH);
         // Fades out toward the edges so the band has no hard ends.
         const edge = 1 - Math.pow(t, 1.8);
         const alpha = (0.04 + v * 0.3) * edge;
-        const wid = Math.max(8, barW - 14);
+        const wid = Math.max(6, barW - 12);
         const r = Math.min(wid / 2, 10);
         const xr = left + half + i * barW;
         const xl = left + half - (i + 1) * barW;
@@ -7883,6 +7887,16 @@ function NBackSessionApp() {
         {mainView === "regime" && (
           <div className="space-y-14">
             <div>
+              {/* Same top-left Back as Account, Stats and the rest, instead
+                  of a full-width button at the foot of the page. */}
+              {regimeKey && (
+                <button
+                  onClick={() => setMainView("account")}
+                  className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                >
+                  &lsaquo; Back
+                </button>
+              )}
               <div className="text-slate-100 text-lg font-semibold mb-4">
                 VERSION {BUILD_VERSION} · {BUILD_TIME}
               </div>
@@ -7978,14 +7992,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            {regimeKey && (
-              <button
-                onClick={() => setMainView("account")}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Back
-              </button>
-            )}
+
           </div>
         )}
 
