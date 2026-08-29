@@ -2080,9 +2080,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 19;
+const BUILD_VERSION = 20;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:04 PM";
+const BUILD_TIME = "8:11 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -7851,7 +7851,6 @@ function NBackSessionApp() {
                   const unlockedCount = section.items.filter((a) =>
                     isAchievementUnlocked(a, achievementState)
                   ).length;
-                  const sectionColor = EXERCISE_COLORS[group] || "#4CB9D8";
                   return (
                   <div key={section.key} className="space-y-4">
                   {section.label && (
@@ -7896,37 +7895,19 @@ function NBackSessionApp() {
                       return (
                         <div
                           key={a.id}
-                          /* Unlocked cards take the exercise's own colour,
-                             tinted with a solid bar down the left edge —
-                             the same treatment the regime cards use. Locked
-                             ones stay neutral so progress reads at a
-                             glance. */
-                          className="rounded-lg p-5 border border-l-4 transition-colors"
-                          style={
+                          className={`rounded-lg p-5 border transition-colors ${
                             isUnlocked
-                              ? {
-                                  backgroundColor: exerciseTint(sectionColor, 0.1),
-                                  borderColor: exerciseTint(sectionColor, 0.38),
-                                  borderLeftColor: sectionColor,
-                                }
-                              : {
-                                  backgroundColor: "#101112",
-                                  borderColor: "#23252A",
-                                  borderLeftColor: "#2E3138",
-                                }
-                          }
+                              ? `${groupAccent.bg} ${groupAccent.border}`
+                              : "bg-slate-900 border-slate-800"
+                          }`}
                         >
                           <div className="flex items-center gap-5">
                             <div
-                              className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl"
-                              style={
+                              className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl ${
                                 isUnlocked
-                                  ? {
-                                      backgroundImage: exerciseDeepFill(sectionColor),
-                                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
-                                    }
-                                  : { backgroundColor: "#18191B", filter: "grayscale(1)", opacity: 0.5 }
-                              }
+                                  ? `bg-gradient-to-br ${groupAccent.grad} shadow-lg shadow-black/30`
+                                  : "bg-slate-800 grayscale opacity-50"
+                              }`}
                             >
                               {a.icon}
                             </div>
@@ -10378,7 +10359,7 @@ function NBackSessionApp() {
              formed while the music is still climbing. */
           style={
             unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
-              ? { animation: "prBackdrop 2s ease-out both" }
+              ? { animation: "prBackdrop 0.45s ease-out both" }
               : undefined
           }
         >
@@ -10404,10 +10385,10 @@ function NBackSessionApp() {
                   apart at different rates — slow enough to read as
                   atmosphere rather than as objects moving. */}
               {[
-                { x: -180, s: 1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
-                { x: 150, s: 1.25, d: 1.2, dur: 7.5, c: "#ffffff14" },
-                { x: -40, s: 0.85, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
-                { x: 240, s: 1.1, d: 2.6, dur: 8, c: "#ffffff0f" },
+                { x: -180, s: 1, d: 1.2, dur: 6.5, c: `${PR_YELLOW}1f` },
+                { x: 150, s: 1.25, d: 1.75, dur: 7.5, c: "#ffffff14" },
+                { x: -40, s: 0.85, d: 2.4, dur: 6, c: `${PR_YELLOW}17` },
+                { x: 240, s: 1.1, d: 3.1, dur: 8, c: "#ffffff0f" },
               ].map(({ x, s: scale, d, dur, c }, i) => (
                 <div
                   key={`v${i}`}
@@ -10532,7 +10513,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 3.9s 4.5s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 5.1s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
