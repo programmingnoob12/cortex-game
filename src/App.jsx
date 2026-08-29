@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 37;
+const BUILD_VERSION = 38;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -2504,7 +2504,7 @@ function SongVisualizer({ className, style }) {
       const half = bandW / 2;
       const barW = half / bars;
       const baseline = h - Math.min(h * 0.05, 40);
-      const maxH = h * 0.4;
+      const maxH = h * 0.3;
 
       // Track the loudest bin this frame so the scale follows the music.
       let frameMax = 0;
@@ -2564,8 +2564,8 @@ function SongVisualizer({ className, style }) {
         // Fades out toward the edges so the band has no hard ends.
         const edge = 1 - Math.pow(t, 1.8);
         const alpha = (0.04 + v * 0.3) * edge;
-        const wid = Math.max(6, barW - 12);
-        const r = Math.min(wid / 2, 10);
+        const wid = Math.max(4, barW - 8);
+        const r = Math.min(wid / 2, 6);
         const xr = left + half + i * barW;
         const xl = left + half - (i + 1) * barW;
 
