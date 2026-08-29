@@ -2077,9 +2077,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 13;
+const BUILD_VERSION = 14;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:40 PM";
+const BUILD_TIME = "7:44 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2368,7 +2368,7 @@ function playCelebrationSong() {
     // late, climbs quickly to about half, then eases the rest of the way
     // over a longer stretch — which is what stops the entry sounding like a
     // switch being flipped.
-    gain.gain.setValueAtTime(SONG_PEAK * 0.025, now);
+    gain.gain.setValueAtTime(SONG_PEAK * 0.01, now);
     gain.gain.exponentialRampToValueAtTime(SONG_PEAK * 0.35, now + SONG_FADE_IN * 0.4);
     gain.gain.exponentialRampToValueAtTime(SONG_PEAK, now + SONG_FADE_IN);
     // Hold until the fade-out point, then ease down to silence.
@@ -7567,9 +7567,18 @@ function NBackSessionApp() {
            something to arrive onto. */
         /* Rings pushing outward through the wait. */
         @keyframes prRing {
-          0% { opacity: 0; transform: scale(0.3); }
-          25% { opacity: 0.9; }
-          100% { opacity: 0; transform: scale(3.4); }
+          0% { opacity: 0; transform: scale(0.25); }
+          18% { opacity: 1; }
+          100% { opacity: 0; transform: scale(3.6); }
+        }
+        @keyframes prSweep {
+          to { transform: rotate(360deg); }
+        }
+        /* Motes travelling inward from the edge to the centre. */
+        @keyframes prMote {
+          0% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.6); }
+          20% { opacity: 1; }
+          100% { opacity: 0; transform: translate(0, 0) scale(0.2); }
         }
         /* A glow gathering where the gem will appear. */
         @keyframes prGather {
@@ -10310,35 +10319,76 @@ function NBackSessionApp() {
         >
           {unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad" && (
             /* Pre-roll. Something has to occupy the wait or the dark screen
-               reads as a hang: a ring expands out of the centre and a glow
-               gathers behind where the gem will land, both fading out as
-               the content itself starts to resolve. */
+               reads as a hang. Four layers, all built from the PR yellow:
+               a gathering glow, a slowly turning ring of light, rings
+               pushing outward, and motes drawn inward toward the point the
+               gem will occupy. Everything clears as the content resolves. */
             <div
               className="pointer-events-none absolute inset-0 flex items-center justify-center"
               aria-hidden="true"
-              style={{ animation: "prPrerollFade 4.4s ease-out both" }}
+              style={{ animation: "prPrerollFade 5s ease-out both" }}
             >
               <div
                 className="absolute rounded-full"
                 style={{
-                  width: 260,
-                  height: 260,
-                  background: `radial-gradient(closest-side, ${PR_YELLOW}22, transparent 70%)`,
-                  animation: "prGather 3.2s ease-out both",
+                  width: 320,
+                  height: 320,
+                  background: `radial-gradient(closest-side, ${PR_YELLOW}26, ${PR_YELLOW}0d 45%, transparent 72%)`,
+                  animation: "prGather 3.4s ease-out both",
                 }}
               />
-              {[0, 0.9, 1.8].map((delay) => (
+              {/* A conic sweep, masked to a hairline, turning slowly. It is
+                  what stops the wait feeling static between ring pulses. */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: 200,
+                  height: 200,
+                  background: `conic-gradient(from 0deg, transparent 0deg, ${PR_YELLOW}00 200deg, ${PR_YELLOW}cc 330deg, transparent 360deg)`,
+                  WebkitMask:
+                    "radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))",
+                  mask: "radial-gradient(closest-side, transparent calc(100% - 2px), #000 calc(100% - 2px))",
+                  animation: "prSweep 2.6s linear infinite, prGather 1.4s ease-out both",
+                }}
+              />
+              {[
+                { d: 0, size: 150 },
+                { d: 0.7, size: 130 },
+                { d: 1.4, size: 170 },
+                { d: 2.1, size: 140 },
+              ].map(({ d, size }) => (
                 <div
-                  key={delay}
+                  key={d}
                   className="absolute rounded-full"
                   style={{
-                    width: 120,
-                    height: 120,
-                    border: `1px solid ${PR_YELLOW}55`,
-                    animation: `prRing 2.6s ${delay}s cubic-bezier(0.22,1,0.36,1) both`,
+                    width: size,
+                    height: size,
+                    border: `1px solid ${PR_YELLOW}66`,
+                    boxShadow: `0 0 18px ${PR_YELLOW}22`,
+                    animation: `prRing 2.8s ${d}s cubic-bezier(0.16,1,0.3,1) both`,
                   }}
                 />
               ))}
+              {/* Motes converging. Twelve is enough to read as movement
+                  without turning into confetti. */}
+              {Array.from({ length: 12 }).map((_, i) => {
+                const angle = (i / 12) * Math.PI * 2;
+                const dist = 190 + (i % 3) * 34;
+                return (
+                  <div
+                    key={`m${i}`}
+                    className="absolute rounded-full"
+                    style={{
+                      width: 3,
+                      height: 3,
+                      background: PR_YELLOW,
+                      "--mx": `${Math.cos(angle) * dist}px`,
+                      "--my": `${Math.sin(angle) * dist}px`,
+                      animation: `prMote 2.4s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
           <div
@@ -10349,7 +10399,7 @@ function NBackSessionApp() {
                     // Starts well after the pre-roll has established itself,
                     // so the content resolves ON the drop rather than before.
                     animation:
-                      "prReveal 4.4s 2.4s cubic-bezier(0.22,1,0.36,1) both",
+                      "prReveal 3.9s 2.2s cubic-bezier(0.22,1,0.36,1) both",
                   }
                 : undefined
             }
