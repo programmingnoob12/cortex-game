@@ -333,6 +333,11 @@ function makeSupabaseStorage(userId) {
 // an account but no completed payment (shouldn't normally happen, since
 // accounts are only created by the Stripe webhook after payment) can't
 // slip through.
+
+// Per-user cache of the last membership answer, so a returning member is
+// not held at a loading screen while the same question is asked again.
+const MEMBERSHIP_CACHE_PREFIX = "cortex.membershipOk.";
+
 function AuthGate({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [email, setEmail] = useState("");
@@ -340,11 +345,15 @@ function AuthGate({ children }) {
   const [linkSent, setLinkSent] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [membershipOk, setMembershipOk] = useState(null); // null = checking, true/false once known
+  // null = not known yet. Seeded from the last known answer for this user so
+  // a returning member goes straight into the app instead of waiting on a
+  // round trip; the real check still runs underneath and corrects it.
+  const [membershipOk, setMembershipOk] = useState(null);
   // The raw value behind membershipOk — "paused", "past_due", "inactive" —
   // so a locked-out person is told which one applies and offered the action
   // that actually fixes it, instead of a single dead-end message.
   const [membershipStatus, setMembershipStatus] = useState(null);
+  const membershipOkRef = useRef(null);
   const [recoverBusy, setRecoverBusy] = useState(false);
   const [recoverError, setRecoverError] = useState("");
   // 'magic' | 'password' | 'forgot' | 'forgotSent' | 'recovery' — which
@@ -369,9 +378,27 @@ function AuthGate({ children }) {
   }, []);
 
   useEffect(() => {
+    membershipOkRef.current = membershipOk;
+  }, [membershipOk]);
+
+  useEffect(() => {
     if (!session?.user) {
       setMembershipOk(null);
       return;
+    }
+    // Paint from cache first. This is a convenience, not a security boundary:
+    // every read of member data is enforced server-side by RLS, so a stale
+    // "true" here buys nothing beyond a few hundred milliseconds of UI that
+    // the check below immediately corrects.
+    try {
+      const cached = localStorage.getItem(MEMBERSHIP_CACHE_PREFIX + session.user.id);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setMembershipStatus(parsed.status ?? null);
+        setMembershipOk(!!parsed.ok);
+      }
+    } catch {
+      // Unreadable cache just means the normal wait.
     }
     let cancelled = false;
     (async () => {
@@ -382,8 +409,13 @@ function AuthGate({ children }) {
         .maybeSingle();
       if (cancelled) return;
       if (error) {
-        setMembershipStatus(null);
-        setMembershipOk(false);
+        // A failed request is not proof of a lapsed membership. With a
+        // cached answer in hand, keep showing it rather than throwing a
+        // paying member out over a dropped connection.
+        if (membershipOkRef.current === null) {
+          setMembershipStatus(null);
+          setMembershipOk(false);
+        }
         return;
       }
       setMembershipStatus(data?.membership_status || null);
@@ -397,7 +429,16 @@ function AuthGate({ children }) {
         : null;
       const stillInPaidPeriod =
         data?.membership_status !== "inactive" && paidUntil !== null && paidUntil > Date.now();
-      setMembershipOk(data?.membership_status === "active" || stillInPaidPeriod);
+      const ok = data?.membership_status === "active" || stillInPaidPeriod;
+      setMembershipOk(ok);
+      try {
+        localStorage.setItem(
+          MEMBERSHIP_CACHE_PREFIX + session.user.id,
+          JSON.stringify({ ok, status: data?.membership_status || null })
+        );
+      } catch {
+        // Cache is optional.
+      }
     })();
     return () => {
       cancelled = true;
@@ -669,11 +710,10 @@ function AuthGate({ children }) {
   }
 
   if (membershipOk === null) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-slate-400 text-sm">Checking membership…</div>
-      </div>
-    );
+    // No interstitial. On the first check of a new browser this is a blank
+    // dark page for a moment, which reads as the app still loading rather
+    // than as a step it is making the person wait through.
+    return <div className="min-h-screen bg-slate-950" />;
   }
 
   if (!membershipOk) {
@@ -786,6 +826,9 @@ function AuthGate({ children }) {
             onClick={() => {
               try {
                 localStorage.removeItem("cortex.billingState");
+                Object.keys(localStorage)
+                  .filter((k) => k.startsWith("cortex.membershipOk."))
+                  .forEach((k) => localStorage.removeItem(k));
               } catch {}
               supabase.auth.signOut();
             }}
@@ -7885,6 +7928,9 @@ function NBackSessionApp() {
                 onClick={() => {
               try {
                 localStorage.removeItem("cortex.billingState");
+                Object.keys(localStorage)
+                  .filter((k) => k.startsWith("cortex.membershipOk."))
+                  .forEach((k) => localStorage.removeItem(k));
               } catch {}
               supabase.auth.signOut();
             }}
