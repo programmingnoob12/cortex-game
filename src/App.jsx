@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 32;
+const BUILD_VERSION = 33;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:53 PM";
+const BUILD_TIME = "11:57 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2499,14 +2499,14 @@ function SongVisualizer({ className, style }) {
       }
       analyser.getByteFrequencyData(data);
 
-      const bars = 56;
+      const bars = 72;
       const usable = Math.floor(data.length * 0.62);
-      const bandW = Math.min(w * 0.66, 820);
+      const bandW = Math.min(w * 0.92, 1500);
       const left = (w - bandW) / 2;
       const half = bandW / 2;
       const barW = half / bars;
-      const baseline = h - Math.min(h * 0.08, 64);
-      const maxH = Math.min(h * 0.15, 110);
+      const baseline = h - Math.min(h * 0.05, 40);
+      const maxH = h * 0.25;
 
       // Track the loudest bin this frame so the scale follows the music.
       let frameMax = 0;
@@ -2529,7 +2529,7 @@ function SongVisualizer({ className, style }) {
         0,
         w / 2,
         baseline,
-        Math.max(120, bandW * 0.55 * (0.6 + bass * 0.7))
+        Math.max(160, bandW * 0.6 * (0.6 + bass * 0.7))
       );
       bloom.addColorStop(0, `rgba(242, 194, 0, ${(0.05 + bass * 0.09).toFixed(3)})`);
       bloom.addColorStop(1, "rgba(242, 194, 0, 0)");
@@ -10770,6 +10770,7 @@ function NBackSessionApp() {
                 immediately, rather than possibly trailing in later. */}
             <button
               onClick={() => {
+                playClick();
                 // Take the music out with the screen rather than cutting it
                 // dead or leaving it running over whatever comes next.
                 fadeOutCelebrationSong();
@@ -10862,7 +10863,10 @@ function NBackSessionApp() {
                 )}
               </div>
               <button
-                onClick={() => setAchievementCelebrationQueue((q) => q.slice(1))}
+                onClick={() => {
+                  playClick();
+                  setAchievementCelebrationQueue((q) => q.slice(1));
+                }}
                 className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
               >
                 Accept
