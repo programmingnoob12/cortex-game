@@ -1145,6 +1145,27 @@ const REGIME_COLORS = {
 // The cards need four values from one hex: a faint fill, a visible border,
 // a solid dot, and text bright enough to read. Derived rather than listed
 // so adding an exercise means adding one colour, not four.
+// The button fill as an inline value, for the places that need it on a
+// non-button element. Mirrors the rule in index.css: the left end is a
+// lightness lift of the same hue, sized to the headroom the colour has, so
+// a pale colour never bleaches.
+function exerciseFill(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const lifted = l + (1 - l) * 0.07;
+  const scale = l > 0 ? lifted / l : 1;
+  const to255 = (v) => Math.round(Math.min(1, v * scale) * 255);
+  const light = `#${[to255(r), to255(g), to255(b)]
+    .map((v) => v.toString(16).padStart(2, "0"))
+    .join("")}`;
+  return `linear-gradient(100deg, ${light}, ${hex})`;
+}
+
 function exerciseTint(hex, alpha) {
   const n = parseInt(hex.slice(1), 16);
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
@@ -6968,20 +6989,20 @@ function NBackSessionApp() {
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
                     style={{ "--ex": rc }}
-                    className="w-full text-left bg-gradient-to-r rounded-xl p-8 shadow-lg shadow-black/30"
+                    className="w-full text-left bg-gradient-to-r rounded-xl px-7 py-5 shadow-lg shadow-black/30"
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl font-semibold">{r.title}</div>
                         {r.key === "medium" && (
-                          <span className="italic text-sm font-medium opacity-80">
+                          <span className="italic text-sm font-semibold">
                             Recommended
                           </span>
                         )}
                       </div>
                       <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-base mt-2 opacity-80">{r.summary}</div>
+                    <div className="text-base font-medium mt-1">{r.summary}</div>
                   </button>
                 );
               })}
@@ -7305,24 +7326,18 @@ function NBackSessionApp() {
                 return (
                   <div
                     key={e.key}
-                    className="rounded-xl p-7"
+                    className="rounded-xl p-6 text-white"
                     style={{
-                      backgroundColor: exerciseTint(exColor, 0.07),
-                      border: `1px solid ${exerciseTint(exColor, 0.34)}`,
+                      backgroundImage: exerciseFill(exColor),
+                      boxShadow:
+                        "inset 0 1px rgba(255,255,255,0.3), inset 0 -1px rgba(0,0,0,0.12), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.3)",
                     }}
                   >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-2 h-2 rounded-full"
-                        style={{ backgroundColor: exColor }}
-                      />
-                      <div className="text-xl font-semibold text-slate-100">
-                        {e.title}
-                      </div>
-                    </div>
+                    <div className="text-xl font-semibold">{e.title}</div>
                     <div className="flex items-center gap-5 mt-3">
                       <LevelGem level={bestLevel} size={36} />
-                      <div className="text-lg font-medium" style={{ color: exColor }}>
+                      <div className="text-lg font-medium">
                         {isAccuracy
                           ? `${e.abbrev}${bestLevel}B`
                           : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
