@@ -2153,16 +2153,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 61;
+const BUILD_VERSION = 62;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:09 PM";
+const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Trial count matches the title's size and colour",
-  "Session-done tune no longer plays twice",
-  "Level-up tune ends on a brighter note",
+  "Gem moved to the right of each card, larger",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8805,29 +8803,34 @@ function NBackSessionApp() {
                       textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                     }}
                   >
-                    <div className="text-xl font-semibold">{e.title}</div>
-                    <div className="flex items-center gap-5 mt-3">
+                    {/* Name and score stack on the left, gem sits opposite
+                        it at the right edge and larger: it is the thing the
+                        eye should land on first. */}
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <div className="text-xl font-semibold">{e.title}</div>
+                        <div className="text-lg font-medium mt-2">
+                          {isAccuracy
+                            ? `${e.abbrev}${bestLevel}B`
+                            : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
+                        </div>
+                      </div>
                       {/* The gem's own drop-shadow is tuned for the
                           near-black page and all but vanishes on a coloured
                           card. A second shadow on the wrapper follows the
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
                       <span
-                        className="inline-flex"
+                        className="inline-flex shrink-0"
                         style={{
-                          filter: `drop-shadow(0 4px 5px ${exerciseShadowColor(
+                          filter: `drop-shadow(0 5px 7px ${exerciseShadowColor(
                             exColor,
                             0.85
-                          )}) drop-shadow(0 1px 2px ${exerciseShadowColor(exColor, 0.7)})`,
+                          )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
                         }}
                       >
-                        <LevelGem level={bestLevel} size={36} />
+                        <LevelGem level={bestLevel} size={64} />
                       </span>
-                      <div className="text-lg font-medium">
-                        {isAccuracy
-                          ? `${e.abbrev}${bestLevel}B`
-                          : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
-                      </div>
                     </div>
                   </button>
                 );
