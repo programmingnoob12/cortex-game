@@ -1583,13 +1583,35 @@ const BACKGROUND_MUSIC_SRC = "/audio/bina-beats.mp3";
 // which browsers cache — and a cached HTML body under an audio src fails to
 // decode forever after. Bumping this string sidesteps any such stale entry.
 const BACKGROUND_MUSIC_CACHE_TAG = "v1";
-const BINAURAL_VOLUME = 0.245; // background listening level — tune to taste
-function useBinauralBeats(enabled) {
+const BINAURAL_VOLUME = 0.245; // default background listening level
+const BINAURAL_MAX_VOLUME = 0.6; // top of the in-exercise slider
+function useBinauralBeats(enabled, volume = BINAURAL_VOLUME) {
   const audioRef = useRef(null);
   const fadeRafRef = useRef(null);
   const playPromiseRef = useRef(null);
   const settleRef = useRef(null);
   const [audioError, setAudioError] = useState(null);
+  // The fade reads the target from a ref rather than closing over the prop,
+  // so a fade already in flight lands on whatever the slider now says.
+  const volumeRef = useRef(volume);
+  const enabledRef = useRef(enabled);
+  enabledRef.current = enabled;
+  const firstVolumeRef = useRef(true);
+  useEffect(() => {
+    volumeRef.current = volume;
+    // Skip the first run: that is just the initial value, and letting it
+    // through would cancel the opening fade before it started.
+    if (firstVolumeRef.current) {
+      firstVolumeRef.current = false;
+      return;
+    }
+    const audio = audioRef.current;
+    if (!audio || !enabledRef.current) return;
+    // A drag wants the level now, not a second from now, so the fade is
+    // dropped and the value applied straight.
+    cancelAnimationFrame(fadeRafRef.current);
+    audio.volume = Math.max(0, Math.min(1, volume));
+  }, [volume]);
 
   const describe = (audio) => {
     const codes = {
@@ -1680,7 +1702,7 @@ function useBinauralBeats(enabled) {
           logClientError(`binaural play: ${err.name}: ${err.message}`);
         });
       }
-      fadeTo(BINAURAL_VOLUME, 1200);
+      fadeTo(volumeRef.current, 1200);
       // Belt and braces. The fade is an animation-frame loop, and anything
       // that stops that loop early (a thrown frame, a throttled tab) would
       // leave the track playing at whatever volume it had got to — which,
@@ -1688,7 +1710,8 @@ function useBinauralBeats(enabled) {
       // regardless of whether the fade finished.
       settleRef.current = setTimeout(() => {
         if (audioRef.current !== audio) return;
-        if (audio.volume < BINAURAL_VOLUME - 0.001) audio.volume = BINAURAL_VOLUME;
+        const target = Math.max(0, Math.min(1, volumeRef.current));
+        if (audio.volume < target - 0.001) audio.volume = target;
         if (audio.paused) {
           const again = audio.play();
           playPromiseRef.current = again;
@@ -2153,9 +2176,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 52;
+const BUILD_VERSION = 53;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:12 PM";
+const BUILD_TIME = "3:41 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -5910,6 +5933,7 @@ function NBackSessionApp() {
   const [selectedBackgroundId, setSelectedBackgroundIdState] = useState("none"); // persisted — profile banner background
   const [featuredBadgeId, setFeaturedBadgeIdState] = useState(null); // persisted — one badge pinned front-and-center on the profile
   const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(false); // persisted — toggle shown during audio-modality exercises
+  const [binauralVolume, setBinauralVolumeState] = useState(BINAURAL_VOLUME); // persisted — level of the binaural track, adjustable mid-exercise
   const [rrtBranchingEnabled, setRrtBranchingEnabledState] = useState(true); // persisted — default ON; lets one RRT item be the object of 3+ premises instead of capping every item at 2
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
@@ -6365,6 +6389,15 @@ function NBackSessionApp() {
         // no saved binaural setting yet
       }
       try {
+        const res = await window.storage.get("binaural-volume", false);
+        if (res && res.value) {
+          const v = Number(JSON.parse(res.value));
+          if (Number.isFinite(v)) setBinauralVolumeState(Math.max(0, Math.min(BINAURAL_MAX_VOLUME, v)));
+        }
+      } catch (err) {
+        // no saved binaural volume yet
+      }
+      try {
         const res = await window.storage.get("rrt-branching-enabled", false);
         if (res && res.value) {
           setRrtBranchingEnabledState(JSON.parse(res.value));
@@ -6609,6 +6642,21 @@ function NBackSessionApp() {
     }
   }, []);
 
+  // Written on every drag frame, so the state updates immediately and the
+  // save is left to settle: persisting each intermediate value of a slider
+  // drag would be dozens of writes for one adjustment.
+  const binauralVolumeSaveRef = useRef(null);
+  const setBinauralVolume = useCallback((val) => {
+    const v = Math.max(0, Math.min(BINAURAL_MAX_VOLUME, val));
+    setBinauralVolumeState(v);
+    if (window.storage) {
+      clearTimeout(binauralVolumeSaveRef.current);
+      binauralVolumeSaveRef.current = setTimeout(() => {
+        safeStorageSet("binaural-volume", JSON.stringify(v), false);
+      }, 400);
+    }
+  }, []);
+
   const setRrtBranchingEnabled = useCallback((val) => {
     setRrtBranchingEnabledState(val);
     if (window.storage) {
@@ -6619,7 +6667,8 @@ function NBackSessionApp() {
   // Only actually plays while a trial is running — stops itself on setup/
   // results screens rather than droning on in the menus.
   const { unlock: unlockBinauralAudio, audioError: binauralAudioError } = useBinauralBeats(
-    binauralBeatsEnabled && screen === "running"
+    binauralBeatsEnabled && screen === "running",
+    binauralVolume
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -10885,6 +10934,45 @@ function NBackSessionApp() {
         </>
         )}
       </div>
+
+      {/* Binaural volume, parked in the corner of whichever exercise is
+          running. It only exists while the track does: turning the toggle
+          off takes it away with the sound. Fixed to the viewport rather
+          than placed inside any one exercise's layout, so RRT, 3D MOT and
+          the N-back screens all get it without each needing its own copy. */}
+      {mainView === "app" && screen === "running" && binauralBeatsEnabled && (
+        <div className="fixed top-4 left-4 z-40 flex items-center gap-3 rounded-full bg-slate-900/85 border border-slate-700/60 backdrop-blur px-4 py-2 shadow-lg shadow-black/30">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-slate-400 shrink-0"
+            aria-hidden="true"
+          >
+            <path d="M11 5 6 9H2v6h4l5 4z" />
+            <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+            <path d="M18.5 5.5a9 9 0 0 1 0 13" />
+          </svg>
+          <input
+            type="range"
+            className="bina-range"
+            min={0}
+            max={BINAURAL_MAX_VOLUME}
+            step={0.005}
+            value={binauralVolume}
+            onChange={(e) => setBinauralVolume(Number(e.target.value))}
+            aria-label="Binaural beats volume"
+          />
+          <span className="text-xs text-slate-400 tabular-nums w-8 text-right">
+            {Math.round((binauralVolume / BINAURAL_MAX_VOLUME) * 100)}
+          </span>
+        </div>
+      )}
 
       {unlockInfo && (
         <div
