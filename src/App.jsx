@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 57;
+const BUILD_VERSION = 58;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:43 PM";
+const BUILD_TIME = "5:51 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2539,24 +2539,29 @@ function playCelebrationSong() {
     );
     gain.gain.linearRampToValueAtTime(0.0001, now + playFor + SONG_FADE_OUT);
 
-    // gain -> analyser -> speakers. The analyser is a pass-through; it only
-    // reads what goes past it, so this does not change what is heard.
+    // The analyser hangs off the SOURCE, not off the gain. Downstream of the
+    // gain it was reading the fade envelope as well as the music: the track
+    // climbs 60dB over the fade-in and drops away again at the end, which
+    // swamped the music's own dynamics and is why the glow moved at times
+    // that had nothing to do with what was playing. An analyser needs no
+    // output connection to work, so this is a pure tap on the raw track.
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 1024;
-    // The byte data is a dB mapping between these two bounds. The defaults
-    // (-100 to -30) spread the range across a lot of near-silence, which is
-    // why the bars sat in a narrow band and barely moved. Tightening them
-    // around where music actually lives expands the contrast enormously.
-    analyser.minDecibels = -72;
-    analyser.maxDecibels = -18;
-    analyser.smoothingTimeConstant = 0.16;
-    gain.connect(analyser);
-    analyser.connect(ctx.destination);
+    analyser.fftSize = 2048;
+    // The byte data is a dB mapping between these bounds. Reading the raw
+    // track rather than the faded one, the levels are those of a mastered
+    // mix, so the window sits accordingly.
+    analyser.minDecibels = -60;
+    analyser.maxDecibels = -12;
+    // Low, so a kick registers as a kick. The smoothing that matters is
+    // done in the animation, where attack and release can differ.
+    analyser.smoothingTimeConstant = 0.08;
+    gain.connect(ctx.destination);
     songAnalyser = analyser;
 
     const src = ctx.createBufferSource();
     src.buffer = songBuffer;
     src.connect(gain);
+    src.connect(analyser);
     // Offset playback into the track rather than trimming the file.
     src.start(now, SONG_START);
     src.stop(now + playFor + SONG_FADE_OUT + 0.05);
@@ -2634,7 +2639,12 @@ function PrGoldGlow({ className, style, out }) {
     let raf = 0;
     let data = null;
     let level = 0;
-    let peak = 0.12;
+    // A slow-moving reference for the recent past. The difference between
+    // the instant reading and this is what an onset is: not "loud", but
+    // "louder than it just was", which is what a drop or a kick actually is
+    // and what the eye expects the light to answer.
+    let slow = 0;
+    let started = false;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const el = ref.current;
@@ -2645,28 +2655,37 @@ function PrGoldGlow({ className, style, out }) {
         data = new Uint8Array(analyser.frequencyBinCount);
       }
       analyser.getByteFrequencyData(data);
-      // Bottom eighth of the spectrum: kick, bass, the parts a drop moves.
-      const bins = Math.max(4, Math.floor(data.length / 8));
+      // 30Hz to roughly 250Hz: kick, bass, the parts a drop moves. Worked
+      // out from the bin width rather than a fixed fraction of the array,
+      // so it stays correct if the FFT size ever changes.
+      const binHz = (analyser.context.sampleRate / 2) / data.length;
+      const lo = Math.max(1, Math.floor(30 / binHz));
+      const hi = Math.max(lo + 2, Math.floor(250 / binHz));
       let sum = 0;
-      for (let i = 0; i < bins; i++) sum += data[i];
-      const raw = sum / bins / 255;
-      // Auto-gain. A mastered track sits in a narrow loudness band, so the
-      // raw reading barely leaves the middle of its range and a fixed
-      // mapping produces almost no visible movement. Tracking the loudest
-      // moment so far and measuring against it means the quiet stretch
-      // before the drop and the drop itself land at opposite extremes.
-      if (raw > peak) peak = raw;
-      else peak = Math.max(0.08, peak * 0.9985);
-      const floorLevel = peak * 0.42;
-      let norm = (raw - floorLevel) / Math.max(0.05, peak - floorLevel);
-      norm = Math.max(0, Math.min(1, norm));
-      // Squared, so quiet passages stay nearly still and loud ones throw it
-      // hard rather than everything drifting in the middle.
-      norm *= norm;
-      // Fast to rise, slow to fall, so it snaps on a hit and eases back.
-      level += (norm - level) * (norm > level ? 0.5 : 0.075);
-      el.style.transform = `scale(${(0.9 + level * 0.72).toFixed(3)})`;
-      el.style.filter = `brightness(${(0.85 + level * 1.5).toFixed(3)})`;
+      for (let i = lo; i <= hi && i < data.length; i++) sum += data[i];
+      const now = sum / (hi - lo + 1) / 255;
+
+      if (!started) {
+        slow = now;
+        started = true;
+      }
+      // Roughly a one-second memory.
+      slow += (now - slow) * 0.02;
+
+      // Two contributions. The sustained part only starts to count once the
+      // track is genuinely loud, so the quiet build stays nearly still; the
+      // onset part fires on the moment energy jumps above where it has been
+      // sitting, which is what lands the movement ON the drop rather than
+      // somewhere near it.
+      const sustained = Math.max(0, Math.min(1, (now - 0.52) / 0.34));
+      const onset = Math.max(0, Math.min(1, (now - slow) * 7));
+      const target = Math.max(sustained * 0.8, onset);
+
+      // Near-instant to rise so a hit is not smeared across three frames,
+      // slow to fall so it blooms and eases back rather than flickering.
+      level += (target - level) * (target > level ? 0.62 : 0.055);
+      el.style.transform = `scale(${(0.92 + level * 0.7).toFixed(3)})`;
+      el.style.filter = `brightness(${(0.88 + level * 1.6).toFixed(3)})`;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -8766,11 +8785,14 @@ function NBackSessionApp() {
 
             <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7">
               <div className="text-xl font-semibold text-slate-100">
-                {sessionInProgress ? "Session in progress" : "Next session"}
+                Next session
               </div>
-              {sessionInProgress ? (
-                <div className="text-lg mt-2 text-amber-400">
-                  {formatDuration(totalSessionTimeRemainingMs())} left
+              {sessionInProgress || sessionParked ? (
+                <div className="text-lg mt-2 font-medium" style={{ color: PR_YELLOW }}>
+                  In progress
+                  {sessionInProgress
+                    ? ` · ${formatDuration(totalSessionTimeRemainingMs())} left`
+                    : ""}
                 </div>
               ) : (
                 <div
