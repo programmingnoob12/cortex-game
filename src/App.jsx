@@ -993,7 +993,7 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 1040px, calc(100vh - 150px)))";
+const NBACK_BOX_SIZE = "max(240px, min(100%, 1180px, calc(100vh - 120px)))";
 
 
 // ---------------------------------------------------------------------
@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 44;
+const BUILD_VERSION = 45;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:12 AM";
+const BUILD_TIME = "12:56 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -4489,6 +4489,44 @@ const QNB_PRIME_SHAPES = [
   ...QNB_PICTOGRAMS.map((n) => `nps:${n}`),
 ];
 
+const QNB_POLYOMINO_SHAPES = Object.keys(QNB_POLYOMINO_GEOMETRY);
+const QNB_PICTOGRAM_SHAPES = QNB_PICTOGRAMS.map((n) => `nps:${n}`);
+
+// The pictogram PNGs are fetched by the browser the first time an <image>
+// inside a mask points at them, which is mid-trial — the cell paints empty
+// for a frame or two before the symbol appears. Warming the cache ahead of
+// the run removes that flash. Cheap: twelve files, a few KB each.
+let qnbPictogramsPreloaded = false;
+function preloadQnbPictograms() {
+  if (qnbPictogramsPreloaded || typeof window === "undefined") return;
+  qnbPictogramsPreloaded = true;
+  QNB_PICTOGRAMS.forEach((name) => {
+    const img = new Image();
+    img.src = `${QNB_PICTOGRAM_BASE}${name}.png`;
+  });
+}
+
+// A real Fisher-Yates. `sort(() => Math.random() - 0.5)` is not a shuffle:
+// the comparator is inconsistent, so the result is heavily biased toward the
+// original order, which meant the pool almost always came out as the first
+// few polyominoes and the first few pictograms and the rest of the set never
+// appeared. Drawn half from each family so a session always mixes the two.
+function shuffled(list) {
+  const out = [...list];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+function pickQnbShapeSet(count = 8) {
+  const half = Math.floor(count / 2);
+  return shuffled([
+    ...shuffled(QNB_POLYOMINO_SHAPES).slice(0, half),
+    ...shuffled(QNB_PICTOGRAM_SHAPES).slice(0, count - half),
+  ]);
+}
+
 // QNB' draws its color/shape stimulus as a Voronoi-textured blob clipped to
 // the same outline ShapeIcon uses, instead of a flat solid fill — reuses the
 // same voronoiCells() generator RRT's Voronoi items use.
@@ -4526,12 +4564,29 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
     // trial's colour — the same trick Brain Workshop uses to get any shape in
     // any colour from one file.
     const maskId = `qnbp-mask-${safeId}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
+    const outlineMaskId = `${maskId}-o`;
+    const href = `${QNB_PICTOGRAM_BASE}${shape.slice(4)}.png`;
+    // A PNG silhouette can't take an SVG stroke, so the outline is the same
+    // silhouette drawn slightly larger in black and sitting underneath: the
+    // ring of it that the fill doesn't cover reads as an outline of matching
+    // weight to the stroke the vector shapes carry.
+    const grow = 3.2;
     return (
       <svg width={size} height={size} viewBox="0 0 100 100">
         <defs>
+          <mask id={outlineMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+            <image
+              href={href}
+              x={6 - grow / 2}
+              y={6 - grow / 2}
+              width={88 + grow}
+              height={88 + grow}
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </mask>
           <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
             <image
-              href={`${QNB_PICTOGRAM_BASE}${shape.slice(4)}.png`}
+              href={href}
               x="6"
               y="6"
               width="88"
@@ -4540,6 +4595,7 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
             />
           </mask>
         </defs>
+        <rect x="0" y="0" width="100" height="100" fill="#12171F" mask={`url(#${outlineMaskId})`} />
         <g mask={`url(#${maskId})`}>
           {cells.map((c, i) => (
             <polygon key={i} points={c.points} fill={c.color} />
@@ -7067,9 +7123,8 @@ function NBackSessionApp() {
       // random eight per session, the way Brain Workshop picks a subset of a
       // set, so the shapes vary between sessions without changing how often
       // a match can occur.
-      const runShapeSet = isQnbPrime
-        ? [...QNB_PRIME_SHAPES].sort(() => Math.random() - 0.5).slice(0, 8)
-        : null;
+      const runShapeSet = isQnbPrime ? pickQnbShapeSet(8) : null;
+      if (isQnbPrime) preloadQnbPictograms();
       const seq = generateSequence(
         modalities,
         nn,
@@ -7994,7 +8049,7 @@ function NBackSessionApp() {
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
                 maxWidth:
-                  mainView === "app" && screen === "running" ? "76rem" : "42rem",
+                  mainView === "app" && screen === "running" ? "88rem" : "42rem",
               }
         }
       >
@@ -10530,7 +10585,7 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            <div className="flex items-stretch justify-center gap-14 sm:gap-24 w-full">
+            <div className="flex items-stretch justify-center gap-20 sm:gap-32 w-full">
             <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
