@@ -993,7 +993,8 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 1180px, calc(100vh - 210px)))";
+// Sizing lives in index.css (.nback-box) rather than here, because it has
+// to differ between the side-by-side desktop layout and the stacked one.
 
 
 // ---------------------------------------------------------------------
@@ -2153,14 +2154,17 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 63;
+const BUILD_VERSION = 64;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:06 AM";
+const BUILD_TIME = "11:29 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Best-average markers now read New PR",
+  "N-back grid uses more of the screen",
+  "Answer buttons sit further from the grid",
+  "Buttons stack under the grid on phones",
+  "Stat and picker grids reflow on narrow screens",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5909,7 +5913,7 @@ function BadgeGrid({ state, onSeeAll, onSelectBadge, hideHeader }) {
           )}
         </div>
       )}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {ACHIEVEMENTS_CATALOG.map((a) => {
           const isUnlocked = isAchievementUnlocked(a, state);
           const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[a.group]];
@@ -8182,7 +8186,7 @@ function NBackSessionApp() {
     const spaced = (list) =>
       list.map((el, i) => (
         <Fragment key={el.key}>
-          {i > 0 && <div className="h-6 sm:h-10 shrink-0" />}
+          {i > 0 && <div className="hidden md:block h-6 lg:h-10 shrink-0" />}
           {el}
         </Fragment>
       ));
@@ -8214,7 +8218,7 @@ function NBackSessionApp() {
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
           ? "items-center justify-center px-4 py-2"
-          : "items-center justify-center p-12"
+          : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
       {/* The decorative glows sit at -top-40 / -bottom-40, i.e. 10rem OUTSIDE
@@ -8759,7 +8763,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -9375,7 +9379,7 @@ function NBackSessionApp() {
               <div className="mt-5 space-y-10">
               <div className="space-y-5">
               <div className="text-lg text-slate-300">Choose an avatar</div>
-              <div className="grid grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                 {AVATAR_OPTIONS.map((a) => {
                   const isSelected = selectedAvatarId === a.id && !customAvatarImage;
                   return (
@@ -9448,7 +9452,7 @@ function NBackSessionApp() {
                 <div className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
                   Avatar frame
                 </div>
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   {FRAME_OPTIONS.map((f) => {
                     const unlockAch = ACHIEVEMENTS_CATALOG.find((a) => a.id === f.unlockedBy);
                     const unlocked = isCosmeticUnlocked(f, achievementState);
@@ -9500,7 +9504,7 @@ function NBackSessionApp() {
                 <div className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
                   Profile color
                 </div>
-                <div className="grid grid-cols-6 gap-3">
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-3">
                   {PROFILE_COLOR_OPTIONS.map((c) => {
                     const unlockAch = ACHIEVEMENTS_CATALOG.find((a) => a.id === c.unlockedBy);
                     const unlocked = isCosmeticUnlocked(c, achievementState);
@@ -9525,7 +9529,7 @@ function NBackSessionApp() {
                 <div className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
                   Profile background
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   {PROFILE_BACKGROUND_OPTIONS.map((b) => {
                     const unlockAch = ACHIEVEMENTS_CATALOG.find((a) => a.id === b.unlockedBy);
                     const unlocked = isCosmeticUnlocked(b, achievementState);
@@ -9573,7 +9577,7 @@ function NBackSessionApp() {
                     Unlock a badge to feature it on your profile.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, achievementState)).map((a) => {
                       const isActive = featuredBadgeId === a.id;
                       const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[a.group]];
@@ -10061,7 +10065,7 @@ function NBackSessionApp() {
                   ) : billingState.plan === "annual" ? null : (
                     <div className="space-y-3">
                       <div className="text-slate-400 text-base">Pause billing for</div>
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {[1, 2, 3].map((m) => (
                           <button
                             key={m}
@@ -10248,7 +10252,7 @@ function NBackSessionApp() {
                     />
                     {e.title}
                   </h2>
-                  <div className="grid grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <Stat
                       label={bestLabel}
                       value={bestValue}
@@ -10964,13 +10968,17 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            <div className="flex items-stretch justify-center gap-20 sm:gap-32 w-full">
-            <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
+            {/* Side by side from md up, stacked below it: on a phone the two
+                button columns cannot sit beside a square grid and leave the
+                grid anything usable, so they drop underneath it instead,
+                which also puts them under the thumbs. */}
+            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-4 md:gap-28 lg:gap-44 w-full">
+            <div className="order-2 md:order-1 flex md:flex-col justify-between gap-3 md:gap-0 h-24 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
+              className="nback-box order-1 md:order-2"
               style={{
-                width: NBACK_BOX_SIZE,
                 aspectRatio: "1 / 1",
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
@@ -11019,7 +11027,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="flex flex-col justify-between w-28 sm:w-36 shrink-0">
+            <div className="order-3 flex md:flex-col justify-between gap-3 md:gap-0 h-24 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>
@@ -11082,7 +11090,7 @@ function NBackSessionApp() {
             )}
 
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {exercise.modalities.map((m) => (
                 <Stat
                   key={m}
