@@ -993,7 +993,7 @@ const NBACK_CELL_ACTIVE = "#F7F8F8";
 
 // Grid box: full column width, capped so the square grid plus its answer
 // buttons always fit the viewport height.
-const NBACK_BOX_SIZE = "max(240px, min(100%, 1180px, calc(100vh - 120px)))";
+const NBACK_BOX_SIZE = "max(240px, min(100%, 1180px, calc(100vh - 210px)))";
 
 
 // ---------------------------------------------------------------------
@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 58;
+const BUILD_VERSION = 59;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:51 PM";
+const BUILD_TIME = "6:30 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2684,29 +2684,45 @@ function PrGoldGlow({ className, style, out }) {
       // Near-instant to rise so a hit is not smeared across three frames,
       // slow to fall so it blooms and eases back rather than flickering.
       level += (target - level) * (target > level ? 0.62 : 0.055);
-      el.style.transform = `scale(${(0.92 + level * 0.7).toFixed(3)})`;
-      el.style.filter = `brightness(${(0.88 + level * 1.6).toFixed(3)})`;
+      // Opacity, not brightness. The gradient is yellow on black, so
+      // brightening it barely changes anything — the colour is already at
+      // the top of its range. How much of it is on screen is the part the
+      // eye reads, and that is opacity.
+      el.style.opacity = (0.26 + level * 0.74).toFixed(3);
+      el.style.transform = `scale(${(0.82 + level * 0.9).toFixed(3)})`;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [out]);
 
+  // Two layers on purpose. The outer one owns the reveal fade and the
+  // fade-out at the end, both slow CSS transitions on opacity; the inner one
+  // is written every frame. One element cannot do both, since the per-frame
+  // write would fight the transition.
   return (
     <div
-      ref={ref}
       className={className}
       aria-hidden="true"
       style={{
         ...style,
-        willChange: "transform, filter, opacity",
         opacity: out ? 0 : style?.opacity,
-        background:
-          `radial-gradient(58% 46% at 50% 46%, ${PR_YELLOW}38 0%, ${PR_YELLOW}1F 34%, ${PR_YELLOW}0A 58%, transparent 78%)`,
         transition: out
           ? `opacity ${SONG_FADE_OUT}s linear`
           : style?.transition,
       }}
-    />
+    >
+      <div
+        ref={ref}
+        className="absolute inset-0"
+        style={{
+          willChange: "transform, opacity",
+          // Considerably stronger than it was. At the old alpha the bloom
+          // was all but invisible on the near-black backdrop, so no amount
+          // of modulation could be seen — the light was not there to move.
+          background: `radial-gradient(56% 44% at 50% 46%, ${PR_YELLOW}85 0%, ${PR_YELLOW}4D 28%, ${PR_YELLOW}1F 52%, transparent 76%)`,
+        }}
+      />
+    </div>
   );
 }
 
@@ -4479,7 +4495,15 @@ function buildRrtOrderExplanation(entry) {
 
 function ShapeIcon({ shape, color, size = 64 }) {
   const s = size;
-  const common = { fill: color };
+  // Every shape carries the same dark edge. On the near-white active cell a
+  // light stimulus colour otherwise has nothing holding its silhouette, and
+  // the shapes that do have an outline look like a different set.
+  const common = {
+    fill: color,
+    stroke: "#12171F",
+    strokeWidth: 2.4,
+    strokeLinejoin: "round",
+  };
   switch (shape) {
     case "square":
       return (
@@ -10893,15 +10917,15 @@ function NBackSessionApp() {
 
         {!switchNotice && screen === "running" && (
           <div className="flex flex-col items-center gap-2 w-full">
-            <div className="text-center">
+            {/* Title and trials-remaining on one line, so the header is a
+                single band above the grid rather than two stacked rows. */}
+            <div className="flex items-baseline justify-center gap-3">
               <div className="text-2xl font-semibold tracking-tight text-slate-100">
                 {exercise.key === "iqnb"
                   ? `${exercise.abbrev} ${qnbPrimeLevel.toFixed(2)}`
                   : `${exercise.abbrev}${n}B`}
               </div>
-              <div className="text-slate-400 text-base mt-0.5">
-                {trialCount - index}
-              </div>
+              <div className="text-slate-400 text-base">{trialCount - index}</div>
             </div>
 
             {/* Answer buttons flank the grid rather than sitting under it.
@@ -10979,7 +11003,7 @@ function NBackSessionApp() {
           </div>
         )}
 
-        {!switchNotice && screen === "results" && (
+        {!switchNotice && screen === "results" && exercise.key !== "overview" && (
           <div className="space-y-14">
             {Object.keys(newPRBanners).length > 0 && (
               <div className="grid grid-cols-1 gap-5">
