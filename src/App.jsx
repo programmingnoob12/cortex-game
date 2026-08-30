@@ -2153,9 +2153,19 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 59;
+const BUILD_VERSION = 60;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:30 PM";
+const BUILD_TIME = "6:36 PM";
+// What changed in this version, shown under the stamp on the regime screen.
+// One short line each, replaced wholesale every version — this is a "what
+// am I looking at" note, not a history.
+const BUILD_NOTES = [
+  "Record glow now visibly reacts to the music",
+  "Outlines on every N-back shape",
+  "Title and trial count on one line",
+  "Grid no longer hugs the bottom",
+  "Round results no longer appear on the overview",
+];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -8399,9 +8409,17 @@ function NBackSessionApp() {
                   &lsaquo; Back
                 </button>
               )}
-              <div className="text-slate-100 text-lg font-semibold mb-4">
+              <div className="text-slate-100 text-lg font-semibold">
                 VERSION {BUILD_VERSION} · {BUILD_TIME}
               </div>
+              <ul className="mt-1.5 mb-5 space-y-0.5">
+                {BUILD_NOTES.map((note) => (
+                  <li key={note} className="text-slate-500 text-xs flex gap-2">
+                    <span aria-hidden="true">·</span>
+                    <span className="truncate">{note}</span>
+                  </li>
+                ))}
+              </ul>
               <h1 className="text-5xl font-semibold tracking-tight">
                 Choose your regime
               </h1>
