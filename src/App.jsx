@@ -1588,6 +1588,7 @@ function useBinauralBeats(enabled) {
   const audioRef = useRef(null);
   const fadeRafRef = useRef(null);
   const playPromiseRef = useRef(null);
+  const settleRef = useRef(null);
   const [audioError, setAudioError] = useState(null);
 
   const describe = (audio) => {
@@ -1680,11 +1681,34 @@ function useBinauralBeats(enabled) {
         });
       }
       fadeTo(BINAURAL_VOLUME, 1200);
+      // Belt and braces. The fade is an animation-frame loop, and anything
+      // that stops that loop early (a thrown frame, a throttled tab) would
+      // leave the track playing at whatever volume it had got to — which,
+      // starting from zero, is silence. This lands the volume on target
+      // regardless of whether the fade finished.
+      settleRef.current = setTimeout(() => {
+        if (audioRef.current !== audio) return;
+        if (audio.volume < BINAURAL_VOLUME - 0.001) audio.volume = BINAURAL_VOLUME;
+        if (audio.paused) {
+          const again = audio.play();
+          playPromiseRef.current = again;
+          if (again && again.catch) again.catch(() => {});
+        }
+        // One line in Diagnostics describing what the element is actually
+        // doing a second and a half in, so a silent track can be diagnosed
+        // from the log instead of guessed at.
+        logClientError(
+          `binaural state: paused=${audio.paused} vol=${audio.volume.toFixed(2)} t=${audio.currentTime.toFixed(1)} ready=${audio.readyState} err=${audio.error ? audio.error.code : "none"} src=${audio.currentSrc.slice(-28)}`
+        );
+      }, 1500);
     } else {
       fadeTo(0, 500);
     }
 
-    return () => cancelAnimationFrame(fadeRafRef.current);
+    return () => {
+      cancelAnimationFrame(fadeRafRef.current);
+      clearTimeout(settleRef.current);
+    };
   }, [enabled]);
 
   // Full teardown only on unmount, not every toggle — keeps the same Audio
@@ -2129,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 50;
+const BUILD_VERSION = 51;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:34 AM";
+const BUILD_TIME = "2:58 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
