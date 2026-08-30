@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 46;
+const BUILD_VERSION = 48;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:24 AM";
+const BUILD_TIME = "1:52 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -4619,28 +4619,42 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
     // any colour from one file.
     const maskId = `qnbp-mask-${safeId}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
     const outlineMaskId = `${maskId}-o`;
+    const dilateId = `${maskId}-d`;
     const href = `${QNB_PICTOGRAM_BASE}${shape.slice(4)}.png`;
-    // A PNG silhouette can't take an SVG stroke, so the outline is the same
-    // silhouette drawn slightly larger in black and sitting underneath: the
-    // ring of it that the fill doesn't cover reads as an outline of matching
-    // weight to the stroke the vector shapes carry.
-    const grow = 2.0;
-    // The pictograms carry a lot of internal whitespace compared with the
-    // solid polyominoes, so drawn to the same box they read smaller. Given
-    // the full cell they sit at the same visual weight.
-    const inset = 1;
+    // A PNG silhouette cannot take an SVG stroke. Scaling a second copy up
+    // and putting it behind does not work either: scaling grows the shape
+    // away from its centre, so the edge nearest the middle gets no outline
+    // at all and the far edge gets a fat one. feMorphology dilates the alpha
+    // itself, which grows every edge by the same amount in every direction —
+    // a true outline. Set to the stroke width the vector shapes use, so the
+    // two families read at the same weight.
+    const OUTLINE = 1.3;
+    const inset = 1 + OUTLINE;
     const span = 100 - inset * 2;
     return (
       <svg width={size} height={size} viewBox="0 0 100 100">
         <defs>
+          <filter
+            id={dilateId}
+            x="-25%"
+            y="-25%"
+            width="150%"
+            height="150%"
+            filterUnits="objectBoundingBox"
+            primitiveUnits="userSpaceOnUse"
+            colorInterpolationFilters="sRGB"
+          >
+            <feMorphology operator="dilate" radius={OUTLINE} />
+          </filter>
           <mask id={outlineMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
             <image
               href={href}
-              x={inset - grow / 2}
-              y={inset - grow / 2}
-              width={span + grow}
-              height={span + grow}
+              x={inset}
+              y={inset}
+              width={span}
+              height={span}
               preserveAspectRatio="xMidYMid meet"
+              filter={`url(#${dilateId})`}
             />
           </mask>
           <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
