@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 56;
+const BUILD_VERSION = 57;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:01 PM";
+const BUILD_TIME = "5:43 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2634,6 +2634,7 @@ function PrGoldGlow({ className, style, out }) {
     let raf = 0;
     let data = null;
     let level = 0;
+    let peak = 0.12;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const el = ref.current;
@@ -2649,10 +2650,23 @@ function PrGoldGlow({ className, style, out }) {
       let sum = 0;
       for (let i = 0; i < bins; i++) sum += data[i];
       const raw = sum / bins / 255;
+      // Auto-gain. A mastered track sits in a narrow loudness band, so the
+      // raw reading barely leaves the middle of its range and a fixed
+      // mapping produces almost no visible movement. Tracking the loudest
+      // moment so far and measuring against it means the quiet stretch
+      // before the drop and the drop itself land at opposite extremes.
+      if (raw > peak) peak = raw;
+      else peak = Math.max(0.08, peak * 0.9985);
+      const floorLevel = peak * 0.42;
+      let norm = (raw - floorLevel) / Math.max(0.05, peak - floorLevel);
+      norm = Math.max(0, Math.min(1, norm));
+      // Squared, so quiet passages stay nearly still and loud ones throw it
+      // hard rather than everything drifting in the middle.
+      norm *= norm;
       // Fast to rise, slow to fall, so it snaps on a hit and eases back.
-      level += (raw - level) * (raw > level ? 0.35 : 0.07);
-      el.style.transform = `scale(${(1 + level * 0.34).toFixed(3)})`;
-      el.style.filter = `brightness(${(1 + level * 0.85).toFixed(3)})`;
+      level += (norm - level) * (norm > level ? 0.5 : 0.075);
+      el.style.transform = `scale(${(0.9 + level * 0.72).toFixed(3)})`;
+      el.style.filter = `brightness(${(0.85 + level * 1.5).toFixed(3)})`;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -8009,8 +8023,9 @@ function NBackSessionApp() {
   const [shineCard, setShineCard] = useState(null);
   const [prRevealed, setPrRevealed] = useState(false);
   const [prGlowOut, setPrGlowOut] = useState(false);
-  const prCinematic =
-    !!unlockInfo && unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad";
+  // Every exercise's record gets the full reveal, not just Quad's. A record
+  // is a record whichever screen it came off.
+  const prCinematic = !!unlockInfo && unlockInfo.isNewPR;
   useEffect(() => {
     if (!prCinematic) {
       setPrRevealed(false);
@@ -11015,11 +11030,11 @@ function NBackSessionApp() {
       {unlockInfo && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8"
-          /* Trial, Quad N-Back records only: the screen builds over the
-             stretch before the track's drop, rather than cutting in fully
-             formed while the music is still climbing. */
+          /* On a record the screen builds over the stretch before the
+             track's drop, rather than cutting in fully formed while the
+             music is still climbing. */
           style={
-            unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad"
+            unlockInfo.isNewPR
               ? { animation: "prBackdrop 2s ease-out both" }
               : undefined
           }
@@ -11091,7 +11106,7 @@ function NBackSessionApp() {
                     width: 12,
                     height: 12,
                     background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
-                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite`,
+                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite both`,
                   }}
                 />
               ))}
@@ -11148,7 +11163,12 @@ function NBackSessionApp() {
                       background: PR_YELLOW,
                       "--mx": `${(Math.cos(angle) * dist).toFixed(2)}vw`,
                       "--my": `${(Math.sin(angle) * dist).toFixed(2)}vh`,
-                      animation: `prMote 2.6s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite`,
+                      /* `both` matters more than it looks: without a fill
+                         mode, a mote waiting out its delay shows its
+                         un-animated state — opacity 1, no transform — so all
+                         eighteen sat stacked at dead centre as one small dot
+                         until their turn came. */
+                      animation: `prMote 2.6s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite both`,
                     }}
                   />
                 );
