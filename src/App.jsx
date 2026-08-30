@@ -2078,7 +2078,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 43;
+const BUILD_VERSION = 44;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:12 AM";
 
@@ -4434,14 +4434,78 @@ const SHAPE_CLIP_GEOMETRY = {
   hexagon: { el: "polygon", props: { points: "50,6 90,28 90,72 50,94 10,72 10,28" } },
 };
 
+
+// ---------------------------------------------------------------------
+// QNB' SHAPE SET
+// ---------------------------------------------------------------------
+// QNB' gets its own shapes, deliberately nothing like the basic polygons
+// Quad N-Back uses, so the two exercises never feel like the same task.
+//
+// Two families:
+//
+// POLYOMINOES — tetrominoes and pentominoes. The outlines are generated from
+// their cell grids by tracing the boundary, so each is one closed path rather
+// than four squares with visible seams where they meet. Geometry, not
+// artwork: nothing is copied from anywhere.
+const QNB_POLYOMINO_GEOMETRY = {
+  tetI: { el: "path", props: { d: "M6.0 39.0 L94.0 39.0 L94.0 61.0 L6.0 61.0 Z" } },
+  tetO: { el: "path", props: { d: "M6.0 6.0 L94.0 6.0 L94.0 94.0 L6.0 94.0 Z" } },
+  tetT: { el: "path", props: { d: "M6.0 20.7 L94.0 20.7 L94.0 50.0 L64.7 50.0 L64.7 79.3 L35.3 79.3 L35.3 50.0 L6.0 50.0 Z" } },
+  tetS: { el: "path", props: { d: "M35.3 20.7 L94.0 20.7 L94.0 50.0 L64.7 50.0 L64.7 79.3 L6.0 79.3 L6.0 50.0 L35.3 50.0 Z" } },
+  tetZ: { el: "path", props: { d: "M6.0 20.7 L64.7 20.7 L64.7 50.0 L94.0 50.0 L94.0 79.3 L35.3 79.3 L35.3 50.0 L6.0 50.0 Z" } },
+  tetJ: { el: "path", props: { d: "M6.0 20.7 L35.3 20.7 L35.3 50.0 L94.0 50.0 L94.0 79.3 L6.0 79.3 Z" } },
+  tetL: { el: "path", props: { d: "M64.7 20.7 L94.0 20.7 L94.0 79.3 L6.0 79.3 L6.0 50.0 L64.7 50.0 Z" } },
+  penP: { el: "path", props: { d: "M20.7 6.0 L79.3 6.0 L79.3 64.7 L50.0 64.7 L50.0 94.0 L20.7 94.0 Z" } },
+  penU: { el: "path", props: { d: "M6.0 20.7 L35.3 20.7 L35.3 50.0 L64.7 50.0 L64.7 20.7 L94.0 20.7 L94.0 79.3 L6.0 79.3 Z" } },
+  penF: { el: "path", props: { d: "M35.3 6.0 L94.0 6.0 L94.0 35.3 L64.7 35.3 L64.7 94.0 L35.3 94.0 L35.3 64.7 L6.0 64.7 L6.0 35.3 L35.3 35.3 Z" } },
+  penW: { el: "path", props: { d: "M6.0 6.0 L35.3 6.0 L35.3 35.3 L64.7 35.3 L64.7 64.7 L94.0 64.7 L94.0 94.0 L35.3 94.0 L35.3 64.7 L6.0 64.7 Z" } },
+  penX: { el: "path", props: { d: "M35.3 6.0 L64.7 6.0 L64.7 35.3 L94.0 35.3 L94.0 64.7 L64.7 64.7 L64.7 94.0 L35.3 94.0 L35.3 64.7 L6.0 64.7 L6.0 35.3 L35.3 35.3 Z" } },
+};
+
+// PICTOGRAMS — the US National Park Service map symbols, which are a federal
+// work and therefore public domain. They are white-on-transparent PNGs, used
+// here as SVG masks so the Voronoi fill shows through the symbol's silhouette
+// and takes the trial's colour, exactly as the vector shapes do.
+const QNB_PICTOGRAM_BASE = "/images/qnb/";
+const QNB_PICTOGRAMS = [
+  "campfire",
+  "sailing",
+  "airport",
+  "fishing",
+  "telephone",
+  "horseback-riding",
+  "swimming",
+  "picnic-area",
+  "drinking-water",
+  "gas-station",
+  "lodging",
+  "store",
+];
+
+// The pool QNB' draws from. Prefixed so the renderer can tell at a glance
+// which family a shape belongs to.
+const QNB_PRIME_SHAPES = [
+  ...Object.keys(QNB_POLYOMINO_GEOMETRY),
+  ...QNB_PICTOGRAMS.map((n) => `nps:${n}`),
+];
+
 // QNB' draws its color/shape stimulus as a Voronoi-textured blob clipped to
 // the same outline ShapeIcon uses, instead of a flat solid fill — reuses the
 // same voronoiCells() generator RRT's Voronoi items use.
 function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
-  // Back to the original outlines. QNB_SHAPE_GEOMETRY is still defined for
-  // when a richer set is wanted, but nothing routes to it right now.
-  const parts = [SHAPE_CLIP_GEOMETRY[shape] || SHAPE_CLIP_GEOMETRY.square];
-  const clipId = `qnbp-clip-${shape}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
+  // Three sources, in order: a pictogram (masked PNG), a polyomino, or one of
+  // the original polygons. QNB_SHAPE_GEOMETRY is still defined for when a
+  // different vector set is wanted.
+  const isPictogram = typeof shape === "string" && shape.startsWith("nps:");
+  const parts = isPictogram
+    ? []
+    : [
+        QNB_POLYOMINO_GEOMETRY[shape] ||
+          SHAPE_CLIP_GEOMETRY[shape] ||
+          SHAPE_CLIP_GEOMETRY.square,
+      ];
+  const safeId = `${shape}`.replace(/[^a-zA-Z0-9]/g, "");
+  const clipId = `qnbp-clip-${safeId}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
   // The same straight-cut partition RRT's tiles use, rather than the older
   // many-celled mosaic: fewer, bigger, flat regions read far better at this
   // size. The stimulus colour takes the largest region so the shape still
@@ -4456,6 +4520,35 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
       }),
     [seed, color, shape]
   );
+  if (isPictogram) {
+    // The PNG is white on transparent, so its alpha is the silhouette. Used
+    // as a mask, the Voronoi fill shows through the symbol and takes the
+    // trial's colour — the same trick Brain Workshop uses to get any shape in
+    // any colour from one file.
+    const maskId = `qnbp-mask-${safeId}-${(seed || color).replace(/[^a-zA-Z0-9]/g, "")}`;
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100">
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+            <image
+              href={`${QNB_PICTOGRAM_BASE}${shape.slice(4)}.png`}
+              x="6"
+              y="6"
+              width="88"
+              height="88"
+              preserveAspectRatio="xMidYMid meet"
+            />
+          </mask>
+        </defs>
+        <g mask={`url(#${maskId})`}>
+          {cells.map((c, i) => (
+            <polygon key={i} points={c.points} fill={c.color} />
+          ))}
+        </g>
+      </svg>
+    );
+  }
+
   return (
     <svg width={size} height={size} viewBox="0 0 100 100">
       <defs>
@@ -6969,13 +7062,21 @@ function NBackSessionApp() {
         : ex.key === "quad"
         ? 0.25
         : 0.3;
+      // QNB' draws from its own shape pool — polyominoes and pictograms —
+      // rather than the basic polygons the other N-back exercises use. A
+      // random eight per session, the way Brain Workshop picks a subset of a
+      // set, so the shapes vary between sessions without changing how often
+      // a match can occur.
+      const runShapeSet = isQnbPrime
+        ? [...QNB_PRIME_SHAPES].sort(() => Math.random() - 0.5).slice(0, 8)
+        : null;
       const seq = generateSequence(
         modalities,
         nn,
         tt,
         runInterference,
         runMatchChance,
-        null
+        runShapeSet
       );
       setSequence(seq);
       setResults([]);
