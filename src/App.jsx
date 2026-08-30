@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 55;
+const BUILD_VERSION = 56;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:40 PM";
+const BUILD_TIME = "5:01 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2293,62 +2293,71 @@ let cheerBytes = null;
 // Fetching needs no audio context, so it happens at load. Decoding does, so
 // it waits until there is one — creating a context here would create it
 // suspended and take the rest of the app's audio down with it.
-// The card press. Brighter and longer than the click: a filtered noise
-// sweep rising under a stack of bell partials, so it reads as something
-// catching the light rather than being tapped.
+// The card press. A struck-metal tap: a very short bright transient, then
+// a stack of INHARMONIC partials ringing above it. Harmonic ratios (2x, 3x)
+// sound like a pitched instrument; the ratios below are the ones a struck
+// bar or bell actually produces, and they are what the ear hears as metal.
 function playShine() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
     const master = ctx.createGain();
-    master.gain.value = 0.13;
-    master.connect(ctx.destination);
+    master.gain.value = 0.15;
+    // Rolls off everything below the strike so it stays bright and small
+    // rather than thudding.
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 900;
+    master.connect(hp);
+    hp.connect(ctx.destination);
 
-    // Noise through a bandpass that sweeps upward — the "shhing".
-    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.42));
+    // The contact itself: a few milliseconds of noise, gone almost before
+    // it registers. Without it the partials sound blown rather than struck.
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.02));
     const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < frames; i++) {
       const t = i / frames;
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.2);
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 5);
     }
     const noise = ctx.createBufferSource();
     noise.buffer = buf;
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.Q.value = 4.5;
-    bp.frequency.setValueAtTime(900, now);
-    bp.frequency.exponentialRampToValueAtTime(7200, now + 0.34);
+    bp.frequency.value = 5200;
+    bp.Q.value = 1.1;
     const noiseGain = ctx.createGain();
-    noiseGain.gain.setValueAtTime(0.0001, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.5, now + 0.05);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+    noiseGain.gain.value = 0.9;
     noise.connect(bp);
     bp.connect(noiseGain);
     noiseGain.connect(master);
     noise.start(now);
-    noise.stop(now + 0.45);
 
-    // A major-ninth spread, high and thin, arriving just behind the sweep.
+    // Struck-bar ratios. Everything lands at once, as a strike does, and
+    // the higher partials die first so the tap brightens then thins out.
+    const base = 1180;
     [
-      { freq: 1046.5, at: 0.0, level: 0.34, len: 0.5 },
-      { freq: 1568.0, at: 0.045, level: 0.28, len: 0.44 },
-      { freq: 2093.0, at: 0.085, level: 0.2, len: 0.38 },
-      { freq: 3136.0, at: 0.125, level: 0.13, len: 0.32 },
-    ].forEach(({ freq, at, level, len }) => {
-      const start = now + at;
+      { r: 1, level: 0.5, len: 0.62 },
+      { r: 2.756, level: 0.34, len: 0.42 },
+      { r: 5.404, level: 0.24, len: 0.3 },
+      { r: 8.933, level: 0.16, len: 0.21 },
+      { r: 13.34, level: 0.1, len: 0.14 },
+      { r: 3.932, level: 0.18, len: 0.34 },
+    ].forEach(({ r, level, len }) => {
       const osc = ctx.createOscillator();
       osc.type = "sine";
-      osc.frequency.value = freq;
+      // A hair of detune per partial so it shimmers instead of sitting
+      // dead still, the way a real bar never rings perfectly pure.
+      osc.frequency.setValueAtTime(base * r * (1 + (Math.random() - 0.5) * 0.006), now);
       const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, start);
-      g.gain.exponentialRampToValueAtTime(level, start + 0.014);
-      g.gain.exponentialRampToValueAtTime(0.0001, start + len);
+      g.gain.setValueAtTime(0.0001, now);
+      g.gain.exponentialRampToValueAtTime(level, now + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + len);
       osc.connect(g);
       g.connect(master);
-      osc.start(start);
-      osc.stop(start + len + 0.05);
+      osc.start(now);
+      osc.stop(now + len + 0.05);
     });
   } catch (err) {
     // Audio is a nicety here; a failure must never break the press.
@@ -8701,7 +8710,7 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card no-sheen rounded-xl p-6 text-white text-left${
+                    className={`ex-card rounded-xl p-6 text-white text-left${
                       shineCard === e.key ? " ex-card-shine" : ""
                     }`}
                     style={{
