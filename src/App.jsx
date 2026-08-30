@@ -1578,37 +1578,73 @@ const MODALITY_KEY_LABEL = { pos: "A", audio: "L", color: "F", shape: "J" };
 // a `public/audio/` folder in a Vite/CRA/Next app) — update the path
 // below if you put it somewhere else.
 const BACKGROUND_MUSIC_SRC = "/audio/bina-beats.mp3";
+// Version tag on the URL. Before the track existed, requests for this path
+// fell through to the SPA rewrite and came back as index.html with a 200,
+// which browsers cache — and a cached HTML body under an audio src fails to
+// decode forever after. Bumping this string sidesteps any such stale entry.
+const BACKGROUND_MUSIC_CACHE_TAG = "v1";
 const BINAURAL_VOLUME = 0.35; // background listening level — tune to taste
 function useBinauralBeats(enabled) {
   const audioRef = useRef(null);
   const fadeRafRef = useRef(null);
+  const playPromiseRef = useRef(null);
   const [audioError, setAudioError] = useState(null);
+
+  const describe = (audio) => {
+    const codes = {
+      1: "playback aborted",
+      2: "network error fetching the track",
+      3: "the track could not be decoded",
+      4: "the track was not found or is not a supported format",
+    };
+    if (audio && audio.error) return codes[audio.error.code] || "audio element error";
+    return null;
+  };
 
   const ensureAudio = () => {
     if (audioRef.current) return audioRef.current;
-    const audio = new Audio(BACKGROUND_MUSIC_SRC);
+    const audio = new Audio(
+      `${BACKGROUND_MUSIC_SRC}?${BACKGROUND_MUSIC_CACHE_TAG}`
+    );
     audio.loop = true;
     audio.volume = 0;
     audio.preload = "auto";
+    audio.addEventListener("error", () => {
+      const msg = describe(audio) || "the track failed to load";
+      setAudioError(msg);
+      logClientError(`binaural: ${msg}`);
+    });
     audioRef.current = audio;
     return audio;
   };
 
-  // Call this DIRECTLY from the toggle's onClick — synchronously, in the
-  // same call stack as the actual tap. Autoplay policies require play() to
-  // be triggered inside a user gesture; deferring it into a useEffect after
-  // a state update can get silently blocked in some browsers, which looks
-  // exactly like "toggle is on but nothing plays".
+  // Start the element inside the tap that turned the toggle on. Autoplay
+  // policy grants an element permission the first time play() is called from
+  // a real gesture, and that permission sticks for the element's lifetime —
+  // which is what lets the exercise start it later without a second tap.
   const unlock = () => {
     setAudioError(null);
     const audio = ensureAudio();
-    audio.play().catch((err) => setAudioError(`${err.name}: ${err.message}`));
+    const p = audio.play();
+    playPromiseRef.current = p;
+    if (p && p.catch) {
+      p.catch((err) => {
+        // An interrupted play (we paused it again straight away) is normal
+        // and not worth showing.
+        if (err && err.name === "AbortError") return;
+        setAudioError(`${err.name}: ${err.message}`);
+        logClientError(`binaural play: ${err.name}: ${err.message}`);
+      });
+    }
   };
 
   useEffect(() => {
-    if (enabled && !audioRef.current) unlock(); // in case this effect fires before a prior unlock()
+    if (!audioRef.current) {
+      if (!enabled) return undefined;
+      unlock();
+    }
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio) return undefined;
 
     const fadeTo = (target, durationMs) => {
       cancelAnimationFrame(fadeRafRef.current);
@@ -1616,18 +1652,33 @@ function useBinauralBeats(enabled) {
       const startTime = performance.now();
       const step = (now) => {
         const t = Math.min(1, (now - startTime) / durationMs);
-        audio.volume = start + (target - start) * t;
+        audio.volume = Math.max(0, Math.min(1, start + (target - start) * t));
         if (t < 1) {
           fadeRafRef.current = requestAnimationFrame(step);
         } else if (target === 0) {
-          audio.pause();
+          // Only ever pause once the play() that started it has settled;
+          // pausing a pending play() throws and, worse, can leave the
+          // element in a state where the next play() never resolves.
+          Promise.resolve(playPromiseRef.current)
+            .catch(() => {})
+            .then(() => {
+              if (audioRef.current === audio && audio.volume === 0) audio.pause();
+            });
         }
       };
       fadeRafRef.current = requestAnimationFrame(step);
     };
 
     if (enabled) {
-      audio.play().catch((err) => setAudioError(`${err.name}: ${err.message}`));
+      const p = audio.play();
+      playPromiseRef.current = p;
+      if (p && p.catch) {
+        p.catch((err) => {
+          if (err && err.name === "AbortError") return;
+          setAudioError(`${err.name}: ${err.message}`);
+          logClientError(`binaural play: ${err.name}: ${err.message}`);
+        });
+      }
       fadeTo(BINAURAL_VOLUME, 1200);
     } else {
       fadeTo(0, 500);
@@ -2078,9 +2129,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 49;
+const BUILD_VERSION = 50;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:05 AM";
+const BUILD_TIME = "2:34 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
