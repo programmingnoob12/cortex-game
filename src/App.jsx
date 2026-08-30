@@ -2153,18 +2153,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 60;
+const BUILD_VERSION = 61;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:36 PM";
+const BUILD_TIME = "7:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Record glow now visibly reacts to the music",
-  "Outlines on every N-back shape",
-  "Title and trial count on one line",
-  "Grid no longer hugs the bottom",
-  "Round results no longer appear on the overview",
+  "Trial count matches the title's size and colour",
+  "Session-done tune no longer plays twice",
+  "Level-up tune ends on a brighter note",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2886,8 +2884,17 @@ function fadeOutCelebrationSong(seconds = 3) {
 // out as oscillators rather than shipped as a file, so there is no licence
 // attached to it and nothing to attribute. Deliberately quiet: it plays on
 // top of the level-up overlay, which is already carrying the moment.
+let lastLevelUpAt = 0;
 function playLevelUp() {
   try {
+    // Two callers can legitimately fire on the same moment — finishing a
+    // session queues an achievement check, and the achievement effect plays
+    // this too — so the tune came out twice, stacked and louder. One is
+    // enough; anything inside a quarter second of the last is the same
+    // event arriving by a second route.
+    const t = Date.now();
+    if (t - lastLevelUpAt < 300) return;
+    lastLevelUpAt = t;
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
@@ -2895,14 +2902,16 @@ function playLevelUp() {
     master.gain.value = 0.1;
     master.connect(ctx.destination);
 
-    // C5 E5 G5 C6. The octave lands last and rings roughly twice as long,
-    // which is what makes it read as an arrival rather than a sequence that
-    // simply stopped.
+    // C5 E5 G5 E6. Landing on the third an octave and a half up rather than
+    // on the root: the root is where a phrase comes to rest, the third is
+    // where it opens out, which is why this version lifts. It also rings
+    // longest, so it reads as an arrival rather than a sequence that simply
+    // stopped.
     const notes = [
       { freq: 523.25, at: 0, len: 0.5 },
       { freq: 659.25, at: 0.075, len: 0.5 },
       { freq: 783.99, at: 0.15, len: 0.55 },
-      { freq: 1046.5, at: 0.235, len: 0.95 },
+      { freq: 1318.51, at: 0.235, len: 1.05 },
     ];
     notes.forEach(({ freq, at, len }, i) => {
       const start = now + at;
@@ -10943,7 +10952,9 @@ function NBackSessionApp() {
                   ? `${exercise.abbrev} ${qnbPrimeLevel.toFixed(2)}`
                   : `${exercise.abbrev}${n}B`}
               </div>
-              <div className="text-slate-400 text-base">{trialCount - index}</div>
+              <div className="text-2xl font-semibold tracking-tight text-slate-100">
+                {trialCount - index}
+              </div>
             </div>
 
             {/* Answer buttons flank the grid rather than sitting under it.
