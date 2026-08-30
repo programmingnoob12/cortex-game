@@ -2153,14 +2153,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 62;
+const BUILD_VERSION = 63;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:35 PM";
+const BUILD_TIME = "11:06 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Gem moved to the right of each card, larger",
+  "Best-average markers now read New PR",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10615,7 +10615,7 @@ function NBackSessionApp() {
                                   {formatLevelValue(e, row.dayAvg)}
                                   {row.isAvgPR && (
                                     <span className="lg:hidden ml-2 text-xs font-semibold">
-                                      Best avg!
+                                      New PR!
                                     </span>
                                   )}
                                 </td>
@@ -10644,7 +10644,7 @@ function NBackSessionApp() {
                             }}
                           >
                             <span aria-hidden="true">←</span>
-                            {row.isPR ? "New PR!" : "Best avg!"}
+                            New PR!
                           </div>
                         ) : null
                       )}

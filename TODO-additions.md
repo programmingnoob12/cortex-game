@@ -47,3 +47,20 @@ progress on the exercises, and label the index figures as estimates.
 
 This supersedes the earlier item 21 (quiz before checkout), which had no
 detail.
+
+## 30. Ragebait for marketing, occasionally
+
+Deliberately provocative posts as part of the marketing mix, not the whole of
+it. Works by drawing argument in the replies, which is engagement either way.
+
+Angles that fit the product:
+- Claims about which training actually transfers, stated flatly
+- Rankings that put a popular app or method last
+- A hard take on IQ, talent or "you cannot train intelligence"
+- Posting a score and calling a threshold average
+
+Worth deciding up front: keep it to opinions about the field, not attacks on
+named people or groups. The first kind gets argued with and spreads; the
+second gets the account reported and follows the brand around afterwards.
+Ration it too. An account that is only ragebait stops converting, because
+nobody trusts it enough to buy.
