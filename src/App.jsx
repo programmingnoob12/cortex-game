@@ -1583,7 +1583,7 @@ const BACKGROUND_MUSIC_SRC = "/audio/bina-beats.mp3";
 // which browsers cache — and a cached HTML body under an audio src fails to
 // decode forever after. Bumping this string sidesteps any such stale entry.
 const BACKGROUND_MUSIC_CACHE_TAG = "v1";
-const BINAURAL_VOLUME = 0.35; // background listening level — tune to taste
+const BINAURAL_VOLUME = 0.245; // background listening level — tune to taste
 function useBinauralBeats(enabled) {
   const audioRef = useRef(null);
   const fadeRafRef = useRef(null);
@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 51;
+const BUILD_VERSION = 52;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:58 PM";
+const BUILD_TIME = "3:12 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
