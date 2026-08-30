@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 45;
+const BUILD_VERSION = 46;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:56 AM";
+const BUILD_TIME = "1:24 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2472,6 +2472,28 @@ function playSessionDone() {
 // the middle where the energy is, mirrored top and bottom so the screen
 // reads as a band rather than a chart. Pure canvas: 64 bars a frame is
 // nothing, and it costs no DOM.
+// The record screen's backdrop. A still gold bloom rather than something
+// driven by the music: the reveal already carries the motion, and a glow
+// pumping on the beat behind it competed with the content. It comes up with
+// the reveal and goes out on the song's fade so the two end together.
+function PrGoldGlow({ className, style, out }) {
+  return (
+    <div
+      className={className}
+      aria-hidden="true"
+      style={{
+        ...style,
+        opacity: out ? 0 : style?.opacity,
+        background:
+          `radial-gradient(58% 46% at 50% 46%, ${PR_YELLOW}38 0%, ${PR_YELLOW}1F 34%, ${PR_YELLOW}0A 58%, transparent 78%)`,
+        transition: out
+          ? `opacity ${SONG_FADE_OUT}s linear`
+          : style?.transition,
+      }}
+    />
+  );
+}
+
 function SongVisualizer({ className, style }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -4519,12 +4541,44 @@ function shuffled(list) {
   }
   return out;
 }
+// Picking a fresh random handful each time meant some shapes went many
+// sessions without ever appearing. Instead each family is a deck that is
+// dealt from and only reshuffled once it runs out, so a few sessions cover
+// the whole set and nothing sits unseen.
+const QNB_DECK_KEY = "cortex.qnbDecks.v1";
+function readQnbDecks() {
+  try {
+    const raw = localStorage.getItem(QNB_DECK_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    if (parsed && Array.isArray(parsed.poly) && Array.isArray(parsed.pict)) return parsed;
+  } catch {
+    /* fall through to a fresh pair of decks */
+  }
+  return { poly: [], pict: [] };
+}
+function dealFrom(deck, source, count) {
+  let d = deck.filter((x) => source.includes(x));
+  const out = [];
+  while (out.length < count) {
+    if (d.length === 0) d = shuffled(source);
+    out.push(d.shift());
+  }
+  return { taken: out, rest: d };
+}
 function pickQnbShapeSet(count = 8) {
   const half = Math.floor(count / 2);
-  return shuffled([
-    ...shuffled(QNB_POLYOMINO_SHAPES).slice(0, half),
-    ...shuffled(QNB_PICTOGRAM_SHAPES).slice(0, count - half),
-  ]);
+  const decks = readQnbDecks();
+  const poly = dealFrom(decks.poly, QNB_POLYOMINO_SHAPES, half);
+  const pict = dealFrom(decks.pict, QNB_PICTOGRAM_SHAPES, count - half);
+  try {
+    localStorage.setItem(
+      QNB_DECK_KEY,
+      JSON.stringify({ poly: poly.rest, pict: pict.rest })
+    );
+  } catch {
+    /* a session without persistence just gets a random draw next time */
+  }
+  return shuffled([...poly.taken, ...pict.taken]);
 }
 
 // QNB' draws its color/shape stimulus as a Voronoi-textured blob clipped to
@@ -4570,27 +4624,32 @@ function VoronoiShapeIcon({ shape, color, seed, size = 64 }) {
     // silhouette drawn slightly larger in black and sitting underneath: the
     // ring of it that the fill doesn't cover reads as an outline of matching
     // weight to the stroke the vector shapes carry.
-    const grow = 3.2;
+    const grow = 2.0;
+    // The pictograms carry a lot of internal whitespace compared with the
+    // solid polyominoes, so drawn to the same box they read smaller. Given
+    // the full cell they sit at the same visual weight.
+    const inset = 1;
+    const span = 100 - inset * 2;
     return (
       <svg width={size} height={size} viewBox="0 0 100 100">
         <defs>
           <mask id={outlineMaskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
             <image
               href={href}
-              x={6 - grow / 2}
-              y={6 - grow / 2}
-              width={88 + grow}
-              height={88 + grow}
+              x={inset - grow / 2}
+              y={inset - grow / 2}
+              width={span + grow}
+              height={span + grow}
               preserveAspectRatio="xMidYMid meet"
             />
           </mask>
           <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
             <image
               href={href}
-              x="6"
-              y="6"
-              width="88"
-              height="88"
+              x={inset}
+              y={inset}
+              width={span}
+              height={span}
               preserveAspectRatio="xMidYMid meet"
             />
           </mask>
@@ -7749,6 +7808,7 @@ function NBackSessionApp() {
   // animation-delay. A delay that big is fragile: any re-render restarts it
   // and the screen sits in its blurred opening frame indefinitely.
   const [prRevealed, setPrRevealed] = useState(false);
+  const [prGlowOut, setPrGlowOut] = useState(false);
   const prCinematic =
     !!unlockInfo && unlockInfo.isNewPR && unlockInfo.exerciseKey === "quad";
   useEffect(() => {
@@ -7757,8 +7817,19 @@ function NBackSessionApp() {
       return undefined;
     }
     setPrRevealed(false);
+    setPrGlowOut(false);
     const t = setTimeout(() => setPrRevealed(true), 4700);
-    return () => clearTimeout(t);
+    // The song plays SONG_START..SONG_FADE_OUT_AT and then fades over
+    // SONG_FADE_OUT. The glow starts its own fade at the same moment and
+    // over the same span, so the light and the music leave together.
+    const g = setTimeout(
+      () => setPrGlowOut(true),
+      (SONG_FADE_OUT_AT - SONG_START) * 1000
+    );
+    return () => {
+      clearTimeout(t);
+      clearTimeout(g);
+    };
   }, [prCinematic, unlockInfo]);
 
   // Fetch and decode the applause once, up front, so the first record of a
@@ -10676,7 +10747,7 @@ function NBackSessionApp() {
                 logPartialSession(exercise.key);
                 setMainView("home");
               }}
-              className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium -mb-5"
+              className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-2"
             >
               ‹ Home
             </button>
@@ -10870,8 +10941,9 @@ function NBackSessionApp() {
             </div>
           )}
           {prCinematic && (
-            <SongVisualizer
+            <PrGoldGlow
               className="pointer-events-none absolute inset-0 w-full h-full"
+              out={prGlowOut}
               style={{
                 opacity: prRevealed ? 1 : 0,
                 transition: "opacity 2s ease-out",
