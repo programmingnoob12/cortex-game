@@ -2153,9 +2153,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 54;
+const BUILD_VERSION = 55;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:40 PM";
+const BUILD_TIME = "4:40 PM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
@@ -2293,6 +2293,68 @@ let cheerBytes = null;
 // Fetching needs no audio context, so it happens at load. Decoding does, so
 // it waits until there is one — creating a context here would create it
 // suspended and take the rest of the app's audio down with it.
+// The card press. Brighter and longer than the click: a filtered noise
+// sweep rising under a stack of bell partials, so it reads as something
+// catching the light rather than being tapped.
+function playShine() {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.value = 0.13;
+    master.connect(ctx.destination);
+
+    // Noise through a bandpass that sweeps upward — the "shhing".
+    const frames = Math.max(1, Math.floor(ctx.sampleRate * 0.42));
+    const buf = ctx.createBuffer(1, frames, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < frames; i++) {
+      const t = i / frames;
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2.2);
+    }
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 4.5;
+    bp.frequency.setValueAtTime(900, now);
+    bp.frequency.exponentialRampToValueAtTime(7200, now + 0.34);
+    const noiseGain = ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.0001, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.5, now + 0.05);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+    noise.connect(bp);
+    bp.connect(noiseGain);
+    noiseGain.connect(master);
+    noise.start(now);
+    noise.stop(now + 0.45);
+
+    // A major-ninth spread, high and thin, arriving just behind the sweep.
+    [
+      { freq: 1046.5, at: 0.0, level: 0.34, len: 0.5 },
+      { freq: 1568.0, at: 0.045, level: 0.28, len: 0.44 },
+      { freq: 2093.0, at: 0.085, level: 0.2, len: 0.38 },
+      { freq: 3136.0, at: 0.125, level: 0.13, len: 0.32 },
+    ].forEach(({ freq, at, level, len }) => {
+      const start = now + at;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, start);
+      g.gain.exponentialRampToValueAtTime(level, start + 0.014);
+      g.gain.exponentialRampToValueAtTime(0.0001, start + len);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(start);
+      osc.stop(start + len + 0.05);
+    });
+  } catch (err) {
+    // Audio is a nicety here; a failure must never break the press.
+  }
+}
+
 function preloadCheer() {
   if (cheerLoadStarted) return;
   cheerLoadStarted = true;
@@ -2552,12 +2614,49 @@ function playSessionDone() {
 // pumping on the beat behind it competed with the content. It comes up with
 // the reveal and goes out on the song's fade so the two end together.
 function PrGoldGlow({ className, style, out }) {
+  const ref = useRef(null);
+  // The bloom breathes with the track. Read straight off the analyser and
+  // written to the element each frame rather than through state, so the
+  // motion is smooth and no React render happens sixty times a second. The
+  // low end drives it, which is what makes it track the beat instead of
+  // just overall loudness.
+  useEffect(() => {
+    if (out) return undefined;
+    let raf = 0;
+    let data = null;
+    let level = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const el = ref.current;
+      if (!el) return;
+      const analyser = getSongAnalyser();
+      if (!analyser) return;
+      if (!data || data.length !== analyser.frequencyBinCount) {
+        data = new Uint8Array(analyser.frequencyBinCount);
+      }
+      analyser.getByteFrequencyData(data);
+      // Bottom eighth of the spectrum: kick, bass, the parts a drop moves.
+      const bins = Math.max(4, Math.floor(data.length / 8));
+      let sum = 0;
+      for (let i = 0; i < bins; i++) sum += data[i];
+      const raw = sum / bins / 255;
+      // Fast to rise, slow to fall, so it snaps on a hit and eases back.
+      level += (raw - level) * (raw > level ? 0.35 : 0.07);
+      el.style.transform = `scale(${(1 + level * 0.34).toFixed(3)})`;
+      el.style.filter = `brightness(${(1 + level * 0.85).toFixed(3)})`;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [out]);
+
   return (
     <div
+      ref={ref}
       className={className}
       aria-hidden="true"
       style={{
         ...style,
+        willChange: "transform, filter, opacity",
         opacity: out ? 0 : style?.opacity,
         background:
           `radial-gradient(58% 46% at 50% 46%, ${PR_YELLOW}38 0%, ${PR_YELLOW}1F 34%, ${PR_YELLOW}0A 58%, transparent 78%)`,
@@ -7896,6 +7995,9 @@ function NBackSessionApp() {
   // Quad N-Back record reveal, driven by a timer rather than a long CSS
   // animation-delay. A delay that big is fragile: any re-render restarts it
   // and the screen sits in its blurred opening frame indefinitely.
+  // Which Home card is mid-shine. One at a time; cleared when its sweep
+  // finishes so the same card can be pressed again straight away.
+  const [shineCard, setShineCard] = useState(null);
   const [prRevealed, setPrRevealed] = useState(false);
   const [prGlowOut, setPrGlowOut] = useState(false);
   const prCinematic =
@@ -8134,10 +8236,14 @@ function NBackSessionApp() {
           100% { opacity: 0; }
         }
         /* Motes travelling inward from the edge to the centre. */
+        /* They fade out well before the centre. Ending at translate(0,0)
+           stacked all eighteen on the same pixel, which read as one small
+           dot sitting in the middle of the screen. */
         @keyframes prMote {
           0% { opacity: 0; transform: translate(var(--mx), var(--my)) scale(0.6); }
           20% { opacity: 1; }
-          100% { opacity: 0; transform: translate(0, 0) scale(0.2); }
+          72% { opacity: 0; }
+          100% { opacity: 0; transform: translate(calc(var(--mx) * 0.18), calc(var(--my) * 0.18)) scale(0.2); }
         }
         @keyframes prSparkle {
           0%, 100% { opacity: 0; transform: scale(0.3); }
@@ -8584,9 +8690,20 @@ function NBackSessionApp() {
                 const acc = ACCENT_STYLES[e.accent];
                 const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
                 return (
-                  <div
+                  /* A button rather than a div so it takes a press properly:
+                     it lifts under the cursor, and a click runs a light
+                     sweep across the face with a matching sound. */
+                  <button
+                    type="button"
                     key={e.key}
-                    className="rounded-xl p-6 text-white"
+                    onClick={() => {
+                      playShine();
+                      setShineCard(e.key);
+                    }}
+                    onAnimationEnd={() => setShineCard(null)}
+                    className={`ex-card no-sheen rounded-xl p-6 text-white text-left${
+                      shineCard === e.key ? " ex-card-shine" : ""
+                    }`}
                     style={{
                       backgroundImage: exerciseDeepFill(exColor),
                       boxShadow:
@@ -8618,7 +8735,7 @@ function NBackSessionApp() {
                           : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
                       </div>
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -10631,7 +10748,7 @@ function NBackSessionApp() {
                   <div>
                     <div className="text-base font-medium text-slate-100">Binaural beats</div>
                     <div className="text-sm text-slate-500 mt-0.5">
-                      40Hz Gamma tone, played quietly underneath the exercise audio
+                      40Hz Gamma tone
                     </div>
                   </div>
                   <Toggle
