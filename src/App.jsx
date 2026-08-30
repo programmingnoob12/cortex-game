@@ -2078,9 +2078,9 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 48;
+const BUILD_VERSION = 49;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:52 AM";
+const BUILD_TIME = "2:05 AM";
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
 // rather than shipped as a file: it is a few hundred bytes of code instead
