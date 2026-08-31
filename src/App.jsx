@@ -2269,14 +2269,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 92;
+const BUILD_VERSION = 93;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:01 PM";
+const BUILD_TIME = "9:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation: text back, smaller button, drawn play and pause icons",
+  "Motivation: seek bar you can click and drag",
+  "Length stated in the text, wording changed to motivation audio",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13703,7 +13704,7 @@ const HYPNOSIS_TRACK = {
   url: "/audio/Cortex%20Hypnosis%20Version%201.mp3",
   title: "Motivation",
   blurb:
-    "A short guided hypnosis track. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
+    "A guided motivation audio, about 12 minutes long. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
 };
 
 // Deliberately bare: a play button and a volume slider, nothing else. No
@@ -13713,6 +13714,8 @@ function HypnosisScreen({ onDone }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
+  const [elapsed, setElapsed] = useState(0);
+  const [duration, setDuration] = useState(0);
 
   // Stop on leaving, so it cannot keep playing underneath the rest of the app.
   useEffect(() => {
@@ -13726,6 +13729,24 @@ function HypnosisScreen({ onDone }) {
     const el = audioRef.current;
     if (el) el.volume = volume;
   }, [volume]);
+
+  // Click or drag anywhere on the bar to move. Pointer events rather than
+  // click alone, so dragging scrubs continuously instead of only landing
+  // where the finger lifts.
+  const scrubTo = (clientX, el) => {
+    const audio = audioRef.current;
+    const rect = el.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const target = ratio * (audio?.duration || duration || 0);
+    if (audio && isFinite(target)) audio.currentTime = target;
+    setElapsed(target);
+  };
+
+  const fmt = (secs) => {
+    if (!secs || !isFinite(secs)) return "0:00";
+    const m = Math.floor(secs / 60);
+    return `${m}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
+  };
 
   const toggle = () => {
     const el = audioRef.current;
@@ -13765,6 +13786,8 @@ function HypnosisScreen({ onDone }) {
           onEnded={() => setPlaying(false)}
           onPause={() => setPlaying(false)}
           onPlay={() => setPlaying(true)}
+          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+          onTimeUpdate={(e) => setElapsed(e.currentTarget.currentTime)}
         />
         <div className="flex items-center gap-6">
           {/* Drawn rather than typed. The glyph characters render as colour
@@ -13786,7 +13809,57 @@ function HypnosisScreen({ onDone }) {
               </svg>
             )}
           </button>
-          <div className="flex-1 flex items-center gap-3">
+          <div className="flex-1 min-w-0 space-y-3">
+            <div
+              role="slider"
+              tabIndex={0}
+              aria-label="Seek"
+              aria-valuemin={0}
+              aria-valuemax={Math.round(duration)}
+              aria-valuenow={Math.round(elapsed)}
+              onPointerDown={(e) => {
+                e.currentTarget.setPointerCapture(e.pointerId);
+                scrubTo(e.clientX, e.currentTarget);
+              }}
+              onPointerMove={(e) => {
+                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                  scrubTo(e.clientX, e.currentTarget);
+                }
+              }}
+              onKeyDown={(e) => {
+                const audio = audioRef.current;
+                if (!audio) return;
+                if (e.key === "ArrowRight") audio.currentTime += 10;
+                if (e.key === "ArrowLeft") audio.currentTime -= 10;
+              }}
+              className="relative h-6 flex items-center cursor-pointer touch-none group"
+            >
+              <div className="h-1.5 w-full rounded-full bg-slate-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${duration ? Math.round((elapsed / duration) * 1000) / 10 : 0}%`,
+                    background: "hsl(from var(--ex) h s min(l, 58))",
+                  }}
+                />
+              </div>
+              <div
+                className="absolute w-3.5 h-3.5 rounded-full border-2 border-slate-950 pointer-events-none"
+                style={{
+                  left: `${duration ? (elapsed / duration) * 100 : 0}%`,
+                  transform: "translateX(-50%)",
+                  background: "hsl(from var(--ex) h s min(l, 58))",
+                }}
+              />
+            </div>
+            <div className="flex justify-between text-slate-500 text-xs tabular-nums">
+              <span>{fmt(elapsed)}</span>
+              <span>{fmt(duration)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-6 flex items-center gap-3">
             <svg
               width="18"
               height="18"
@@ -13812,7 +13885,6 @@ function HypnosisScreen({ onDone }) {
               aria-label="Volume"
               className="w-full accent-current cursor-pointer"
             />
-          </div>
         </div>
       </div>
     </div>
