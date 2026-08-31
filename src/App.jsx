@@ -2190,7 +2190,7 @@ const SHOW_TEST_TOOLS = false;
 // Profile pieces that only make sense once other people can see them.
 const SHOW_BIO = false;
 const SHOW_BADGES = false;
-const SHOW_PROFILE_IDENTITY_EDIT = false; // avatar photo and display name
+const SHOW_PROFILE_IDENTITY_EDIT = false; // the Account page avatar and name block
 
 // The written lines, numbered to match the shared doc. `cond` is the state
 // that can show it; a line with no cond is unconditional and also feeds the
@@ -2269,14 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 87;
+const BUILD_VERSION = 88;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:58 PM";
+const BUILD_TIME = "8:04 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Every screen now opens at the top",
+  "Account avatar and name row hidden",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9721,6 +9721,7 @@ function NBackSessionApp() {
               </button>
             </div>
 
+            {SHOW_PROFILE_IDENTITY_EDIT && (
             <div className="flex items-center gap-6">
               <div className="relative shrink-0">
                 <AvatarFrame tier={ownAvatarFrameTier}>
@@ -9840,6 +9841,7 @@ function NBackSessionApp() {
                 )}
               </div>
             </div>
+            )}
 
             {SHOW_BIO && (
             <div className="space-y-2">
