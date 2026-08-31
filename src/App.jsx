@@ -2154,17 +2154,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 64;
+const BUILD_VERSION = 65;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:29 AM";
+const BUILD_TIME = "12:12 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "N-back grid uses more of the screen",
-  "Answer buttons sit further from the grid",
-  "Buttons stack under the grid on phones",
-  "Stat and picker grids reflow on narrow screens",
+  "Phone: answer buttons shrunk, grid given the space",
+  "Phone: skip button no longer sits over the title",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8172,12 +8170,12 @@ function NBackSessionApp() {
           key={m}
           onClick={() => handlePress(m)}
           disabled={!armed}
-          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
+          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 md:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
         >
-          <span className="text-sm font-medium uppercase tracking-wide opacity-70">
+          <span className="text-[0.65rem] md:text-sm font-medium uppercase tracking-wide opacity-70">
             {meta.label}
           </span>
-          <span className="text-4xl font-semibold leading-none">
+          <span className="text-xl md:text-4xl font-semibold leading-none">
             {MODALITY_KEY_LABEL[m]}
           </span>
         </button>
@@ -10972,8 +10970,8 @@ function NBackSessionApp() {
                 button columns cannot sit beside a square grid and leave the
                 grid anything usable, so they drop underneath it instead,
                 which also puts them under the thumbs. */}
-            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-4 md:gap-28 lg:gap-44 w-full">
-            <div className="order-2 md:order-1 flex md:flex-col justify-between gap-3 md:gap-0 h-24 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
+            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-2.5 md:gap-28 lg:gap-44 w-full">
+            <div className="order-2 md:order-1 flex md:flex-col justify-between gap-2.5 md:gap-0 h-14 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
@@ -11027,7 +11025,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="order-3 flex md:flex-col justify-between gap-3 md:gap-0 h-24 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
+            <div className="order-3 flex md:flex-col justify-between gap-2.5 md:gap-0 h-14 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>
@@ -11689,7 +11687,7 @@ function NBackSessionApp() {
       {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
         <button
           onClick={() => forceSwitchToNext(exerciseIndex)}
-          className="fixed top-6 right-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2.5 px-5 text-sm font-medium shadow-lg"
+          className="fixed top-2 right-2 md:top-6 md:right-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30"
         >
           🧪 Skip to next exercise
         </button>
