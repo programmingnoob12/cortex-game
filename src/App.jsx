@@ -1695,12 +1695,14 @@ function useBinauralBeats(enabled) {
           playPromiseRef.current = again;
           if (again && again.catch) again.catch(() => {});
         }
-        // One line in Diagnostics describing what the element is actually
-        // doing a second and a half in, so a silent track can be diagnosed
-        // from the log instead of guessed at.
-        logClientError(
-          `binaural state: paused=${audio.paused} vol=${audio.volume.toFixed(2)} t=${audio.currentTime.toFixed(1)} ready=${audio.readyState} err=${audio.error ? audio.error.code : "none"} src=${audio.currentSrc.slice(-28)}`
-        );
+        // Only worth a Diagnostics line when something is actually wrong.
+        // This used to log unconditionally, which filled the log with
+        // healthy-state notices that read as errors.
+        if (audio.paused || audio.error || audio.volume < 0.001) {
+          logClientError(
+            `binaural stalled: paused=${audio.paused} vol=${audio.volume.toFixed(2)} t=${audio.currentTime.toFixed(1)} ready=${audio.readyState} err=${audio.error ? audio.error.code : "none"}`
+          );
+        }
       }, 1500);
     } else {
       fadeTo(0, 500);
@@ -2197,9 +2199,9 @@ const SHOW_PROFILE_IDENTITY_EDIT = false; // the Account page avatar and name bl
 // screen between exercises.
 const MOTIVATION_LINES = [
   { id: 1, text: "A sharper mind gives you an edge." },
-  { id: 2, text: "Great job! You're getting ahead of the competition. Faster decisions. Better reactions." },
+  { id: 2, text: "Great job! You're getting ahead of the competition." },
   { id: 3, text: "Sharper reactions. Stronger performance." },
-  { id: 4, text: "Other people aren't willing to do what you just did. That's why you have an edge. Become better than your old self." },
+  { id: 4, text: "Other people aren't willing to do what you just did. That's why you have an edge." },
   { id: 5, text: "OUTTHINK. OUTREACT. OUTPERFORM." },
   { id: 6, text: "GET AHEAD." },
   { id: 7, text: "MAKE YOUR MIND STRONGER." },
@@ -2209,7 +2211,6 @@ const MOTIVATION_LINES = [
   { id: 11, text: "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection." },
   { id: 12, text: "Your future self will thank you." },
   { id: 13, text: "You're getting smarter than the competition." },
-  { id: 14, text: "Close to your personal best. That's a good sign.", cond: "nearBest" },
   { id: 15, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
   { id: 16, text: "Keep going. Your future self will thank you." },
   { id: 17, text: "Be proud of how smart you have become. The best don't stop improving. Become better than your old self." },
@@ -2233,6 +2234,9 @@ const MOTIVATION_LINES = [
   { id: 35, text: "You're building the thing everyone else calls talent." },
   { id: 36, text: "What used to be impossible for you is now average. That's how far you've come.", cond: "avgPR" },
   { id: 37, text: "Remember this. Then go higher.", cond: "pr" },
+  { id: 38, text: "Faster decisions. Better reactions." },
+  { id: 39, text: "Become better than your old self." },
+  { id: 40, text: "You're on your way to becoming mentally unstoppable." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2269,15 +2273,18 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 94;
+const BUILD_VERSION = 95;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:27 PM";
+const BUILD_TIME = "9:39 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation: shorter copy, length under the header",
-  "Speaker icon gains arcs with the volume",
+  "Binaural no longer cuts out between exercises",
+  "Diagnostics no longer logs healthy audio state",
+  "Achievements text larger and less cramped",
+  "Motivation: Skip after a session, no Back there",
+  "Membership and Log out at the foot of Account",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5270,7 +5277,7 @@ function LegalPage({ doc, onBack }) {
       <div>
         <button
           onClick={onBack}
-          className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+          className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
         >
           &lsaquo; Back
         </button>
@@ -7113,10 +7120,10 @@ function NBackSessionApp() {
   // Only actually plays while a trial is running — stops itself on setup/
   // results screens rather than droning on in the menus.
   const { unlock: unlockBinauralAudio, audioError: binauralAudioError } = useBinauralBeats(
-    binauralBeatsEnabled &&
-      mainView === "app" &&
-      exercise.key !== "overview" &&
-      !switchNotice
+    // The hand-off between exercises is still "in an exercise" as far as the
+    // track is concerned; stopping it there made the audio cut out every few
+    // minutes. A tutorial leaves mainView === "app", so that still stops it.
+    binauralBeatsEnabled && mainView === "app" && exercise.key !== "overview"
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -8855,7 +8862,7 @@ function NBackSessionApp() {
               {regimeKey && (
                 <button
                   onClick={() => setMainView("account")}
-                  className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                  className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
                 >
                   &lsaquo; Back
                 </button>
@@ -8972,7 +8979,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setMainView("home")}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
               >
                 ‹ Back
               </button>
@@ -9077,15 +9084,15 @@ function NBackSessionApp() {
                       return (
                         <div
                           key={a.id}
-                          className={`rounded-lg p-5 border transition-colors ${
+                          className={`rounded-xl p-6 border transition-colors ${
                             isUnlocked
                               ? `${groupAccent.bg} ${groupAccent.border}`
                               : "bg-slate-900 border-slate-800"
                           }`}
                         >
-                          <div className="flex items-center gap-5">
+                          <div className="flex items-center gap-6">
                             <div
-                              className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center text-2xl ${
+                              className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center text-3xl ${
                                 isUnlocked
                                   ? `bg-gradient-to-br ${groupAccent.grad} shadow-lg shadow-black/30`
                                   : "bg-slate-800 grayscale opacity-50"
@@ -9096,25 +9103,25 @@ function NBackSessionApp() {
                             <div className="flex-1">
                               <AchievementTitle
                                 achievement={a}
-                                className="text-lg font-semibold"
-                                baseColor={isUnlocked ? "#F7F8F8" : "#8A8F98"}
+                                className="text-xl font-semibold"
+                                baseColor={isUnlocked ? "#F7F8F8" : "#A6A9B1"}
                               />
-                              <div className="text-sm text-slate-500 mt-0.5">
+                              <div className="text-base text-slate-400 mt-1.5 leading-relaxed">
                                 {a.description}
                               </div>
                               {a.reward && (
-                                <div className={`italic text-sm mt-1 ${groupAccent.text}`}>
+                                <div className={`text-base mt-1.5 ${groupAccent.text}`}>
                                   Unlocks: {a.reward}
                                 </div>
                               )}
                             </div>
                             <div className="shrink-0 text-right">
                               {isUnlocked ? (
-                                <span className={`text-sm font-semibold ${groupAccent.text}`}>
+                                <span className={`text-base font-semibold ${groupAccent.text}`}>
                                   ✓ Achieved
                                 </span>
                               ) : (
-                                <span className="text-sm text-slate-500">
+                                <span className="text-base text-slate-400 tabular-nums">
                                   {progressText || "Locked"}
                                 </span>
                               )}
@@ -9152,7 +9159,14 @@ function NBackSessionApp() {
         )}
 
         {mainView === "hypnosis" && (
-          <HypnosisScreen onDone={() => setMainView("home")} />
+          <HypnosisScreen
+            onDone={() => setMainView("home")}
+            /* Reached at the end of a regime this is the last step of the
+               session, so it gets a Skip under the player and no Back —
+               there is nothing behind it to go back to. Opened from Home it
+               is just a page, so it gets Back and no Skip. */
+            afterSession={overviewSource !== "home"}
+          />
         )}
 
         {mainView === "home" && (
@@ -9162,9 +9176,11 @@ function NBackSessionApp() {
           <div className="space-y-14 pt-12 sm:pt-0">
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
-                <AvatarFrame tier={ownAvatarFrameTier}>
-                  <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
-                </AvatarFrame>
+                {SHOW_PROFILE_IDENTITY_EDIT && (
+                  <AvatarFrame tier={ownAvatarFrameTier}>
+                    <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
+                  </AvatarFrame>
+                )}
                 <div>
                   <div className="text-slate-400 text-base">Welcome back</div>
                   <h1 className="text-3xl font-semibold tracking-tight">
@@ -9450,7 +9466,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setMainView("home")}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
               >
                 ‹ Back
               </button>
@@ -9699,27 +9715,13 @@ function NBackSessionApp() {
                   setBadgesExpanded(false);
                   setMainView("home");
                 }}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
               >
                 ‹ Back
               </button>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Account
               </h1>
-              <button
-                onClick={() => {
-              try {
-                localStorage.removeItem("cortex.billingState");
-                Object.keys(localStorage)
-                  .filter((k) => k.startsWith("cortex.membershipOk."))
-                  .forEach((k) => localStorage.removeItem(k));
-              } catch {}
-              supabase.auth.signOut();
-            }}
-                className="mt-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
-              >
-                Log out
-              </button>
             </div>
 
             {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -10193,16 +10195,6 @@ function NBackSessionApp() {
               </span>
             </button>
 
-            <button
-              onClick={() => setMainView("membership")}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
-            >
-              <span>Membership</span>
-              <span className="text-slate-500 text-base font-normal capitalize">
-                {membershipPlan} ›
-              </span>
-            </button>
-
             {/* Sits with Show tutorials because it behaves the same way: on
                 unless the person turns it off, and set here rather than
                 mid-exercise. */}
@@ -10228,27 +10220,37 @@ function NBackSessionApp() {
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
               <div>
                 <div className="text-xl font-medium">Show tutorials</div>
-                {Object.values(dismissedTutorials).some(Boolean) && (
-                  <div className="text-slate-500 text-base mt-1">
-                    <button
-                      onClick={() => {
-                        setDismissedTutorialsState({});
-                        if (window.storage) {
-                          safeStorageSet("dismissed-tutorials", JSON.stringify({}), false);
-                        }
-                      }}
-                      className="text-indigo-400 hover:text-indigo-300 underline"
-                    >
-                      Reset dismissed tutorials
-                    </button>
-                  </div>
-                )}
               </div>
               <Toggle
                 on={!hideTutorials}
                 onToggle={() => setHideTutorials(!hideTutorials)}
               />
             </div>
+
+            <button
+              onClick={() => setMainView("membership")}
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+            >
+              <span>Membership</span>
+              <span className="text-slate-500 text-base font-normal capitalize">
+                {membershipPlan} ›
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                try {
+                  localStorage.removeItem("cortex.billingState");
+                  Object.keys(localStorage)
+                    .filter((k) => k.startsWith("cortex.membershipOk."))
+                    .forEach((k) => localStorage.removeItem(k));
+                } catch {}
+                supabase.auth.signOut();
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 rounded-lg py-5 text-xl font-medium text-left px-7 text-slate-300"
+            >
+              Log out
+            </button>
 
             {/* Diagnostics — surfaces failed storage writes and thrown
                 errors that used to fail completely silently (see
@@ -10333,7 +10335,7 @@ function NBackSessionApp() {
                 back control in the app looks and behaves identically. */}
             <button
               onClick={() => setMainView("account")}
-              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
             >
               &lsaquo; Back
             </button>
@@ -10897,7 +10899,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setOverviewView("summary")}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
               >
                 ‹ Back
               </button>
@@ -12255,9 +12257,11 @@ function NBackSessionApp() {
           onClick={() => setMainView("account")}
           className="fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
-          <AvatarFrame tier={ownAvatarFrameTier}>
-            <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={24} />
-          </AvatarFrame>
+          {SHOW_PROFILE_IDENTITY_EDIT && (
+            <AvatarFrame tier={ownAvatarFrameTier}>
+              <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={24} />
+            </AvatarFrame>
+          )}
           Account
         </button>
       )}
@@ -13711,7 +13715,7 @@ const HYPNOSIS_TRACK = {
 // Deliberately bare: a play button and a volume slider, nothing else. No
 // scrubber, no timestamps — this is a track to sit through rather than one to
 // navigate around, and a progress bar invites checking how long is left.
-function HypnosisScreen({ onDone }) {
+function HypnosisScreen({ onDone, afterSession }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
@@ -13764,12 +13768,14 @@ function HypnosisScreen({ onDone }) {
   return (
     <div className="space-y-12">
       <div>
-        <button
-          onClick={onDone}
-          className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
-        >
-          &lsaquo; Back
-        </button>
+        {!afterSession && (
+          <button
+            onClick={onDone}
+            className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+          >
+            &lsaquo; Back
+          </button>
+        )}
         <h1 className="text-4xl font-semibold tracking-tight">
           {HYPNOSIS_TRACK.title}
         </h1>
@@ -13894,6 +13900,15 @@ function HypnosisScreen({ onDone }) {
             />
         </div>
       </div>
+
+      {afterSession && (
+        <button
+          onClick={onDone}
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+        >
+          Skip
+        </button>
+      )}
     </div>
   );
 }
