@@ -2015,10 +2015,10 @@ function longestStreakDays(exerciseHistory) {
 // the plumbing only: a small placeholder set so the screen has something to
 // say, replaced wholesale once the real copy is settled.
 const NUDGE_LINES = {
-  pr: ["New personal best. Nice work."],
-  streak: ["Keep the streak going."],
+  pr: ["New personal record. Nice work."],
+  streak: ["{n} day streak. Keep it going."],
   worse: ["Some days are hard. Just focus on being consistent."],
-  general: ["Another one done. Consistency is what does it."],
+  general: ["Show up even when you aren't feeling it. That's how winners are made."],
 };
 
 // `forcedKey` shows one specific pool, for the test buttons.
@@ -2032,7 +2032,9 @@ function sessionNudge(state, forcedKey) {
       : (state?.streak || 0) >= 2
       ? NUDGE_LINES.streak
       : NUDGE_LINES.general);
-  return pool[Math.floor(Math.random() * pool.length)];
+  const line = pool[Math.floor(Math.random() * pool.length)];
+  // `{n}` in a line fills in with the current streak length.
+  return line.replace("{n}", String(state?.streak ?? 0));
 }
 
 // Every calendar date (as toDateString()) with at least one logged session —
@@ -2226,14 +2228,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 79;
+const BUILD_VERSION = 80;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:20 PM";
+const BUILD_TIME = "5:33 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Session-complete copy moved out to the shared doc",
+  "Session-complete placeholders swapped for the first real lines",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
