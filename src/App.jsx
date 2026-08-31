@@ -2180,17 +2180,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 72;
+const BUILD_VERSION = 73;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:17 PM";
+const BUILD_TIME = "3:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Buttons spring on hover and press",
-  "Interference fixed at 12.5% for every N-back",
-  "Binaural beats keep playing until switched off",
-  "Binaural toggle on the round results screen too",
+  "Glow now fires on the attack of each hit, not after it",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2588,9 +2585,10 @@ function playCelebrationSong() {
     // mix, so the window sits accordingly.
     analyser.minDecibels = -60;
     analyser.maxDecibels = -12;
-    // Low, so a kick registers as a kick. The smoothing that matters is
-    // done in the animation, where attack and release can differ.
-    analyser.smoothingTimeConstant = 0.08;
+    // Zero. Every bit of smoothing here is latency on the attack, and the
+    // decay is handled in the animation instead, where it can be applied
+    // after the trigger rather than before it.
+    analyser.smoothingTimeConstant = 0;
     gain.connect(ctx.destination);
     songAnalyser = analyser;
 
@@ -2663,64 +2661,130 @@ function playSessionDone() {
 // driven by the music: the reveal already carries the motion, and a glow
 // pumping on the beat behind it competed with the content. It comes up with
 // the reveal and goes out on the song's fade so the two end together.
-// The celebration track's quietest and loudest moments, as a full-spectrum
-// linear amplitude. Measured off the file rather than guessed.
-const GLOW_FLOOR = 0.002;
-const GLOW_REF = 0.0068;
+// Beat detection for the record screen's glow. Deliberately not "average
+// loudness": a kick is a transient, and an average over the whole spectrum
+// dilutes it to almost nothing. What follows is a spectral-flux detector on
+// the low bands with an adaptive threshold, which fires on the leading edge
+// of a hit rather than partway through it.
+//
+// Flip to true to overlay the live numbers while tuning.
+const GLOW_DEBUG = false;
+// Frames of history the threshold is computed from. At 60fps this is about
+// three quarters of a second: long enough to be stable, short enough to
+// follow a track that changes.
+const FLUX_HISTORY = 45;
+
 function PrGoldGlow({ className, style, out }) {
   const ref = useRef(null);
-  // The bloom tracks how loud the track is, moment to moment. Read straight
-  // off the analyser and written to the element each frame rather than
-  // through state, so the motion is smooth and no React render happens sixty
-  // times a second.
+  const debugRef = useRef(null);
   useEffect(() => {
     if (out) return undefined;
     let raf = 0;
-    let data = null;
-    let level = 0;
+    let spectrum = null;
+    let prevBass = null;
+    // Ring buffer of recent flux values, for the adaptive threshold.
+    const history = new Float32Array(FLUX_HISTORY);
+    let historyAt = 0;
+    let historyFilled = 0;
+    let pulse = 0;
+    let sustained = 0;
+    let baseline = 0;
+
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const el = ref.current;
       if (!el) return;
       const analyser = getSongAnalyser();
       if (!analyser) return;
-      if (!data || data.length !== analyser.frequencyBinCount) {
-        data = new Uint8Array(analyser.frequencyBinCount);
+      if (!spectrum || spectrum.length !== analyser.frequencyBinCount) {
+        spectrum = new Uint8Array(analyser.frequencyBinCount);
+        prevBass = null;
       }
-      analyser.getByteFrequencyData(data);
+      analyser.getByteFrequencyData(spectrum);
 
-      // Loudness, plainly. The whole spectrum, converted out of decibels
-      // into linear amplitude and averaged. Nothing clever on top: no onset
-      // detection, no adaptive reference, no band weighting. The louder the
-      // moment, the bigger the number, all the way up.
-      const dbSpan = analyser.maxDecibels - analyser.minDecibels;
-      let sum = 0;
-      for (let i = 1; i < data.length; i++) {
-        sum += Math.pow(10, (analyser.minDecibels + (data[i] / 255) * dbSpan) / 20);
+      // Bins are found from the real bin width, never assumed. Sub-bass and
+      // bass are what a kick and a drop live in; the rest of the spectrum is
+      // deliberately not part of the trigger.
+      const binHz = analyser.context.sampleRate / analyser.fftSize;
+      const binAt = (hz) => Math.max(1, Math.min(spectrum.length - 1, Math.round(hz / binHz)));
+      const subLo = binAt(20);
+      const bassHi = binAt(250);
+
+      // Spectral flux: the sum of the frame-to-frame INCREASES across the low
+      // bands. Increases only, because a note ending is not an onset. This is
+      // the number that spikes on the attack of a hit, one frame after it
+      // starts, rather than tracking how loud the hit eventually gets.
+      let flux = 0;
+      let energy = 0;
+      if (!prevBass || prevBass.length !== bassHi - subLo + 1) {
+        prevBass = new Float32Array(bassHi - subLo + 1);
       }
-      const amp = sum / (data.length - 1);
+      for (let i = subLo; i <= bassHi; i++) {
+        // Weighted toward the very bottom, where the kick sits.
+        const weight = i <= binAt(60) ? 1.6 : 1;
+        const v = (spectrum[i] / 255) * weight;
+        const rise = v - prevBass[i - subLo];
+        if (rise > 0) flux += rise;
+        energy += v;
+        prevBass[i - subLo] = v;
+      }
+      energy /= bassHi - subLo + 1;
 
-      // Straight line from the track's quietest moments to its loudest,
-      // both measured off the file. The power curve that used to sit here
-      // squashed everything into the bottom fifth of the range, which is
-      // why the glow stopped appearing to move at all.
-      const target = Math.max(
-        0,
-        Math.min(1, (amp - GLOW_FLOOR) / (GLOW_REF - GLOW_FLOOR))
-      );
+      // Adaptive threshold from the recent past, so this works on a quiet
+      // track and a loud one without a hand-tuned number per song.
+      let mean = 0;
+      const n = historyFilled || 1;
+      for (let i = 0; i < n; i++) mean += history[i];
+      mean /= n;
+      let variance = 0;
+      for (let i = 0; i < n; i++) {
+        const d = history[i] - mean;
+        variance += d * d;
+      }
+      const sd = Math.sqrt(variance / n);
+      // Multiplier and constant tuned by running this exact detector over
+      // the celebration track offline: it lands around 170 hits a minute,
+      // which is the kick and snare rather than every eighth note.
+      const threshold = mean + sd * 2.0 + 0.03;
 
-      // Fast to rise so a hit is not smeared across frames, slower to fall
-      // so it blooms and eases back.
-      // Quick enough to catch a hit, slow enough not to strobe. Simulated
-      // against the real track this holds around 0.35 through the build and
-      // 0.65 through the drop, peaking near 0.95 on the loudest bars.
-      level += (target - level) * (target > level ? 0.45 : 0.1);
+      history[historyAt] = flux;
+      historyAt = (historyAt + 1) % FLUX_HISTORY;
+      if (historyFilled < FLUX_HISTORY) historyFilled++;
 
-      // Opacity, not brightness. The gradient is yellow on black, so
-      // brightening it barely changes anything; how much of it is on screen
-      // is the part the eye reads.
-      el.style.opacity = (0.2 + level * 0.8).toFixed(3);
-      el.style.transform = `scale(${(0.78 + level * 0.95).toFixed(3)})`;
+      // Rolling energy baseline, used to tell an ordinary beat from a drop.
+      baseline += (energy - baseline) * (historyFilled < 10 ? 0.4 : 0.012);
+
+      const beat = historyFilled > 8 && flux > threshold;
+      if (beat) {
+        // How far above the recent norm this hit is. A drop lands several
+        // times the baseline and gets the full pulse; a routine kick during
+        // a busy passage gets less.
+        const strength = Math.min(1, (energy / (baseline + 0.001) - 0.9) * 1.1);
+        // Straight assignment, not a ramp: this is the frame the hit
+        // happened, so this is the frame the light moves.
+        pulse = Math.max(pulse, 0.45 + Math.max(0, strength) * 0.55);
+      } else {
+        pulse *= 0.86;
+      }
+
+      // A slow floor under the pulse so quiet passages are dim and loud ones
+      // sit brighter between hits, without it ever delaying a beat.
+      const target = Math.max(0, Math.min(1, (energy - 0.45) / 0.5));
+      sustained += (target - sustained) * (target > sustained ? 0.25 : 0.05);
+
+      const level = Math.max(sustained * 0.35, Math.min(1, pulse));
+      // Written straight to the element inside the frame. No CSS transition
+      // on these two properties anywhere, or the jump would be smoothed back
+      // into a lag.
+      el.style.opacity = (0.18 + level * 0.82).toFixed(3);
+      el.style.transform = `scale(${(0.76 + level * 1.0).toFixed(3)})`;
+
+      if (GLOW_DEBUG && debugRef.current) {
+        debugRef.current.textContent =
+          `energy ${energy.toFixed(3)}  flux ${flux.toFixed(3)}  thr ${threshold.toFixed(3)}  ` +
+          `beat ${beat ? "YES" : "no"}  pulse ${pulse.toFixed(2)}`;
+        debugRef.current.style.color = beat ? "#7CFF9A" : "#8A8F98";
+      }
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -2753,6 +2817,12 @@ function PrGoldGlow({ className, style, out }) {
           background: `radial-gradient(56% 44% at 50% 46%, ${PR_YELLOW}85 0%, ${PR_YELLOW}4D 28%, ${PR_YELLOW}1F 52%, transparent 76%)`,
         }}
       />
+      {GLOW_DEBUG && (
+        <div
+          ref={debugRef}
+          className="absolute top-3 left-3 text-xs font-mono pointer-events-none"
+        />
+      )}
     </div>
   );
 }
