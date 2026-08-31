@@ -2154,16 +2154,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 67;
+const BUILD_VERSION = 68;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:07 PM";
+const BUILD_TIME = "2:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Record glow rebuilt on linear amplitude, tracks the drops",
-  "Phone: graph and spreadsheet fit the screen",
-  "Nice! plays the tune every press",
+  "Glow size is now just loudness, loudest moves it most",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2636,16 +2634,15 @@ function playSessionDone() {
 // driven by the music: the reveal already carries the motion, and a glow
 // pumping on the beat behind it competed with the content. It comes up with
 // the reveal and goes out on the song's fade so the two end together.
-// Measured off the celebration track's low band, in linear amplitude.
-const GLOW_FLOOR = 0.03;
-const GLOW_REF = 0.12;
+// Where the celebration track's loudest hits sit, as a full-spectrum linear
+// amplitude. Measured off the file rather than guessed.
+const GLOW_REF = 0.009;
 function PrGoldGlow({ className, style, out }) {
   const ref = useRef(null);
-  // The bloom breathes with the track. Read straight off the analyser and
-  // written to the element each frame rather than through state, so the
-  // motion is smooth and no React render happens sixty times a second. The
-  // low end drives it, which is what makes it track the beat instead of
-  // just overall loudness.
+  // The bloom tracks how loud the track is, moment to moment. Read straight
+  // off the analyser and written to the element each frame rather than
+  // through state, so the motion is smooth and no React render happens sixty
+  // times a second.
   useEffect(() => {
     if (out) return undefined;
     let raf = 0;
@@ -2661,39 +2658,30 @@ function PrGoldGlow({ className, style, out }) {
         data = new Uint8Array(analyser.frequencyBinCount);
       }
       analyser.getByteFrequencyData(data);
-      // 30Hz to roughly 250Hz: kick, bass, the parts a drop moves. Worked
-      // out from the bin width rather than a fixed fraction of the array,
-      // so it stays correct if the FFT size ever changes.
-      const binHz = analyser.context.sampleRate / 2 / data.length;
-      const lo = Math.max(1, Math.floor(30 / binHz));
-      const hi = Math.max(lo + 2, Math.floor(250 / binHz));
 
-      // Back out of decibels into linear amplitude before averaging. This is
-      // the part that was wrong: the byte values are a dB scale, and on a dB
-      // scale the quiet build and the drop are only about ten units apart
-      // out of two hundred and fifty, so everything sat in the same narrow
-      // band and the light appeared to move at random. In linear amplitude
-      // the same passage is a factor of three apart, which is what the ear
-      // is hearing.
+      // Loudness, plainly. The whole spectrum, converted out of decibels
+      // into linear amplitude and averaged. Nothing clever on top: no onset
+      // detection, no adaptive reference, no band weighting. The louder the
+      // moment, the bigger the number, all the way up.
       const dbSpan = analyser.maxDecibels - analyser.minDecibels;
       let sum = 0;
-      let count = 0;
-      for (let i = lo; i <= hi && i < data.length; i++) {
-        const db = analyser.minDecibels + (data[i] / 255) * dbSpan;
-        sum += Math.pow(10, db / 20);
-        count++;
+      for (let i = 1; i < data.length; i++) {
+        sum += Math.pow(10, (analyser.minDecibels + (data[i] / 255) * dbSpan) / 20);
       }
-      const amp = count ? sum / count : 0;
+      const amp = sum / (data.length - 1);
 
-      // Floor and reference measured off this track: the build before the
-      // drop sits around 0.03 and the loud passages peak near 0.12. Fixed
-      // rather than adaptive, because anything that chases a moving average
-      // slowly turns quiet passages back up and pumps in the wrong places.
-      const target = Math.max(0, Math.min(1, (amp - GLOW_FLOOR) / (GLOW_REF - GLOW_FLOOR)));
+      // GLOW_REF is where the track's loudest hits land, measured off the
+      // file. The curve above it is just clamped, so the biggest noises put
+      // the glow at full size and everything quieter sits proportionally
+      // below.
+      let target = Math.min(1, amp / GLOW_REF);
+      // Raised to a power so the loud moments pull further clear of the
+      // middle instead of everything bunching around half.
+      target = target * target * Math.sqrt(target);
 
-      // Fast to rise so a kick is not smeared across three frames, slower to
-      // fall so it blooms and eases back instead of flickering.
-      level += (target - level) * (target > level ? 0.75 : 0.16);
+      // Fast to rise so a hit is not smeared across frames, slower to fall
+      // so it blooms and eases back.
+      level += (target - level) * (target > level ? 0.8 : 0.18);
 
       // Opacity, not brightness. The gradient is yellow on black, so
       // brightening it barely changes anything; how much of it is on screen
