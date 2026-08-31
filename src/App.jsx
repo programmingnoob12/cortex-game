@@ -2030,10 +2030,10 @@ const STREAK_MILESTONES = [
 ];
 const SESSION_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
 const NUDGE_FALLBACKS = [
-  "Logged. The graph only moves because days like this exist.",
-  "Another one done. Consistency is the whole method.",
-  "That is today handled. Come back tomorrow and it compounds.",
-  "Nothing dramatic, just the work. That is what changes it.",
+  "Another one done. Consistency is what does it.",
+  "Showing up is the hard part, and you did it.",
+  "Small steps, every day. That is how it works.",
+  "Nice work. See you tomorrow.",
 ];
 
 // `kind` forces a category, for previewing each line without having to
@@ -2049,19 +2049,19 @@ function sessionNudge(state, kind) {
   } = state || {};
 
   const pick = {
-    pr: () => "A personal best today. Those are the sessions the graph remembers.",
+    pr: () => "New personal best! Days like this are why you keep showing up.",
     streakNear: () => {
       const next = STREAK_MILESTONES.find((m) => m.days > streak);
       if (!next) return null;
       const away = next.days - streak;
       if (away > 2) return null;
       return away === 1
-        ? `Day ${streak}. One more and that is ${next.label}.`
-        : `Day ${streak}. Two more days and that is ${next.label}.`;
+        ? `${next.days} day streak tomorrow! Keep it up.`
+        : `Two days off a ${next.days} day streak. Nearly there!`;
     },
     streakBest: () =>
       streak >= 3 && streak >= longestStreak
-        ? `Day ${streak}. That is the longest you have held it.`
+        ? `Day ${streak}, your longest yet! Keep it going.`
         : null,
     sessionsNear: () => {
       const next = SESSION_MILESTONES.find((m) => m > totalSessions);
@@ -2069,15 +2069,12 @@ function sessionNudge(state, kind) {
       const away = next - totalSessions;
       if (away > 3) return null;
       return away === 1
-        ? `One more session and you cross ${next}.`
-        : `${away} more sessions and you cross ${next}.`;
+        ? `One more session and you hit ${next}!`
+        : `${away} more sessions and you hit ${next}!`;
     },
-    nearBest: () =>
-      "One of your exercises is sitting a step off its best. Next session could take it.",
-    strong: () =>
-      "Sharp session. That is the level you are working to make ordinary.",
-    dip: () =>
-      "Off day. That is what the first stretch at a new level looks like, and it passes.",
+    nearBest: () => "You are close to a new best. Next session could do it!",
+    strong: () => "Great session! That is the level you are aiming for.",
+    dip: () => "Some days are hard. Just focus on being consistent.",
     none: () => NUDGE_FALLBACKS[Math.floor(Math.random() * NUDGE_FALLBACKS.length)],
   };
 
@@ -2288,15 +2285,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 76;
+const BUILD_VERSION = 77;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:13 PM";
+const BUILD_TIME = "4:47 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Session complete carries a milestone line",
-  "Test buttons on Home preview every variant",
+  "Session complete lines rewritten, warmer and shorter",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
