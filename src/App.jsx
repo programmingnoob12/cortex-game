@@ -2269,14 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 90;
+const BUILD_VERSION = 91;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:41 PM";
+const BUILD_TIME = "8:52 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Quick regime card is 3D MOT green",
+  "Motivation page: the hypnosis track, play and volume only",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13697,27 +13697,22 @@ function motProjectToScreen(position, camera, width, height) {
 // Shown once at the end of a completed session (the Overview screen's "Home"
 // button routes here instead of straight home), so it lands while the effort
 // is still fresh rather than competing with the decision to start training.
-//
-// TO ADD THE TRACK: drop the audio file's URL into HYPNOSIS_TRACK.url. Until
-// that's set the screen renders with the player disabled and says so, rather
-// than showing a play button that does nothing.
+// The track lives in public/audio. The filename has spaces, so it is
+// percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "", // e.g. "https://your-host/motivation-01.mp3"
+  url: "/audio/Cortex%20Hypnosis%20Version%201.mp3",
   title: "Motivation",
-  blurb:
-    "A short guided hypnosis track. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
 };
 
+// Deliberately bare: a play button and a volume slider, nothing else. No
+// scrubber, no timestamps — this is a track to sit through rather than one to
+// navigate around, and a progress bar invites checking how long is left.
 function HypnosisScreen({ onDone }) {
   const audioRef = useRef(null);
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0); // 0..1
-  const [duration, setDuration] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-  const hasTrack = !!HYPNOSIS_TRACK.url;
+  const [volume, setVolume] = useState(0.8);
 
-  // Pause on unmount so the audio can't keep playing over the rest of the app
-  // after this screen is left mid-track.
+  // Stop on leaving, so it cannot keep playing underneath the rest of the app.
   useEffect(() => {
     return () => {
       const el = audioRef.current;
@@ -13725,10 +13720,16 @@ function HypnosisScreen({ onDone }) {
     };
   }, []);
 
+  useEffect(() => {
+    const el = audioRef.current;
+    if (el) el.volume = volume;
+  }, [volume]);
+
   const toggle = () => {
     const el = audioRef.current;
     if (!el) return;
     if (el.paused) {
+      el.volume = volume;
       el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     } else {
       el.pause();
@@ -13736,93 +13737,66 @@ function HypnosisScreen({ onDone }) {
     }
   };
 
-  const seek = (e) => {
-    const el = audioRef.current;
-    if (!el || !duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    el.currentTime = ratio * duration;
-    setProgress(ratio);
-    setElapsed(ratio * duration);
-  };
-
-  const fmt = (s) => {
-    if (!s || !isFinite(s)) return "0:00";
-    const m = Math.floor(s / 60);
-    return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-  };
-
   return (
-    <div className="space-y-14">
+    <div className="space-y-12">
       <div>
-        {/* No "Session complete" eyebrow. This screen is reachable from Home
-            at any time, where that label was simply untrue, and after a
-            session the celebration overlay already says it. */}
+        <button
+          onClick={onDone}
+          className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+        >
+          &lsaquo; Back
+        </button>
         <h1 className="text-4xl font-semibold tracking-tight">
           {HYPNOSIS_TRACK.title}
         </h1>
       </div>
 
-      <p className="text-slate-300 text-lg leading-relaxed">
-        {HYPNOSIS_TRACK.blurb}
-      </p>
-
-      <div className="bg-slate-900 border border-slate-700/70 rounded-2xl p-8 space-y-6">
-        {hasTrack ? (
-          <>
-            <audio
-              ref={audioRef}
-              src={HYPNOSIS_TRACK.url}
-              preload="metadata"
-              onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-              onTimeUpdate={(e) => {
-                const el = e.currentTarget;
-                setElapsed(el.currentTime);
-                setProgress(el.duration ? el.currentTime / el.duration : 0);
-              }}
-              onEnded={() => {
-                setPlaying(false);
-                setProgress(1);
-              }}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-2xl p-8">
+        <audio
+          ref={audioRef}
+          src={HYPNOSIS_TRACK.url}
+          preload="metadata"
+          onEnded={() => setPlaying(false)}
+          onPause={() => setPlaying(false)}
+          onPlay={() => setPlaying(true)}
+        />
+        <div className="flex items-center gap-7">
+          <button
+            onClick={toggle}
+            aria-label={playing ? "Pause" : "Play"}
+            className="w-16 h-16 shrink-0 rounded-full deep-fill flex items-center justify-center text-2xl"
+          >
+            {playing ? "⏸" : "▶"}
+          </button>
+          <div className="flex-1 flex items-center gap-3">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-slate-500 shrink-0"
+              aria-hidden="true"
+            >
+              <path d="M11 5 6 9H2v6h4l5 4z" />
+              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+            </svg>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              aria-label="Volume"
+              className="w-full accent-current cursor-pointer"
             />
-            <div className="flex items-center gap-6">
-              <button
-                onClick={toggle}
-                aria-label={playing ? "Pause" : "Play"}
-                className="w-16 h-16 shrink-0 rounded-full bg-indigo-500 hover:bg-indigo-400 transition-colors flex items-center justify-center text-2xl"
-              >
-                {playing ? "⏸" : "▶"}
-              </button>
-              <div className="flex-1 space-y-2">
-                <div
-                  onClick={seek}
-                  className="h-2 rounded-full bg-slate-700 cursor-pointer overflow-hidden"
-                >
-                  <div
-                    className="h-full bg-indigo-400 transition-[width] duration-150"
-                    style={{ width: `${Math.round(progress * 100)}%` }}
-                  />
-                </div>
-                <div className="flex justify-between text-slate-400 text-sm tabular-nums">
-                  <span>{fmt(elapsed)}</span>
-                  <span>{fmt(duration)}</span>
-                </div>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="text-slate-400 text-base">
-            No track loaded yet. Add the audio file URL to HYPNOSIS_TRACK.url.
           </div>
-        )}
+        </div>
       </div>
-
-      <button
-        onClick={onDone}
-        className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-      >
-        {hasTrack ? "Done" : "Home"}
-      </button>
     </div>
   );
 }
