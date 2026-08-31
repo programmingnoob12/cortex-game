@@ -2273,15 +2273,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 96;
+const BUILD_VERSION = 97;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:44 PM";
+const BUILD_TIME = "9:48 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats show every exercise you have ever trained",
-  "Breaks in training now show as gaps in the graph",
+  "Switching regime no longer resets the starting level",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8377,7 +8376,11 @@ function NBackSessionApp() {
     setRegimeKey(key);
     setActiveExercises(built);
     setExerciseIndex(0);
-    setN(built[0].defaultN);
+    // The level already reached in that exercise, not the exercise's static
+    // default. Switching regime and coming back used to drop the first
+    // exercise to its starting level, which read as the old progress being
+    // gone even though the stored history was untouched.
+    setN(exerciseLevelsRef.current[built[0].key] ?? built[0].defaultN);
     setScreen("setup");
     setSwitchNotice(false);
     setLevelChangeNotice(null);
