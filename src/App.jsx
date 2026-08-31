@@ -2269,16 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 86;
+const BUILD_VERSION = 87;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:52 PM";
+const BUILD_TIME = "7:58 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Privacy Policy and Terms of Service pages, linked from the footer",
-  "Bio, badges and profile identity editing hidden",
-  "Streak test buttons hidden",
+  "Every screen now opens at the top",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8463,6 +8461,17 @@ function NBackSessionApp() {
   // Quad N-Back record reveal, driven by a timer rather than a long CSS
   // animation-delay. A delay that big is fragile: any re-render restarts it
   // and the screen sits in its blurred opening frame indefinitely.
+  // The whole app scrolls inside one container, so moving between screens
+  // kept whatever scroll position the last one was left at — which is why a
+  // long page opened partway down. Reset it on every change of view.
+  const scrollRootRef = useRef(null);
+  useEffect(() => {
+    if (scrollRootRef.current) scrollRootRef.current.scrollTop = 0;
+    // Some browsers scroll the document rather than the container, depending
+    // on where the overflow actually resolves.
+    if (typeof window !== "undefined") window.scrollTo(0, 0);
+  }, [mainView, screen, overviewView]);
+
   // Which Home card is mid-shine. One at a time; cleared when its sweep
   // finishes so the same card can be pressed again straight away.
   const [shineCard, setShineCard] = useState(null);
@@ -8590,6 +8599,7 @@ function NBackSessionApp() {
 
   return (
     <div
+      ref={scrollRootRef}
       style={{ "--ex": themeColor }}
       className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
         isMotion3dApp
