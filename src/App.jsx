@@ -2180,16 +2180,17 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 71;
+const BUILD_VERSION = 72;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:39 PM";
+const BUILD_TIME = "3:17 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Achievements moved to the top right",
-  "Session complete rebuilt as one sequence",
-  "Record glow given back its full range",
+  "Buttons spring on hover and press",
+  "Interference fixed at 12.5% for every N-back",
+  "Binaural beats keep playing until switched off",
+  "Binaural toggle on the round results screen too",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3225,6 +3226,12 @@ const RRT_TIMEOUT = "#8A8F98";
 // this is the difficulty the exercise is tuned around, and letting it vary
 // made two runs at the same level not comparable.
 const RRT_SCRAMBLE_FACTOR = 0.8;
+
+// Interference for every N-back exercise. Fixed rather than adjustable, for
+// the same reason as the scramble factor: it is part of what a level means,
+// so two runs at the same level have to have faced the same lure rate. QNB'
+// is the exception — it derives its own from the level's step table.
+const NBACK_INTERFERENCE = 0.125;
 
 const RRT_RELATIONS = ["same as", "opposite of"];
 
@@ -6015,7 +6022,7 @@ function NBackSessionApp() {
   // using this shared value.
   // Not persisted; resets to this default on reload. Stored as a fraction
   // (0-0.32) internally, shown as a whole-percent slider in the UI.
-  const [interference, setInterference] = useState(0.12);
+  const interference = NBACK_INTERFERENCE;
   // QNB's own level — a float like 4.37 (whole N + a 0.00-0.99 sub-step),
   // persisted separately from the plain-integer `exerciseLevels` used by
   // every other exercise since it needs the fractional part. Drives which
@@ -6815,7 +6822,7 @@ function NBackSessionApp() {
   // Only actually plays while a trial is running — stops itself on setup/
   // results screens rather than droning on in the menus.
   const { unlock: unlockBinauralAudio, audioError: binauralAudioError } = useBinauralBeats(
-    binauralBeatsEnabled && screen === "running"
+    binauralBeatsEnabled
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -8208,6 +8215,30 @@ function NBackSessionApp() {
       right: spaced(RIGHT.filter((m) => active.includes(m)).map(render)),
     };
   }, [exercise.modalities, feedback, handlePress, index, n]);
+
+  // One definition, rendered both before a round and after it, so the track
+  // can be turned on or off at either point without hunting for the setting.
+  const binauralCard = exercise.modalities?.includes("audio") ? (
+    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-5 space-y-2">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-base font-medium text-slate-100">Binaural beats</div>
+          <div className="text-sm text-slate-500 mt-0.5">40Hz Gamma tone</div>
+        </div>
+        <Toggle
+          on={binauralBeatsEnabled}
+          onToggle={() => {
+            unlockBinauralAudio();
+            setBinauralBeatsEnabled(!binauralBeatsEnabled);
+          }}
+          accent={ACCENT_STYLES[exercise.accent]}
+        />
+      </div>
+      {binauralAudioError && (
+        <div className="text-sm text-rose-400">⚠ {binauralAudioError}</div>
+      )}
+    </div>
+  ) : null;
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
@@ -10866,57 +10897,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            {exercise.modalities.includes("audio") && (
-              <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-5 space-y-2">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-base font-medium text-slate-100">Binaural beats</div>
-                    <div className="text-sm text-slate-500 mt-0.5">
-                      40Hz Gamma tone
-                    </div>
-                  </div>
-                  <Toggle
-                    on={binauralBeatsEnabled}
-                    onToggle={() => {
-                      unlockBinauralAudio();
-                      setBinauralBeatsEnabled(!binauralBeatsEnabled);
-                    }}
-                    accent={ACCENT_STYLES[exercise.accent]}
-                  />
-                </div>
-                {binauralAudioError && (
-                  <div className="text-sm text-rose-400">⚠ {binauralAudioError}</div>
-                )}
-              </div>
-            )}
-
-            {exercise.key !== "iqnb" && (
-              <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-5 space-y-3">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <div className="text-base font-medium text-slate-100">
-                      Interference
-                    </div>
-                    <div className="text-sm text-slate-500 mt-0.5">
-                      Chance a non-match reuses an item from n±1 trials ago. A
-                      deliberate near-miss to keep you honest. Higher = trickier.
-                    </div>
-                  </div>
-                  <div className="text-lg font-semibold text-slate-100 shrink-0">
-                    {Math.round(interference * 100)}%
-                  </div>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={32}
-                  step={1}
-                  value={Math.round(interference * 100)}
-                  onChange={(e) => setInterference(Number(e.target.value) / 100)}
-                  className="w-full accent-current"
-                />
-              </div>
-            )}
+            {binauralCard}
 
             <button
               onClick={() => startTask(exercise, n)}
@@ -11121,9 +11102,11 @@ function NBackSessionApp() {
               ))}
             </div>
 
+            {binauralCard}
+
             <button
               onClick={() => startTask(exercise, n)}
-              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
             >
               Continue <span className="text-base font-normal opacity-70">(space)</span>
             </button>
