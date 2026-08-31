@@ -1989,6 +1989,114 @@ function currentStreakDays(exerciseHistory, brokenAt) {
   return streak;
 }
 
+// The longest run of consecutive training days there has ever been, not just
+// the current one. Needed to tell someone the streak they are on is their
+// best, which is only worth saying when it is true.
+function longestStreakDays(exerciseHistory) {
+  const days = new Set();
+  Object.values(exerciseHistory).forEach((hist) => {
+    (hist || []).forEach((h) => days.add(new Date(h.ts).toDateString()));
+  });
+  if (days.size === 0) return 0;
+  const sorted = Array.from(days)
+    .map((d) => new Date(d).setHours(0, 0, 0, 0))
+    .sort((a, b) => a - b);
+  const DAY = 86400000;
+  let best = 1;
+  let run = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    run = sorted[i] - sorted[i - 1] === DAY ? run + 1 : 1;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+// The line shown on the session-complete screen. One statement, the one
+// closest to landing, and only when something genuinely is close. A screen
+// that always claims you are nearly there stops being believed inside a
+// week, so "nothing to say" is a valid answer and the fallback lines say
+// nothing about milestones at all.
+const STREAK_MILESTONES = [
+  { days: 7, label: "a full week" },
+  { days: 14, label: "two weeks straight" },
+  { days: 21, label: "three weeks" },
+  { days: 30, label: "a month" },
+  { days: 50, label: "fifty days" },
+  { days: 75, label: "seventy-five days" },
+  { days: 100, label: "a hundred days" },
+  { days: 150, label: "a hundred and fifty" },
+  { days: 200, label: "two hundred" },
+  { days: 365, label: "a full year" },
+];
+const SESSION_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
+const NUDGE_FALLBACKS = [
+  "Logged. The graph only moves because days like this exist.",
+  "Another one done. Consistency is the whole method.",
+  "That is today handled. Come back tomorrow and it compounds.",
+  "Nothing dramatic, just the work. That is what changes it.",
+];
+
+// `kind` forces a category, for previewing each line without having to
+// engineer the conditions.
+function sessionNudge(state, kind) {
+  const {
+    streak = 0,
+    longestStreak = 0,
+    totalSessions = 0,
+    hitPRToday = false,
+    nearBest = false,
+    strongSession = null,
+  } = state || {};
+
+  const pick = {
+    pr: () => "A personal best today. Those are the sessions the graph remembers.",
+    streakNear: () => {
+      const next = STREAK_MILESTONES.find((m) => m.days > streak);
+      if (!next) return null;
+      const away = next.days - streak;
+      if (away > 2) return null;
+      return away === 1
+        ? `Day ${streak}. One more and that is ${next.label}.`
+        : `Day ${streak}. Two more days and that is ${next.label}.`;
+    },
+    streakBest: () =>
+      streak >= 3 && streak >= longestStreak
+        ? `Day ${streak}. That is the longest you have held it.`
+        : null,
+    sessionsNear: () => {
+      const next = SESSION_MILESTONES.find((m) => m > totalSessions);
+      if (!next) return null;
+      const away = next - totalSessions;
+      if (away > 3) return null;
+      return away === 1
+        ? `One more session and you cross ${next}.`
+        : `${away} more sessions and you cross ${next}.`;
+    },
+    nearBest: () =>
+      "One of your exercises is sitting a step off its best. Next session could take it.",
+    strong: () =>
+      "Sharp session. That is the level you are working to make ordinary.",
+    dip: () =>
+      "Off day. That is what the first stretch at a new level looks like, and it passes.",
+    none: () => NUDGE_FALLBACKS[Math.floor(Math.random() * NUDGE_FALLBACKS.length)],
+  };
+
+  if (kind) return pick[kind] ? pick[kind]() || pick.none() : pick.none();
+
+  // Priority order. A record beats everything, then whatever is nearest.
+  if (hitPRToday) return pick.pr();
+  const streakLine = pick.streakNear();
+  if (streakLine) return streakLine;
+  const bestLine = pick.streakBest();
+  if (bestLine) return bestLine;
+  const sessionsLine = pick.sessionsNear();
+  if (sessionsLine) return sessionsLine;
+  if (nearBest) return pick.nearBest();
+  if (strongSession === true) return pick.strong();
+  if (strongSession === false) return pick.dip();
+  return pick.none();
+}
+
 // Every calendar date (as toDateString()) with at least one logged session —
 // feeds the streak popup's week-of-circles view.
 function trainedDateStrings(exerciseHistory) {
@@ -2180,16 +2288,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 75;
+const BUILD_VERSION = 76;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:09 PM";
+const BUILD_TIME = "4:13 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Binaural beats on by default, switched off in Account",
-  "Plays across the whole exercise, setup screen included",
-  "Tutorial mentions where to turn it off",
+  "Session complete carries a milestone line",
+  "Test buttons on Home preview every variant",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6053,6 +6160,8 @@ function NBackSessionApp() {
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
+  // Set only by the preview buttons; null means "work it out from the data".
+  const [nudgeKindOverride, setNudgeKindOverride] = useState(null);
   const [selectedAvatarId, setSelectedAvatarIdState] = useState(DEFAULT_AVATAR_ID); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
   const [customAvatarImage, setCustomAvatarImageState] = useState(null); // data URL string | null — an uploaded photo, takes priority over the preset avatar when set
   const [displayName, setDisplayNameState] = useState("You"); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
@@ -7629,6 +7738,63 @@ function NBackSessionApp() {
     comeback: hasComebackFromBrokenStreak(exerciseHistory),
     simulatedUnlockedIds,
   };
+  // The one line the session-complete screen shows. Recomputed on render,
+  // which is fine: it is a handful of comparisons over data already in hand.
+  const sessionNudgeLine = (() => {
+    const todayKey = new Date().toDateString();
+    let hitPRToday = false;
+    let nearBest = false;
+    let todayCount = 0;
+    let todayAccSum = 0;
+    let priorAccSum = 0;
+    let priorCount = 0;
+    Object.entries(exerciseHistory).forEach(([key, hist]) => {
+      if (key.startsWith("_")) return;
+      const stat = exerciseStats[key];
+      (hist || []).forEach((h) => {
+        const isToday = new Date(h.ts).toDateString() === todayKey;
+        const acc = typeof h.accuracy === "number" ? h.accuracy : null;
+        if (isToday) {
+          todayCount++;
+          if (acc != null) todayAccSum += acc;
+          if (stat && typeof h.n === "number" && h.n >= (stat.bestN || 0)) {
+            hitPRToday = true;
+          }
+        } else if (acc != null) {
+          priorAccSum += acc;
+          priorCount++;
+        }
+      });
+      const level = exerciseLevels[key];
+      if (stat && typeof level === "number" && stat.bestN && level === stat.bestN - 1) {
+        nearBest = true;
+      }
+    });
+    // Only judged when there is enough history for "better than usual" to
+    // mean anything.
+    let strongSession = null;
+    if (todayCount > 0 && priorCount >= 5) {
+      const todayAvg = todayAccSum / todayCount;
+      const priorAvg = priorAccSum / priorCount;
+      if (todayAvg >= priorAvg + 4) strongSession = true;
+      else if (todayAvg <= priorAvg - 8) strongSession = false;
+    }
+    return sessionNudge(
+      {
+        streak: currentStreakDays(exerciseHistory, streakBrokenAt),
+        longestStreak: longestStreakDays(exerciseHistory),
+        totalSessions: Object.values(exerciseStats).reduce(
+          (sum, v) => sum + (v?.sessions || 0),
+          0
+        ),
+        hitPRToday,
+        nearBest,
+        strongSession,
+      },
+      nudgeKindOverride
+    );
+  })();
+
   // The frame you've actually equipped (Club Penguin-style — pick one even if
   // several are unlocked), falling back to "none" if it's somehow no longer
   // unlocked (e.g. a simulated badge that got un-simulated).
@@ -8895,6 +9061,40 @@ function NBackSessionApp() {
                 🧪 Reset next session (test)
               </button>
               )}
+              {/* Preview each session-complete line without having to build
+                  the conditions that trigger it. */}
+              <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
+                <div className="text-sm text-slate-500">
+                  🧪 Session complete screen (test): preview each message
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {[
+                    ["Real", null],
+                    ["Record", "pr"],
+                    ["Streak near", "streakNear"],
+                    ["Streak best", "streakBest"],
+                    ["Sessions near", "sessionsNear"],
+                    ["Near best", "nearBest"],
+                    ["Strong", "strong"],
+                    ["Off day", "dip"],
+                    ["Nothing close", "none"],
+                  ].map(([label, kind]) => (
+                    <button
+                      key={label}
+                      onClick={() => {
+                        setNudgeKindOverride(kind);
+                        setSessionCompleteAnim(true);
+                        playLevelUp();
+                        setTimeout(() => setSessionCompleteAnim(false), 3400);
+                      }}
+                      className="rounded-lg py-2 text-xs font-medium border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Skip to exercise (test): bypasses regime/Start Training entirely
@@ -10339,6 +10539,7 @@ function NBackSessionApp() {
                     setMainView("home");
                     return;
                   }
+                  setNudgeKindOverride(null);
                   setSessionCompleteAnim(true);
                   playLevelUp();
                   setTimeout(() => {
@@ -11657,10 +11858,13 @@ function NBackSessionApp() {
               Session complete
             </div>
             <div
-              className="text-slate-400 text-lg mt-3"
-              style={{ animation: "sessionDoneSub 3.4s ease-out forwards" }}
+              className="text-slate-400 text-lg mt-3 max-w-md mx-auto px-6"
+              style={{
+                animation: "sessionDoneSub 3.4s ease-out forwards",
+                textWrap: "balance",
+              }}
             >
-              That is one more than yesterday.
+              {sessionNudgeLine}
             </div>
           </div>
         </div>
