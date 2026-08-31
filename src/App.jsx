@@ -2269,14 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 91;
+const BUILD_VERSION = 92;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:52 PM";
+const BUILD_TIME = "9:01 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation page: the hypnosis track, play and volume only",
+  "Motivation: text back, smaller button, drawn play and pause icons",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13702,6 +13702,8 @@ function motProjectToScreen(position, camera, width, height) {
 const HYPNOSIS_TRACK = {
   url: "/audio/Cortex%20Hypnosis%20Version%201.mp3",
   title: "Motivation",
+  blurb:
+    "A short guided hypnosis track. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
 };
 
 // Deliberately bare: a play button and a volume slider, nothing else. No
@@ -13751,6 +13753,10 @@ function HypnosisScreen({ onDone }) {
         </h1>
       </div>
 
+      <p className="text-slate-300 text-lg leading-relaxed">
+        {HYPNOSIS_TRACK.blurb}
+      </p>
+
       <div className="bg-slate-900 border border-slate-700/70 rounded-2xl p-8">
         <audio
           ref={audioRef}
@@ -13760,13 +13766,25 @@ function HypnosisScreen({ onDone }) {
           onPause={() => setPlaying(false)}
           onPlay={() => setPlaying(true)}
         />
-        <div className="flex items-center gap-7">
+        <div className="flex items-center gap-6">
+          {/* Drawn rather than typed. The glyph characters render as colour
+              emoji on some platforms, which is where the odd-looking pause
+              came from. */}
           <button
             onClick={toggle}
             aria-label={playing ? "Pause" : "Play"}
-            className="w-16 h-16 shrink-0 rounded-full deep-fill flex items-center justify-center text-2xl"
+            className="w-12 h-12 shrink-0 rounded-full deep-fill flex items-center justify-center text-white"
           >
-            {playing ? "⏸" : "▶"}
+            {playing ? (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <rect x="3" y="2" width="3.5" height="12" rx="1.1" />
+                <rect x="9.5" y="2" width="3.5" height="12" rx="1.1" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M4.5 2.6a1 1 0 0 1 1.52-.85l7 5.4a1 1 0 0 1 0 1.7l-7 5.4A1 1 0 0 1 4.5 13.4Z" />
+              </svg>
+            )}
           </button>
           <div className="flex-1 flex items-center gap-3">
             <svg
