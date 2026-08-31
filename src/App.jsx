@@ -2273,14 +2273,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 97;
+const BUILD_VERSION = 98;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:48 PM";
+const BUILD_TIME = "9:53 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Switching regime no longer resets the starting level",
+  "Reminder block on the regime page",
+  "Motivation from Home shows Back, not Skip",
+  "Streak +1 test button back",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6428,6 +6430,11 @@ function NBackSessionApp() {
   }, [regimeKey]);
   const [overviewView, setOverviewView] = useState("summary"); // "summary" | "graph"
   const [statsDisplay, setStatsDisplay] = useState("chart"); // "chart" | "spreadsheet" — which form the stats/graph screen shows session history in
+  // True only on the end-of-regime path, where Motivation is the last step
+  // of the session. Opened from Home it is just a page. Inferring this from
+  // overviewSource was wrong: that value is stale when Motivation is opened
+  // straight from Home without passing through the Overview screen.
+  const [hypnosisAfterSession, setHypnosisAfterSession] = useState(false);
   const [overviewSource, setOverviewSource] = useState("training"); // "training" | "home" — controls which time-trained stat the Session Overview screen shows
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
@@ -8911,6 +8918,29 @@ function NBackSessionApp() {
               <div className="text-slate-100 text-lg font-semibold">
                 VERSION {BUILD_VERSION} · {BUILD_TIME}
               </div>
+              {/* Standing reminder, kept in the app rather than a note
+                  elsewhere so it is unavoidable. Remove the block when the
+                  work is done. */}
+              <div
+                className="mt-3 mb-5 space-y-2 text-sm leading-relaxed"
+                style={{ color: "#E8158F" }}
+              >
+                <div className="font-semibold uppercase tracking-wide text-xs">
+                  To fix
+                </div>
+                <div>
+                  Fix the problem with how they view all of their stats.
+                </div>
+                <div>
+                  One of the pages has its text off-centre, unlike the others.
+                </div>
+                <div>
+                  The goal isn't to just be a brain training app, it also is to
+                  have psychological solutions that make it feel better and
+                  easier, and to essentially nee like a pseudo motivation
+                  mindset coach on top of the training exercises.
+                </div>
+              </div>
               <ul className="mt-1.5 mb-5 space-y-0.5">
                 {BUILD_NOTES.map((note) => (
                   <li key={note} className="text-slate-500 text-xs flex gap-2">
@@ -9206,7 +9236,7 @@ function NBackSessionApp() {
                session, so it gets a Skip under the player and no Back —
                there is nothing behind it to go back to. Opened from Home it
                is just a page, so it gets Back and no Skip. */
-            afterSession={overviewSource !== "home"}
+            afterSession={hypnosisAfterSession}
           />
         )}
 
@@ -9244,7 +9274,6 @@ function NBackSessionApp() {
                     {achievementState.streak === 1 ? "Day" : "Days"}
                   </span>
                 </button>
-                {SHOW_TEST_TOOLS && (
                 <button
                   onClick={() => bumpTestStreak(regimeKey)}
                   title="Test: +1 day streak"
@@ -9252,7 +9281,6 @@ function NBackSessionApp() {
                 >
                   🧪 +1
                 </button>
-                )}
                 {SHOW_TEST_TOOLS && (
                 <button
                   onClick={resetTestStreak}
@@ -9386,7 +9414,10 @@ function NBackSessionApp() {
                 Overview
               </button>
               <button
-                onClick={() => setMainView("hypnosis")}
+                onClick={() => {
+                  setHypnosisAfterSession(false);
+                  setMainView("hypnosis");
+                }}
                 className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
                 Motivation
@@ -10924,6 +10955,7 @@ function NBackSessionApp() {
                   playLevelUp();
                   setTimeout(() => {
                     setSessionCompleteAnim(false);
+                    setHypnosisAfterSession(true);
                     setMainView("hypnosis");
                   }, 6200);
                 }}
