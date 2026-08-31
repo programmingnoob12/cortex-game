@@ -2011,30 +2011,34 @@ function longestStreakDays(exerciseHistory) {
   return best;
 }
 
-// Session-complete lines live in the shared doc for now, not here. This is
-// the plumbing only: a small placeholder set so the screen has something to
-// say, replaced wholesale once the real copy is settled.
-const NUDGE_LINES = {
-  pr: ["New personal record. Nice work."],
-  streak: ["{n} day streak. Keep it going."],
-  worse: ["Some days are hard. Just focus on being consistent."],
-  general: ["Show up even when you aren't feeling it. That's how winners are made."],
-};
+// One line for the session-complete screen: the pool that matches what
+// actually happened, or an unconditional line when nothing does. `forcedId`
+// shows one specific numbered line, for the test panel.
+function sessionNudge(state, forcedId) {
+  const forced = forcedId ? MOTIVATION_BY_ID.get(forcedId) : null;
+  const from = (cond) => MOTIVATION_LINES.filter((l) => l.cond === cond);
 
-// `forcedKey` shows one specific pool, for the test buttons.
-function sessionNudge(state, forcedKey) {
-  const pool =
-    NUDGE_LINES[forcedKey] ||
-    (state?.hitPRToday
-      ? NUDGE_LINES.pr
-      : state?.strongSession === false
-      ? NUDGE_LINES.worse
-      : (state?.streak || 0) >= 2
-      ? NUDGE_LINES.streak
-      : NUDGE_LINES.general);
+  let pool;
+  if (forced) {
+    pool = [forced];
+  } else if (state?.hitPRToday) {
+    pool = from("pr");
+  } else if (state?.strongSession === false) {
+    pool = from("worse");
+  } else if ((state?.streak || 0) === 14) {
+    pool = from("streak14");
+  } else if (state?.nearBest) {
+    pool = from("nearBest");
+  } else if ((state?.streak || 0) >= 2) {
+    pool = from("streak");
+  } else {
+    pool = [];
+  }
+  if (pool.length === 0) pool = MOTIVATION_UNCONDITIONAL;
+
   const line = pool[Math.floor(Math.random() * pool.length)];
   // `{n}` in a line fills in with the current streak length.
-  return line.replace("{n}", String(state?.streak ?? 0));
+  return (line?.text || "Nice work.").replace("{n}", String(state?.streak ?? 0));
 }
 
 // Every calendar date (as toDateString()) with at least one logged session —
@@ -2184,37 +2188,55 @@ const SHOW_PROFILE_CUSTOMIZATION = false;
 // Test-only controls that should not ship.
 const SHOW_TEST_TOOLS = false;
 
-// Shown on the hand-off between exercises. The unconditional lines from the
-// shared doc; anything tied to a streak or a record stays on the
-// session-complete screen where it can actually be true.
-const TRANSITION_QUOTES = [
-  "A sharper mind gives you an edge.",
-  "Great job! You're getting ahead of the competition. Faster decisions. Better reactions.",
-  "Sharper reactions. Stronger performance.",
-  "Others aren't willing to do what you do. That's why you're better than them.",
-  "OUTTHINK. OUTREACT. OUTPERFORM.",
-  "GET AHEAD.",
-  "MAKE YOUR MIND STRONGER.",
-  "BECOME MENTALLY SUPERIOR. KEEP CLIMBING.",
-  "BECOME MENTALLY UNSTOPPABLE.",
-  "Another day, another win.",
-  "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection.",
-  "Your future self will thank you.",
-  "You're getting smarter than the competition.",
-  "Keep going. Your future self will thank you.",
-  "Be proud of how smart you have become. The best don't stop improving. Become better than your old self.",
-  "Enjoy being mentally superior to everyone.",
-  "Other people won't be able to keep up with you.",
-  "You showed up today. That's a win.",
-  "Progress is messy sometimes.",
-  "You're getting stronger with every session.",
-  "Show up even when you aren't feeling it. That's how winners are made.",
-  "You're becoming wiser and smarter every session. Keep it up.",
-  "Others aren't willing to do what you do. That's why you're better than them.",
-  "Most people never train this. That's your advantage.",
-  "Your edge is built on days like this.",
-  "You're building the thing everyone else calls talent.",
+// The written lines, numbered to match the shared doc. `cond` is the state
+// that can show it; a line with no cond is unconditional and also feeds the
+// screen between exercises.
+const MOTIVATION_LINES = [
+  { id: 1, text: "A sharper mind gives you an edge." },
+  { id: 2, text: "Great job! You're getting ahead of the competition. Faster decisions. Better reactions." },
+  { id: 3, text: "Sharper reactions. Stronger performance." },
+  { id: 4, text: "Other people aren't willing to do what you just did. That's why you have an edge. Become better than your old self." },
+  { id: 5, text: "OUTTHINK. OUTREACT. OUTPERFORM." },
+  { id: 6, text: "GET AHEAD." },
+  { id: 7, text: "MAKE YOUR MIND STRONGER." },
+  { id: 8, text: "BECOME MENTALLY SUPERIOR. KEEP CLIMBING." },
+  { id: 9, text: "BECOME MENTALLY UNSTOPPABLE." },
+  { id: 10, text: "Another day, another win." },
+  { id: 11, text: "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection." },
+  { id: 12, text: "Your future self will thank you." },
+  { id: 13, text: "You're getting smarter than the competition." },
+  { id: 14, text: "Close to your personal best. That's a good sign.", cond: "nearBest" },
+  { id: 15, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
+  { id: 16, text: "Keep going. Your future self will thank you." },
+  { id: 17, text: "Be proud of how smart you have become. The best don't stop improving. Become better than your old self." },
+  { id: 18, text: "Enjoy being mentally superior to everyone." },
+  { id: 19, text: "Other people won't be able to keep up with you." },
+  { id: 20, text: "You showed up today. That's a win." },
+  { id: 21, text: "Today was a little harder. You still got it done anyway. Good job.", cond: "worse" },
+  { id: 22, text: "Another personal best. You're on fire!", cond: "pr" },
+  { id: 23, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
+  { id: 24, text: "Progress is messy sometimes." },
+  { id: 25, text: "It was a hard session but you got it done.", cond: "worse" },
+  { id: 26, text: "You're getting stronger with every session." },
+  { id: 27, text: "Show up even when you aren't feeling it. That's how winners are made." },
+  { id: 28, text: "You're becoming wiser and smarter every session. Keep it up." },
+  { id: 29, text: "New personal record. Nice work.", cond: "pr" },
+  { id: 30, text: "{n} day streak. Keep it going.", cond: "streak" },
+  { id: 31, text: "Some days are hard. Just focus on being consistent.", cond: "worse" },
+  { id: 32, text: "Others aren't willing to do what you do. That's why you're better than them." },
+  { id: 33, text: "Most people never train this. That's your advantage." },
+  { id: 34, text: "Your edge is built on days like this." },
+  { id: 35, text: "You're building the thing everyone else calls talent." },
+  { id: 36, text: "What used to be impossible for you is now average. That's how far you've come.", cond: "avgPR" },
+  { id: 37, text: "Remember this. Then go higher.", cond: "pr" },
 ];
+const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
+const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
+
+// Shown on the hand-off between exercises. The unconditional lines only:
+// anything tied to a streak or a record belongs on the session-complete
+// screen, where it can actually be true.
+const TRANSITION_QUOTES = MOTIVATION_UNCONDITIONAL.map((l) => l.text);
 
 
 
@@ -2243,14 +2265,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 82;
+const BUILD_VERSION = 83;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:43 PM";
+const BUILD_TIME = "6:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Four more lines on the between-round screen",
+  "A test button for every written line",
+  "Gem tiers renamed: Bright, Radiant, Illuminated",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5012,9 +5035,9 @@ const GEM_TIERS = {
   1: { color: "#94a3b8", glow: false, label: "Novice" },
   2: { color: "#4ade80", glow: true, label: "Apprentice" },
   3: { color: "#38bdf8", glow: true, label: "Adept" },
-  4: { color: "#818CF8", glow: true, label: "Proficient" },
-  5: { color: "#22d3ee", glow: true, label: "Bright" },
-  6: { color: "#fb7185", glow: true, label: "Radiant" },
+  4: { color: "#818CF8", glow: true, label: "Bright" },
+  5: { color: "#22d3ee", glow: true, label: "Radiant" },
+  6: { color: "#fb7185", glow: true, label: "Illuminated" },
   7: { color: "#c084fc", glow: true, label: "Brilliant" },
   8: { color: "#f59e0b", glow: true, label: "Elite" },
   9: { color: "#fde047", glow: true, label: "Transcendent" },
@@ -9028,31 +9051,66 @@ function NBackSessionApp() {
                 🧪 Reset next session (test)
               </button>
               )}
+              {/* One button per written line. Hover a number for the text;
+                  click it to run the session-complete screen with that line. */}
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
-                  🧪 Session complete screen (test)
+                  🧪 Session complete screen (test) — {MOTIVATION_LINES.length} lines
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                  {[
-                    ["Real", null],
-                    ["Record", "pr"],
-                    ["Streak", "streak"],
-                    ["Off day", "worse"],
-                    ["General", "general"],
-                  ].map(([label, kind]) => (
+                <div className="flex flex-wrap gap-1.5">
+                  {MOTIVATION_LINES.map((l) => (
                     <button
-                      key={label}
+                      key={l.id}
+                      title={`${l.text}${l.cond ? `  ·  ${l.cond}` : ""}`}
                       onClick={() => {
-                        setNudgeIdOverride(kind);
+                        setNudgeIdOverride(l.id);
                         setSessionCompleteAnim(true);
                         playLevelUp();
                         setTimeout(() => setSessionCompleteAnim(false), 6200);
                       }}
-                      className="rounded-lg py-2 text-xs font-medium border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300"
+                      className={`w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border text-slate-300 hover:border-slate-400 ${
+                        l.cond
+                          ? "border-amber-700/70 bg-amber-950/30"
+                          : "border-slate-700 bg-slate-800"
+                      }`}
                     >
-                      {label}
+                      {l.id}
                     </button>
                   ))}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setNudgeIdOverride(null);
+                      setSessionCompleteAnim(true);
+                      playLevelUp();
+                      setTimeout(() => setSessionCompleteAnim(false), 6200);
+                    }}
+                    className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                  >
+                    Real (uses your data)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSwitchQuote(
+                        TRANSITION_QUOTES[
+                          Math.floor(Math.random() * TRANSITION_QUOTES.length)
+                        ]
+                      );
+                      setSwitchNotice(true);
+                      setMainView("app");
+                      setTimeout(() => {
+                        setSwitchNotice(false);
+                        setMainView("home");
+                      }, 4400);
+                    }}
+                    className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                  >
+                    Between-round screen
+                  </button>
+                </div>
+                <div className="text-xs text-slate-600">
+                  Amber = has a condition. Grey = unconditional, also used between rounds.
                 </div>
               </div>
 
