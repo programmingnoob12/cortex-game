@@ -2180,17 +2180,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 70;
+const BUILD_VERSION = 71;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:32 PM";
+const BUILD_TIME = "2:39 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Quote screen between exercises",
-  "Leaderboard and profile customization hidden",
-  "N-back buttons moved to the screen edges, grid larger",
-  "Record glow swells with the music instead of flickering",
+  "Achievements moved to the top right",
+  "Session complete rebuilt as one sequence",
+  "Record glow given back its full range",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2663,9 +2662,10 @@ function playSessionDone() {
 // driven by the music: the reveal already carries the motion, and a glow
 // pumping on the beat behind it competed with the content. It comes up with
 // the reveal and goes out on the song's fade so the two end together.
-// Where the celebration track's loudest hits sit, as a full-spectrum linear
-// amplitude. Measured off the file rather than guessed.
-const GLOW_REF = 0.009;
+// The celebration track's quietest and loudest moments, as a full-spectrum
+// linear amplitude. Measured off the file rather than guessed.
+const GLOW_FLOOR = 0.002;
+const GLOW_REF = 0.0068;
 function PrGoldGlow({ className, style, out }) {
   const ref = useRef(null);
   // The bloom tracks how loud the track is, moment to moment. Read straight
@@ -2699,23 +2699,21 @@ function PrGoldGlow({ className, style, out }) {
       }
       const amp = sum / (data.length - 1);
 
-      // GLOW_REF is where the track's loudest hits land, measured off the
-      // file. The curve above it is just clamped, so the biggest noises put
-      // the glow at full size and everything quieter sits proportionally
-      // below.
-      let target = Math.min(1, amp / GLOW_REF);
-      // Raised to a power so the loud moments pull further clear of the
-      // middle instead of everything bunching around half.
-      target = target * target * Math.sqrt(target);
+      // Straight line from the track's quietest moments to its loudest,
+      // both measured off the file. The power curve that used to sit here
+      // squashed everything into the bottom fifth of the range, which is
+      // why the glow stopped appearing to move at all.
+      const target = Math.max(
+        0,
+        Math.min(1, (amp - GLOW_FLOOR) / (GLOW_REF - GLOW_FLOOR))
+      );
 
       // Fast to rise so a hit is not smeared across frames, slower to fall
       // so it blooms and eases back.
-      // Slow on purpose. The analyser reads the signal before the speakers
-      // play it, so a per-frame reaction is always slightly ahead of what is
-      // heard, and at sixty frames a second that reads as random flicker
-      // rather than as timing. Swelling over a few tenths of a second tracks
-      // the loud PASSAGES, which is what actually looks in time.
-      level += (target - level) * (target > level ? 0.16 : 0.045);
+      // Quick enough to catch a hit, slow enough not to strobe. Simulated
+      // against the real track this holds around 0.35 through the build and
+      // 0.65 through the drop, peaking near 0.95 on the loudest bars.
+      level += (target - level) * (target > level ? 0.45 : 0.1);
 
       // Opacity, not brightness. The gradient is yellow on black, so
       // brightening it barely changes anything; how much of it is on screen
@@ -8280,20 +8278,46 @@ function NBackSessionApp() {
            top-lit inset shadow. Keeping a second rule here meant every
            button was lightened twice, which is why the tinted ones (the
            Achievements pill especially) blew out on hover. */
+        /* Session complete. Built as one sequence rather than three
+           overlapping effects: a wash of light, the ring drawing itself
+           closed, the mark landing inside it, then the words. */
+        @keyframes sessionDoneWash {
+          0% { opacity: 0; transform: scale(0.6); }
+          30% { opacity: 1; }
+          100% { opacity: 0; transform: scale(2.4); }
+        }
         @keyframes sessionDoneRing {
           0% { transform: scale(0.4); opacity: 0; }
           45% { transform: scale(1); opacity: 1; }
           100% { transform: scale(1.9); opacity: 0; }
         }
+        /* The stroke draws round the circle instead of the whole ring
+           fading up, which is what makes it read as being completed. */
+        @keyframes sessionDoneTrace {
+          0% { stroke-dashoffset: 302; opacity: 0; }
+          8% { opacity: 1; }
+          100% { stroke-dashoffset: 0; opacity: 1; }
+        }
         @keyframes sessionDoneMark {
-          0% { transform: scale(0.5) rotate(-8deg); opacity: 0; }
-          55% { transform: scale(1.12) rotate(3deg); opacity: 1; }
-          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          0% { transform: scale(0.4); opacity: 0; }
+          60% { transform: scale(1.18); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes sessionDoneText {
-          0%, 25% { transform: translateY(10px); opacity: 0; }
-          55%, 88% { transform: translateY(0); opacity: 1; }
+          0%, 12% { transform: translateY(14px); opacity: 0; filter: blur(8px); }
+          40%, 86% { transform: translateY(0); opacity: 1; filter: blur(0); }
+          100% { opacity: 0; filter: blur(0); }
+        }
+        @keyframes sessionDoneSub {
+          0%, 30% { transform: translateY(10px); opacity: 0; }
+          58%, 86% { transform: translateY(0); opacity: 1; }
           100% { opacity: 0; }
+        }
+        /* Sparks thrown outward as the mark lands. */
+        @keyframes sessionDoneSpark {
+          0% { transform: translate(0, 0) scale(0); opacity: 0; }
+          25% { opacity: 1; }
+          100% { transform: translate(var(--sx), var(--sy)) scale(1); opacity: 0; }
         }
         /* Tailwind's tracking-tight is -0.025em, which reads as cramped at
            the display sizes the headings use. Halved. */
@@ -10335,7 +10359,7 @@ function NBackSessionApp() {
                   setTimeout(() => {
                     setSessionCompleteAnim(false);
                     setMainView("hypnosis");
-                  }, 2100);
+                  }, 3400);
                 }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
@@ -11629,29 +11653,82 @@ function NBackSessionApp() {
           rather than a silent navigation. Pointer events off so it can never
           trap a click if the timer is somehow missed. */}
       {sessionCompleteAnim && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-sm pointer-events-none">
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-sm pointer-events-none overflow-hidden">
+          {/* A wash of light behind everything, so the screen brightens
+              before anything is drawn on it. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
+              animation: "sessionDoneWash 3.4s cubic-bezier(0.2,0.7,0.3,1) forwards",
+            }}
+          />
           <div className="relative flex items-center justify-center">
             <span
-              className="absolute w-40 h-40 rounded-full border-2 border-cyan-400"
-              style={{ animation: "sessionDoneRing 1.5s ease-out forwards" }}
+              className="absolute w-44 h-44 rounded-full border border-cyan-400/50"
+              style={{ animation: "sessionDoneRing 2.2s ease-out 0.55s forwards" }}
             />
             <span
-              className="absolute w-40 h-40 rounded-full border border-cyan-400"
-              style={{ animation: "sessionDoneRing 1.5s ease-out 0.22s forwards" }}
+              className="absolute w-44 h-44 rounded-full border border-cyan-400/30"
+              style={{ animation: "sessionDoneRing 2.2s ease-out 0.95s forwards" }}
             />
+            {/* Sparks thrown out on the beat the mark lands. */}
+            {Array.from({ length: 12 }).map((_, i) => {
+              const angle = (i / 12) * Math.PI * 2;
+              const dist = 96 + (i % 3) * 26;
+              return (
+                <span
+                  key={i}
+                  aria-hidden="true"
+                  className="absolute rounded-full bg-cyan-300"
+                  style={{
+                    width: 5,
+                    height: 5,
+                    "--sx": `${(Math.cos(angle) * dist).toFixed(1)}px`,
+                    "--sy": `${(Math.sin(angle) * dist).toFixed(1)}px`,
+                    animation: `sessionDoneSpark 1.5s ${0.62 + (i % 4) * 0.04}s cubic-bezier(0.2,0.7,0.3,1) both`,
+                  }}
+                />
+              );
+            })}
+            {/* The ring draws itself closed. Circumference of r=48 is about
+                302, which is where the dash numbers come from. */}
+            <svg width="112" height="112" viewBox="0 0 112 112" className="absolute">
+              <circle
+                cx="56"
+                cy="56"
+                r="48"
+                fill="none"
+                stroke="#4CB9D8"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeDasharray="302"
+                transform="rotate(-90 56 56)"
+                style={{ animation: "sessionDoneTrace 0.75s cubic-bezier(0.4,0,0.2,1) both" }}
+              />
+            </svg>
             <div
-              className="w-28 h-28 rounded-full bg-cyan-500/10 border border-cyan-400 flex items-center justify-center text-5xl text-cyan-300"
-              style={{ animation: "sessionDoneMark 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards" }}
+              className="w-28 h-28 rounded-full bg-cyan-500/10 flex items-center justify-center text-5xl text-cyan-300"
+              style={{ animation: "sessionDoneMark 0.6s 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}
             >
               ✓
             </div>
           </div>
-          <div
-            className="mt-10 text-center"
-            style={{ animation: "sessionDoneText 2.1s ease-out forwards" }}
-          >
-            <div className="text-3xl font-semibold tracking-tight">Session complete</div>
-            <div className="text-slate-400 text-base mt-2">Nice work. That one counts.</div>
+          <div className="mt-12 text-center">
+            <div
+              className="text-4xl font-semibold tracking-tight"
+              style={{ animation: "sessionDoneText 3.4s ease-out forwards" }}
+            >
+              Session complete
+            </div>
+            <div
+              className="text-slate-400 text-lg mt-3"
+              style={{ animation: "sessionDoneSub 3.4s ease-out forwards" }}
+            >
+              That is one more than yesterday.
+            </div>
           </div>
         </div>
       )}
@@ -11686,7 +11763,9 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("achievements")}
-          className="fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
+          /* Top right while the Leaderboard is hidden. When that comes back it
+             takes this corner and Achievements returns to the left. */
+          className="fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
         >
           <span className="text-lg">🏅</span>
           <span className="hidden sm:inline">Achievements</span>
