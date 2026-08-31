@@ -2273,18 +2273,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 95;
+const BUILD_VERSION = 96;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:39 PM";
+const BUILD_TIME = "9:44 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Binaural no longer cuts out between exercises",
-  "Diagnostics no longer logs healthy audio state",
-  "Achievements text larger and less cramped",
-  "Motivation: Skip after a session, no Back there",
-  "Membership and Log out at the foot of Account",
+  "Stats show every exercise you have ever trained",
+  "Breaks in training now show as gaps in the graph",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3080,16 +3077,38 @@ function aggregateSessions(sessions, grain) {
     b.best = b.best === null ? sn.level : Math.max(b.best, sn.level);
     buckets.set(key, b);
   });
-  return Array.from(buckets.values())
-    .sort((a, b) => a.ts - b.ts)
-    .map((b, i) => ({
-      session: i + 1,
-      label: bucketLabel(b.ts, grain),
+  const filled = Array.from(buckets.values()).sort((a, b) => a.ts - b.ts);
+
+  // Periods with no training are kept as empty points rather than skipped.
+  // Without them the line joins August straight onto October as though the
+  // gap never happened; with them it breaks, which is the truth.
+  const withGaps = [];
+  filled.forEach((b, i) => {
+    if (i > 0) {
+      const cursor = new Date(filled[i - 1].ts);
+      for (let guard = 0; guard < 600; guard++) {
+        if (grain === "month") cursor.setMonth(cursor.getMonth() + 1);
+        else cursor.setDate(cursor.getDate() + 7);
+        if (bucketKeyFor(cursor.getTime(), grain) === bucketKeyFor(b.ts, grain)) break;
+        if (cursor.getTime() >= b.ts) break;
+        withGaps.push({
+          ts: cursor.getTime(),
+          label: bucketLabel(cursor.getTime(), grain),
+          level: null,
+          avg: null,
+          sessions: 0,
+        });
+      }
+    }
+    withGaps.push({
       ts: b.ts,
+      label: bucketLabel(b.ts, grain),
       level: b.best,
       avg: b.sum / b.count,
       sessions: b.count,
-    }));
+    });
+  });
+  return withGaps.map((b, i) => ({ ...b, session: i + 1 }));
 }
 
 // Table records, walked oldest to newest: a day sets a score record when its
@@ -3123,7 +3142,9 @@ function withRunningAverage(list) {
   let bestScore = null;
   return list.map((item) => {
     if (item.level == null) {
-      return { ...item, avg: count ? sum / count : null, isPR: false, isAvgPR: false };
+      // A gap point. The average line breaks with the score line rather than
+      // carrying the old running average across months of no training.
+      return { ...item, avg: null, isPR: false, isAvgPR: false };
     }
     const isPR = bestScore !== null && item.level > bestScore;
     if (bestScore === null || item.level > bestScore) bestScore = item.level;
@@ -7967,6 +7988,23 @@ function NBackSessionApp() {
     new Set(currentRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
 
+  // Stats is not scoped to the current regime. Training history is stored per
+  // EXERCISE, never per regime, so switching from Quick to Balanced and back
+  // never loses anything — but listing only the current regime's exercises
+  // hid the rest, which looked exactly like data loss. This lists the current
+  // regime's exercises first, then every other exercise that has any history,
+  // so a run of Quick in August still shows after a September on Balanced.
+  const statsExercises = (() => {
+    const inRegime = new Set(currentRegime.steps.map((st) => st.key));
+    const others = Object.values(EXERCISE_LIBRARY).filter(
+      (e) =>
+        e.key !== "overview" &&
+        !inRegime.has(e.key) &&
+        (exerciseHistory[e.key] || []).length > 0
+    );
+    return [...overviewExercises, ...others];
+  })();
+
   // The tutorial now always shows for exactly the one exercise that's about
   // to start (gated in proceedStartFromHome / forceSwitchToNext below) —
   // no more walking through every exercise in the regime up front.
@@ -10919,7 +10957,7 @@ function NBackSessionApp() {
             </div>
 
             {statsDisplay === "chart"
-              ? overviewExercises.map((e) => {
+              ? statsExercises.map((e) => {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
@@ -11107,7 +11145,7 @@ function NBackSessionApp() {
                 </div>
               );
             })
-              : overviewExercises.map((e) => {
+              : statsExercises.map((e) => {
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               // Averages and records only make sense oldest-first, so build
               // them that way and flip back to newest-first for display.
