@@ -2184,23 +2184,34 @@ const SHOW_PROFILE_CUSTOMIZATION = false;
 // Test-only controls that should not ship.
 const SHOW_TEST_TOOLS = false;
 
-// Shown on the hand-off between exercises. Short enough to finish reading in
-// the couple of seconds the transition lasts, and about the practice rather
-// than about being clever.
+// Shown on the hand-off between exercises. The unconditional lines from the
+// shared doc; anything tied to a streak or a record stays on the
+// session-complete screen where it can actually be true.
 const TRANSITION_QUOTES = [
-  "Focus on consistency, not intensity.",
-  "The strain is the training.",
-  "Missing is how you find the edge.",
-  "Show up tired. It still counts.",
-  "You only lose the streak by choosing to.",
-  "Slow progress is still progress.",
-  "Attention is a muscle. This is the gym.",
-  "Hard today, ordinary in a month.",
-  "Nobody gets sharper on easy days.",
-  "One session is a rounding error. A hundred is a different person.",
-  "Come back tomorrow. That is the whole method.",
-  "Do not chase the score. Chase the reps.",
+  "A sharper mind gives you an edge.",
+  "Great job! You're getting ahead of the competition. Faster decisions. Better reactions.",
+  "Sharper reactions. Stronger performance.",
+  "Others aren't willing to do what you do. That's why you're better than them.",
+  "OUTTHINK. OUTREACT. OUTPERFORM.",
+  "GET AHEAD.",
+  "MAKE YOUR MIND STRONGER.",
+  "BECOME MENTALLY SUPERIOR. KEEP CLIMBING.",
+  "BECOME MENTALLY UNSTOPPABLE.",
+  "Another day, another win.",
+  "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection.",
+  "Your future self will thank you.",
+  "You're getting smarter than the competition.",
+  "Keep going. Your future self will thank you.",
+  "Be proud of how smart you have become. The best don't stop improving. Become better than your old self.",
+  "Enjoy being mentally superior to everyone.",
+  "Other people won't be able to keep up with you.",
+  "You showed up today. That's a win.",
+  "Progress is messy sometimes.",
+  "You're getting stronger with every session.",
+  "Show up even when you aren't feeling it. That's how winners are made.",
+  "You're becoming wiser and smarter every session. Keep it up.",
 ];
+
 
 
 // Achievement titles read "Quad N-Back Apprentice". Only the rank at the
@@ -2228,14 +2239,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 80;
+const BUILD_VERSION = 81;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:33 PM";
+const BUILD_TIME = "5:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Session-complete placeholders swapped for the first real lines",
+  "Between-round screen uses the written lines",
+  "Session complete holds for 6.2s so it can be read",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8344,7 +8356,8 @@ function NBackSessionApp() {
            closed, the mark landing inside it, then the words. */
         @keyframes sessionDoneWash {
           0% { opacity: 0; transform: scale(0.6); }
-          30% { opacity: 1; }
+          16% { opacity: 1; }
+          70% { opacity: 0.5; }
           100% { opacity: 0; transform: scale(2.4); }
         }
         @keyframes sessionDoneRing {
@@ -8364,14 +8377,17 @@ function NBackSessionApp() {
           60% { transform: scale(1.18); opacity: 1; }
           100% { transform: scale(1); opacity: 1; }
         }
+        /* Percentages retimed for the longer hold: both settle early and
+           then sit still for most of the screen, so there is time to read
+           the line rather than watch it arrive and leave. */
         @keyframes sessionDoneText {
-          0%, 12% { transform: translateY(14px); opacity: 0; filter: blur(8px); }
-          40%, 86% { transform: translateY(0); opacity: 1; filter: blur(0); }
+          0%, 7% { transform: translateY(14px); opacity: 0; filter: blur(8px); }
+          22%, 92% { transform: translateY(0); opacity: 1; filter: blur(0); }
           100% { opacity: 0; filter: blur(0); }
         }
         @keyframes sessionDoneSub {
-          0%, 30% { transform: translateY(10px); opacity: 0; }
-          58%, 86% { transform: translateY(0); opacity: 1; }
+          0%, 16% { transform: translateY(10px); opacity: 0; }
+          32%, 92% { transform: translateY(0); opacity: 1; }
           100% { opacity: 0; }
         }
         /* Sparks thrown outward as the mark lands. */
@@ -9027,7 +9043,7 @@ function NBackSessionApp() {
                         setNudgeIdOverride(kind);
                         setSessionCompleteAnim(true);
                         playLevelUp();
-                        setTimeout(() => setSessionCompleteAnim(false), 3400);
+                        setTimeout(() => setSessionCompleteAnim(false), 6200);
                       }}
                       className="rounded-lg py-2 text-xs font-medium border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300"
                     >
@@ -10487,7 +10503,7 @@ function NBackSessionApp() {
                   setTimeout(() => {
                     setSessionCompleteAnim(false);
                     setMainView("hypnosis");
-                  }, 3400);
+                  }, 6200);
                 }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
@@ -11738,7 +11754,7 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
-              animation: "sessionDoneWash 3.4s cubic-bezier(0.2,0.7,0.3,1) forwards",
+              animation: "sessionDoneWash 6.2s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
           <div className="relative flex items-center justify-center">
@@ -11795,14 +11811,14 @@ function NBackSessionApp() {
           <div className="mt-12 text-center">
             <div
               className="text-4xl font-semibold tracking-tight"
-              style={{ animation: "sessionDoneText 3.4s ease-out forwards" }}
+              style={{ animation: "sessionDoneText 6.2s ease-out forwards" }}
             >
               Session complete
             </div>
             <div
               className="text-slate-400 text-lg mt-3 max-w-md mx-auto px-6"
               style={{
-                animation: "sessionDoneSub 3.4s ease-out forwards",
+                animation: "sessionDoneSub 6.2s ease-out forwards",
                 textWrap: "balance",
               }}
             >
