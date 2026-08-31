@@ -2154,15 +2154,17 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 65;
+const BUILD_VERSION = 66;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:12 PM";
+const BUILD_TIME = "2:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Phone: answer buttons shrunk, grid given the space",
-  "Phone: skip button no longer sits over the title",
+  "Phone: home pills no longer overlap the header",
+  "RRT scramble fixed at 80%, test slider removed",
+  "RRT branching always on, toggle removed",
+  "3D MOT right/wrong now use RRT's green and red",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3198,6 +3200,11 @@ const RRT_COLOR_PALETTE = [
 const RRT_GREEN = "#1E982B";
 const RRT_RED = "#971426";
 const RRT_TIMEOUT = "#8A8F98";
+
+// How scrambled the premise viewing order is. Fixed rather than adjustable:
+// this is the difficulty the exercise is tuned around, and letting it vary
+// made two runs at the same level not comparable.
+const RRT_SCRAMBLE_FACTOR = 0.8;
 
 const RRT_RELATIONS = ["same as", "opposite of"];
 
@@ -5976,7 +5983,7 @@ function NBackSessionApp() {
   // 0 = natural chain order (easy), 1 = actively avoids putting two
   // item-sharing premises back to back (hard). See the slider above the
   // RRT exercise box.
-  const [rrtScrambleFactor, setRrtScrambleFactor] = useState(0.5);
+  const rrtScrambleFactor = RRT_SCRAMBLE_FACTOR;
   const [switchNotice, setSwitchNotice] = useState(false);
   // Chance (0-32%) that a non-match trial is a "lure" reusing the item from
   // n-1 or n+1 trials back instead of a fresh one, so it superficially
@@ -6094,7 +6101,6 @@ function NBackSessionApp() {
   const [selectedBackgroundId, setSelectedBackgroundIdState] = useState("none"); // persisted — profile banner background
   const [featuredBadgeId, setFeaturedBadgeIdState] = useState(null); // persisted — one badge pinned front-and-center on the profile
   const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(false); // persisted — toggle shown during audio-modality exercises
-  const [rrtBranchingEnabled, setRrtBranchingEnabledState] = useState(true); // persisted — default ON; lets one RRT item be the object of 3+ premises instead of capping every item at 2
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
@@ -6549,14 +6555,6 @@ function NBackSessionApp() {
         // no saved binaural setting yet
       }
       try {
-        const res = await window.storage.get("rrt-branching-enabled", false);
-        if (res && res.value) {
-          setRrtBranchingEnabledState(JSON.parse(res.value));
-        }
-      } catch (err) {
-        // no saved rrt-branching setting yet — stays on (the useState default)
-      }
-      try {
         const res = await window.storage.get("regime-completion-dates", false);
         if (res && res.value) {
           setRegimeCompletionDatesState(JSON.parse(res.value));
@@ -6790,13 +6788,6 @@ function NBackSessionApp() {
     setBinauralBeatsEnabledState(val);
     if (window.storage) {
       safeStorageSet("binaural-beats-enabled", JSON.stringify(val), false);
-    }
-  }, []);
-
-  const setRrtBranchingEnabled = useCallback((val) => {
-    setRrtBranchingEnabledState(val);
-    if (window.storage) {
-      safeStorageSet("rrt-branching-enabled", JSON.stringify(val), false);
     }
   }, []);
 
@@ -8716,8 +8707,11 @@ function NBackSessionApp() {
         )}
 
         {mainView === "home" && (
-          <div className="space-y-14">
-            <div className="flex items-start justify-between gap-6">
+          /* The Achievements and Leaderboard pills are fixed to the top
+             corners. On a wide screen they sit clear of everything; on a
+             phone the content has to start below them. */
+          <div className="space-y-14 pt-12 sm:pt-0">
+            <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 <AvatarFrame tier={ownAvatarFrameTier}>
                   <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
@@ -10697,55 +10691,6 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "rrt" && (
-          <div className="max-w-xs mx-auto mb-4 bg-slate-900 border border-slate-700/70 rounded-xl p-5 space-y-2">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <div className="text-base font-medium text-slate-100">
-                  Branching premises
-                </div>
-                <div className="text-sm text-slate-500 mt-0.5">
-                  Lets one item be defined relative to 3+ others (e.g. B, C,
-                  and D each linked straight to A) instead of every item
-                  touching at most 2 premises. Leave on if unsure. Has no
-                  effect at 0% Scramble below — that setting always uses a
-                  straight chain so every premise is guaranteed to link to
-                  the next.
-                </div>
-              </div>
-              <Toggle
-                on={rrtBranchingEnabled}
-                onToggle={() => setRrtBranchingEnabled(!rrtBranchingEnabled)}
-                accent={ACCENT_STYLES[exercise.accent]}
-              />
-            </div>
-          </div>
-        )}
-
-        {!switchNotice && exercise.key === "rrt" && (
-          <div className="max-w-xs mx-auto mb-4 bg-slate-900/60 border border-dashed border-slate-700 rounded-xl p-3">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-1.5">
-              <span>🧪 Scramble Factor (testing)</span>
-              <span className="text-slate-200 font-medium">
-                {Math.round(rrtScrambleFactor * 100)}%
-              </span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={5}
-              value={Math.round(rrtScrambleFactor * 100)}
-              onChange={(e) => setRrtScrambleFactor(Number(e.target.value) / 100)}
-              className="w-full accent-teal-500"
-            />
-            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
-              <span>Unscrambled</span>
-              <span>Scrambled</span>
-            </div>
-          </div>
-        )}
-
-        {!switchNotice && exercise.key === "rrt" && (
           <RRTExercise
             exercise={exercise}
             onFinish={() => forceSwitchToNext(exerciseIndex)}
@@ -10754,7 +10699,7 @@ function NBackSessionApp() {
             onSessionEnd={recordRrtSessionEnd}
             paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
             scrambleFactor={rrtScrambleFactor}
-            branchingEnabled={rrtBranchingEnabled}
+            branchingEnabled={true}
           />
         )}
 
@@ -11670,9 +11615,10 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
-          className="fixed top-6 right-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
         >
-          🏆 Leaderboard
+          <span>🏆</span>
+          <span className="hidden sm:inline">Leaderboard</span>
         </button>
       )}
 
@@ -11696,10 +11642,10 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("achievements")}
-          className="fixed top-6 left-6 flex items-center gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-3 px-6 text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
+          className="fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
         >
           <span className="text-lg">🏅</span>
-          <span>Achievements</span>
+          <span className="hidden sm:inline">Achievements</span>
           <span className="text-xs font-semibold bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5">
             {ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, achievementState)).length}/
             {ACHIEVEMENTS_CATALOG.length}
@@ -12995,8 +12941,10 @@ const MOT_TIER_STEP = 0.1;
 const MOT_TIER_SCHEMA_VERSION = 2;
 const MOT_COLOR_NEUTRAL = 0xaba89f; // light grey, matches the reference ball color (slightly darkened)
 const MOT_COLOR_TARGET = 0xb4a55a; // muted gold — desaturated to match the neutral ball's sophistication
-const MOT_COLOR_CORRECT = 0x5a8269; // muted sage green — same idea: low saturation reads as premium, high saturation reads as a toy
-const MOT_COLOR_WRONG = 0x965f5a; // muted brick red — same idea
+// The same green and red RRT uses for a right and a wrong answer, so one
+// signal means one thing across the whole app.
+const MOT_COLOR_CORRECT = 0x1e982b;
+const MOT_COLOR_WRONG = 0x971426;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
 // Uniform-random unit vector (so starting directions don't bunch up near
