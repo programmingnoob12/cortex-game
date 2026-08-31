@@ -2187,6 +2187,10 @@ const SHOW_LEADERBOARD = false;
 const SHOW_PROFILE_CUSTOMIZATION = false;
 // Test-only controls that should not ship.
 const SHOW_TEST_TOOLS = false;
+// Profile pieces that only make sense once other people can see them.
+const SHOW_BIO = false;
+const SHOW_BADGES = false;
+const SHOW_PROFILE_IDENTITY_EDIT = false; // avatar photo and display name
 
 // The written lines, numbered to match the shared doc. `cond` is the state
 // that can show it; a line with no cond is unconditional and also feeds the
@@ -2265,14 +2269,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 85;
+const BUILD_VERSION = 86;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:28 PM";
+const BUILD_TIME = "7:52 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tier 2 is Proficient, tier 1 stays Novice",
+  "Privacy Policy and Terms of Service pages, linked from the footer",
+  "Bio, badges and profile identity editing hidden",
+  "Streak test buttons hidden",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5053,6 +5059,270 @@ function gemTierFor(level) {
 }
 function rankNameFor(level) {
   return gemTierFor(level).label;
+}
+
+// ---------------------------------------------------------------------
+// LEGAL PAGES
+// ---------------------------------------------------------------------
+// Written for this app specifically rather than pasted from a generator, so
+// the data it names is the data actually collected. It still needs a lawyer's
+// eye before launch: the sections on liability, governing law and consumer
+// guarantees are the ones that carry real risk if they are wrong.
+const LEGAL_CONTACT = "hello@cortex.app";
+const LEGAL_UPDATED = "31 August 2026";
+
+const PRIVACY_POLICY = {
+  title: "Privacy Policy",
+  intro:
+    "This policy explains what Cortex collects, why, and what you can do about it. It is written to be read, not to be skimmed past.",
+  sections: [
+    {
+      h: "Who we are",
+      p: [
+        "Cortex is a brain-training application. For the purposes of data protection law we are the data controller for the information described below. Reach us at " +
+          LEGAL_CONTACT + ".",
+      ],
+    },
+    {
+      h: "What we collect",
+      list: [
+        "Your email address, so you can sign in and we can contact you about your account.",
+        "A display name, which you choose and can change.",
+        "Your training data: which exercises you did, when, how long for, the level you reached and the accuracy you scored.",
+        "Your settings, such as your chosen regime and whether background audio is on.",
+        "Payment records held by our payment processor. We never see or store your card number.",
+        "Basic technical information your browser sends, such as device type and browser version, and error reports when something in the app fails.",
+      ],
+    },
+    {
+      h: "What we do not collect",
+      list: [
+        "We do not collect your card details. Those go directly to Stripe.",
+        "We do not use advertising trackers or sell data to advertisers.",
+        "We do not collect your contacts, location, camera or microphone.",
+        "We do not build profiles for anyone other than you.",
+      ],
+    },
+    {
+      h: "Why we collect it",
+      p: [
+        "Your training data exists so the app can show you your progress, set the right difficulty, and keep your streak. That is its only purpose. Aggregated, anonymised figures may be used to improve the exercises, for example to check whether a level is too hard for most people.",
+        "Your email and payment records exist so we can run your subscription and support you when something goes wrong.",
+      ],
+    },
+    {
+      h: "Who we share it with",
+      p: [
+        "Only the services needed to run the app:",
+      ],
+      list: [
+        "Supabase, which hosts the database and handles sign-in.",
+        "Vercel, which serves the application.",
+        "Stripe, which processes payments.",
+      ],
+      after: [
+        "Each of these is bound by its own contractual obligations to us. We do not sell your data, and we do not share it with anyone else unless the law requires it.",
+      ],
+    },
+    {
+      h: "Where it is stored",
+      p: [
+        "Our providers operate data centres in several countries, which means your data may be processed outside the country you live in. Where that happens, we rely on the standard contractual protections those providers offer.",
+      ],
+    },
+    {
+      h: "How long we keep it",
+      p: [
+        "Your account data and training history are kept while your account exists. If you delete your account, we delete them within 30 days, except where we are legally required to keep billing records for longer. Error logs are kept for 90 days.",
+      ],
+    },
+    {
+      h: "Your rights",
+      p: [
+        "You can ask us to give you a copy of your data, correct it, or delete it. You can withdraw consent to marketing at any time. Email " +
+          LEGAL_CONTACT + " and we will respond within 30 days. If you are unhappy with how we handle a request, you can complain to your local privacy regulator.",
+      ],
+    },
+    {
+      h: "Cookies and local storage",
+      p: [
+        "We store a sign-in token so you are not asked to log in on every visit, and we keep some of your preferences in your browser's local storage. Neither is used for tracking or advertising. Clearing your browser data will sign you out and reset local preferences, but your account and training history stay safe on the server.",
+      ],
+    },
+    {
+      h: "Children",
+      p: [
+        "Cortex is not intended for children under 16, and we do not knowingly collect data from them. If you believe a child has created an account, tell us and we will remove it.",
+      ],
+    },
+    {
+      h: "Security",
+      p: [
+        "Data is encrypted in transit and at rest by our providers, and access is limited to those who need it. No system is perfectly secure. If a breach affects your data, we will tell you and the relevant regulator as the law requires.",
+      ],
+    },
+    {
+      h: "Changes",
+      p: [
+        "If we change this policy in a way that matters, we will tell you in the app or by email before it takes effect. The date at the top always reflects the current version.",
+      ],
+    },
+  ],
+};
+
+const TERMS_OF_SERVICE = {
+  title: "Terms of Service",
+  intro:
+    "These terms are the agreement between you and Cortex. By creating an account you accept them.",
+  sections: [
+    {
+      h: "The service",
+      p: [
+        "Cortex provides cognitive training exercises and tracks your performance in them. We may add, change or remove exercises and features over time. We aim to keep the app available but we do not promise uninterrupted service.",
+      ],
+    },
+    {
+      h: "What Cortex is not",
+      p: [
+        "Cortex is a training tool, not a medical device, a diagnostic instrument, or a substitute for professional care.",
+        "The levels and scores in the app measure your performance on these specific exercises. They are not IQ scores, clinical assessments, or measurements of your intelligence, and they should not be treated as such. Any figure the app calls an estimate is exactly that.",
+        "We make no promise about how training here will affect your performance at anything outside the app. Whether cognitive training transfers to everyday ability is an open question in the research literature, and we do not claim to have settled it.",
+        "If you have concerns about your memory, attention or cognition, speak to a doctor rather than relying on this app.",
+      ],
+    },
+    {
+      h: "Your account",
+      p: [
+        "You are responsible for keeping your sign-in details secure and for what happens under your account. One account is for one person. Tell us promptly if you think someone else has access to it.",
+      ],
+    },
+    {
+      h: "Subscriptions and payment",
+      list: [
+        "Paid plans are billed in advance, monthly or annually, through Stripe.",
+        "Subscriptions renew automatically until you cancel.",
+        "You can cancel at any time from your account. Cancelling stops future charges and your access continues to the end of the period you have already paid for.",
+        "Prices may change. If they do, we will tell you before the change applies to you, and you can cancel instead.",
+        "Where the law where you live gives you a right to a refund or a cooling-off period, that right applies regardless of anything else in these terms.",
+      ],
+    },
+    {
+      h: "Acceptable use",
+      p: ["Do not:"],
+      list: [
+        "Break into, probe or disrupt the service or anyone else's account.",
+        "Copy, scrape, resell or redistribute the app or its content.",
+        "Share one account between several people, or resell access.",
+        "Use the app to break the law.",
+      ],
+      after: [
+        "We may suspend or close an account that does any of these.",
+      ],
+    },
+    {
+      h: "Your content",
+      p: [
+        "Your training data is yours. You give us the permission we need to store and process it in order to run the service, as described in the Privacy Policy, and nothing more.",
+      ],
+    },
+    {
+      h: "Our content",
+      p: [
+        "The app, its exercises, code, audio, artwork and text belong to us or our licensors. Your subscription buys you the right to use them personally, not to own or redistribute them.",
+      ],
+    },
+    {
+      h: "Ending the agreement",
+      p: [
+        "You can close your account whenever you like. We can end or suspend your access if you break these terms, or with reasonable notice if we stop offering the service. If we stop offering it, we will refund the unused portion of anything you have prepaid.",
+      ],
+    },
+    {
+      h: "Liability",
+      p: [
+        "The service is provided as it is. To the extent the law allows, we are not liable for indirect or consequential loss, and our total liability to you is limited to what you have paid us in the twelve months before the claim.",
+        "Nothing in these terms excludes rights you have under consumer protection law that cannot be excluded.",
+      ],
+    },
+    {
+      h: "Changes to these terms",
+      p: [
+        "We may update these terms. If a change materially affects you, we will tell you before it takes effect, and continuing to use the app afterwards means you accept it.",
+      ],
+    },
+    {
+      h: "Governing law",
+      p: [
+        "These terms are governed by the law of New Zealand, and the courts of New Zealand have jurisdiction, without affecting any right you have to bring a claim where you live.",
+      ],
+    },
+    {
+      h: "Contact",
+      p: ["Questions about these terms: " + LEGAL_CONTACT + "."],
+    },
+  ],
+};
+
+// Renders either document. Reading-width column, numbered sections, back to
+// Account — the same shape as every other secondary screen in the app.
+function LegalPage({ doc, onBack }) {
+  return (
+    <div className="space-y-10" style={{ maxWidth: "42rem" }}>
+      <div>
+        <button
+          onClick={onBack}
+          className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-3"
+        >
+          &lsaquo; Back
+        </button>
+        <h1 className="text-4xl font-semibold tracking-tight">{doc.title}</h1>
+        <div className="text-slate-500 text-sm mt-2">
+          Last updated {LEGAL_UPDATED}
+        </div>
+        <p className="text-slate-300 text-base mt-5">{doc.intro}</p>
+      </div>
+
+      <div className="space-y-9">
+        {doc.sections.map((sec, i) => (
+          <section key={sec.h} className="space-y-3">
+            <h2 className="text-lg font-semibold text-slate-100 flex gap-3">
+              <span className="text-slate-600 tabular-nums font-medium">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              {sec.h}
+            </h2>
+            {(sec.p || []).map((para) => (
+              <p key={para} className="text-slate-400 text-base leading-relaxed">
+                {para}
+              </p>
+            ))}
+            {sec.list && (
+              <ul className="space-y-1.5">
+                {sec.list.map((item) => (
+                  <li
+                    key={item}
+                    className="text-slate-400 text-base leading-relaxed pl-5 relative"
+                  >
+                    <span className="absolute left-0 top-2.5 w-1.5 h-1.5 rounded-full bg-slate-600" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {(sec.after || []).map((para) => (
+              <p key={para} className="text-slate-400 text-base leading-relaxed">
+                {para}
+              </p>
+            ))}
+          </section>
+        ))}
+      </div>
+
+      <div className="pt-6 border-t border-slate-800/80 text-slate-500 text-sm">
+        Questions: <span className="underline underline-offset-2">{LEGAL_CONTACT}</span>
+      </div>
+    </div>
+  );
 }
 
 function LevelGem({ level, size = 40, glowPulse = false }) {
@@ -8863,6 +9133,13 @@ function NBackSessionApp() {
           </div>
         )}
 
+        {(mainView === "privacy" || mainView === "terms") && (
+          <LegalPage
+            doc={mainView === "privacy" ? PRIVACY_POLICY : TERMS_OF_SERVICE}
+            onBack={() => setMainView("account")}
+          />
+        )}
+
         {mainView === "hypnosis" && (
           <HypnosisScreen onDone={() => setMainView("home")} />
         )}
@@ -8899,6 +9176,7 @@ function NBackSessionApp() {
                     {achievementState.streak === 1 ? "Day" : "Days"}
                   </span>
                 </button>
+                {SHOW_TEST_TOOLS && (
                 <button
                   onClick={() => bumpTestStreak(regimeKey)}
                   title="Test: +1 day streak"
@@ -8906,6 +9184,8 @@ function NBackSessionApp() {
                 >
                   🧪 +1
                 </button>
+                )}
+                {SHOW_TEST_TOOLS && (
                 <button
                   onClick={resetTestStreak}
                   title="Test: reset streak to 0"
@@ -8913,6 +9193,7 @@ function NBackSessionApp() {
                 >
                   🧪 ↺
                 </button>
+                )}
               </div>
             </div>
 
@@ -9137,12 +9418,18 @@ function NBackSessionApp() {
                 Contact:{" "}
                 <span className="underline underline-offset-2">hello@cortex.app</span>
               </span>
-              <a href="#" className="hover:text-slate-400 transition-colors">
+              <button
+                onClick={() => setMainView("privacy")}
+                className="hover:text-slate-400 transition-colors"
+              >
                 Privacy Policy
-              </a>
-              <a href="#" className="hover:text-slate-400 transition-colors">
+              </button>
+              <button
+                onClick={() => setMainView("terms")}
+                className="hover:text-slate-400 transition-colors"
+              >
                 Terms of Service
-              </a>
+              </button>
             </div>
           </div>
         )}
@@ -9429,6 +9716,7 @@ function NBackSessionApp() {
                 <AvatarFrame tier={ownAvatarFrameTier}>
                   <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={64} />
                 </AvatarFrame>
+                {SHOW_PROFILE_IDENTITY_EDIT && (
                 <button
                   onClick={() => avatarFileInputRef.current?.click()}
                   title={customAvatarImage ? "Change photo" : "Upload photo"}
@@ -9450,7 +9738,8 @@ function NBackSessionApp() {
                     <circle cx="12" cy="13" r="4" />
                   </svg>
                 </button>
-                {customAvatarImage && (
+                )}
+                {SHOW_PROFILE_IDENTITY_EDIT && customAvatarImage && (
                   <button
                     onClick={removeCustomAvatar}
                     title="Remove photo"
@@ -9484,7 +9773,8 @@ function NBackSessionApp() {
                 />
               </div>
               <div className="flex flex-col gap-3">
-                {isEditingName ? (
+                {SHOW_PROFILE_IDENTITY_EDIT ? (
+                  isEditingName ? (
                   <input
                     autoFocus
                     value={nameDraft}
@@ -9504,7 +9794,7 @@ function NBackSessionApp() {
                     maxLength={24}
                     className="text-2xl font-semibold text-slate-100 bg-transparent border-b border-indigo-500 focus:outline-none w-40"
                   />
-                ) : (
+                  ) : (
                   <button
                     onClick={() => {
                       setNameDraft(displayName);
@@ -9529,6 +9819,11 @@ function NBackSessionApp() {
                       <path d="m15 5 4 4" />
                     </svg>
                   </button>
+                  )
+                ) : (
+                  <div className="text-2xl font-semibold text-slate-100">
+                    {displayName}
+                  </div>
                 )}
                 {avatarUploadError && (
                   <div className="text-sm text-rose-400">{avatarUploadError}</div>
@@ -9536,6 +9831,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
+            {SHOW_BIO && (
             <div className="space-y-2">
               <div className="text-lg text-slate-300">Bio</div>
               {isEditingBio ? (
@@ -9588,6 +9884,7 @@ function NBackSessionApp() {
                 </button>
               )}
             </div>
+            )}
 
             {SHOW_PROFILE_CUSTOMIZATION && (
             <div>
@@ -9836,6 +10133,7 @@ function NBackSessionApp() {
             </div>
             )}
 
+            {SHOW_BADGES && (
             <div>
               <button
                 onClick={() => setBadgesExpanded((v) => !v)}
@@ -9857,7 +10155,9 @@ function NBackSessionApp() {
                 </div>
               )}
             </div>
+            )}
 
+            {SHOW_TEST_TOOLS && (
             <button
               onClick={() => {
                 const random =
@@ -9868,6 +10168,7 @@ function NBackSessionApp() {
             >
               🧪 Test: simulate achievement unlock
             </button>
+            )}
 
             <button
               onClick={() => setMainView("regime")}
@@ -9989,21 +10290,26 @@ function NBackSessionApp() {
               )}
             </div>
 
-            {/* Placeholder legal/contact footer. The three policy pages are
-                what a subscription business is expected to make reachable;
-                the links are dead until those pages exist. */}
+            {/* Legal and contact footer. Both policy links open real pages
+                inside the app rather than leaving it. */}
             <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
                 <span className="underline underline-offset-2">hello@cortex.app</span>
               </span>
-              <a href="#" className="hover:text-slate-400 transition-colors">
+              <button
+                onClick={() => setMainView("privacy")}
+                className="hover:text-slate-400 transition-colors"
+              >
                 Privacy Policy
-              </a>
-              <a href="#" className="hover:text-slate-400 transition-colors">
+              </button>
+              <button
+                onClick={() => setMainView("terms")}
+                className="hover:text-slate-400 transition-colors"
+              >
                 Terms of Service
-              </a>
+              </button>
             </div>
           </div>
         )}
