@@ -2180,14 +2180,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 73;
+const BUILD_VERSION = 74;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:20 PM";
+const BUILD_TIME = "4:04 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Glow now fires on the attack of each hit, not after it",
+  "Glow breathes on its own, no longer tied to the audio",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2657,143 +2657,16 @@ function playSessionDone() {
 // the middle where the energy is, mirrored top and bottom so the screen
 // reads as a band rather than a chart. Pure canvas: 64 bars a frame is
 // nothing, and it costs no DOM.
-// The record screen's backdrop. A still gold bloom rather than something
-// driven by the music: the reveal already carries the motion, and a glow
-// pumping on the beat behind it competed with the content. It comes up with
-// the reveal and goes out on the song's fade so the two end together.
-// Beat detection for the record screen's glow. Deliberately not "average
-// loudness": a kick is a transient, and an average over the whole spectrum
-// dilutes it to almost nothing. What follows is a spectral-flux detector on
-// the low bands with an adaptive threshold, which fires on the leading edge
-// of a hit rather than partway through it.
-//
-// Flip to true to overlay the live numbers while tuning.
-const GLOW_DEBUG = false;
-// Frames of history the threshold is computed from. At 60fps this is about
-// three quarters of a second: long enough to be stable, short enough to
-// follow a track that changes.
-const FLUX_HISTORY = 45;
-
+// The record screen's backdrop. A gold bloom that breathes on its own,
+// independent of the track: two slow, unequal cycles laid over each other so
+// it never lands in the same place twice and never reads as a loop. It comes
+// up with the reveal and goes out on the song's fade, so the light and the
+// music leave together.
 function PrGoldGlow({ className, style, out }) {
-  const ref = useRef(null);
-  const debugRef = useRef(null);
-  useEffect(() => {
-    if (out) return undefined;
-    let raf = 0;
-    let spectrum = null;
-    let prevBass = null;
-    // Ring buffer of recent flux values, for the adaptive threshold.
-    const history = new Float32Array(FLUX_HISTORY);
-    let historyAt = 0;
-    let historyFilled = 0;
-    let pulse = 0;
-    let sustained = 0;
-    let baseline = 0;
-
-    const tick = () => {
-      raf = requestAnimationFrame(tick);
-      const el = ref.current;
-      if (!el) return;
-      const analyser = getSongAnalyser();
-      if (!analyser) return;
-      if (!spectrum || spectrum.length !== analyser.frequencyBinCount) {
-        spectrum = new Uint8Array(analyser.frequencyBinCount);
-        prevBass = null;
-      }
-      analyser.getByteFrequencyData(spectrum);
-
-      // Bins are found from the real bin width, never assumed. Sub-bass and
-      // bass are what a kick and a drop live in; the rest of the spectrum is
-      // deliberately not part of the trigger.
-      const binHz = analyser.context.sampleRate / analyser.fftSize;
-      const binAt = (hz) => Math.max(1, Math.min(spectrum.length - 1, Math.round(hz / binHz)));
-      const subLo = binAt(20);
-      const bassHi = binAt(250);
-
-      // Spectral flux: the sum of the frame-to-frame INCREASES across the low
-      // bands. Increases only, because a note ending is not an onset. This is
-      // the number that spikes on the attack of a hit, one frame after it
-      // starts, rather than tracking how loud the hit eventually gets.
-      let flux = 0;
-      let energy = 0;
-      if (!prevBass || prevBass.length !== bassHi - subLo + 1) {
-        prevBass = new Float32Array(bassHi - subLo + 1);
-      }
-      for (let i = subLo; i <= bassHi; i++) {
-        // Weighted toward the very bottom, where the kick sits.
-        const weight = i <= binAt(60) ? 1.6 : 1;
-        const v = (spectrum[i] / 255) * weight;
-        const rise = v - prevBass[i - subLo];
-        if (rise > 0) flux += rise;
-        energy += v;
-        prevBass[i - subLo] = v;
-      }
-      energy /= bassHi - subLo + 1;
-
-      // Adaptive threshold from the recent past, so this works on a quiet
-      // track and a loud one without a hand-tuned number per song.
-      let mean = 0;
-      const n = historyFilled || 1;
-      for (let i = 0; i < n; i++) mean += history[i];
-      mean /= n;
-      let variance = 0;
-      for (let i = 0; i < n; i++) {
-        const d = history[i] - mean;
-        variance += d * d;
-      }
-      const sd = Math.sqrt(variance / n);
-      // Multiplier and constant tuned by running this exact detector over
-      // the celebration track offline: it lands around 170 hits a minute,
-      // which is the kick and snare rather than every eighth note.
-      const threshold = mean + sd * 2.0 + 0.03;
-
-      history[historyAt] = flux;
-      historyAt = (historyAt + 1) % FLUX_HISTORY;
-      if (historyFilled < FLUX_HISTORY) historyFilled++;
-
-      // Rolling energy baseline, used to tell an ordinary beat from a drop.
-      baseline += (energy - baseline) * (historyFilled < 10 ? 0.4 : 0.012);
-
-      const beat = historyFilled > 8 && flux > threshold;
-      if (beat) {
-        // How far above the recent norm this hit is. A drop lands several
-        // times the baseline and gets the full pulse; a routine kick during
-        // a busy passage gets less.
-        const strength = Math.min(1, (energy / (baseline + 0.001) - 0.9) * 1.1);
-        // Straight assignment, not a ramp: this is the frame the hit
-        // happened, so this is the frame the light moves.
-        pulse = Math.max(pulse, 0.45 + Math.max(0, strength) * 0.55);
-      } else {
-        pulse *= 0.86;
-      }
-
-      // A slow floor under the pulse so quiet passages are dim and loud ones
-      // sit brighter between hits, without it ever delaying a beat.
-      const target = Math.max(0, Math.min(1, (energy - 0.45) / 0.5));
-      sustained += (target - sustained) * (target > sustained ? 0.25 : 0.05);
-
-      const level = Math.max(sustained * 0.35, Math.min(1, pulse));
-      // Written straight to the element inside the frame. No CSS transition
-      // on these two properties anywhere, or the jump would be smoothed back
-      // into a lag.
-      el.style.opacity = (0.18 + level * 0.82).toFixed(3);
-      el.style.transform = `scale(${(0.76 + level * 1.0).toFixed(3)})`;
-
-      if (GLOW_DEBUG && debugRef.current) {
-        debugRef.current.textContent =
-          `energy ${energy.toFixed(3)}  flux ${flux.toFixed(3)}  thr ${threshold.toFixed(3)}  ` +
-          `beat ${beat ? "YES" : "no"}  pulse ${pulse.toFixed(2)}`;
-        debugRef.current.style.color = beat ? "#7CFF9A" : "#8A8F98";
-      }
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [out]);
-
-  // Two layers on purpose. The outer one owns the reveal fade and the
-  // fade-out at the end, both slow CSS transitions on opacity; the inner one
-  // is written every frame. One element cannot do both, since the per-frame
-  // write would fight the transition.
+  // Two layers. The outer one owns the reveal fade and the fade-out at the
+  // end, both slow transitions on opacity; the inner one carries the breathe.
+  // One element cannot do both, since the animation would fight the
+  // transition for the same property.
   return (
     <div
       className={className}
@@ -2807,22 +2680,14 @@ function PrGoldGlow({ className, style, out }) {
       }}
     >
       <div
-        ref={ref}
         className="absolute inset-0"
         style={{
           willChange: "transform, opacity",
-          // Considerably stronger than it was. At the old alpha the bloom
-          // was all but invisible on the near-black backdrop, so no amount
-          // of modulation could be seen — the light was not there to move.
+          animation: "prGlowBreathe 7.5s ease-in-out infinite",
+          // Strong enough to actually read on the near-black backdrop.
           background: `radial-gradient(56% 44% at 50% 46%, ${PR_YELLOW}85 0%, ${PR_YELLOW}4D 28%, ${PR_YELLOW}1F 52%, transparent 76%)`,
         }}
       />
-      {GLOW_DEBUG && (
-        <div
-          ref={debugRef}
-          className="absolute top-3 left-3 text-xs font-mono pointer-events-none"
-        />
-      )}
     </div>
   );
 }
@@ -8526,6 +8391,16 @@ function NBackSessionApp() {
         @keyframes gemGlowPulse {
           0%, 100% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 8px var(--glow-color)); }
           50% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 22px var(--glow-color)); }
+        }
+        /* Two cycles at different lengths, so scale and brightness drift
+           in and out of step and the bloom never repeats exactly. */
+        @keyframes prGlowBreathe {
+          0%   { transform: scale(0.94); opacity: 0.72; }
+          23%  { transform: scale(1.06); opacity: 0.95; }
+          46%  { transform: scale(0.99); opacity: 0.8; }
+          64%  { transform: scale(1.12); opacity: 1; }
+          82%  { transform: scale(1.0);  opacity: 0.84; }
+          100% { transform: scale(0.94); opacity: 0.72; }
         }
         @keyframes switchIn {
           0% { opacity: 0; transform: translateY(14px); filter: blur(6px); }
