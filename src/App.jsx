@@ -1414,10 +1414,10 @@ const REGIMES = [
   {
     key: "low",
     title: "Quick",
-    subtitle: "25 min",
-    summary: "Dual N-Back",
+    subtitle: "15 min",
+    summary: "3D MOT",
     accent: "indigo",
-    steps: [{ key: "dual", minutes: 25 }],
+    steps: [{ key: "motion3d", minutes: 15 }],
   },
   {
     key: "medium",
@@ -2269,14 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 88;
+const BUILD_VERSION = 89;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:04 PM";
+const BUILD_TIME = "8:26 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Account avatar and name row hidden",
+  "Quick regime is now 15 min of 3D MOT",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
