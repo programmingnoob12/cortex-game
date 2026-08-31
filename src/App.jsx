@@ -2128,6 +2128,32 @@ function formatScoreValue(exercise, value) {
 // showing days something was actually played.
 const PR_YELLOW = "#F2C200";
 
+// Features built but held back until there are enough users for them to make
+// sense. Flip either to true and everything wired to it comes back; nothing
+// has been deleted.
+const SHOW_LEADERBOARD = false;
+const SHOW_PROFILE_CUSTOMIZATION = false;
+// Test-only controls that should not ship.
+const SHOW_TEST_TOOLS = false;
+
+// Shown on the hand-off between exercises. Short enough to finish reading in
+// the couple of seconds the transition lasts, and about the practice rather
+// than about being clever.
+const TRANSITION_QUOTES = [
+  "Focus on consistency, not intensity.",
+  "The strain is the training.",
+  "Missing is how you find the edge.",
+  "Show up tired. It still counts.",
+  "You only lose the streak by choosing to.",
+  "Slow progress is still progress.",
+  "Attention is a muscle. This is the gym.",
+  "Hard today, ordinary in a month.",
+  "Nobody gets sharper on easy days.",
+  "One session is a rounding error. A hundred is a different person.",
+  "Come back tomorrow. That is the whole method.",
+  "Do not chase the score. Chase the reps.",
+];
+
 
 // Achievement titles read "Quad N-Back Apprentice". Only the rank at the
 // end takes the tier colour — colouring the whole line made the exercise
@@ -2154,14 +2180,17 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 68;
+const BUILD_VERSION = 70;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:16 PM";
+const BUILD_TIME = "2:32 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Glow size is now just loudness, loudest moves it most",
+  "Quote screen between exercises",
+  "Leaderboard and profile customization hidden",
+  "N-back buttons moved to the screen edges, grid larger",
+  "Record glow swells with the music instead of flickering",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2681,7 +2710,12 @@ function PrGoldGlow({ className, style, out }) {
 
       // Fast to rise so a hit is not smeared across frames, slower to fall
       // so it blooms and eases back.
-      level += (target - level) * (target > level ? 0.8 : 0.18);
+      // Slow on purpose. The analyser reads the signal before the speakers
+      // play it, so a per-frame reaction is always slightly ahead of what is
+      // heard, and at sixty frames a second that reads as random flicker
+      // rather than as timing. Swelling over a few tenths of a second tracks
+      // the loud PASSAGES, which is what actually looks in time.
+      level += (target - level) * (target > level ? 0.16 : 0.045);
 
       // Opacity, not brightness. The gradient is yellow on black, so
       // brightening it barely changes anything; how much of it is on screen
@@ -5973,6 +6007,7 @@ function NBackSessionApp() {
   // RRT exercise box.
   const rrtScrambleFactor = RRT_SCRAMBLE_FACTOR;
   const [switchNotice, setSwitchNotice] = useState(false);
+  const [switchQuote, setSwitchQuote] = useState("");
   // Chance (0-32%) that a non-match trial is a "lure" reusing the item from
   // n-1 or n+1 trials back instead of a fresh one, so it superficially
   // resembles a recent repeat without actually being the n-back match.
@@ -7512,6 +7547,9 @@ function NBackSessionApp() {
     if (nextIndex >= list.length) return; // nothing further defined
 
     setSwitchNotice(true);
+    setSwitchQuote(
+      TRANSITION_QUOTES[Math.floor(Math.random() * TRANSITION_QUOTES.length)]
+    );
     setExerciseIndex(nextIndex);
     setScreen("setup");
 
@@ -7540,7 +7578,7 @@ function NBackSessionApp() {
         setMainView("tutorial");
       }
       // land on the setup screen for the next exercise; user presses Start themselves
-    }, 2500);
+    }, 4400);
   }, []);
 
   useEffect(() => {
@@ -8194,7 +8232,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-center justify-center px-4 py-2"
+          ? "items-start justify-center px-2 md:px-4 pt-2 pb-2"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -8364,6 +8402,14 @@ function NBackSessionApp() {
           0%, 100% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 8px var(--glow-color)); }
           50% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 22px var(--glow-color)); }
         }
+        @keyframes switchIn {
+          0% { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        @keyframes switchBar {
+          0% { width: 0%; }
+          100% { width: 100%; }
+        }
         @keyframes sparkleFloat {
           0% { transform: translateY(4px) scale(0.7); opacity: 0; }
           35% { opacity: 1; }
@@ -8380,7 +8426,7 @@ function NBackSessionApp() {
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
                 maxWidth:
-                  mainView === "app" && screen === "running" ? "88rem" : "42rem",
+                  mainView === "app" && screen === "running" ? "100%" : "42rem",
               }
         }
       >
@@ -8665,15 +8711,6 @@ function NBackSessionApp() {
                               />
                             </div>
                           )}
-                          <button
-                            onClick={() => {
-                              setSimulatedUnlockedIds((ids) => new Set(ids).add(a.id));
-                              setAchievementCelebrationQueue((q) => [...q, a]);
-                            }}
-                            className="mt-4 w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-xs"
-                          >
-                            🧪 {isUnlocked ? "Replay celebration" : "Simulate unlock"}
-                          </button>
                         </div>
                       );
                     })}
@@ -8869,12 +8906,14 @@ function NBackSessionApp() {
               >
                 Motivation
               </button>
+              {SHOW_TEST_TOOLS && (
               <button
                 onClick={resetNextSessionForTesting}
                 className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
                 🧪 Reset next session (test)
               </button>
+              )}
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Skip to exercise (test): bypasses regime/Start Training entirely
@@ -8909,7 +8948,7 @@ function NBackSessionApp() {
           </div>
         )}
 
-        {mainView === "leaderboard" && (
+        {SHOW_LEADERBOARD && mainView === "leaderboard" && (
           <div className="space-y-12">
             <div>
               <button
@@ -9345,6 +9384,7 @@ function NBackSessionApp() {
               )}
             </div>
 
+            {SHOW_PROFILE_CUSTOMIZATION && (
             <div>
               <button
                 onClick={() => setCustomizeExpanded((v) => !v)}
@@ -9589,6 +9629,7 @@ function NBackSessionApp() {
               </div>
               )}
             </div>
+            )}
 
             <div>
               <button
@@ -10175,9 +10216,33 @@ function NBackSessionApp() {
         )}
 
         {switchNotice && (
-          <div className="space-y-5 text-center">
-            <div className="text-5xl">⏱</div>
-            <h1 className="text-3xl font-semibold">Well done! Next exercise</h1>
+          /* The hand-off between exercises. Long enough to read one line and
+             draw a breath, which is the point: it marks the boundary instead
+             of dropping straight into the next task. */
+          <div className="flex flex-col items-center text-center gap-8 py-10">
+            <div
+              className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500"
+              style={{ animation: "switchIn 0.5s ease-out both" }}
+            >
+              Next exercise
+            </div>
+            <h1
+              className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
+              style={{ animation: "switchIn 0.9s 0.18s cubic-bezier(0.16,0.8,0.24,1) both", textWrap: "balance" }}
+            >
+              {switchQuote}
+            </h1>
+            {/* A line that fills over the wait, so the length of the pause is
+                visible rather than felt as a stall. */}
+            <div className="w-40 h-0.5 rounded-full bg-slate-800 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  background: "var(--ex)",
+                  animation: "switchBar 4.2s linear both",
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -10903,7 +10968,7 @@ function NBackSessionApp() {
                 button columns cannot sit beside a square grid and leave the
                 grid anything usable, so they drop underneath it instead,
                 which also puts them under the thumbs. */}
-            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-center gap-2.5 md:gap-28 lg:gap-44 w-full">
+            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-between gap-2.5 w-full">
             <div className="order-2 md:order-1 flex md:flex-col justify-between gap-2.5 md:gap-0 h-14 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
@@ -11435,18 +11500,6 @@ function NBackSessionApp() {
               >
                 Close
               </button>
-              {isOwnBadge && (
-                <button
-                  onClick={() => {
-                    setSimulatedUnlockedIds((ids) => new Set(ids).add(a.id));
-                    setAchievementCelebrationQueue((q) => [...q, a]);
-                    setBadgeDetail(null);
-                  }}
-                  className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2.5 text-sm"
-                >
-                  🧪 {isUnlocked ? "Replay celebration" : "Simulate unlock"}
-                </button>
-              )}
             </div>
           </div>
         );
@@ -11603,7 +11656,7 @@ function NBackSessionApp() {
         </div>
       )}
 
-      {mainView === "home" && (
+      {SHOW_LEADERBOARD && mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
           className="fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
