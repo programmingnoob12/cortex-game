@@ -2011,539 +2011,28 @@ function longestStreakDays(exerciseHistory) {
   return best;
 }
 
-// Every session-complete line, numbered. `cat` is the condition that can
-// show it; `id` is the number the test panel uses. Numbering is stable, so
-// deleting a line later leaves the others where they are.
-const NUDGE_GROUPS = [
-  {
-    cat: "streakNear",
-    title: "Close to a new streak",
-    lines: [
-      { id: 1, text: "3 days in a row. Keep showing up." },
-      { id: 2, text: "You're building momentum." },
-      { id: 3, text: "One more day. Keep the streak alive." },
-      { id: 4, text: "You're closer to your next milestone than you think." },
-      { id: 5, text: "5-day streak incoming." },
-      { id: 6, text: "Don't worry about perfect. Just come back tomorrow." },
-      { id: 7, text: "Small actions. Stronger habits." },
-      { id: 8, text: "You're proving you can stay consistent." },
-      { id: 9, text: "Keep going. Future you will thank you." },
-      { id: 10, text: "This is how streaks are built, one session at a time." },
-    ],
-  },
-  {
-    cat: "streak7Near",
-    title: "About to hit 7 days",
-    lines: [
-      { id: 11, text: "7 days is within reach. Don't stop now." },
-      { id: 12, text: "You're one step away from a full week." },
-      { id: 13, text: "Almost a full week of showing up." },
-      { id: 14, text: "7 days soon. You've got this." },
-      { id: 15, text: "One more session closer to a week of consistency." },
-      { id: 16, text: "A week ago, this was just a goal. Keep going." },
-      { id: 17, text: "You're building a habit, not just a streak." },
-      { id: 18, text: "Nearly 7 days. Stay with it." },
-    ],
-  },
-  {
-    cat: "streak7Hit",
-    title: "Hit a 7-day streak",
-    lines: [
-      { id: 19, text: "7 days straight. That's real consistency." },
-      { id: 20, text: "One full week. Nice work." },
-      { id: 21, text: "7 days of showing up for yourself." },
-      { id: 22, text: "A week stronger than you were before." },
-      { id: 23, text: "You did it. Now let's see what comes next." },
-      { id: 24, text: "7 days down. Keep building." },
-      { id: 25, text: "Consistency is starting to become part of who you are." },
-      { id: 26, text: "One week. One habit getting stronger." },
-    ],
-  },
-  {
-    cat: "streak14Near",
-    title: "Close to 14 days",
-    lines: [
-      { id: 27, text: "14 days is getting close. Keep going." },
-      { id: 28, text: "Nearly two weeks of consistency." },
-      { id: 29, text: "You're building something bigger than a streak." },
-      { id: 30, text: "Two weeks is within reach." },
-      { id: 31, text: "You've already come this far. See it through." },
-      { id: 32, text: "Keep showing up. You're almost at 14." },
-      { id: 33, text: "The hard part is often just coming back tomorrow." },
-      { id: 34, text: "14 days soon. Stay consistent." },
-    ],
-  },
-  {
-    cat: "streak14Hit",
-    title: "Hit a 14-day streak",
-    lines: [
-      { id: 35, text: "14 days straight. That's commitment." },
-      { id: 36, text: "Two full weeks. Keep going." },
-      { id: 37, text: "You've shown up for 14 days. That's something to be proud of." },
-      { id: 38, text: "Two weeks of building your brain and your habits." },
-      { id: 39, text: "14 days stronger." },
-      { id: 40, text: "You're proving that consistency is something you can do." },
-      { id: 41, text: "This didn't happen by accident. You kept showing up." },
-      { id: 42, text: "14 days. Imagine where you could be in another two weeks." },
-    ],
-  },
-  {
-    cat: "prNear",
-    title: "Almost beat a personal record",
-    lines: [
-      { id: 43, text: "So close to a new personal best. You'll get it." },
-      { id: 44, text: "Not your best score yet, but you're getting closer." },
-      { id: 45, text: "Almost. Keep training." },
-      { id: 46, text: "You were right there. Try again tomorrow." },
-      { id: 47, text: "Progress isn't always a new record." },
-      { id: 48, text: "Close to your personal best. That's a good sign." },
-      { id: 49, text: "You didn't beat it today. That doesn't erase your progress." },
-      { id: 50, text: "Every session gives you another chance to improve." },
-      { id: 51, text: "Personal bests aren't beaten every day. Keep showing up." },
-      { id: 52, text: "Almost there. Your next record could be closer than you think." },
-    ],
-  },
-  {
-    cat: "worse",
-    title: "Performed worse than usual",
-    lines: [
-      { id: 53, text: "Not every day will be your best day." },
-      { id: 54, text: "A bad session doesn't mean you're going backwards." },
-      { id: 55, text: "Your score is feedback, not a judgment." },
-      { id: 56, text: "Some days your brain just isn't at its best. Keep going." },
-      { id: 57, text: "Progress isn't a straight line." },
-      { id: 58, text: "Show up on the good days and the hard days." },
-      { id: 59, text: "One session doesn't define you." },
-      { id: 60, text: "Today's score is just today's score." },
-      { id: 61, text: "The important thing is that you trained." },
-    ],
-  },
-  {
-    cat: "pr",
-    title: "New personal record",
-    lines: [
-      { id: 62, text: "New personal best. Nice work." },
-      { id: 63, text: "You just beat your record." },
-      { id: 64, text: "New high score. Your training is paying off." },
-      { id: 65, text: "Personal best achieved. Keep pushing." },
-      { id: 66, text: "You did better than ever before." },
-      { id: 67, text: "New record. Remember this feeling." },
-      { id: 68, text: "Your best just got better." },
-      { id: 69, text: "That's progress you can see." },
-    ],
-  },
-  {
-    cat: "mindset",
-    title: "General mindset",
-    lines: [
-      { id: 70, text: "You don't need to feel motivated. Just start." },
-      { id: 71, text: "Consistency beats intensity." },
-      { id: 72, text: "A little progress still counts." },
-      { id: 73, text: "The goal is progress, not perfection." },
-      { id: 74, text: "Keep the promise you made to yourself." },
-      { id: 75, text: "Your future self is built by what you do today." },
-      { id: 76, text: "You showed up. That matters." },
-      { id: 77, text: "Every session is a vote for the person you want to become." },
-      { id: 78, text: "The hardest part is often starting." },
-      { id: 79, text: "Keep going, even when it doesn't feel exciting." },
-      { id: 80, text: "You're training more than your brain. You're training consistency." },
-      { id: 81, text: "Good habits get easier when you repeat them." },
-    ],
-  },
-  {
-    cat: "streakNear",
-    title: "Close to a new streak (excited)",
-    lines: [
-      { id: 82, text: "You're on a roll! Keep it going." },
-      { id: 83, text: "Look at that streak growing! 🔥" },
-      { id: 84, text: "You're getting closer every day." },
-      { id: 85, text: "Keep showing up, you're building something awesome." },
-      { id: 86, text: "You're only one session away!" },
-      { id: 87, text: "Momentum is building. Don't let it go!" },
-      { id: 88, text: "You're doing better than you think." },
-      { id: 89, text: "This is starting to feel like a habit." },
-      { id: 90, text: "Keep going. You're onto something." },
-      { id: 91, text: "You're getting stronger with every session." },
-      { id: 92, text: "Another day, another win." },
-      { id: 93, text: "You've got some serious momentum now!" },
-      { id: 94, text: "Keep that streak alive! 🔥" },
-      { id: 95, text: "You're so close to your next milestone." },
-      { id: 96, text: "Look how far you've already come!" },
-    ],
-  },
-  {
-    cat: "streak7Near",
-    title: "Almost 7 days (excited)",
-    lines: [
-      { id: 97, text: "One more session and you've got a 7-day streak!" },
-      { id: 98, text: "You're SO close to a full week!" },
-      { id: 99, text: "6 days down. Let's finish the week! 🔥" },
-      { id: 100, text: "Your first week is almost complete!" },
-      { id: 101, text: "Look at you, nearly a whole week of training." },
-      { id: 102, text: "One more day. You've got this!" },
-      { id: 103, text: "You're about to hit your first big milestone." },
-      { id: 104, text: "A full week is right around the corner!" },
-      { id: 105, text: "You've come this far. Let's get that 7!" },
-      { id: 106, text: "Tomorrow could be your 7-day streak. 👀" },
-      { id: 107, text: "Your streak is looking good. Keep it alive!" },
-      { id: 108, text: "You're building some serious momentum here." },
-    ],
-  },
-  {
-    cat: "streak7Hit",
-    title: "Hit 7 days (excited)",
-    lines: [
-      { id: 109, text: "7 DAYS! 🎉 You actually did it!" },
-      { id: 110, text: "A whole week! That's awesome." },
-      { id: 111, text: "Look at that streak! 🔥" },
-      { id: 112, text: "One full week of showing up for yourself." },
-      { id: 113, text: "7 days down. What a start!" },
-      { id: 114, text: "You just proved you can stick with it." },
-      { id: 115, text: "That's one week of training your brain. 🧠" },
-      { id: 116, text: "You're officially on a roll!" },
-      { id: 117, text: "7 days straight. Now that's momentum." },
-      { id: 118, text: "You made it a habit. Keep going!" },
-      { id: 119, text: "Your brain is getting the work in. 💪" },
-      { id: 120, text: "A week ago you started. Look at you now." },
-      { id: 121, text: "This is what progress feels like." },
-      { id: 122, text: "One milestone down. Let's chase the next one!" },
-    ],
-  },
-  {
-    cat: "streak14Near",
-    title: "Close to 14 days (excited)",
-    lines: [
-      { id: 123, text: "You're getting SO close to 14 days!" },
-      { id: 124, text: "Two weeks is right there. Keep going!" },
-      { id: 125, text: "13 days?! You're absolutely flying." },
-      { id: 126, text: "One more day until two weeks! 🔥" },
-      { id: 127, text: "You've built some serious momentum." },
-      { id: 128, text: "Look how far you've come!" },
-      { id: 129, text: "You're one session away from a huge milestone." },
-      { id: 130, text: "Don't stop now, you're almost there!" },
-      { id: 131, text: "Two weeks of showing up is about to be yours." },
-      { id: 132, text: "You've already done the hard part. Finish strong!" },
-      { id: 133, text: "Your streak is getting impressive. 👀" },
-      { id: 134, text: "Keep riding that momentum!" },
-    ],
-  },
-  {
-    cat: "streak14Hit",
-    title: "Hit 14 days (excited)",
-    lines: [
-      { id: 135, text: "14 DAYS! 🔥 That's incredible!" },
-      { id: 136, text: "Two whole weeks! Look at you go." },
-      { id: 137, text: "You just hit a 14-day streak! 🎉" },
-      { id: 138, text: "Two weeks of showing up. That's huge." },
-      { id: 139, text: "You've built some serious consistency." },
-      { id: 140, text: "Your streak is officially on fire. 🔥" },
-      { id: 141, text: "14 days stronger than when you started." },
-      { id: 142, text: "You kept coming back. And look where it got you." },
-      { id: 143, text: "Two weeks down. Imagine what you can do next." },
-      { id: 144, text: "This is becoming part of your routine." },
-      { id: 145, text: "You didn't just start. You stuck with it." },
-      { id: 146, text: "That's a milestone worth celebrating. 🎉" },
-      { id: 147, text: "You're building serious momentum now." },
-      { id: 148, text: "Keep going. This is getting exciting." },
-    ],
-  },
-  {
-    cat: "prNear",
-    title: "Almost beat a record (excited)",
-    lines: [
-      { id: 149, text: "SO CLOSE! Your new record is coming." },
-      { id: 150, text: "You're right on the edge of a new personal best!" },
-      { id: 151, text: "That was CLOSE! 🔥" },
-      { id: 152, text: "Your record is looking nervous. 👀" },
-      { id: 153, text: "You're getting closer to beating your best!" },
-      { id: 154, text: "You were just a little away. You've got this." },
-      { id: 155, text: "Almost! Your next big score could be right around the corner." },
-      { id: 156, text: "You're knocking on the door of a new record." },
-      { id: 157, text: "That was seriously close!" },
-      { id: 158, text: "Your best score isn't looking so safe anymore. 😏" },
-      { id: 159, text: "Keep going, you're getting there!" },
-      { id: 160, text: "You're clearly getting better. Keep pushing!" },
-      { id: 161, text: "You nearly got it. That's exciting." },
-      { id: 162, text: "The record is within reach!" },
-    ],
-  },
-  {
-    cat: "pr",
-    title: "New personal record (excited)",
-    lines: [
-      { id: 163, text: "NEW PERSONAL BEST! 🎉🔥" },
-      { id: 164, text: "You just beat your record!" },
-      { id: 165, text: "LET'S GO! New high score!" },
-      { id: 166, text: "You just did something you've never done before." },
-      { id: 167, text: "Your best just got better!" },
-      { id: 168, text: "That's your new record! How good is that?" },
-      { id: 169, text: "You were training for this moment. 💪" },
-      { id: 170, text: "Look at that score! 🔥" },
-      { id: 171, text: "You just raised the bar." },
-      { id: 172, text: "New record unlocked! 🏆" },
-      { id: 173, text: "That's what progress looks like." },
-      { id: 174, text: "You just proved you can get better." },
-      { id: 175, text: "Your old record didn't stand a chance. 😎" },
-      { id: 176, text: "Another personal best. You're on fire!" },
-    ],
-  },
-  {
-    cat: "worse",
-    title: "Bad session (warm)",
-    lines: [
-      { id: 177, text: "Hey, it happens. Tomorrow is another chance. ❤️" },
-      { id: 178, text: "Not your best? No problem. You still showed up." },
-      { id: 179, text: "Your brain has good days and slow days. That's normal." },
-      { id: 180, text: "Don't let one score fool you. You're still improving." },
-      { id: 181, text: "You showed up today. That's a win." },
-      { id: 182, text: "Tough session? You still got it done. 💪" },
-      { id: 183, text: "Everyone has off days. Keep going." },
-      { id: 184, text: "Today was a little harder. You handled it." },
-      { id: 185, text: "One tough session can't erase all your progress." },
-      { id: 186, text: "Your score doesn't define your progress." },
-      { id: 187, text: "Shake it off. You've got another one in you." },
-      { id: 188, text: "Some days click. Some don't. Keep having fun with it." },
-      { id: 189, text: "You don't have to be perfect to get better." },
-      { id: 190, text: "The important part? You came back and trained." },
-    ],
-  },
-  {
-    cat: "returning",
-    title: "Returning after missing a day",
-    lines: [
-      { id: 191, text: "You're back! That's what matters. ❤️" },
-      { id: 192, text: "Missed a day? No big deal. Let's keep going." },
-      { id: 193, text: "Your streak ended. Your progress didn't." },
-      { id: 194, text: "Welcome back! Let's get another session in." },
-      { id: 195, text: "You don't have to start over. Just start again." },
-      { id: 196, text: "Yesterday doesn't matter. You're here today." },
-      { id: 197, text: "Back again. That's a win." },
-      { id: 198, text: "Life happens. What matters is coming back." },
-      { id: 199, text: "Your next streak starts right here." },
-      { id: 200, text: "One missed day doesn't undo what you've built." },
-      { id: 201, text: "You're still on the journey. Keep going." },
-      { id: 202, text: "Ready when you are. 🧠" },
-      { id: 203, text: "You came back. That's the habit we're building." },
-    ],
-  },
-  {
-    cat: "mindset",
-    title: "Make training feel good",
-    lines: [
-      { id: 204, text: "You're getting better at getting better." },
-      { id: 205, text: "Every session is another little win." },
-      { id: 206, text: "You're giving your brain a workout. 🧠💪" },
-      { id: 207, text: "Look at you putting in the work!" },
-      { id: 208, text: "You're making progress, one session at a time." },
-      { id: 209, text: "Your brain is getting some serious reps in." },
-      { id: 210, text: "You showed up. Your future self is going to love that." },
-      { id: 211, text: "Keep having fun with it!" },
-      { id: 212, text: "You're building momentum every time you play." },
-      { id: 213, text: "One more session. One more step forward." },
-      { id: 214, text: "You're doing something good for yourself today." },
-      { id: 215, text: "This is your time to get a little better." },
-      { id: 216, text: "Keep playing. Keep improving. Keep enjoying it." },
-      { id: 217, text: "You're closer than you were yesterday." },
-      { id: 218, text: "Every session gives you another chance to surprise yourself." },
-      { id: 219, text: "You're not chasing perfection. You're chasing your next little win." },
-      { id: 220, text: "You've got this. Now go have some fun. 🎯" },
-      { id: 221, text: "Progress feels pretty good, doesn't it?" },
-      { id: 222, text: "Your brain just got another workout. Nice. 🧠" },
-      { id: 223, text: "Come back tomorrow. Let's see what you can do." },
-    ],
-  },
-  {
-    cat: "playful",
-    title: "Playful / game-like",
-    lines: [
-      { id: 224, text: "🔥 COMBO CONTINUES!" },
-      { id: 225, text: "STREAK POWER UP!" },
-      { id: 226, text: "NEW MILESTONE INCOMING!" },
-      { id: 227, text: "You're on fire! 🔥" },
-      { id: 228, text: "Another win added to the board." },
-      { id: 229, text: "Your streak is getting dangerous. 😎" },
-      { id: 230, text: "Can you beat yourself tomorrow?" },
-      { id: 231, text: "Your high score is officially under threat. 👀" },
-      { id: 232, text: "Next level loading..." },
-      { id: 233, text: "XP earned. 🧠" },
-      { id: 234, text: "Momentum +1" },
-      { id: 235, text: "Brain workout complete. 💪" },
-      { id: 236, text: "Another rep for your brain." },
-      { id: 237, text: "You're getting stronger." },
-      { id: 238, text: "The next record is yours to chase." },
-      { id: 239, text: "Let's see what you've got tomorrow." },
-      { id: 240, text: "One session closer to your next level." },
-      { id: 241, text: "Achievement unlocked! 🏆" },
-    ],
-  },
-  {
-    cat: "sharper",
-    title: "Intelligence / being sharper",
-    lines: [
-      { id: 242, text: "Get sharper than you were yesterday." },
-      { id: 243, text: "Train your brain. Stay one step ahead." },
-      { id: 244, text: "Give yourself an edge." },
-      { id: 245, text: "Keep sharpening the mind." },
-      { id: 246, text: "Think faster. React faster." },
-      { id: 247, text: "Your brain is a weapon. Keep it sharp." },
-      { id: 248, text: "Become harder to beat." },
-      { id: 249, text: "Make your mind your advantage." },
-      { id: 250, text: "Don't just keep up. Get ahead." },
-      { id: 251, text: "Train the skills other people neglect." },
-      { id: 252, text: "A sharper mind gives you an edge." },
-      { id: 253, text: "What if you could think faster than you do now?" },
-      { id: 254, text: "Keep training. Keep gaining an edge." },
-      { id: 255, text: "Your competition isn't training right now. Are you?" },
-    ],
-  },
-  {
-    cat: "sports",
-    title: "Performance / sports",
-    lines: [
-      { id: 256, text: "Train your brain. Take it to the field." },
-      { id: 257, text: "Faster decisions. Better reactions." },
-      { id: 258, text: "Give yourself another edge on game day." },
-      { id: 259, text: "The difference can be milliseconds." },
-      { id: 260, text: "Your body isn't the only thing you can train." },
-      { id: 261, text: "Sharper reactions. Stronger performance." },
-      { id: 262, text: "Train while everyone else is resting." },
-      { id: 263, text: "Give yourself an advantage before the game even starts." },
-      { id: 264, text: "Faster reactions could mean the difference." },
-      { id: 265, text: "Your next opponent won't know you're training this." },
-      { id: 266, text: "Build the mental edge." },
-      { id: 267, text: "Be the player who reacts first." },
-      { id: 268, text: "Train the part of performance most people forget." },
-    ],
-  },
-  {
-    cat: "competition",
-    title: "Competition / outperforming",
-    lines: [
-      { id: 269, text: "Can you beat the people around you?" },
-      { id: 270, text: "Your score is your target. Now beat it." },
-      { id: 271, text: "Don't settle for average." },
-      { id: 272, text: "See how far ahead you can get." },
-      { id: 273, text: "Someone else is trying to beat your score." },
-      { id: 274, text: "Climb the leaderboard." },
-      { id: 275, text: "You've got a score to beat." },
-      { id: 276, text: "Make your next session your strongest yet." },
-      { id: 277, text: "Can you become the hardest person to beat?" },
-      { id: 278, text: "Push your limits." },
-      { id: 279, text: "Your competition isn't going to wait." },
-      { id: 280, text: "Someone has your spot. Go take it." },
-      { id: 281, text: "Don't just participate. Improve." },
-      { id: 282, text: "Raise the bar. Then raise it again." },
-      { id: 283, text: "Find your edge." },
-    ],
-  },
-  {
-    cat: "mastery",
-    title: "Status / mastery",
-    lines: [
-      { id: 284, text: "Become the person who's hard to beat." },
-      { id: 285, text: "Mastery takes reps." },
-      { id: 286, text: "Build a skill most people never train." },
-      { id: 287, text: "Separate yourself from the average." },
-      { id: 288, text: "Get better at something most people ignore." },
-      { id: 289, text: "Your edge is built when nobody is watching." },
-      { id: 290, text: "Be proud of how sharp you become." },
-      { id: 291, text: "Build an advantage that compounds." },
-      { id: 292, text: "The best don't stop improving." },
-      { id: 293, text: "Keep raising your own standard." },
-      { id: 294, text: "Become better than your old self." },
-      { id: 295, text: "Train like you're serious about getting better." },
-      { id: 296, text: "You're not here to stay average." },
-    ],
-  },
-  {
-    cat: "primal",
-    title: "Primal / punchy",
-    lines: [
-      { id: 297, text: "GET THE EDGE." },
-      { id: 298, text: "BEAT YOUR BEST." },
-      { id: 299, text: "STAY SHARP." },
-      { id: 300, text: "GET FASTER." },
-      { id: 301, text: "OUTTHINK. OUTREACT. OUTPERFORM." },
-      { id: 302, text: "DON'T GET LEFT BEHIND." },
-      { id: 303, text: "BECOME HARDER TO BEAT." },
-      { id: 304, text: "RAISE YOUR STANDARD." },
-      { id: 305, text: "CHALLENGE YOUR LIMITS." },
-      { id: 306, text: "TAKE YOUR EDGE." },
-      { id: 307, text: "GET AHEAD." },
-      { id: 308, text: "MAKE YOUR MIND STRONGER." },
-      { id: 309, text: "PLAY TO WIN." },
-      { id: 310, text: "KEEP CLIMBING." },
-      { id: 311, text: "PROVE IT TO YOURSELF." },
-    ],
-  },
-];
+// Session-complete lines live in the shared doc for now, not here. This is
+// the plumbing only: a small placeholder set so the screen has something to
+// say, replaced wholesale once the real copy is settled.
+const NUDGE_LINES = {
+  pr: ["New personal best. Nice work."],
+  streak: ["Keep the streak going."],
+  worse: ["Some days are hard. Just focus on being consistent."],
+  general: ["Another one done. Consistency is what does it."],
+};
 
-// Flat lookup by number, and by condition.
-const NUDGE_BY_ID = new Map();
-const NUDGE_BY_CAT = {};
-NUDGE_GROUPS.forEach((g) => {
-  g.lines.forEach((l) => {
-    NUDGE_BY_ID.set(l.id, l.text);
-    (NUDGE_BY_CAT[g.cat] ||= []).push(l.text);
-  });
-});
-
-// Streak milestones the copy is written around. Anything else falls back to
-// the generic near-a-streak lines.
-const STREAK_MILESTONES = [7, 14, 21, 30, 50, 75, 100, 150, 200, 365];
-const SESSION_MILESTONES = [10, 25, 50, 100, 250, 500, 1000];
-
-// One line for the session-complete screen. Which POOL it comes from is
-// decided by what actually happened; which line inside the pool is random,
-// so the same condition does not produce the same sentence twice running.
-// `forcedId` shows one specific numbered line, for the test panel.
-function sessionNudge(state, forcedId) {
-  if (forcedId && NUDGE_BY_ID.has(forcedId)) return NUDGE_BY_ID.get(forcedId);
-
-  const {
-    streak = 0,
-    totalSessions = 0,
-    hitPRToday = false,
-    nearBest = false,
-    strongSession = null,
-    returning = false,
-  } = state || {};
-
-  const from = (cat) => {
-    const pool = NUDGE_BY_CAT[cat];
-    if (!pool || pool.length === 0) return null;
-    return pool[Math.floor(Math.random() * pool.length)];
-  };
-
-  // Priority. A record beats everything; coming back after a gap beats a
-  // milestone, because that is the moment somebody is deciding whether to
-  // carry on at all.
-  if (hitPRToday) return from("pr") || from("mindset");
-  if (returning) return from("returning") || from("mindset");
-
-  if (streak === 7) return from("streak7Hit") || from("mindset");
-  if (streak === 14) return from("streak14Hit") || from("mindset");
-  if (streak === 5 || streak === 6) return from("streak7Near") || from("streakNear");
-  if (streak === 12 || streak === 13) return from("streak14Near") || from("streakNear");
-
-  const nextStreak = STREAK_MILESTONES.find((m) => m > streak);
-  if (nextStreak && nextStreak - streak <= 2 && streak >= 2) {
-    return from("streakNear") || from("mindset");
-  }
-  if (streak >= 2 && streak <= 4) return from("streakNear") || from("mindset");
-
-  if (strongSession === false) return from("worse") || from("mindset");
-  if (nearBest) return from("prNear") || from("mindset");
-
-  const nextSessions = SESSION_MILESTONES.find((m) => m > totalSessions);
-  if (nextSessions && nextSessions - totalSessions <= 3) {
-    return from("playful") || from("mindset");
-  }
-
-  // Nothing specific to say, so rotate the general pools rather than
-  // repeating one voice every time.
-  const generals = ["mindset", "playful", "sharper", "sports", "competition", "mastery", "primal"];
-  return from(generals[Math.floor(Math.random() * generals.length)]) || "Nice work.";
+// `forcedKey` shows one specific pool, for the test buttons.
+function sessionNudge(state, forcedKey) {
+  const pool =
+    NUDGE_LINES[forcedKey] ||
+    (state?.hitPRToday
+      ? NUDGE_LINES.pr
+      : state?.strongSession === false
+      ? NUDGE_LINES.worse
+      : (state?.streak || 0) >= 2
+      ? NUDGE_LINES.streak
+      : NUDGE_LINES.general);
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // Every calendar date (as toDateString()) with at least one logged session —
@@ -2737,15 +2226,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 78;
+const BUILD_VERSION = 79;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:04 PM";
+const BUILD_TIME = "5:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "311 session-complete lines, all numbered",
-  "Preview panel on Home with a button per number",
+  "Session-complete copy moved out to the shared doc",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6611,7 +6099,6 @@ function NBackSessionApp() {
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
-  const [nudgeTesterOpen, setNudgeTesterOpen] = useState(false);
   const [selectedAvatarId, setSelectedAvatarIdState] = useState(DEFAULT_AVATAR_ID); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
   const [customAvatarImage, setCustomAvatarImageState] = useState(null); // data URL string | null — an uploaded photo, takes priority over the preset avatar when set
   const [displayName, setDisplayNameState] = useState("You"); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
@@ -9520,58 +9007,32 @@ function NBackSessionApp() {
                 🧪 Reset next session (test)
               </button>
               )}
-              {/* Every numbered line, previewable. Collapsed by default
-                  because there are three hundred of them. */}
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
-                <button
-                  onClick={() => setNudgeTesterOpen((v) => !v)}
-                  className="w-full text-left text-sm text-slate-400 hover:text-slate-200 flex items-center justify-between"
-                >
-                  <span>🧪 Session complete lines ({NUDGE_BY_ID.size}) — preview by number</span>
-                  <span>{nudgeTesterOpen ? "︿" : "›"}</span>
-                </button>
-                {nudgeTesterOpen && (
-                  <div className="space-y-4">
+                <div className="text-sm text-slate-500">
+                  🧪 Session complete screen (test)
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {[
+                    ["Real", null],
+                    ["Record", "pr"],
+                    ["Streak", "streak"],
+                    ["Off day", "worse"],
+                    ["General", "general"],
+                  ].map(([label, kind]) => (
                     <button
+                      key={label}
                       onClick={() => {
-                        setNudgeIdOverride(null);
+                        setNudgeIdOverride(kind);
                         setSessionCompleteAnim(true);
                         playLevelUp();
                         setTimeout(() => setSessionCompleteAnim(false), 3400);
                       }}
-                      className="w-full rounded-lg py-2 text-sm font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
+                      className="rounded-lg py-2 text-xs font-medium border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300"
                     >
-                      Real (uses your actual data)
+                      {label}
                     </button>
-                    {NUDGE_GROUPS.map((g) => (
-                      <div key={`${g.cat}-${g.lines[0].id}`} className="space-y-2">
-                        <div className="text-xs uppercase tracking-wide text-slate-500">
-                          {g.title}{" "}
-                          <span className="text-slate-600">
-                            ({g.lines[0].id}–{g.lines[g.lines.length - 1].id})
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                          {g.lines.map((l) => (
-                            <button
-                              key={l.id}
-                              title={l.text}
-                              onClick={() => {
-                                setNudgeIdOverride(l.id);
-                                setSessionCompleteAnim(true);
-                                playLevelUp();
-                                setTimeout(() => setSessionCompleteAnim(false), 3400);
-                              }}
-                              className="w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border border-slate-700 bg-slate-800 hover:bg-slate-700 hover:border-slate-500 text-slate-300"
-                            >
-                              {l.id}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                  ))}
+                </div>
               </div>
 
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
