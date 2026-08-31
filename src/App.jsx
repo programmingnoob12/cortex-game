@@ -1183,7 +1183,7 @@ const EXERCISE_COLORS = {
 // defines it: Quick is Dual N-Back, Balanced leads with RRT, Deep is built
 // around QNB'.
 const REGIME_COLORS = {
-  low: EXERCISE_COLORS.dual,
+  low: EXERCISE_COLORS.motion3d,
   medium: EXERCISE_COLORS.rrt,
   high: EXERCISE_COLORS.iqnb,
 };
@@ -2269,14 +2269,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 89;
+const BUILD_VERSION = 90;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:26 PM";
+const BUILD_TIME = "8:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Quick regime is now 15 min of 3D MOT",
+  "Quick regime card is 3D MOT green",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
