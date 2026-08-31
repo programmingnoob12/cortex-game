@@ -2269,15 +2269,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 93;
+const BUILD_VERSION = 94;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:05 PM";
+const BUILD_TIME = "9:27 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation: seek bar you can click and drag",
-  "Length stated in the text, wording changed to motivation audio",
+  "Motivation: shorter copy, length under the header",
+  "Speaker icon gains arcs with the volume",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13703,8 +13703,9 @@ function motProjectToScreen(position, camera, width, height) {
 const HYPNOSIS_TRACK = {
   url: "/audio/Cortex%20Hypnosis%20Version%201.mp3",
   title: "Motivation",
+  length: "12 min",
   blurb:
-    "A guided motivation audio, about 12 minutes long. Put headphones on, sit back, and let it play to the end. There's no need to do it every day. Use it when you want an extra boost, and skip it whenever you don't.",
+    "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost.",
 };
 
 // Deliberately bare: a play button and a volume slider, nothing else. No
@@ -13772,6 +13773,7 @@ function HypnosisScreen({ onDone }) {
         <h1 className="text-4xl font-semibold tracking-tight">
           {HYPNOSIS_TRACK.title}
         </h1>
+        <div className="text-slate-500 text-base mt-2">{HYPNOSIS_TRACK.length}</div>
       </div>
 
       <p className="text-slate-300 text-lg leading-relaxed">
@@ -13860,9 +13862,12 @@ function HypnosisScreen({ onDone }) {
         </div>
 
         <div className="mt-6 flex items-center gap-3">
+            {/* Arcs appear with the level: one quiet, two medium, three
+                loud, none at zero. Same idea as a phone's volume icon, so
+                the icon itself reads as a meter. */}
             <svg
-              width="18"
-              height="18"
+              width="20"
+              height="20"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -13872,8 +13877,10 @@ function HypnosisScreen({ onDone }) {
               className="text-slate-500 shrink-0"
               aria-hidden="true"
             >
-              <path d="M11 5 6 9H2v6h4l5 4z" />
-              <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+              <path d="M10 5 5.5 9H2v6h3.5L10 19z" />
+              {volume > 0 && <path d="M13.4 9.4a3.6 3.6 0 0 1 0 5.2" />}
+              {volume > 0.34 && <path d="M16.4 6.8a7.3 7.3 0 0 1 0 10.4" />}
+              {volume > 0.67 && <path d="M19.4 4.2a11 11 0 0 1 0 15.6" />}
             </svg>
             <input
               type="range"
