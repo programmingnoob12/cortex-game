@@ -2154,17 +2154,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 66;
+const BUILD_VERSION = 67;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:03 PM";
+const BUILD_TIME = "2:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Phone: home pills no longer overlap the header",
-  "RRT scramble fixed at 80%, test slider removed",
-  "RRT branching always on, toggle removed",
-  "3D MOT right/wrong now use RRT's green and red",
+  "Record glow rebuilt on linear amplitude, tracks the drops",
+  "Phone: graph and spreadsheet fit the screen",
+  "Nice! plays the tune every press",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2637,6 +2636,9 @@ function playSessionDone() {
 // driven by the music: the reveal already carries the motion, and a glow
 // pumping on the beat behind it competed with the content. It comes up with
 // the reveal and goes out on the song's fade so the two end together.
+// Measured off the celebration track's low band, in linear amplitude.
+const GLOW_FLOOR = 0.03;
+const GLOW_REF = 0.12;
 function PrGoldGlow({ className, style, out }) {
   const ref = useRef(null);
   // The bloom breathes with the track. Read straight off the analyser and
@@ -2649,12 +2651,6 @@ function PrGoldGlow({ className, style, out }) {
     let raf = 0;
     let data = null;
     let level = 0;
-    // A slow-moving reference for the recent past. The difference between
-    // the instant reading and this is what an onset is: not "loud", but
-    // "louder than it just was", which is what a drop or a kick actually is
-    // and what the eye expects the light to answer.
-    let slow = 0;
-    let started = false;
     const tick = () => {
       raf = requestAnimationFrame(tick);
       const el = ref.current;
@@ -2668,38 +2664,42 @@ function PrGoldGlow({ className, style, out }) {
       // 30Hz to roughly 250Hz: kick, bass, the parts a drop moves. Worked
       // out from the bin width rather than a fixed fraction of the array,
       // so it stays correct if the FFT size ever changes.
-      const binHz = (analyser.context.sampleRate / 2) / data.length;
+      const binHz = analyser.context.sampleRate / 2 / data.length;
       const lo = Math.max(1, Math.floor(30 / binHz));
       const hi = Math.max(lo + 2, Math.floor(250 / binHz));
+
+      // Back out of decibels into linear amplitude before averaging. This is
+      // the part that was wrong: the byte values are a dB scale, and on a dB
+      // scale the quiet build and the drop are only about ten units apart
+      // out of two hundred and fifty, so everything sat in the same narrow
+      // band and the light appeared to move at random. In linear amplitude
+      // the same passage is a factor of three apart, which is what the ear
+      // is hearing.
+      const dbSpan = analyser.maxDecibels - analyser.minDecibels;
       let sum = 0;
-      for (let i = lo; i <= hi && i < data.length; i++) sum += data[i];
-      const now = sum / (hi - lo + 1) / 255;
-
-      if (!started) {
-        slow = now;
-        started = true;
+      let count = 0;
+      for (let i = lo; i <= hi && i < data.length; i++) {
+        const db = analyser.minDecibels + (data[i] / 255) * dbSpan;
+        sum += Math.pow(10, db / 20);
+        count++;
       }
-      // Roughly a one-second memory.
-      slow += (now - slow) * 0.02;
+      const amp = count ? sum / count : 0;
 
-      // Two contributions. The sustained part only starts to count once the
-      // track is genuinely loud, so the quiet build stays nearly still; the
-      // onset part fires on the moment energy jumps above where it has been
-      // sitting, which is what lands the movement ON the drop rather than
-      // somewhere near it.
-      const sustained = Math.max(0, Math.min(1, (now - 0.52) / 0.34));
-      const onset = Math.max(0, Math.min(1, (now - slow) * 7));
-      const target = Math.max(sustained * 0.8, onset);
+      // Floor and reference measured off this track: the build before the
+      // drop sits around 0.03 and the loud passages peak near 0.12. Fixed
+      // rather than adaptive, because anything that chases a moving average
+      // slowly turns quiet passages back up and pumps in the wrong places.
+      const target = Math.max(0, Math.min(1, (amp - GLOW_FLOOR) / (GLOW_REF - GLOW_FLOOR)));
 
-      // Near-instant to rise so a hit is not smeared across three frames,
-      // slow to fall so it blooms and eases back rather than flickering.
-      level += (target - level) * (target > level ? 0.62 : 0.055);
+      // Fast to rise so a kick is not smeared across three frames, slower to
+      // fall so it blooms and eases back instead of flickering.
+      level += (target - level) * (target > level ? 0.75 : 0.16);
+
       // Opacity, not brightness. The gradient is yellow on black, so
-      // brightening it barely changes anything — the colour is already at
-      // the top of its range. How much of it is on screen is the part the
-      // eye reads, and that is opacity.
-      el.style.opacity = (0.26 + level * 0.74).toFixed(3);
-      el.style.transform = `scale(${(0.82 + level * 0.9).toFixed(3)})`;
+      // brightening it barely changes anything; how much of it is on screen
+      // is the part the eye reads.
+      el.style.opacity = (0.2 + level * 0.8).toFixed(3);
+      el.style.transform = `scale(${(0.78 + level * 0.95).toFixed(3)})`;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -2895,7 +2895,7 @@ function playLevelUp() {
     // enough; anything inside a quarter second of the last is the same
     // event arriving by a second route.
     const t = Date.now();
-    if (t - lastLevelUpAt < 300) return;
+    if (t - lastLevelUpAt < 120) return;
     lastLevelUpAt = t;
     const ctx = uiAudioContext();
     if (!ctx) return;
@@ -10351,11 +10351,11 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-6 h-[30rem]">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6 h-[22rem] sm:h-[30rem]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
-                          margin={{ top: 8, right: 16, bottom: 24, left: 0 }}
+                          margin={{ top: 8, right: 8, bottom: 20, left: 0 }}
                         >
                           <defs>
                             <linearGradient
@@ -10536,18 +10536,18 @@ function NBackSessionApp() {
                     </div>
                   ) : (
                     <div className="relative">
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-hidden overflow-x-auto">
-                      <table className="w-full text-sm">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-x-auto">
+                      <table className="w-full min-w-[34rem] text-xs sm:text-sm whitespace-nowrap">
                         <thead>
                           <tr
                             className="border-b border-slate-700/70 text-left text-slate-100"
                             style={{ height: SHEET_ROW_H }}
                           >
-                            <th className="px-4 py-2.5 font-medium">Day</th>
-                            <th className="px-4 py-2.5 font-medium">Date</th>
-                            <th className="px-4 py-2.5 font-medium">Time</th>
-                            <th className="px-4 py-2.5 font-medium">Best score</th>
-                            <th className="px-4 py-2.5 font-medium">Avg</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Best score</th>
+                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Avg</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -10568,17 +10568,17 @@ function NBackSessionApp() {
                                       : "rgba(30,152,43,0.12)",
                                 }}
                               >
-                                <td className="px-4 py-2.5 text-slate-100">
+                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
                                   {d.toLocaleDateString(undefined, { weekday: "short" })}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-100">
+                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
                                   {d.toLocaleDateString()}
                                 </td>
-                                <td className="px-4 py-2.5 text-slate-100">
+                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
                                   {row.durationMs ? formatDuration(row.durationMs) : "—"}
                                 </td>
                                 <td
-                                  className="px-4 py-2.5 font-medium"
+                                  className="px-2.5 sm:px-4 py-2.5 font-medium"
                                   style={
                                     row.isPR
                                       ? {
@@ -10597,7 +10597,7 @@ function NBackSessionApp() {
                                   )}
                                 </td>
                                 <td
-                                  className="px-4 py-2.5 font-medium"
+                                  className="px-2.5 sm:px-4 py-2.5 font-medium"
                                   style={
                                     row.isAvgPR
                                       ? {
@@ -11282,7 +11282,10 @@ function NBackSessionApp() {
                 immediately, rather than possibly trailing in later. */}
             <button
               onClick={() => {
-                playClick();
+                // The tune, not the click: this button is the moment the
+                // reward is collected, so it should sound like one every
+                // time it is pressed.
+                playLevelUp();
                 // Take the music out with the screen rather than cutting it
                 // dead or leaving it running over whatever comes next.
                 fadeOutCelebrationSong();
@@ -11376,7 +11379,7 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={() => {
-                  playClick();
+                  playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));
                 }}
                 className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
