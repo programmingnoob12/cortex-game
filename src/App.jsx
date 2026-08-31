@@ -2180,14 +2180,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 74;
+const BUILD_VERSION = 75;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:04 PM";
+const BUILD_TIME = "4:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Glow breathes on its own, no longer tied to the audio",
+  "Binaural beats on by default, switched off in Account",
+  "Plays across the whole exercise, setup screen included",
+  "Tutorial mentions where to turn it off",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6063,7 +6065,7 @@ function NBackSessionApp() {
   const [selectedColorId, setSelectedColorIdState] = useState("indigo"); // persisted — profile accent color theme
   const [selectedBackgroundId, setSelectedBackgroundIdState] = useState("none"); // persisted — profile banner background
   const [featuredBadgeId, setFeaturedBadgeIdState] = useState(null); // persisted — one badge pinned front-and-center on the profile
-  const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(false); // persisted — toggle shown during audio-modality exercises
+  const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(true); // persisted — on by default, switched off from the Account page
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
@@ -6757,7 +6759,10 @@ function NBackSessionApp() {
   // Only actually plays while a trial is running — stops itself on setup/
   // results screens rather than droning on in the menus.
   const { unlock: unlockBinauralAudio, audioError: binauralAudioError } = useBinauralBeats(
-    binauralBeatsEnabled
+    binauralBeatsEnabled &&
+      mainView === "app" &&
+      exercise.key !== "overview" &&
+      !switchNotice
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -8151,30 +8156,6 @@ function NBackSessionApp() {
     };
   }, [exercise.modalities, feedback, handlePress, index, n]);
 
-  // One definition, rendered both before a round and after it, so the track
-  // can be turned on or off at either point without hunting for the setting.
-  const binauralCard = exercise.modalities?.includes("audio") ? (
-    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-5 space-y-2">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <div className="text-base font-medium text-slate-100">Binaural beats</div>
-          <div className="text-sm text-slate-500 mt-0.5">40Hz Gamma tone</div>
-        </div>
-        <Toggle
-          on={binauralBeatsEnabled}
-          onToggle={() => {
-            unlockBinauralAudio();
-            setBinauralBeatsEnabled(!binauralBeatsEnabled);
-          }}
-          accent={ACCENT_STYLES[exercise.accent]}
-        />
-      </div>
-      {binauralAudioError && (
-        <div className="text-sm text-rose-400">⚠ {binauralAudioError}</div>
-      )}
-    </div>
-  ) : null;
-
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
 
   // Drives --ex, which every accent button reads from. Only set while an
@@ -9162,6 +9143,12 @@ function NBackSessionApp() {
               </p>
             </div>
 
+            {/* Said once, here, rather than as a control on every screen. */}
+            <p className="text-slate-500 text-base">
+              A 40Hz gamma tone plays quietly under every exercise. If you would
+              rather train in silence, switch off Binaural beats in Account.
+            </p>
+
             <label className="flex items-center gap-3 text-slate-300 text-base cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -9683,6 +9670,28 @@ function NBackSessionApp() {
                 {membershipPlan} ›
               </span>
             </button>
+
+            {/* Sits with Show tutorials because it behaves the same way: on
+                unless the person turns it off, and set here rather than
+                mid-exercise. */}
+            <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-medium">Binaural beats</div>
+                <div className="text-slate-500 text-base mt-1">
+                  40Hz Gamma tone, played quietly under the exercises
+                </div>
+                {binauralAudioError && (
+                  <div className="text-rose-400 text-base mt-1">⚠ {binauralAudioError}</div>
+                )}
+              </div>
+              <Toggle
+                on={binauralBeatsEnabled}
+                onToggle={() => {
+                  unlockBinauralAudio();
+                  setBinauralBeatsEnabled(!binauralBeatsEnabled);
+                }}
+              />
+            </div>
 
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
               <div>
@@ -10842,8 +10851,6 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            {binauralCard}
-
             <button
               onClick={() => startTask(exercise, n)}
               className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
@@ -11046,8 +11053,6 @@ function NBackSessionApp() {
                 />
               ))}
             </div>
-
-            {binauralCard}
 
             <button
               onClick={() => startTask(exercise, n)}
