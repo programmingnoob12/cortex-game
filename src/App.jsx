@@ -2276,15 +2276,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 106;
+const BUILD_VERSION = 107;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:16 PM";
+const BUILD_TIME = "2:22 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT tutorial copy, conclusion above the map",
-  "Shorter RRT setup line",
+  "Tutorial: Back and Next on every step, ends on I get it",
+  "Conclusion block matches the exercise, sits under the grid",
+  "Arrow pointing at the timer checkbox, dismissable",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3279,6 +3280,9 @@ const RRT_TIMEOUT = "#8A8F98";
 // this is the difficulty the exercise is tuned around, and letting it vary
 // made two runs at the same level not comparable.
 const RRT_SCRAMBLE_FACTOR = 0.8;
+
+// Whether the "tick this to start" pointer has been dismissed for good.
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHintHidden";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4470,14 +4474,23 @@ function RrtTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.rrt;
 
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
-  const nextButton = (label, onClick) => (
-    <button
-      onClick={onClick}
-      style={{ "--ex": accent }}
-      className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
-    >
-      {label}
-    </button>
+  const nav = (label, onClick) => (
+    <div className="flex gap-3">
+      <button
+        onClick={() => setStep((v) => Math.max(0, v - 1))}
+        disabled={step === 0}
+        className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+      >
+        Back
+      </button>
+      <button
+        onClick={onClick}
+        style={{ "--ex": accent }}
+        className="flex-1 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+      >
+        {label}
+      </button>
+    </div>
   );
   const premise = (a, dir, b) => (
     <div className={card}>
@@ -4514,7 +4527,7 @@ function RrtTutorial({ onDone }) {
           </p>
         </div>
       ),
-      action: nextButton("Next", () => setStep(1)),
+      action: nav("Next", () => setStep(1)),
     },
     {
       body: (
@@ -4529,7 +4542,7 @@ function RrtTutorial({ onDone }) {
           </p>
         </div>
       ),
-      action: nextButton("Next", () => setStep(2)),
+      action: nav("Next", () => setStep(2)),
     },
     {
       body: (
@@ -4541,21 +4554,39 @@ function RrtTutorial({ onDone }) {
           </p>
         </div>
       ),
-      action: nextButton("Next", () => setStep(3)),
+      action: nav("Next", () => setStep(3)),
     },
     {
       body: (
         <div className="space-y-4">
-          {premise(green, "South-West", blue)}
           <div className={card}>
             <RrtTutorialMap
               items={RRT_TUTORIAL_ITEMS}
               positions={RRT_TUTORIAL_POSITIONS}
             />
           </div>
+          {/* Laid out exactly as the exercise lays out a conclusion: the
+              italic caps label, then the two tiles and the relation. */}
+          <div className={card}>
+            <div className="text-center">
+              <div
+                className="italic font-bold tracking-wide text-lg"
+                style={{ color: accent }}
+              >
+                CONCLUSION
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-3.5 py-5 flex-wrap text-center">
+              <RrtItemTile item={green} size={46} />
+              <span className="text-slate-100 text-2xl font-medium">
+                is South-West of
+              </span>
+              <RrtItemTile item={blue} size={46} />
+            </div>
+          </div>
         </div>
       ),
-      action: nextButton("Start training", onDone),
+      action: nav("I get it", onDone),
     },
   ];
 
@@ -10022,12 +10053,6 @@ function NBackSessionApp() {
               </div>
             )}
 
-            {/* Said once, here, rather than as a control on every screen. */}
-            <p className="text-slate-500 text-base">
-              A 40Hz gamma tone plays quietly under every exercise. If you would
-              rather train in silence, switch off Binaural beats in Account.
-            </p>
-
             <label className="flex items-center gap-3 text-slate-300 text-base cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -13132,6 +13157,25 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   const secondsLeft = Math.ceil(msLeft / 1000);
 
+  // A pointer at the timer checkbox, because nothing else on the screen says
+  // that is how a round starts. Dismissed for good by its own tick box.
+  const [hideTimerHint, setHideTimerHint] = useState(() => {
+    try {
+      return localStorage.getItem(RRT_TIMER_HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissTimerHint = () => {
+    setHideTimerHint(true);
+    try {
+      localStorage.setItem(RRT_TIMER_HINT_KEY, "1");
+    } catch {
+      /* a session without persistence just sees it again next time */
+    }
+  };
+  const showTimerHint = !hideTimerHint && !timerRunning;
+
   if (stage === "setup") {
     return (
       <div className="space-y-6">
@@ -13197,8 +13241,55 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           style={{ width: `${(msLeft / ROUND_MS) * 100}%` }}
         />
       </div>
-      <div className="flex items-center justify-between">
+      <div className="relative flex items-center justify-between">
         <div className="italic font-bold tracking-wide text-slate-300 text-lg">TIMER</div>
+        {showTimerHint && (
+          <div
+            className="absolute right-0 top-full mt-2 z-20 flex flex-col items-end"
+            style={{ animation: "switchIn 0.4s ease-out both" }}
+          >
+            {/* Points up and right at the box it is talking about. */}
+            <svg
+              width="34"
+              height="26"
+              viewBox="0 0 34 26"
+              fill="none"
+              className="mr-1"
+              aria-hidden="true"
+            >
+              <path
+                d="M2 24C2 24 6 9 20 5"
+                stroke={EXERCISE_COLORS.rrt}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M13 4.5 21 3.5 19.5 11.5"
+                stroke={EXERCISE_COLORS.rrt}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div
+              className="rounded-lg px-3 py-2 border text-sm text-right whitespace-nowrap"
+              style={{
+                borderColor: `${EXERCISE_COLORS.rrt}66`,
+                background: "#0F1115",
+                color: "#E2E4E9",
+              }}
+            >
+              <div>Tick this to start the round.</div>
+              <button
+                onClick={dismissTimerHint}
+                className="mt-1.5 inline-flex items-center gap-2 text-slate-500 hover:text-slate-300 transition-colors text-xs"
+              >
+                <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+                Don't show again
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <div className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 text-base font-medium">
             {secondsLeft} sec
