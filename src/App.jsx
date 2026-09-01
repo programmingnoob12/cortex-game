@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 112;
+const BUILD_VERSION = 113;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:48 PM";
+const BUILD_TIME = "4:59 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "N-back tutorials drafted for Dual, Quad and QNB'",
-  "Real checkbox on the timer hint",
+  "N-back tutorial cut back to one line and a live demo",
+  "Timer hint reset so it shows again",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3284,7 +3284,7 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // Bumped: earlier builds had a version of this that could be dismissed by
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v2";
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v3";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4631,45 +4631,106 @@ function RrtTutorial({ onDone }) {
 
 // A row of small 3x3 grids showing one stream over consecutive trials. The
 // trials that make the point are highlighted; everything else stays quiet.
-function NBackTutorialStrip({ trials, highlight = [], n }) {
+function NBackTutorialDemo({ accent, n }) {
+  // A short scripted run. Two of the trials repeat the square from n back,
+  // so the demo always shows at least one match no matter the level.
+  const seq = (() => {
+    const base = [0, 4, 8, 2, 6, 1, 7, 3, 5, 0];
+    const out = base.slice(0, Math.max(6, n + 4));
+    if (out[1 + n] !== undefined) out[1 + n] = out[1];
+    if (out[3 + n] !== undefined) out[3 + n] = out[3];
+    return out;
+  })();
+
+  const [i, setI] = useState(-1);
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => setI((v) => (v >= seq.length - 1 ? -1 : v + 1)),
+      i === -1 ? 700 : i >= seq.length - 1 ? 1600 : 1100
+    );
+    return () => clearTimeout(t);
+  }, [i, seq.length]);
+
+  const cur = i >= 0 ? seq[i] : null;
+  const isMatch = i >= n && seq[i] === seq[i - n];
+
   return (
-    <div className="flex items-end justify-center gap-3 flex-wrap">
-      {trials.map((t, i) => {
-        const marked = highlight.includes(i);
-        return (
-          <div key={i} className="flex flex-col items-center gap-2">
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1.35rem)",
-                gridTemplateRows: "repeat(3, 1.35rem)",
-                borderTop: `1px solid ${NBACK_GRID_LINE}`,
-                borderLeft: `1px solid ${NBACK_GRID_LINE}`,
-                outline: marked ? `2px solid ${PR_YELLOW}` : "none",
-                outlineOffset: "3px",
-                borderRadius: 2,
-              }}
-            >
-              {POSITIONS.map((cell) => (
-                <div
-                  key={cell}
-                  style={{
-                    borderRight: `1px solid ${NBACK_GRID_LINE}`,
-                    borderBottom: `1px solid ${NBACK_GRID_LINE}`,
-                    background: cell === t.pos ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
-                  }}
-                />
-              ))}
+    <div className="flex flex-col items-center gap-5">
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 3.6rem)",
+          gridTemplateRows: "repeat(3, 3.6rem)",
+          borderTop: `1px solid ${NBACK_GRID_LINE}`,
+          borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+          borderRadius: 4,
+        }}
+      >
+        {POSITIONS.map((cell) => (
+          <div
+            key={cell}
+            style={{
+              borderRight: `1px solid ${NBACK_GRID_LINE}`,
+              borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+              background: cell === cur ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+              transition: "background 0.12s linear",
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="flex items-end justify-center gap-2 flex-wrap min-h-[3.4rem]">
+        {seq.map((p, idx) => {
+          if (idx > i) return null;
+          const marked = isMatch && (idx === i || idx === i - n);
+          return (
+            <div key={idx} className="flex flex-col items-center gap-1.5">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 0.6rem)",
+                  gridTemplateRows: "repeat(3, 0.6rem)",
+                  borderTop: `1px solid ${NBACK_GRID_LINE}`,
+                  borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+                  outline: marked ? `2px solid ${PR_YELLOW}` : "none",
+                  outlineOffset: "2px",
+                  borderRadius: 2,
+                  opacity: idx === i ? 1 : 0.55,
+                }}
+              >
+                {POSITIONS.map((cell) => (
+                  <div
+                    key={cell}
+                    style={{
+                      borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                      borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                      background: cell === p ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                    }}
+                  />
+                ))}
+              </div>
+              <div
+                className="text-[0.65rem] tabular-nums"
+                style={{ color: marked ? PR_YELLOW : "#6E717A" }}
+              >
+                {idx + 1}
+              </div>
             </div>
-            <div
-              className="text-xs tabular-nums"
-              style={{ color: marked ? PR_YELLOW : "#6E717A" }}
-            >
-              {i + 1}
-            </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      <div
+        className="rounded-lg px-5 py-2.5 text-base font-semibold transition-colors"
+        style={{
+          border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
+          color: isMatch ? PR_YELLOW : "#6E717A",
+          background: isMatch ? `${PR_YELLOW}1A` : "transparent",
+        }}
+      >
+        {isMatch ? "Press" : "Don't press"}
+      </div>
     </div>
   );
 }
@@ -4679,17 +4740,7 @@ function NBackTutorial({ exercise, onDone, level }) {
   const accent = EXERCISE_COLORS[exercise.key] || "#4CB9D8";
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
   const modalities = exercise.modalities || [];
-  const isQnbPrime = exercise.key === "iqnb";
-
-  // A fixed six-trial run where trial 4 repeats trial 2 — a 2-back match.
-  const demoTrials = [
-    { pos: 0 },
-    { pos: 4 },
-    { pos: 8 },
-    { pos: 4 },
-    { pos: 2 },
-    { pos: 6 },
-  ];
+  const n = Math.max(1, Math.floor(level || 2));
 
   const nav = (label, onClick) => (
     <div className="flex items-center justify-between gap-3">
@@ -4716,14 +4767,13 @@ function NBackTutorial({ exercise, onDone, level }) {
     body: (
       <div className={`${card} space-y-4`}>
         <p className="text-slate-100 text-xl leading-relaxed">
-          A square lights up. Then another. Then another.
+          You will be shown a stimulus. Remember it.
         </p>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          You are not remembering the whole sequence.
+        <p className="text-slate-100 text-xl leading-relaxed">
+          When the stimulus is the same as the one {n} back, press the button.
         </p>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          You only ever hold the last two. Everything older than that, let go
-          of.
+        <p className="text-slate-100 text-xl leading-relaxed">
+          If it is not, press nothing.
         </p>
       </div>
     ),
@@ -4732,86 +4782,35 @@ function NBackTutorial({ exercise, onDone, level }) {
   steps.push({
     body: (
       <div className={`${card} space-y-6`}>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          Trial 4 is in the same square as trial 2. Two back. That is a match.
-        </p>
-        <NBackTutorialStrip trials={demoTrials} highlight={[1, 3]} />
-        <p className="text-slate-100 text-lg leading-relaxed">
-          When that happens, press the button for that stream. When it does
-          not, press nothing.
-        </p>
-      </div>
-    ),
-  });
-
-  steps.push({
-    body: (
-      <div className={`${card} space-y-5`}>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          {modalities.length === 1
-            ? "One stream to watch."
-            : `${modalities.length} streams, running at the same time.`}
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          {modalities.map((m) => (
-            <div
-              key={m}
-              className="rounded-lg border border-slate-700/70 bg-slate-950/40 px-4 py-3 flex items-center justify-between"
-            >
-              <span className="text-slate-100 text-base">
-                {MODALITY_META[m].label}
-              </span>
-              <span
-                className="text-2xl font-semibold leading-none"
-                style={{ color: accent }}
-              >
-                {MODALITY_KEY_LABEL[m]}
-              </span>
+        <NBackTutorialDemo accent={accent} n={n} />
+        {modalities.length > 1 && (
+          <div className="space-y-3">
+            <p className="text-slate-100 text-lg leading-relaxed text-center">
+              {modalities.length} streams run at once. Each has its own button.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              {modalities.map((m) => (
+                <div
+                  key={m}
+                  className="rounded-lg border border-slate-700/70 bg-slate-950/40 px-4 py-3 flex items-center justify-between"
+                >
+                  <span className="text-slate-100 text-base">
+                    {MODALITY_META[m].label}
+                  </span>
+                  <span
+                    className="text-2xl font-semibold leading-none"
+                    style={{ color: accent }}
+                  >
+                    {MODALITY_KEY_LABEL[m]}
+                  </span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          Each one is judged on its own. A match in one says nothing about the
-          others.
-        </p>
+          </div>
+        )}
       </div>
     ),
   });
-
-  steps.push({
-    body: (
-      <div className={`${card} space-y-4`}>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          The first {level} trials cannot be a match, so the buttons stay
-          inactive until there is something to compare against.
-        </p>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          Miss one and keep going. Stopping to work out what you missed costs
-          you the next two.
-        </p>
-      </div>
-    ),
-  });
-
-  if (isQnbPrime) {
-    steps.push({
-      body: (
-        <div className={`${card} space-y-4`}>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            QNB' moves in hundredths. 4.00 up to 4.99, then 5.00.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Every step up makes matches rarer and adds more near-misses:
-            something that looks like a match but sits one trial off.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Those are the point. Getting them wrong is how you learn to feel
-            the difference.
-          </p>
-        </div>
-      ),
-    });
-  }
 
   const isLast = step >= steps.length - 1;
   const current = steps[Math.min(step, steps.length - 1)];
@@ -13920,7 +13919,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         </div>
       </div>
       <div
-        className="lg:hidden mt-3 rounded-lg px-3 py-2 border text-sm"
+        className="lg:hidden absolute top-full left-0 right-0 mt-3 rounded-lg px-3 py-2 border text-sm"
         style={{
           borderColor: `${EXERCISE_COLORS.rrt}66`,
           background: "#0F1115",
