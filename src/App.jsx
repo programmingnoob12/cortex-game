@@ -2276,16 +2276,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 100;
+const BUILD_VERSION = 101;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:54 PM";
+const BUILD_TIME = "1:04 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT setup card restyled and cut to the essentials",
-  "No hand-off screen before the session overview",
-  "Transition text centred in the viewport",
+  "Wisdom page added under Motivation",
+  "Hand-off screen always centres, whatever came before",
+  "RRT card matches the N-back card exactly",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9234,6 +9234,42 @@ function NBackSessionApp() {
           </div>
         )}
 
+        {mainView === "wisdom" && (
+          <div className="space-y-10" style={{ maxWidth: "42rem" }}>
+            <div>
+              <button
+                onClick={() => setMainView("home")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+              >
+                &lsaquo; Back
+              </button>
+              <h1 className="text-4xl font-semibold tracking-tight">Wisdom</h1>
+              <div className="text-slate-500 text-base mt-2">Book of Proverbs</div>
+            </div>
+
+            <p className="text-slate-300 text-lg leading-relaxed">
+              A short quiz on the Book of Proverbs.
+            </p>
+
+            <div
+              className="rounded-xl p-6 border"
+              style={{
+                borderColor: "#4CB9D833",
+                background: "#4CB9D80D",
+              }}
+            >
+              <p className="text-slate-300 text-base leading-relaxed">
+                Note: you don't have to believe in the entire bible to get value
+                from this quiz. There is practical wisdom anyone can use.
+              </p>
+            </div>
+
+            <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-8 text-center text-slate-500 text-base">
+              Quiz coming soon.
+            </div>
+          </div>
+        )}
+
         {(mainView === "privacy" || mainView === "terms") && (
           <LegalPage
             doc={mainView === "privacy" ? PRIVACY_POLICY : TERMS_OF_SERVICE}
@@ -9433,6 +9469,12 @@ function NBackSessionApp() {
                 className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
                 Motivation
+              </button>
+              <button
+                onClick={() => setMainView("wisdom")}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Wisdom
               </button>
               {SHOW_TEST_TOOLS && (
               <button
@@ -10850,10 +10892,11 @@ function NBackSessionApp() {
         )}
 
         {switchNotice && (
-          /* The hand-off between exercises. Long enough to read one line and
-             draw a breath, which is the point: it marks the boundary instead
-             of dropping straight into the next task. */
-          <div className="flex flex-col items-center justify-center text-center gap-8 min-h-[70vh]">
+          /* The hand-off between exercises. A fixed overlay rather than page
+             content, because the page container's alignment differs between
+             the running screen and the others, which is why this landed in
+             the middle after one exercise and near the top after another. */
+          <div className="fixed inset-0 z-40 flex flex-col items-center justify-center text-center gap-8 px-6 bg-slate-950">
             <div
               className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500"
               style={{ animation: "switchIn 0.5s ease-out both" }}
@@ -12871,12 +12914,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
         </div>
 
-        {/* Same shape as the N-back setup card: near-black face, the
-            exercise's own colour on the border. */}
-        <div
-          className="bg-slate-900 rounded-xl p-6 space-y-3"
-          style={{ border: `1px solid ${EXERCISE_COLORS.rrt}66` }}
-        >
+        {/* Exactly the construction the N-back setup card uses — the
+            exercise's own tinted fill and border, not a one-off. */}
+        <div className={`${accent.bg} border ${accent.border} rounded-xl p-6 space-y-3`}>
           <div className="text-lg text-slate-300">
             Premises: <span className="text-slate-100 font-medium">{premiseCount}p</span>
           </div>
@@ -12884,8 +12924,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             Round length: <span className="text-slate-200 font-medium">{ROUND_MS / 1000} sec</span>
           </div>
           <p className="text-slate-400 text-base">
-            20 correct in a row ranks you up. Round length drops 30s, 25s, 20s,
-            then a premise is added and it resets to 30s.
+            20 in a row = level up. 30s, 25s, 20s, and then premise count +1.
           </p>
         </div>
 
