@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 115;
+const BUILD_VERSION = 116;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:11 PM";
+const BUILD_TIME = "5:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Timer hint back outside with the arrow",
-  "N-back demo uses each exercise's own stimuli",
+  "Demo runs once to the first match and stops",
+  "Letter is spoken instead of written",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4651,17 +4651,22 @@ function NBackTutorialDemo({ exercise, accent }) {
     { pos: 8, color: COLORS[2], shape: shapeSet[2], letter: "L" },
     { pos: 6, color: COLORS[4], shape: shapeSet[3], letter: "R" },
   ];
-  const seq = [defs[0], defs[1], defs[2], defs[1], defs[3], defs[1]];
+  // Four trials: three new items, then the second one again. It runs once and
+  // stops on the match, so the last thing on screen is the thing to learn.
+  const seq = [defs[0], defs[1], defs[2], defs[1]];
 
   const [i, setI] = useState(-1);
 
   useEffect(() => {
-    const t = setTimeout(
-      () => setI((v) => (v >= seq.length - 1 ? -1 : v + 1)),
-      i === -1 ? 1000 : i >= seq.length - 1 ? 2600 : 1900
-    );
+    if (i >= seq.length - 1) return undefined;
+    const t = setTimeout(() => setI((v) => v + 1), i === -1 ? 900 : 1900);
     return () => clearTimeout(t);
   }, [i, seq.length]);
+
+  useEffect(() => {
+    if (!hasAudio || i < 0 || i >= seq.length) return;
+    speak(seq[i].letter);
+  }, [i, hasAudio]);
 
   const cur = i >= 0 ? seq[i] : null;
   const isMatch = i >= n && seq[i] === seq[i - n];
@@ -4713,21 +4718,11 @@ function NBackTutorialDemo({ exercise, accent }) {
                 transition: "background 0.12s linear",
               }}
             >
-              {active && (
-                <div style={{ width: "78%", height: "78%" }}>
-                  {stimulus(cur, 64)}
-                </div>
-              )}
+              {active && stimulus(cur, 50)}
             </div>
           );
         })}
       </div>
-
-      {hasAudio && (
-        <div className="text-base text-slate-300 min-h-[1.5rem]">
-          {cur ? `Sound: "${cur.letter}"` : "\u00A0"}
-        </div>
-      )}
 
       <div className="flex items-end justify-center gap-2 flex-wrap min-h-[3.4rem]">
         {seq.map((item, idx) => {
@@ -4749,9 +4744,7 @@ function NBackTutorialDemo({ exercise, accent }) {
                 }}
               >
                 {hasShape || hasColor ? (
-                  <div style={{ width: "80%", height: "80%" }}>
-                    {stimulus(item, 22)}
-                  </div>
+                  stimulus(item, 21)
                 ) : (
                   <span className="text-[0.7rem] font-semibold text-slate-900">
                     {item.letter}
@@ -13912,7 +13905,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // so it drops underneath instead.
   const timerHint = showTimerHint ? (
     <>
-      <div className="hidden lg:flex absolute left-full top-[4.6rem] ml-4 items-start gap-2 w-60">
+      <div className="hidden lg:flex absolute left-full top-[6.4rem] ml-3 items-start gap-2 w-60">
         <svg
           width="38"
           height="22"
