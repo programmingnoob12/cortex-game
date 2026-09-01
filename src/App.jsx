@@ -2276,14 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 104;
+const BUILD_VERSION = 105;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:03 PM";
+const BUILD_TIME = "2:12 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT tutorial rebuilt on Space 2D with the map explanation",
+  "RRT tutorial: four steps, even spacing, answer as a conclusion row",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4491,79 +4491,59 @@ function RrtTutorial({ onDone }) {
   const steps = [
     {
       body: (
-        <div className={card}>
+        <div className={`${card} space-y-4`}>
           <p className="text-slate-200 text-xl leading-relaxed">
             Close your eyes and feel where different objects are in your room.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed mt-5">
+          <p className="text-slate-300 text-lg leading-relaxed">
             Don't imagine the object. Feel where it is.
           </p>
-          <ul className="mt-5 space-y-2 text-slate-300 text-lg leading-relaxed">
-            <li>Feel where the door is. What direction it is.</li>
-            <li>Feel where the chair is.</li>
-          </ul>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Feel where the door is. What direction it is.
+          </p>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Feel where the chair is.
+          </p>
         </div>
       ),
-      action: nextButton("I did that", () => setStep(1)),
+      action: nextButton("Next", () => setStep(1)),
     },
     {
       body: (
-        <div className={card}>
+        <div className={`${card} space-y-4`}>
           <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
             That is spatializing.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed mt-4">
+          <p className="text-slate-300 text-lg leading-relaxed">
             In RRT you spatialize the items. You do not imagine them. It has to
             be a sensory feeling, the same one you just had about the door.
           </p>
         </div>
       ),
-      action: nextButton("Got it", () => setStep(2)),
-    },
-    {
-      body: (
-        <div className={card}>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            Three items. Feel where each item is.
-          </p>
-          <div className="flex items-center justify-center gap-10 my-9">
-            {RRT_TUTORIAL_ITEMS.map((it) => (
-              <RrtItemTile key={it.patternSeed} item={it} size={72} />
-            ))}
-          </div>
-        </div>
-      ),
-      action: nextButton("Ready", () => setStep(3)),
+      action: nextButton("Next", () => setStep(2)),
     },
     {
       body: (
         <div className="space-y-4">
           {premise(orange, "West", blue)}
           {premise(green, "South", orange)}
+          <p className="text-slate-300 text-lg leading-relaxed pt-2">
+            Feel where each item is.
+          </p>
         </div>
       ),
-      action: nextButton("Show me the answer", () => setStep(4)),
+      action: nextButton("Next", () => setStep(3)),
     },
     {
       body: (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className={card}>
             <RrtTutorialMap
               items={RRT_TUTORIAL_ITEMS}
               positions={RRT_TUTORIAL_POSITIONS}
             />
           </div>
-          <div className="space-y-3 text-slate-300 text-lg leading-relaxed">
-            <p>Orange sits west of Blue. Green sits south of Orange.</p>
-            <p>
-              So Green is south-west of Blue. You never had to work that out
-              step by step. Once the three are placed, the answer is just
-              there, the same way the door is.
-            </p>
-            <p className="text-slate-400 text-base">
-              That is the whole skill. Place them, then read the map.
-            </p>
-          </div>
+          {premise(green, "South-West", blue)}
         </div>
       ),
       action: nextButton("Start training", onDone),
