@@ -2239,6 +2239,7 @@ const MOTIVATION_LINES = [
   { id: 40, text: "You're on your way to becoming mentally unstoppable." },
   { id: 41, text: "Your opponents aren't ready." },
   { id: 42, text: "The closest thing we have to a superpower is intellect." },
+  { id: 43, text: "Dominate everyone." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2275,15 +2276,16 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 99;
+const BUILD_VERSION = 100;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:41 PM";
+const BUILD_TIME = "12:54 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Line edits, two new lines",
-  "Log out back to a small button",
+  "RRT setup card restyled and cut to the essentials",
+  "No hand-off screen before the session overview",
+  "Transition text centred in the viewport",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7880,14 +7882,21 @@ function NBackSessionApp() {
     const nextIndex = fromIndex + 1;
     if (nextIndex >= list.length) return; // nothing further defined
 
-    setSwitchNotice(true);
-    setSwitchQuote(
-      TRANSITION_QUOTES[Math.floor(Math.random() * TRANSITION_QUOTES.length)]
-    );
+    const nextExercise = list[nextIndex];
+    // The Session Overview is the end of the regime, not another exercise.
+    // Showing "Next exercise" in front of it was simply wrong, and it put a
+    // four-second wait between finishing and seeing the result.
+    const goingToOverview = nextExercise.key === "overview";
+
+    if (!goingToOverview) {
+      setSwitchNotice(true);
+      setSwitchQuote(
+        TRANSITION_QUOTES[Math.floor(Math.random() * TRANSITION_QUOTES.length)]
+      );
+    }
     setExerciseIndex(nextIndex);
     setScreen("setup");
 
-    const nextExercise = list[nextIndex];
     if (nextExercise.key === "overview") {
       // Landing on the Session Overview screen straight out of a training session —
       // show today's training time, not the lifetime total.
@@ -7896,7 +7905,7 @@ function NBackSessionApp() {
       // the 7-day regime-streak achievement.
       markRegimeCompletedToday();
     }
-    setTimeout(() => {
+    const land = () => {
       setSwitchNotice(false);
       setN(exerciseLevelsRef.current[nextExercise.key] ?? nextExercise.defaultN);
       // Show this specific exercise's tutorial right before it starts — the
@@ -7912,7 +7921,9 @@ function NBackSessionApp() {
         setMainView("tutorial");
       }
       // land on the setup screen for the next exercise; user presses Start themselves
-    }, 4400);
+    };
+    if (goingToOverview) land();
+    else setTimeout(land, 4400);
   }, []);
 
   useEffect(() => {
@@ -10842,7 +10853,7 @@ function NBackSessionApp() {
           /* The hand-off between exercises. Long enough to read one line and
              draw a breath, which is the point: it marks the boundary instead
              of dropping straight into the next task. */
-          <div className="flex flex-col items-center text-center gap-8 py-10">
+          <div className="flex flex-col items-center justify-center text-center gap-8 min-h-[70vh]">
             <div
               className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500"
               style={{ animation: "switchIn 0.5s ease-out both" }}
@@ -12858,10 +12869,14 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       <div className="space-y-6">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
-          <p className="text-slate-500 text-lg mt-2">Space 2D · Variation 1</p>
         </div>
 
-        <div className={`${accent.bg} border ${accent.border} rounded-xl p-6 space-y-3`}>
+        {/* Same shape as the N-back setup card: near-black face, the
+            exercise's own colour on the border. */}
+        <div
+          className="bg-slate-900 rounded-xl p-6 space-y-3"
+          style={{ border: `1px solid ${EXERCISE_COLORS.rrt}66` }}
+        >
           <div className="text-lg text-slate-300">
             Premises: <span className="text-slate-100 font-medium">{premiseCount}p</span>
           </div>
@@ -12869,11 +12884,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             Round length: <span className="text-slate-200 font-medium">{ROUND_MS / 1000} sec</span>
           </div>
           <p className="text-slate-400 text-base">
-            A chain of statements about a set of items, then one true/false
-            question at the end. Each round is randomly "same as" /
-            "opposite of", "contains" / "is within", or "more than" /
-            "less than". Check the timer box when you're ready to start the
-            clock.
+            20 correct in a row ranks you up. Round length drops 30s, 25s, 20s,
+            then a premise is added and it resets to 30s.
           </p>
         </div>
 
