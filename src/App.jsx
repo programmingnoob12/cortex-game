@@ -2276,16 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 107;
+const BUILD_VERSION = 108;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:22 PM";
+const BUILD_TIME = "2:31 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial: Back and Next on every step, ends on I get it",
-  "Conclusion block matches the exercise, sits under the grid",
-  "Arrow pointing at the timer checkbox, dismissable",
+  "Tutorial items: a rectangle, a square and a word",
+  "Copy trimmed, question under the conclusion",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4378,14 +4377,18 @@ function rrtHasRealPointer() {
 // with the room the person is actually sitting in before it mentions the
 // app at all. Fixed items and a fixed layout, identical for everyone, so
 // the explanation can be written rather than generated.
+// One wide tile, one square, one three-letter word — the three shapes the
+// exercise itself uses. Seeds chosen so the squares carve into exactly three
+// colours (wide tiles always do), which keeps the tutorial's tiles simpler to
+// hold than a live round's.
 const RRT_TUTORIAL_ITEMS = [
   {
     type: "voronoi",
     hue: 220,
     identityLight: 58,
     colorName: "Blue",
-    patternSeed: "tutorial-blue",
-    wide: false,
+    patternSeed: "tutorial-blue-2",
+    wide: true,
     label: "the Blue tile",
   },
   {
@@ -4393,20 +4396,17 @@ const RRT_TUTORIAL_ITEMS = [
     hue: 28,
     identityLight: 55,
     colorName: "Orange",
-    patternSeed: "tutorial-orange",
+    patternSeed: "tutorial-orange-1",
     wide: false,
     label: "the Orange tile",
   },
   {
-    type: "voronoi",
-    hue: 140,
-    identityLight: 40,
-    colorName: "Green",
-    patternSeed: "tutorial-green",
-    wide: false,
-    label: "the Green tile",
+    type: "letters",
+    letters: "VOK",
+    label: "VOK",
   },
 ];
+
 
 // Blue at the origin, Orange west of it, Green south of Orange. Chosen so
 // the map is an L: two of the three relations are on an axis, and the third
@@ -4475,18 +4475,18 @@ function RrtTutorial({ onDone }) {
 
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
   const nav = (label, onClick) => (
-    <div className="flex gap-3">
+    <div className="flex items-center justify-between gap-3">
       <button
         onClick={() => setStep((v) => Math.max(0, v - 1))}
         disabled={step === 0}
-        className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+        className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
       >
         Back
       </button>
       <button
         onClick={onClick}
         style={{ "--ex": accent }}
-        className="flex-1 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
       >
         {label}
       </button>
@@ -4510,20 +4510,19 @@ function RrtTutorial({ onDone }) {
             Close your eyes and feel where different objects are in your room.
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
-            Don't imagine the object. Feel where it is.
+            Don't imagine the object.
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
-            Feel where the door is. What direction it is.
+            Feel where the door is.
+          </p>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Feel the space. Feel the direction.
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
             Feel where the chair is.
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
             Feel where the roof is.
-          </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            Feel how the objects are in different spaces and directions from
-            each other.
           </p>
         </div>
       ),
@@ -4536,9 +4535,8 @@ function RrtTutorial({ onDone }) {
             That is spatializing.
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
-            In RRT you spatialize the items. You do not imagine them. It has to
-            be a sensory feeling, the same feeling you just felt for each of
-            those objects in your room.
+            In RRT you spatialize the items. You do not imagine them. You feel
+            where each item is in relation to each other.
           </p>
         </div>
       ),
@@ -4582,6 +4580,13 @@ function RrtTutorial({ onDone }) {
                 is South-West of
               </span>
               <RrtItemTile item={blue} size={46} />
+            </div>
+            <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-300 text-lg">
+              <span>Can you feel how</span>
+              <RrtItemTile item={green} size={30} />
+              <span>is south-west of</span>
+              <RrtItemTile item={blue} size={30} />
+              <span>?</span>
             </div>
           </div>
         </div>
