@@ -2276,14 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 103;
+const BUILD_VERSION = 104;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:16 PM";
+const BUILD_TIME = "2:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT tutorial: first draft of the spatializing walkthrough",
+  "RRT tutorial rebuilt on Space 2D with the map explanation",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4370,8 +4370,9 @@ function rrtHasRealPointer() {
 // ---------------------------------------------------------------------
 // A walk-through rather than a wall of text. The point it has to land is
 // that spatializing is a FELT thing, not a picture in the head, so it opens
-// with an exercise on the room the person is actually sitting in before it
-// ever mentions the app. Draft: expected to change.
+// with the room the person is actually sitting in before it mentions the
+// app at all. Fixed items and a fixed layout, identical for everyone, so
+// the explanation can be written rather than generated.
 const RRT_TUTORIAL_ITEMS = [
   {
     type: "voronoi",
@@ -4402,9 +4403,68 @@ const RRT_TUTORIAL_ITEMS = [
   },
 ];
 
+// Blue at the origin, Orange west of it, Green south of Orange. Chosen so
+// the map is an L: two of the three relations are on an axis, and the third
+// (Blue to Green) is a diagonal the person has to feel rather than read.
+const RRT_TUTORIAL_POSITIONS = [
+  { x: 0, y: 0 }, // Blue
+  { x: -1, y: 0 }, // Orange
+  { x: -1, y: -1 }, // Green
+];
+
+// The same grid the Explanation panel draws in a real round, built from the
+// positions above. Kept as its own component so the tutorial and the game
+// stay identical without either importing the other's layout.
+function RrtTutorialMap({ items, positions, size = 46 }) {
+  const xs = positions.map((p) => p.x);
+  const ys = positions.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+  const cells = positions.map((p, i) => ({
+    item: items[i],
+    col: p.x - minX,
+    row: maxY - p.y,
+  }));
+  return (
+    <div
+      className="mx-auto"
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${cols}, 4.25rem)`,
+        gridTemplateRows: `repeat(${rows}, 4.25rem)`,
+        gap: 0,
+        borderTop: "1px solid #3A3D44",
+        borderLeft: "1px solid #3A3D44",
+        width: "fit-content",
+      }}
+    >
+      {Array.from({ length: cols * rows }).map((_, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const here = cells.find((c) => c.col === col && c.row === row);
+        return (
+          <div
+            key={idx}
+            className="flex items-center justify-center"
+            style={{
+              borderRight: "1px solid #3A3D44",
+              borderBottom: "1px solid #3A3D44",
+            }}
+          >
+            {here ? <RrtItemTile item={here.item} size={size} /> : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function RrtTutorial({ onDone }) {
   const [step, setStep] = useState(0);
-  const [answer, setAnswer] = useState(null);
   const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
   const accent = EXERCISE_COLORS.rrt;
 
@@ -4418,25 +4478,30 @@ function RrtTutorial({ onDone }) {
       {label}
     </button>
   );
+  const premise = (a, dir, b) => (
+    <div className={card}>
+      <div className="flex items-center justify-center gap-5 flex-wrap">
+        <RrtItemTile item={a} size={56} />
+        <span className="text-slate-300 text-lg">is {dir} of</span>
+        <RrtItemTile item={b} size={56} />
+      </div>
+    </div>
+  );
 
-  // 0 — the room. 1 — what that was. 2 — spatialize three items.
-  // 3 — the premises. 4 — the conclusion. 5 — done.
   const steps = [
     {
       body: (
         <div className={card}>
           <p className="text-slate-200 text-xl leading-relaxed">
-            Close your eyes.
+            Close your eyes and feel where different objects are in your room.
+          </p>
+          <p className="text-slate-300 text-lg leading-relaxed mt-5">
+            Don't imagine the object. Feel where it is.
           </p>
           <ul className="mt-5 space-y-2 text-slate-300 text-lg leading-relaxed">
-            <li>Feel where your mouse is.</li>
-            <li>Where your door is.</li>
-            <li>Where the roof is.</li>
-            <li>Where your feet are.</li>
+            <li>Feel where the door is. What direction it is.</li>
+            <li>Feel where the chair is.</li>
           </ul>
-          <p className="text-slate-400 text-base mt-6">
-            You did not look. You did not picture them. You knew.
-          </p>
         </div>
       ),
       action: nextButton("I did that", () => setStep(1)),
@@ -4459,104 +4524,49 @@ function RrtTutorial({ onDone }) {
       body: (
         <div className={card}>
           <p className="text-slate-300 text-lg leading-relaxed">
-            Three items. Give each one a place. Not a picture, a position.
+            Three items. Feel where each item is.
           </p>
           <div className="flex items-center justify-center gap-10 my-9">
             {RRT_TUTORIAL_ITEMS.map((it) => (
               <RrtItemTile key={it.patternSeed} item={it} size={72} />
             ))}
           </div>
-          <p className="text-slate-500 text-base">
-            Left, middle, right is fine to start. What matters is that you can
-            feel where each one sits without looking back at it.
-          </p>
         </div>
       ),
-      action: nextButton("They have a place", () => setStep(3)),
+      action: nextButton("Ready", () => setStep(3)),
     },
     {
       body: (
         <div className="space-y-4">
-          <div className={card}>
-            <div className="flex items-center justify-center gap-5">
-              <RrtItemTile item={blue} size={56} />
-              <span className="text-slate-300 text-lg">is the same as</span>
-              <RrtItemTile item={orange} size={56} />
-            </div>
-          </div>
-          <div className={card}>
-            <div className="flex items-center justify-center gap-5">
-              <RrtItemTile item={orange} size={56} />
-              <span className="text-slate-300 text-lg">is the opposite of</span>
-              <RrtItemTile item={green} size={56} />
-            </div>
-          </div>
-          <p className="text-slate-500 text-base pt-1">
-            Hold them where you put them. Do not re-read.
-          </p>
+          {premise(orange, "West", blue)}
+          {premise(green, "South", orange)}
         </div>
       ),
-      action: nextButton("Ready for the question", () => setStep(4)),
+      action: nextButton("Show me the answer", () => setStep(4)),
     },
     {
       body: (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className={card}>
-            <div className="flex items-center justify-center gap-5">
-              <RrtItemTile item={blue} size={56} />
-              <span className="text-slate-300 text-lg">is the opposite of</span>
-              <RrtItemTile item={green} size={56} />
-            </div>
+            <RrtTutorialMap
+              items={RRT_TUTORIAL_ITEMS}
+              positions={RRT_TUTORIAL_POSITIONS}
+            />
           </div>
-          {answer === null ? (
-            <div className="flex gap-4">
-              <button
-                onClick={() => setAnswer(true)}
-                style={{ backgroundColor: RRT_GREEN }}
-                className="flex-1 rounded-lg py-4 text-xl font-medium text-white"
-              >
-                True
-              </button>
-              <button
-                onClick={() => setAnswer(false)}
-                style={{ backgroundColor: RRT_RED }}
-                className="flex-1 rounded-lg py-4 text-xl font-medium text-white"
-              >
-                False
-              </button>
-            </div>
-          ) : (
-            <div
-              className="rounded-xl p-6 border"
-              style={{
-                borderColor: answer === true ? `${RRT_GREEN}80` : `${RRT_RED}80`,
-                background: answer === true ? `${RRT_GREEN}1A` : `${RRT_RED}1A`,
-              }}
-            >
-              <div
-                className="text-xl font-semibold"
-                style={{ color: answer === true ? RRT_GREEN : RRT_RED }}
-              >
-                {answer === true ? "True. That is it." : "Not quite. It is true."}
-              </div>
-              <p className="text-slate-300 text-base leading-relaxed mt-3">
-                Blue is the same as Orange, so Blue sits where Orange sits.
-                Orange is the opposite of Green. So Blue is the opposite of
-                Green.
-              </p>
-              <p className="text-slate-400 text-base leading-relaxed mt-3">
-                If you had to re-read the premises to get there, you pictured
-                them instead of placing them. Placing is faster, and it is the
-                thing that gets trained.
-              </p>
-            </div>
-          )}
+          <div className="space-y-3 text-slate-300 text-lg leading-relaxed">
+            <p>Orange sits west of Blue. Green sits south of Orange.</p>
+            <p>
+              So Green is south-west of Blue. You never had to work that out
+              step by step. Once the three are placed, the answer is just
+              there, the same way the door is.
+            </p>
+            <p className="text-slate-400 text-base">
+              That is the whole skill. Place them, then read the map.
+            </p>
+          </div>
         </div>
       ),
-      action:
-        answer === null
-          ? null
-          : nextButton("Start training", onDone),
+      action: nextButton("Start training", onDone),
     },
   ];
 
@@ -4579,15 +4589,6 @@ function RrtTutorial({ onDone }) {
       </div>
 
       {current.action}
-
-      {step < steps.length - 1 && (
-        <button
-          onClick={onDone}
-          className="w-full text-slate-500 hover:text-slate-300 transition-colors text-base"
-        >
-          Skip
-        </button>
-      )}
     </div>
   );
 }
@@ -10009,7 +10010,7 @@ function NBackSessionApp() {
           <div className="space-y-14">
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
-                {tutorialStepExercise.title}
+                {tutorialStepExercise.title} Tutorial
               </h1>
             </div>
 
