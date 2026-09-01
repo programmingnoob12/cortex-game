@@ -2276,14 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 110;
+const BUILD_VERSION = 111;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:19 PM";
+const BUILD_TIME = "4:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Timer hint shows again, stale dismissal cleared",
+  "Timer hint sits outside the card, pointing back at the box",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13296,55 +13296,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           </button>
         </div>
       </div>
-      {showTimerHint && (
-        <div
-          className="flex justify-end -mt-1"
-          style={{ animation: "switchIn 0.4s ease-out both" }}
-        >
-          <div className="flex flex-col items-end">
-            {/* Points up and to the right, at the box it is talking about. */}
-            <svg
-              width="34"
-              height="24"
-              viewBox="0 0 34 24"
-              fill="none"
-              className="mr-2"
-              aria-hidden="true"
-            >
-              <path
-                d="M3 22C3 22 7 8 21 4"
-                stroke={EXERCISE_COLORS.rrt}
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M14 3.5 22 2.5 20.5 10.5"
-                stroke={EXERCISE_COLORS.rrt}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div
-              className="rounded-lg px-3 py-2 border text-sm text-right"
-              style={{
-                borderColor: `${EXERCISE_COLORS.rrt}66`,
-                background: "#0F1115",
-                color: "#F7F8F8",
-              }}
-            >
-              <div>Tick this to start the round.</div>
-              <button
-                onClick={dismissTimerHint}
-                className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
-              >
-                <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
-                Don't show again
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {historyOpen && (
         <div
@@ -13684,6 +13636,73 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     </>
   );
 
+  // The pointer at the timer checkbox. Deliberately outside the card: the
+  // card clips its own overflow, and a note sitting inside it competed with
+  // the puzzle. On a narrow screen there is no room beside the card, so it
+  // drops underneath instead.
+  const timerHint = showTimerHint ? (
+    <>
+      <div className="hidden lg:flex absolute left-full top-20 ml-5 items-start gap-2 w-64">
+        <svg
+          width="40"
+          height="26"
+          viewBox="0 0 40 26"
+          fill="none"
+          className="shrink-0 mt-1"
+          aria-hidden="true"
+        >
+          <path
+            d="M38 20C38 20 30 6 4 5"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M11 1 3 5 10 10"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div
+          className="rounded-lg px-3 py-2 border text-sm"
+          style={{
+            borderColor: `${EXERCISE_COLORS.rrt}66`,
+            background: "#0F1115",
+            color: "#F7F8F8",
+          }}
+        >
+          <div>Tick this to start the round.</div>
+          <button
+            onClick={dismissTimerHint}
+            className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
+          >
+            <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+            Don't show again
+          </button>
+        </div>
+      </div>
+      <div
+        className="lg:hidden mt-3 rounded-lg px-3 py-2 border text-sm"
+        style={{
+          borderColor: `${EXERCISE_COLORS.rrt}66`,
+          background: "#0F1115",
+          color: "#F7F8F8",
+        }}
+      >
+        <div>Tick the box next to TIMER to start the round.</div>
+        <button
+          onClick={dismissTimerHint}
+          className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
+        >
+          <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+          Don't show again
+        </button>
+      </div>
+    </>
+  ) : null;
+
   // Verdict flash: a tinted wash plus a hard inset ring in the verdict colour,
   // with the label set small and letter-spaced over it. The puzzle stays
   // readable underneath instead of being painted out by a full-bleed block
@@ -13719,6 +13738,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     return (
       <div className="relative max-w-sm mx-auto">
         {flashOverlay}
+        {timerHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
@@ -13822,6 +13842,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   return (
     <div className="relative max-w-sm mx-auto">
       {flashOverlay}
+      {timerHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
