@@ -2225,18 +2225,20 @@ const MOTIVATION_LINES = [
   { id: 26, text: "You're getting stronger with every session." },
   { id: 27, text: "Show up even when you aren't feeling it. That's how winners are made." },
   { id: 28, text: "You're becoming wiser and smarter every session. Keep it up." },
-  { id: 29, text: "New personal record. Nice work.", cond: "pr" },
+  { id: 29, text: "New personal record! Nice work.", cond: "pr" },
   { id: 30, text: "{n} day streak. Keep it going.", cond: "streak" },
   { id: 31, text: "Some days are hard. Just focus on being consistent.", cond: "worse" },
   { id: 32, text: "Others aren't willing to do what you do. That's why you're better than them." },
-  { id: 33, text: "Most people never train this. That's your advantage." },
+  { id: 33, text: "Most people never train this. That's why you have an edge." },
   { id: 34, text: "Your edge is built on days like this." },
   { id: 35, text: "You're building the thing everyone else calls talent." },
-  { id: 36, text: "What used to be impossible for you is now average. That's how far you've come.", cond: "avgPR" },
-  { id: 37, text: "Remember this. Then go higher.", cond: "pr" },
+  { id: 36, text: "What used to be impossible is now your average. That's how far you've come.", cond: "avgPR" },
+  { id: 37, text: "Celebrate this. Then go higher.", cond: "pr" },
   { id: 38, text: "Faster decisions. Better reactions." },
   { id: 39, text: "Become better than your old self." },
   { id: 40, text: "You're on your way to becoming mentally unstoppable." },
+  { id: 41, text: "Your opponents aren't ready." },
+  { id: 42, text: "The closest thing we have to a superpower is intellect." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2273,16 +2275,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 98;
+const BUILD_VERSION = 99;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:53 PM";
+const BUILD_TIME = "12:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Reminder block on the regime page",
-  "Motivation from Home shows Back, not Skip",
-  "Streak +1 test button back",
+  "Line edits, two new lines",
+  "Log out back to a small button",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10274,7 +10275,7 @@ function NBackSessionApp() {
               <div>
                 <div className="text-xl font-medium">Binaural beats</div>
                 <div className="text-slate-500 text-base mt-1">
-                  40Hz Gamma tone, played quietly under the exercises
+                  40Hz Gamma tone, played quietly during exercises
                 </div>
                 {binauralAudioError && (
                   <div className="text-rose-400 text-base mt-1">⚠ {binauralAudioError}</div>
@@ -10309,20 +10310,22 @@ function NBackSessionApp() {
               </span>
             </button>
 
-            <button
-              onClick={() => {
-                try {
-                  localStorage.removeItem("cortex.billingState");
-                  Object.keys(localStorage)
-                    .filter((k) => k.startsWith("cortex.membershipOk."))
-                    .forEach((k) => localStorage.removeItem(k));
-                } catch {}
-                supabase.auth.signOut();
-              }}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 rounded-lg py-5 text-xl font-medium text-left px-7 text-slate-300"
-            >
-              Log out
-            </button>
+            <div>
+              <button
+                onClick={() => {
+                  try {
+                    localStorage.removeItem("cortex.billingState");
+                    Object.keys(localStorage)
+                      .filter((k) => k.startsWith("cortex.membershipOk."))
+                      .forEach((k) => localStorage.removeItem(k));
+                  } catch {}
+                  supabase.auth.signOut();
+                }}
+                className="bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-colors rounded-lg px-4 py-2 text-sm font-medium text-slate-200"
+              >
+                Log out
+              </button>
+            </div>
 
             {/* Diagnostics — surfaces failed storage writes and thrown
                 errors that used to fail completely silently (see
