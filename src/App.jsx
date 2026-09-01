@@ -2276,16 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 101;
+const BUILD_VERSION = 103;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:04 PM";
+const BUILD_TIME = "1:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Wisdom page added under Motivation",
-  "Hand-off screen always centres, whatever came before",
-  "RRT card matches the N-back card exactly",
+  "RRT tutorial: first draft of the spatializing walkthrough",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2755,11 +2753,9 @@ function playSessionDone() {
 // the middle where the energy is, mirrored top and bottom so the screen
 // reads as a band rather than a chart. Pure canvas: 64 bars a frame is
 // nothing, and it costs no DOM.
-// The record screen's backdrop. A gold bloom that breathes on its own,
-// independent of the track: two slow, unequal cycles laid over each other so
-// it never lands in the same place twice and never reads as a loop. It comes
-// up with the reveal and goes out on the song's fade, so the light and the
-// music leave together.
+// The record screen's backdrop. A still gold bloom: it comes up with the
+// reveal, holds, and goes out on the song's fade. Nothing about it moves in
+// between, because anything that did read as drifting rather than as light.
 function PrGoldGlow({ className, style, out }) {
   // Two layers. The outer one owns the reveal fade and the fade-out at the
   // end, both slow transitions on opacity; the inner one carries the breathe.
@@ -2780,8 +2776,7 @@ function PrGoldGlow({ className, style, out }) {
       <div
         className="absolute inset-0"
         style={{
-          willChange: "transform, opacity",
-          animation: "prGlowBreathe 7.5s ease-in-out infinite",
+          willChange: "opacity",
           // Strong enough to actually read on the near-black backdrop.
           background: `radial-gradient(56% 44% at 50% 46%, ${PR_YELLOW}85 0%, ${PR_YELLOW}4D 28%, ${PR_YELLOW}1F 52%, transparent 76%)`,
         }}
@@ -4368,6 +4363,233 @@ function RrtItemTile({ item, size = 40 }) {
 function rrtHasRealPointer() {
   if (typeof window === "undefined" || !window.matchMedia) return false;
   return window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+}
+
+// ---------------------------------------------------------------------
+// RRT TUTORIAL
+// ---------------------------------------------------------------------
+// A walk-through rather than a wall of text. The point it has to land is
+// that spatializing is a FELT thing, not a picture in the head, so it opens
+// with an exercise on the room the person is actually sitting in before it
+// ever mentions the app. Draft: expected to change.
+const RRT_TUTORIAL_ITEMS = [
+  {
+    type: "voronoi",
+    hue: 220,
+    identityLight: 58,
+    colorName: "Blue",
+    patternSeed: "tutorial-blue",
+    wide: false,
+    label: "the Blue tile",
+  },
+  {
+    type: "voronoi",
+    hue: 28,
+    identityLight: 55,
+    colorName: "Orange",
+    patternSeed: "tutorial-orange",
+    wide: false,
+    label: "the Orange tile",
+  },
+  {
+    type: "voronoi",
+    hue: 140,
+    identityLight: 40,
+    colorName: "Green",
+    patternSeed: "tutorial-green",
+    wide: false,
+    label: "the Green tile",
+  },
+];
+
+function RrtTutorial({ onDone }) {
+  const [step, setStep] = useState(0);
+  const [answer, setAnswer] = useState(null);
+  const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
+  const accent = EXERCISE_COLORS.rrt;
+
+  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const nextButton = (label, onClick) => (
+    <button
+      onClick={onClick}
+      style={{ "--ex": accent }}
+      className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+    >
+      {label}
+    </button>
+  );
+
+  // 0 — the room. 1 — what that was. 2 — spatialize three items.
+  // 3 — the premises. 4 — the conclusion. 5 — done.
+  const steps = [
+    {
+      body: (
+        <div className={card}>
+          <p className="text-slate-200 text-xl leading-relaxed">
+            Close your eyes.
+          </p>
+          <ul className="mt-5 space-y-2 text-slate-300 text-lg leading-relaxed">
+            <li>Feel where your mouse is.</li>
+            <li>Where your door is.</li>
+            <li>Where the roof is.</li>
+            <li>Where your feet are.</li>
+          </ul>
+          <p className="text-slate-400 text-base mt-6">
+            You did not look. You did not picture them. You knew.
+          </p>
+        </div>
+      ),
+      action: nextButton("I did that", () => setStep(1)),
+    },
+    {
+      body: (
+        <div className={card}>
+          <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
+            That is spatializing.
+          </p>
+          <p className="text-slate-300 text-lg leading-relaxed mt-4">
+            In RRT you spatialize the items. You do not imagine them. It has to
+            be a sensory feeling, the same one you just had about the door.
+          </p>
+        </div>
+      ),
+      action: nextButton("Got it", () => setStep(2)),
+    },
+    {
+      body: (
+        <div className={card}>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Three items. Give each one a place. Not a picture, a position.
+          </p>
+          <div className="flex items-center justify-center gap-10 my-9">
+            {RRT_TUTORIAL_ITEMS.map((it) => (
+              <RrtItemTile key={it.patternSeed} item={it} size={72} />
+            ))}
+          </div>
+          <p className="text-slate-500 text-base">
+            Left, middle, right is fine to start. What matters is that you can
+            feel where each one sits without looking back at it.
+          </p>
+        </div>
+      ),
+      action: nextButton("They have a place", () => setStep(3)),
+    },
+    {
+      body: (
+        <div className="space-y-4">
+          <div className={card}>
+            <div className="flex items-center justify-center gap-5">
+              <RrtItemTile item={blue} size={56} />
+              <span className="text-slate-300 text-lg">is the same as</span>
+              <RrtItemTile item={orange} size={56} />
+            </div>
+          </div>
+          <div className={card}>
+            <div className="flex items-center justify-center gap-5">
+              <RrtItemTile item={orange} size={56} />
+              <span className="text-slate-300 text-lg">is the opposite of</span>
+              <RrtItemTile item={green} size={56} />
+            </div>
+          </div>
+          <p className="text-slate-500 text-base pt-1">
+            Hold them where you put them. Do not re-read.
+          </p>
+        </div>
+      ),
+      action: nextButton("Ready for the question", () => setStep(4)),
+    },
+    {
+      body: (
+        <div className="space-y-5">
+          <div className={card}>
+            <div className="flex items-center justify-center gap-5">
+              <RrtItemTile item={blue} size={56} />
+              <span className="text-slate-300 text-lg">is the opposite of</span>
+              <RrtItemTile item={green} size={56} />
+            </div>
+          </div>
+          {answer === null ? (
+            <div className="flex gap-4">
+              <button
+                onClick={() => setAnswer(true)}
+                style={{ backgroundColor: RRT_GREEN }}
+                className="flex-1 rounded-lg py-4 text-xl font-medium text-white"
+              >
+                True
+              </button>
+              <button
+                onClick={() => setAnswer(false)}
+                style={{ backgroundColor: RRT_RED }}
+                className="flex-1 rounded-lg py-4 text-xl font-medium text-white"
+              >
+                False
+              </button>
+            </div>
+          ) : (
+            <div
+              className="rounded-xl p-6 border"
+              style={{
+                borderColor: answer === true ? `${RRT_GREEN}80` : `${RRT_RED}80`,
+                background: answer === true ? `${RRT_GREEN}1A` : `${RRT_RED}1A`,
+              }}
+            >
+              <div
+                className="text-xl font-semibold"
+                style={{ color: answer === true ? RRT_GREEN : RRT_RED }}
+              >
+                {answer === true ? "True. That is it." : "Not quite. It is true."}
+              </div>
+              <p className="text-slate-300 text-base leading-relaxed mt-3">
+                Blue is the same as Orange, so Blue sits where Orange sits.
+                Orange is the opposite of Green. So Blue is the opposite of
+                Green.
+              </p>
+              <p className="text-slate-400 text-base leading-relaxed mt-3">
+                If you had to re-read the premises to get there, you pictured
+                them instead of placing them. Placing is faster, and it is the
+                thing that gets trained.
+              </p>
+            </div>
+          )}
+        </div>
+      ),
+      action:
+        answer === null
+          ? null
+          : nextButton("Start training", onDone),
+    },
+  ];
+
+  const current = steps[Math.min(step, steps.length - 1)];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center gap-2">
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
+      </div>
+
+      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
+        {current.body}
+      </div>
+
+      {current.action}
+
+      {step < steps.length - 1 && (
+        <button
+          onClick={onDone}
+          className="w-full text-slate-500 hover:text-slate-300 transition-colors text-base"
+        >
+          Skip
+        </button>
+      )}
+    </div>
+  );
 }
 
 function RrtHistoryItemChip({ item, onClick }) {
@@ -6334,6 +6556,21 @@ function NBackSessionApp() {
   const rrtScrambleFactor = RRT_SCRAMBLE_FACTOR;
   const [switchNotice, setSwitchNotice] = useState(false);
   const [switchQuote, setSwitchQuote] = useState("");
+  // Lines already shown this session. A plain random pick repeated itself
+  // inside a single four-exercise regime often enough to be noticed, which
+  // makes the whole thing read as canned. Draws only from what is left, and
+  // starts over once the pool is exhausted.
+  const usedQuotesRef = useRef(new Set());
+  const nextTransitionQuote = () => {
+    let pool = TRANSITION_QUOTES.filter((q) => !usedQuotesRef.current.has(q));
+    if (pool.length === 0) {
+      usedQuotesRef.current.clear();
+      pool = TRANSITION_QUOTES;
+    }
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    usedQuotesRef.current.add(pick);
+    return pick;
+  };
   // Chance (0-32%) that a non-match trial is a "lure" reusing the item from
   // n-1 or n+1 trials back instead of a fresh one, so it superficially
   // resembles a recent repeat without actually being the n-back match.
@@ -7890,9 +8127,7 @@ function NBackSessionApp() {
 
     if (!goingToOverview) {
       setSwitchNotice(true);
-      setSwitchQuote(
-        TRANSITION_QUOTES[Math.floor(Math.random() * TRANSITION_QUOTES.length)]
-      );
+      setSwitchQuote(nextTransitionQuote());
     }
     setExerciseIndex(nextIndex);
     setScreen("setup");
@@ -8876,16 +9111,6 @@ function NBackSessionApp() {
           0%, 100% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 8px var(--glow-color)); }
           50% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 22px var(--glow-color)); }
         }
-        /* Two cycles at different lengths, so scale and brightness drift
-           in and out of step and the bloom never repeats exactly. */
-        @keyframes prGlowBreathe {
-          0%   { transform: scale(0.94); opacity: 0.72; }
-          23%  { transform: scale(1.06); opacity: 0.95; }
-          46%  { transform: scale(0.99); opacity: 0.8; }
-          64%  { transform: scale(1.12); opacity: 1; }
-          82%  { transform: scale(1.0);  opacity: 0.84; }
-          100% { transform: scale(0.94); opacity: 0.72; }
-        }
         @keyframes switchIn {
           0% { opacity: 0; transform: translateY(14px); filter: blur(6px); }
           100% { opacity: 1; transform: translateY(0); filter: blur(0); }
@@ -9525,11 +9750,7 @@ function NBackSessionApp() {
                   </button>
                   <button
                     onClick={() => {
-                      setSwitchQuote(
-                        TRANSITION_QUOTES[
-                          Math.floor(Math.random() * TRANSITION_QUOTES.length)
-                        ]
-                      );
+                      setSwitchQuote(nextTransitionQuote());
                       setSwitchNotice(true);
                       setMainView("app");
                       setTimeout(() => {
@@ -9792,14 +10013,24 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            {/* Placeholder — real per-exercise tutorial walkthrough content
-                (images/animations/steps) goes here later. TUTORIAL_CONTENT
-                just holds a placeholder string per exercise for now. */}
-            <div className="bg-slate-900 border border-dashed border-slate-700/70 rounded-lg p-8">
-              <p className="text-slate-400 text-lg">
-                {TUTORIAL_CONTENT[tutorialStepExercise.key]}
-              </p>
-            </div>
+            {tutorialStepExercise.key === "rrt" ? (
+              <RrtTutorial
+                onDone={() => {
+                  if (tutorialDontShowAgain) {
+                    setTutorialDismissed(tutorialStepExercise.key, true);
+                  }
+                  setMainView("app");
+                }}
+              />
+            ) : (
+              /* Placeholder — real per-exercise walkthroughs go here as they
+                 get built, the way RRT's has. */
+              <div className="bg-slate-900 border border-dashed border-slate-700/70 rounded-lg p-8">
+                <p className="text-slate-400 text-lg">
+                  {TUTORIAL_CONTENT[tutorialStepExercise.key]}
+                </p>
+              </div>
+            )}
 
             {/* Said once, here, rather than as a control on every screen. */}
             <p className="text-slate-500 text-base">
@@ -9817,17 +10048,21 @@ function NBackSessionApp() {
               Don't show this tutorial again
             </label>
 
-            <button
-              onClick={() => {
-                if (tutorialDontShowAgain) {
-                  setTutorialDismissed(tutorialStepExercise.key, true);
-                }
-                setMainView("app");
-              }}
-              className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
-            >
-              Next
-            </button>
+            {/* RRT's walkthrough carries its own step buttons; the generic
+                Next would be a second way out of the same screen. */}
+            {tutorialStepExercise.key !== "rrt" && (
+              <button
+                onClick={() => {
+                  if (tutorialDontShowAgain) {
+                    setTutorialDismissed(tutorialStepExercise.key, true);
+                  }
+                  setMainView("app");
+                }}
+                className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
+              >
+                Next
+              </button>
+            )}
           </div>
         )}
 
