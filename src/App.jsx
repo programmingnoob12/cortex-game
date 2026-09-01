@@ -2276,14 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 111;
+const BUILD_VERSION = 112;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:41 PM";
+const BUILD_TIME = "4:48 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Timer hint sits outside the card, pointing back at the box",
+  "N-back tutorials drafted for Dual, Quad and QNB'",
+  "Real checkbox on the timer hint",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4616,6 +4617,224 @@ function RrtTutorial({ onDone }) {
       </div>
 
       {current.action}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// N-BACK TUTORIALS
+// ---------------------------------------------------------------------
+// One walkthrough serving Dual, Quad and QNB', built from the exercise's own
+// modality list so each version only teaches the streams it actually runs.
+// The point it has to land is that you are never remembering the sequence,
+// only ever holding the last N of it.
+
+// A row of small 3x3 grids showing one stream over consecutive trials. The
+// trials that make the point are highlighted; everything else stays quiet.
+function NBackTutorialStrip({ trials, highlight = [], n }) {
+  return (
+    <div className="flex items-end justify-center gap-3 flex-wrap">
+      {trials.map((t, i) => {
+        const marked = highlight.includes(i);
+        return (
+          <div key={i} className="flex flex-col items-center gap-2">
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1.35rem)",
+                gridTemplateRows: "repeat(3, 1.35rem)",
+                borderTop: `1px solid ${NBACK_GRID_LINE}`,
+                borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+                outline: marked ? `2px solid ${PR_YELLOW}` : "none",
+                outlineOffset: "3px",
+                borderRadius: 2,
+              }}
+            >
+              {POSITIONS.map((cell) => (
+                <div
+                  key={cell}
+                  style={{
+                    borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                    borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                    background: cell === t.pos ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                  }}
+                />
+              ))}
+            </div>
+            <div
+              className="text-xs tabular-nums"
+              style={{ color: marked ? PR_YELLOW : "#6E717A" }}
+            >
+              {i + 1}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function NBackTutorial({ exercise, onDone, level }) {
+  const [step, setStep] = useState(0);
+  const accent = EXERCISE_COLORS[exercise.key] || "#4CB9D8";
+  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const modalities = exercise.modalities || [];
+  const isQnbPrime = exercise.key === "iqnb";
+
+  // A fixed six-trial run where trial 4 repeats trial 2 — a 2-back match.
+  const demoTrials = [
+    { pos: 0 },
+    { pos: 4 },
+    { pos: 8 },
+    { pos: 4 },
+    { pos: 2 },
+    { pos: 6 },
+  ];
+
+  const nav = (label, onClick) => (
+    <div className="flex items-center justify-between gap-3">
+      <button
+        onClick={() => setStep((v) => Math.max(0, v - 1))}
+        disabled={step === 0}
+        className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+      >
+        Back
+      </button>
+      <button
+        onClick={onClick}
+        style={{ "--ex": accent }}
+        className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+      >
+        {label}
+      </button>
+    </div>
+  );
+
+  const steps = [];
+
+  steps.push({
+    body: (
+      <div className={`${card} space-y-4`}>
+        <p className="text-slate-100 text-xl leading-relaxed">
+          A square lights up. Then another. Then another.
+        </p>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          You are not remembering the whole sequence.
+        </p>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          You only ever hold the last two. Everything older than that, let go
+          of.
+        </p>
+      </div>
+    ),
+  });
+
+  steps.push({
+    body: (
+      <div className={`${card} space-y-6`}>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          Trial 4 is in the same square as trial 2. Two back. That is a match.
+        </p>
+        <NBackTutorialStrip trials={demoTrials} highlight={[1, 3]} />
+        <p className="text-slate-100 text-lg leading-relaxed">
+          When that happens, press the button for that stream. When it does
+          not, press nothing.
+        </p>
+      </div>
+    ),
+  });
+
+  steps.push({
+    body: (
+      <div className={`${card} space-y-5`}>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          {modalities.length === 1
+            ? "One stream to watch."
+            : `${modalities.length} streams, running at the same time.`}
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          {modalities.map((m) => (
+            <div
+              key={m}
+              className="rounded-lg border border-slate-700/70 bg-slate-950/40 px-4 py-3 flex items-center justify-between"
+            >
+              <span className="text-slate-100 text-base">
+                {MODALITY_META[m].label}
+              </span>
+              <span
+                className="text-2xl font-semibold leading-none"
+                style={{ color: accent }}
+              >
+                {MODALITY_KEY_LABEL[m]}
+              </span>
+            </div>
+          ))}
+        </div>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          Each one is judged on its own. A match in one says nothing about the
+          others.
+        </p>
+      </div>
+    ),
+  });
+
+  steps.push({
+    body: (
+      <div className={`${card} space-y-4`}>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          The first {level} trials cannot be a match, so the buttons stay
+          inactive until there is something to compare against.
+        </p>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          Miss one and keep going. Stopping to work out what you missed costs
+          you the next two.
+        </p>
+      </div>
+    ),
+  });
+
+  if (isQnbPrime) {
+    steps.push({
+      body: (
+        <div className={`${card} space-y-4`}>
+          <p className="text-slate-100 text-lg leading-relaxed">
+            QNB' moves in hundredths. 4.00 up to 4.99, then 5.00.
+          </p>
+          <p className="text-slate-100 text-lg leading-relaxed">
+            Every step up makes matches rarer and adds more near-misses:
+            something that looks like a match but sits one trial off.
+          </p>
+          <p className="text-slate-100 text-lg leading-relaxed">
+            Those are the point. Getting them wrong is how you learn to feel
+            the difference.
+          </p>
+        </div>
+      ),
+    });
+  }
+
+  const isLast = step >= steps.length - 1;
+  const current = steps[Math.min(step, steps.length - 1)];
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center gap-2">
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
+      </div>
+
+      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
+        {current.body}
+      </div>
+
+      {nav(isLast ? "I get it" : "Next", () =>
+        isLast ? onDone() : setStep((v) => v + 1)
+      )}
     </div>
   );
 }
@@ -10041,7 +10260,22 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            {tutorialStepExercise.key === "rrt" ? (
+            {["dual", "quad", "iqnb"].includes(tutorialStepExercise.key) ? (
+              <NBackTutorial
+                exercise={tutorialStepExercise}
+                level={
+                  tutorialStepExercise.key === "iqnb"
+                    ? Math.floor(qnbPrimeLevel)
+                    : n
+                }
+                onDone={() => {
+                  if (tutorialDontShowAgain) {
+                    setTutorialDismissed(tutorialStepExercise.key, true);
+                  }
+                  setMainView("app");
+                }}
+              />
+            ) : tutorialStepExercise.key === "rrt" ? (
               <RrtTutorial
                 onDone={() => {
                   if (tutorialDontShowAgain) {
@@ -10072,7 +10306,7 @@ function NBackSessionApp() {
 
             {/* RRT's walkthrough carries its own step buttons; the generic
                 Next would be a second way out of the same screen. */}
-            {tutorialStepExercise.key !== "rrt" && (
+            {!["rrt", "dual", "quad", "iqnb"].includes(tutorialStepExercise.key) && (
               <button
                 onClick={() => {
                   if (tutorialDontShowAgain) {
@@ -13674,13 +13908,15 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           }}
         >
           <div>Tick this to start the round.</div>
-          <button
-            onClick={dismissTimerHint}
-            className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
-          >
-            <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+          <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={dismissTimerHint}
+              className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+            />
             Don't show again
-          </button>
+          </label>
         </div>
       </div>
       <div
@@ -13692,13 +13928,15 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         }}
       >
         <div>Tick the box next to TIMER to start the round.</div>
-        <button
-          onClick={dismissTimerHint}
-          className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
-        >
-          <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+        <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={dismissTimerHint}
+            className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+          />
           Don't show again
-        </button>
+        </label>
       </div>
     </>
   ) : null;
