@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 114;
+const BUILD_VERSION = 115;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:05 PM";
+const BUILD_TIME = "5:11 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Timer hint moved inside the card",
-  "N-back demo fixed at 2 back and slowed down",
+  "Timer hint back outside with the arrow",
+  "N-back demo uses each exercise's own stimuli",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4631,19 +4631,27 @@ function RrtTutorial({ onDone }) {
 
 // A row of small 3x3 grids showing one stream over consecutive trials. The
 // trials that make the point are highlighted; everything else stays quiet.
-function NBackTutorialDemo({ accent }) {
-  // The demo is always 2-back regardless of the player's real level: the
-  // point is to see the rule, and 2 is the shortest gap that shows it.
+function NBackTutorialDemo({ exercise, accent }) {
+  // Always 2 back, whatever level the player is actually on: the point is to
+  // see the rule, and 2 is the shortest gap that shows it.
   const n = 2;
-  // A short scripted run. Two of the trials repeat the square from n back,
-  // so the demo always shows at least one match no matter the level.
-  const seq = (() => {
-    const base = [0, 4, 8, 2, 6, 1, 7, 3, 5, 0];
-    const out = base.slice(0, Math.max(6, n + 4));
-    if (out[1 + n] !== undefined) out[1 + n] = out[1];
-    if (out[3 + n] !== undefined) out[3 + n] = out[3];
-    return out;
-  })();
+  const mods = exercise.modalities || [];
+  const hasShape = mods.includes("shape");
+  const hasColor = mods.includes("color");
+  const hasAudio = mods.includes("audio");
+  const isPrime = exercise.key === "iqnb";
+  const shapeSet = isPrime ? QNB_PRIME_SHAPES : SHAPE_TYPES;
+  const label = isPrime ? "Q2B'" : `${exercise.abbrev}2B`;
+
+  // Four distinct items, then a run where item B repeats exactly two places
+  // later, twice.
+  const defs = [
+    { pos: 0, color: COLORS[0], shape: shapeSet[0], letter: "K" },
+    { pos: 4, color: COLORS[3], shape: shapeSet[1], letter: "T" },
+    { pos: 8, color: COLORS[2], shape: shapeSet[2], letter: "L" },
+    { pos: 6, color: COLORS[4], shape: shapeSet[3], letter: "R" },
+  ];
+  const seq = [defs[0], defs[1], defs[2], defs[1], defs[3], defs[1]];
 
   const [i, setI] = useState(-1);
 
@@ -4658,60 +4666,97 @@ function NBackTutorialDemo({ accent }) {
   const cur = i >= 0 ? seq[i] : null;
   const isMatch = i >= n && seq[i] === seq[i - n];
 
+  const stimulus = (item, size) =>
+    hasShape || hasColor ? (
+      isPrime ? (
+        <VoronoiShapeIcon
+          shape={hasShape ? item.shape : shapeSet[0]}
+          color={hasColor ? item.color : accent}
+          seed={`tut-${item.shape}-${item.color}`}
+          size={size}
+        />
+      ) : (
+        <ShapeIcon
+          shape={hasShape ? item.shape : "square"}
+          color={hasColor ? item.color : accent}
+          size={size}
+        />
+      )
+    ) : null;
+
   return (
     <div className="flex flex-col items-center gap-5">
+      <div className="text-sm tracking-[0.2em] uppercase" style={{ color: accent }}>
+        {label}
+      </div>
+
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 3.6rem)",
-          gridTemplateRows: "repeat(3, 3.6rem)",
+          gridTemplateColumns: "repeat(3, 4rem)",
+          gridTemplateRows: "repeat(3, 4rem)",
           borderTop: `1px solid ${NBACK_GRID_LINE}`,
           borderLeft: `1px solid ${NBACK_GRID_LINE}`,
           borderRadius: 4,
         }}
       >
-        {POSITIONS.map((cell) => (
-          <div
-            key={cell}
-            style={{
-              borderRight: `1px solid ${NBACK_GRID_LINE}`,
-              borderBottom: `1px solid ${NBACK_GRID_LINE}`,
-              background: cell === cur ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
-              transition: "background 0.12s linear",
-            }}
-          />
-        ))}
+        {POSITIONS.map((cell) => {
+          const active = cur && cell === cur.pos;
+          return (
+            <div
+              key={cell}
+              className="flex items-center justify-center overflow-hidden"
+              style={{
+                borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                background: active ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                transition: "background 0.12s linear",
+              }}
+            >
+              {active && (
+                <div style={{ width: "78%", height: "78%" }}>
+                  {stimulus(cur, 64)}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
+      {hasAudio && (
+        <div className="text-base text-slate-300 min-h-[1.5rem]">
+          {cur ? `Sound: "${cur.letter}"` : "\u00A0"}
+        </div>
+      )}
+
       <div className="flex items-end justify-center gap-2 flex-wrap min-h-[3.4rem]">
-        {seq.map((p, idx) => {
+        {seq.map((item, idx) => {
           if (idx > i) return null;
           const marked = isMatch && (idx === i || idx === i - n);
           return (
             <div key={idx} className="flex flex-col items-center gap-1.5">
               <div
+                className="flex items-center justify-center"
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 0.6rem)",
-                  gridTemplateRows: "repeat(3, 0.6rem)",
-                  borderTop: `1px solid ${NBACK_GRID_LINE}`,
-                  borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+                  width: "1.7rem",
+                  height: "1.7rem",
+                  border: `1px solid ${NBACK_GRID_LINE}`,
                   outline: marked ? `2px solid ${PR_YELLOW}` : "none",
                   outlineOffset: "2px",
                   borderRadius: 2,
+                  background: NBACK_CELL_ACTIVE,
                   opacity: idx === i ? 1 : 0.55,
                 }}
               >
-                {POSITIONS.map((cell) => (
-                  <div
-                    key={cell}
-                    style={{
-                      borderRight: `1px solid ${NBACK_GRID_LINE}`,
-                      borderBottom: `1px solid ${NBACK_GRID_LINE}`,
-                      background: cell === p ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
-                    }}
-                  />
-                ))}
+                {hasShape || hasColor ? (
+                  <div style={{ width: "80%", height: "80%" }}>
+                    {stimulus(item, 22)}
+                  </div>
+                ) : (
+                  <span className="text-[0.7rem] font-semibold text-slate-900">
+                    {item.letter}
+                  </span>
+                )}
               </div>
               <div
                 className="text-[0.65rem] tabular-nums"
@@ -4742,10 +4787,10 @@ function NBackTutorialDemo({ accent }) {
         {i < 0
           ? "\u00A0"
           : isMatch
-          ? "Same square as 2 ago."
+          ? "Same item as 2 places ago."
           : i < n
           ? "Nothing to compare it to yet."
-          : "Not the same as 2 ago."}
+          : "Not the same as 2 places ago."}
       </div>
     </div>
   );
@@ -4755,7 +4800,6 @@ function NBackTutorial({ exercise, onDone, level }) {
   const [step, setStep] = useState(0);
   const accent = EXERCISE_COLORS[exercise.key] || "#4CB9D8";
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
-  const modalities = exercise.modalities || [];
   // Every n-back tutorial demonstrates at 2 back, whatever level the player
   // is actually on.
   const n = 2;
@@ -4800,33 +4844,8 @@ function NBackTutorial({ exercise, onDone, level }) {
 
   steps.push({
     body: (
-      <div className={`${card} space-y-6`}>
-        <NBackTutorialDemo accent={accent} />
-        {modalities.length > 1 && (
-          <div className="space-y-3">
-            <p className="text-slate-100 text-lg leading-relaxed text-center">
-              {modalities.length} streams run at once. Each has its own button.
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              {modalities.map((m) => (
-                <div
-                  key={m}
-                  className="rounded-lg border border-slate-700/70 bg-slate-950/40 px-4 py-3 flex items-center justify-between"
-                >
-                  <span className="text-slate-100 text-base">
-                    {MODALITY_META[m].label}
-                  </span>
-                  <span
-                    className="text-2xl font-semibold leading-none"
-                    style={{ color: accent }}
-                  >
-                    {MODALITY_KEY_LABEL[m]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+      <div className={`${card}`}>
+        <NBackTutorialDemo exercise={exercise} accent={accent} />
       </div>
     ),
   });
@@ -13468,31 +13487,6 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   // Shared header for both "premises" and "question" — one continuous clock,
   // armed by the checkbox, plus the running duration readout.
-  // Lives inside the card, right under the timer row. An arrow from outside
-  // never lined up with the checkbox at every width, so the note sits where
-  // the thing it describes is.
-  const timerHintInline = showTimerHint ? (
-    <div
-      className="rounded-lg px-3 py-2 border text-sm"
-      style={{
-        borderColor: `${EXERCISE_COLORS.rrt}66`,
-        background: "#0F1115",
-        color: "#F7F8F8",
-      }}
-    >
-      <div>Tick the box next to TIMER to start the round.</div>
-      <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
-        <input
-          type="checkbox"
-          checked={false}
-          onChange={dismissTimerHint}
-          className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
-        />
-        Don't show again
-      </label>
-    </div>
-  ) : null;
-
   const timerHeader = (
     <>
       {downNotice && (
@@ -13573,8 +13567,6 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           </button>
         </div>
       </div>
-
-      {timerHintInline}
 
       {historyOpen && (
         <div
@@ -13915,6 +13907,76 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   );
 
 
+  // The pointer at the timer checkbox. Outside the card because the card
+  // clips its own overflow. On a narrow screen there is no room beside it,
+  // so it drops underneath instead.
+  const timerHint = showTimerHint ? (
+    <>
+      <div className="hidden lg:flex absolute left-full top-[4.6rem] ml-4 items-start gap-2 w-60">
+        <svg
+          width="38"
+          height="22"
+          viewBox="0 0 38 22"
+          fill="none"
+          className="shrink-0 mt-2"
+          aria-hidden="true"
+        >
+          <path
+            d="M36 16C36 16 28 4 4 4"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M11 1 3 4 10 9"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div
+          className="rounded-lg px-3 py-2 border text-sm"
+          style={{
+            borderColor: `${EXERCISE_COLORS.rrt}66`,
+            background: "#0F1115",
+            color: "#F7F8F8",
+          }}
+        >
+          <div>Tick this to start the round.</div>
+          <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={dismissTimerHint}
+              className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+            />
+            Don't show again
+          </label>
+        </div>
+      </div>
+      <div
+        className="lg:hidden absolute top-full left-0 right-0 mt-3 rounded-lg px-3 py-2 border text-sm"
+        style={{
+          borderColor: `${EXERCISE_COLORS.rrt}66`,
+          background: "#0F1115",
+          color: "#F7F8F8",
+        }}
+      >
+        <div>Tick the box next to TIMER to start the round.</div>
+        <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={dismissTimerHint}
+            className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+          />
+          Don't show again
+        </label>
+      </div>
+    </>
+  ) : null;
+
   // Verdict flash: a tinted wash plus a hard inset ring in the verdict colour,
   // with the label set small and letter-spaced over it. The puzzle stays
   // readable underneath instead of being painted out by a full-bleed block
@@ -13950,6 +14012,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     return (
       <div className="relative max-w-sm mx-auto">
         {flashOverlay}
+        {timerHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
@@ -14053,6 +14116,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   return (
     <div className="relative max-w-sm mx-auto">
       {flashOverlay}
+      {timerHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
