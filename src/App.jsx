@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 108;
+const BUILD_VERSION = 109;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:31 PM";
+const BUILD_TIME = "3:13 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial items: a rectangle, a square and a word",
-  "Copy trimmed, question under the conclusion",
+  "Timer hint no longer covers the checkbox",
+  "Tutorial text white",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4496,7 +4496,7 @@ function RrtTutorial({ onDone }) {
     <div className={card}>
       <div className="flex items-center justify-center gap-5 flex-wrap">
         <RrtItemTile item={a} size={56} />
-        <span className="text-slate-300 text-lg">is {dir} of</span>
+        <span className="text-slate-100 text-lg">is {dir} of</span>
         <RrtItemTile item={b} size={56} />
       </div>
     </div>
@@ -4509,19 +4509,19 @@ function RrtTutorial({ onDone }) {
           <p className="text-slate-200 text-xl leading-relaxed">
             Close your eyes and feel where different objects are in your room.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             Don't imagine the object.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             Feel where the door is.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             Feel the space. Feel the direction.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             Feel where the chair is.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             Feel where the roof is.
           </p>
         </div>
@@ -4534,7 +4534,7 @@ function RrtTutorial({ onDone }) {
           <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
             That is spatializing.
           </p>
-          <p className="text-slate-300 text-lg leading-relaxed">
+          <p className="text-slate-100 text-lg leading-relaxed">
             In RRT you spatialize the items. You do not imagine them. You feel
             where each item is in relation to each other.
           </p>
@@ -4547,7 +4547,7 @@ function RrtTutorial({ onDone }) {
         <div className="space-y-4">
           {premise(orange, "West", blue)}
           {premise(green, "South", orange)}
-          <p className="text-slate-300 text-lg leading-relaxed pt-2">
+          <p className="text-slate-100 text-lg leading-relaxed pt-2">
             Feel where each item is.
           </p>
         </div>
@@ -4581,7 +4581,7 @@ function RrtTutorial({ onDone }) {
               </span>
               <RrtItemTile item={blue} size={46} />
             </div>
-            <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-300 text-lg">
+            <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-100 text-lg">
               <span>Can you feel how</span>
               <RrtItemTile item={green} size={30} />
               <span>is south-west of</span>
@@ -9498,7 +9498,7 @@ function NBackSessionApp() {
               <div className="text-slate-500 text-base mt-2">Book of Proverbs</div>
             </div>
 
-            <p className="text-slate-300 text-lg leading-relaxed">
+            <p className="text-slate-100 text-lg leading-relaxed">
               A short quiz on the Book of Proverbs.
             </p>
 
@@ -13246,55 +13246,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           style={{ width: `${(msLeft / ROUND_MS) * 100}%` }}
         />
       </div>
-      <div className="relative flex items-center justify-between">
+      <div className="flex items-center justify-between">
         <div className="italic font-bold tracking-wide text-slate-300 text-lg">TIMER</div>
-        {showTimerHint && (
-          <div
-            className="absolute right-0 top-full mt-2 z-20 flex flex-col items-end"
-            style={{ animation: "switchIn 0.4s ease-out both" }}
-          >
-            {/* Points up and right at the box it is talking about. */}
-            <svg
-              width="34"
-              height="26"
-              viewBox="0 0 34 26"
-              fill="none"
-              className="mr-1"
-              aria-hidden="true"
-            >
-              <path
-                d="M2 24C2 24 6 9 20 5"
-                stroke={EXERCISE_COLORS.rrt}
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <path
-                d="M13 4.5 21 3.5 19.5 11.5"
-                stroke={EXERCISE_COLORS.rrt}
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div
-              className="rounded-lg px-3 py-2 border text-sm text-right whitespace-nowrap"
-              style={{
-                borderColor: `${EXERCISE_COLORS.rrt}66`,
-                background: "#0F1115",
-                color: "#E2E4E9",
-              }}
-            >
-              <div>Tick this to start the round.</div>
-              <button
-                onClick={dismissTimerHint}
-                className="mt-1.5 inline-flex items-center gap-2 text-slate-500 hover:text-slate-300 transition-colors text-xs"
-              >
-                <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
-                Don't show again
-              </button>
-            </div>
-          </div>
-        )}
         <div className="flex items-center gap-2">
           <div className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 text-base font-medium">
             {secondsLeft} sec
@@ -13341,6 +13294,55 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           </button>
         </div>
       </div>
+      {showTimerHint && (
+        <div
+          className="flex justify-end -mt-1"
+          style={{ animation: "switchIn 0.4s ease-out both" }}
+        >
+          <div className="flex flex-col items-end">
+            {/* Points up and to the right, at the box it is talking about. */}
+            <svg
+              width="34"
+              height="24"
+              viewBox="0 0 34 24"
+              fill="none"
+              className="mr-2"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 22C3 22 7 8 21 4"
+                stroke={EXERCISE_COLORS.rrt}
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M14 3.5 22 2.5 20.5 10.5"
+                stroke={EXERCISE_COLORS.rrt}
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <div
+              className="rounded-lg px-3 py-2 border text-sm text-right"
+              style={{
+                borderColor: `${EXERCISE_COLORS.rrt}66`,
+                background: "#0F1115",
+                color: "#F7F8F8",
+              }}
+            >
+              <div>Tick this to start the round.</div>
+              <button
+                onClick={dismissTimerHint}
+                className="mt-1.5 inline-flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs"
+              >
+                <span className="w-3.5 h-3.5 rounded-sm border border-slate-500 inline-block" />
+                Don't show again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {historyOpen && (
         <div
@@ -14230,7 +14232,7 @@ function HypnosisScreen({ onDone, afterSession }) {
         <div className="text-slate-500 text-base mt-2">{HYPNOSIS_TRACK.length}</div>
       </div>
 
-      <p className="text-slate-300 text-lg leading-relaxed">
+      <p className="text-slate-100 text-lg leading-relaxed">
         {HYPNOSIS_TRACK.blurb}
       </p>
 
