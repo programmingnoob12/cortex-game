@@ -2276,14 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 105;
+const BUILD_VERSION = 106;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:12 PM";
+const BUILD_TIME = "2:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT tutorial: four steps, even spacing, answer as a conclusion row",
+  "RRT tutorial copy, conclusion above the map",
+  "Shorter RRT setup line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4504,6 +4505,13 @@ function RrtTutorial({ onDone }) {
           <p className="text-slate-300 text-lg leading-relaxed">
             Feel where the chair is.
           </p>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Feel where the roof is.
+          </p>
+          <p className="text-slate-300 text-lg leading-relaxed">
+            Feel how the objects are in different spaces and directions from
+            each other.
+          </p>
         </div>
       ),
       action: nextButton("Next", () => setStep(1)),
@@ -4516,7 +4524,8 @@ function RrtTutorial({ onDone }) {
           </p>
           <p className="text-slate-300 text-lg leading-relaxed">
             In RRT you spatialize the items. You do not imagine them. It has to
-            be a sensory feeling, the same one you just had about the door.
+            be a sensory feeling, the same feeling you just felt for each of
+            those objects in your room.
           </p>
         </div>
       ),
@@ -4537,13 +4546,13 @@ function RrtTutorial({ onDone }) {
     {
       body: (
         <div className="space-y-4">
+          {premise(green, "South-West", blue)}
           <div className={card}>
             <RrtTutorialMap
               items={RRT_TUTORIAL_ITEMS}
               positions={RRT_TUTORIAL_POSITIONS}
             />
           </div>
-          {premise(green, "South-West", blue)}
         </div>
       ),
       action: nextButton("Start training", onDone),
@@ -13140,7 +13149,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             Round length: <span className="text-slate-200 font-medium">{ROUND_MS / 1000} sec</span>
           </div>
           <p className="text-slate-400 text-base">
-            20 in a row = level up. 30s, 25s, 20s, and then premise count +1.
+            20 in a row = level up. 30s, 25s, 20s, +1 premise.
           </p>
         </div>
 
