@@ -2276,15 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 109;
+const BUILD_VERSION = 110;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:13 PM";
+const BUILD_TIME = "3:19 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Timer hint no longer covers the checkbox",
-  "Tutorial text white",
+  "Timer hint shows again, stale dismissal cleared",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3281,7 +3280,10 @@ const RRT_TIMEOUT = "#8A8F98";
 const RRT_SCRAMBLE_FACTOR = 0.8;
 
 // Whether the "tick this to start" pointer has been dismissed for good.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHintHidden";
+// Bumped: earlier builds had a version of this that could be dismissed by
+// accident, and a stale "hidden" flag meant the pointer never appeared for
+// someone who had never actually seen it.
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v2";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -13179,7 +13181,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
-  const showTimerHint = !hideTimerHint && !timerRunning;
+  const showTimerHint = !hideTimerHint && !timerRunning && !flash;
 
   if (stage === "setup") {
     return (
