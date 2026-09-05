@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 141;
+const BUILD_VERSION = 142;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:00 PM";
+const BUILD_TIME = "10:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial demos loop",
-  "Bigger n-back tutorial visuals",
+  "Pointer at Explanation in History",
+  "Wider n-back tutorial layout",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4520,11 +4520,18 @@ function Motion3DTutorialDemo() {
   // `run` restarts the whole sequence: it holds on the answer for a few
   // seconds, then plays again, so missing it the first time costs nothing.
   const [run, setRun] = useState(0);
+  // Repositioning for a new run must not animate, or the reset itself reads
+  // as an extra round of movement before the real one starts.
+  const [snap, setSnap] = useState(false);
 
   useEffect(() => {
     setPhase(0);
+    setSnap(true);
     setSpots(spread());
-    const timers = [setTimeout(() => setPhase(1), LIT_MS)];
+    const timers = [
+      setTimeout(() => setSnap(false), 60),
+      setTimeout(() => setPhase(1), LIT_MS),
+    ];
     for (let i = 0; i < MOVES; i += 1) {
       timers.push(
         setTimeout(() => setSpots((prev) => drift(prev)), LIT_MS + i * MOVE_MS)
@@ -4562,7 +4569,9 @@ function Motion3DTutorialDemo() {
                 left: 0,
                 top: 0,
                 transform: `translate(${p.x - R}px, ${p.y - R}px)`,
-                transition: `transform ${MOVE_MS}ms linear, background 0.3s ease, box-shadow 0.3s ease, color 0.3s ease`,
+                transition: snap
+                  ? "none"
+                  : `transform ${MOVE_MS}ms linear, background 0.3s ease, box-shadow 0.3s ease, color 0.3s ease`,
                 background: lit || revealed ? PR_YELLOW : "#2C313A",
                 boxShadow: lit
                   ? `0 0 14px ${PR_YELLOW}99`
@@ -4969,7 +4978,9 @@ function NBackTutorialDemo({ exercise, accent }) {
         )}
       </div>
 
+      <div className="flex flex-col md:flex-row items-center md:items-center justify-center gap-8 w-full">
       <div
+        className="shrink-0"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 5.75rem)",
@@ -4998,7 +5009,8 @@ function NBackTutorialDemo({ exercise, accent }) {
         })}
       </div>
 
-      <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem]">
+      <div className="flex flex-col items-center gap-5 md:min-w-[19rem]">
+      <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem] w-full">
         {seq.map((item, idx) => {
           if (idx > i) return null;
           const marked = isMatch && (idx === i || idx === i - n);
@@ -5014,7 +5026,7 @@ function NBackTutorialDemo({ exercise, accent }) {
                   outlineOffset: "2px",
                   borderRadius: 2,
                   background: NBACK_CELL_ACTIVE,
-                  opacity: idx === i ? 1 : 0.55,
+                  opacity: idx === i || marked ? 1 : 0.55,
                 }}
               >
                 {hasShape || hasColor ? (
@@ -5075,6 +5087,8 @@ function NBackTutorialDemo({ exercise, accent }) {
           : i < n
           ? "Nothing to compare it to yet."
           : "Not the same as 2 places ago."}
+      </div>
+      </div>
       </div>
     </div>
   );
@@ -6704,7 +6718,6 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
     description: `Reach ${levelTitle} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats[exerciseKey]?.bestN || 0) >= level,
-    progress: (s) => `Level ${Math.min(s.exerciseStats[exerciseKey]?.bestN || 0, level)}/${level}`,
     ...overrides,
   };
 }
@@ -6740,7 +6753,6 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
     description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
-    progress: (s) => `Level ${Math.min(s.exerciseStats.iqnb?.bestN || 0, level)}/${level}`,
     ...overrides,
   };
 }
@@ -9751,6 +9763,10 @@ function NBackSessionApp() {
                   Write more motivational lines and psychology-boosting lines.
                 </div>
                 <div>
+                  Glorify it: animations, edits, TikToks, songs, anything that
+                  makes it look cool.
+                </div>
+                <div>
                   The goal isn't to just be a brain training app, it also is to
                   have psychological solutions that make it feel better and
                   easier, and to essentially nee like a pseudo motivation
@@ -11838,7 +11854,7 @@ function NBackSessionApp() {
             </div>
 
             <Stat
-              label={overviewSource === "home" ? "Total duration" : "Duration today"}
+              label={overviewSource === "home" ? "Total duration" : "Duration"}
               value={formatDuration(
                 overviewSource === "home"
                   ? msTrainedTotal(exerciseHistory)
@@ -14133,6 +14149,36 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       <span className="text-slate-400 text-base font-medium">
                         {RRT_PUZZLE_TYPE_LABEL[entry.puzzleType] || "Distinction"}
                       </span>
+                      <div className="flex items-center gap-2">
+                      {!hideHistoryHint && i === 0 && (
+                        <>
+                          <span className="text-sm" style={{ color: EXERCISE_COLORS.rrt }}>
+                            See where you placed them
+                          </span>
+                          <svg
+                            width="30"
+                            height="16"
+                            viewBox="0 0 30 16"
+                            fill="none"
+                            aria-hidden="true"
+                            className="shrink-0"
+                          >
+                            <path
+                              d="M1 12C1 12 12 3 27 3"
+                              stroke={EXERCISE_COLORS.rrt}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d="M21 1 28 3 22 8"
+                              stroke={EXERCISE_COLORS.rrt}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </>
+                      )}
                       <button
                         // Click-only, no hover handlers — on touch devices
                         // a tap fires a synthetic mouseenter immediately
@@ -14163,6 +14209,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       >
                         Explanation
                       </button>
+                      </div>
                     </div>
                   </div>
                   );
