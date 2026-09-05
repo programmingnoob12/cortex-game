@@ -2276,15 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 117;
+const BUILD_VERSION = 118;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:23 PM";
+const BUILD_TIME = "5:29 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Arrow lands on the checkbox",
-  "Demo shows the keys and uses the recorded voice",
+  "New motivation audio wired up",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14470,9 +14469,9 @@ function motProjectToScreen(position, camera, width, height) {
 // The track lives in public/audio. The filename has spaces, so it is
 // percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "/audio/Cortex%20Hypnosis%20Version%201.mp3",
+  url: "/audio/Cortex%20Hypnosis%20v1.mp3",
   title: "Motivation",
-  length: "12 min",
+  length: "10 min",
   blurb:
     "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost.",
 };
