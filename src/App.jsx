@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useMemo, Fragment, Component } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, Fragment, Component } from "react";
 import * as THREE from "three";
 import {
   AreaChart,
@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 129;
+const BUILD_VERSION = 130;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:32 PM";
+const BUILD_TIME = "7:42 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Softer button motion",
-  "Motivation audio starts from the top",
+  "Motivation audio v9 and playback fix",
+  "Back locked until the conclusion",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4803,12 +4803,29 @@ function NBackTutorialDemo({ exercise, accent }) {
         {isPrime ? (
           <>
             QNB'{" "}
-            <span style={{ color: PR_YELLOW, fontWeight: 600 }}>2.00</span>
+            <span
+              style={{
+                color: isMatch ? PR_YELLOW : "inherit",
+                fontWeight: isMatch ? 600 : "inherit",
+                transition: "color 0.2s ease",
+              }}
+            >
+              2.00
+            </span>
           </>
         ) : (
           <>
             {exercise.abbrev}
-            <span style={{ color: PR_YELLOW, fontWeight: 600 }}>2</span>B
+            <span
+              style={{
+                color: isMatch ? PR_YELLOW : "inherit",
+                fontWeight: isMatch ? 600 : "inherit",
+                transition: "color 0.2s ease",
+              }}
+            >
+              2
+            </span>
+            B
           </>
         )}
       </div>
@@ -13239,6 +13256,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // cannot be answered by flicking back and forth instead of holding them.
   const [maxPremiseSeen, setMaxPremiseSeen] = useState(0);
   const [answeredAny, setAnsweredAny] = useState(false);
+  // Back is locked until the conclusion has been reached once, so a round
+  // cannot be worked by flicking between premises instead of holding them.
+  const [reachedQuestion, setReachedQuestion] = useState(false);
 
   // Difficulty progression: every 20 correct answers in a row, RRT steps up
   // once. Each premise-count tier has 3 steps — the round length drops 5s
@@ -13387,6 +13407,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       setPuzzle(newPuzzle);
       setPremiseIndex(0);
       setMaxPremiseSeen(0);
+      setReachedQuestion(false);
       setMsLeft(rm);
       setTimerRunning(keepTimerRunning);
       setFlash(null);
@@ -13408,7 +13429,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   const beginRoundRef = useRef(beginRound);
   // Bumped by the parent when the tutorial finishes, so "I Get It" drops
   // straight into a round instead of the setup screen.
-  useEffect(() => {
+  // Layout effect, not a plain one: a plain effect runs after paint, which
+  // showed the setup screen for a frame before the round replaced it.
+  useLayoutEffect(() => {
     if (autoStart > 0) beginRoundRef.current(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoStart]);
@@ -14138,7 +14161,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             color: "#F7F8F8",
           }}
         >
-          <div>Tick this to start or stop the round.</div>
+          <div>Tick this to start the round.</div>
           <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
             <input
               type="checkbox"
@@ -14158,7 +14181,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           color: "#F7F8F8",
         }}
       >
-        <div>Tick the box next to TIMER to start or stop the round.</div>
+        <div>Tick the box next to TIMER to start the round.</div>
         <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
           <input
             type="checkbox"
@@ -14174,18 +14197,18 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   const historyHint = showHistoryHint ? (
     <>
-      <div className="hidden lg:block absolute left-full top-[1.4rem] ml-3 w-60">
+      <div className="hidden lg:block absolute left-full top-[1.75rem] ml-3 w-60">
         <svg
-          width="92"
+          width="64"
           height="22"
-          viewBox="0 0 92 22"
+          viewBox="0 0 64 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ left: -86, top: 6 }}
+          style={{ left: -58, top: 6 }}
           aria-hidden="true"
         >
           <path
-            d="M90 18C90 18 58 4 5 4"
+            d="M62 18C62 18 40 4 5 4"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
@@ -14310,7 +14333,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               <div className="flex gap-3">
                 <button
                   onClick={() => setPremiseIndex((i) => Math.max(0, i - 1))}
-                  disabled={isFirst || maxPremiseSeen < puzzle.premises.length - 1}
+                  disabled={isFirst || !reachedQuestion}
                   className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:hover:bg-slate-700 transition-colors rounded-lg py-2 text-base font-medium"
                 >
                   Back
@@ -14318,6 +14341,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                 <button
                   onClick={() => {
                     if (isLast) {
+                      setReachedQuestion(true);
                       setStage("question");
                     } else {
                       setPremiseIndex((i) => i + 1);
@@ -14416,6 +14440,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                 onClick={() => {
                   setPremiseIndex(puzzle.premises.length - 1);
                   setMaxPremiseSeen(puzzle.premises.length - 1);
+                  setReachedQuestion(true);
                   setStage("premises");
                 }}
                 className="flex-1 bg-slate-700 hover:bg-slate-600 transition-colors rounded-lg py-2 text-base font-medium"
@@ -14719,7 +14744,7 @@ function motProjectToScreen(position, camera, width, height) {
 // The track lives in public/audio. The filename has spaces, so it is
 // percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "/audio/Cortex%20Hypnosis%20v7.mp3",
+  url: "/audio/Cortex%20Hypnosis%20v9.mp3",
   title: "Motivation",
   length: "10 min",
   // Known length, so the bar reads correctly before metadata arrives instead
@@ -14775,10 +14800,6 @@ function HypnosisScreen({ onDone, afterSession }) {
     if (!el) return;
     if (el.paused) {
       el.volume = volume;
-      // Some browsers begin playback from wherever the buffer happens to
-      // start, clipping the first word. Pinning it to 0 on a fresh play
-      // stops the intro being cut off.
-      if (el.currentTime < 0.5) el.currentTime = 0;
       el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     } else {
       el.pause();
