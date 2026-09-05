@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 124;
+const BUILD_VERSION = 125;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:28 PM";
+const BUILD_TIME = "6:54 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial runs straight into the round",
-  "RRT Back locked until every premise is read",
+  "Tutorial cards hold one size",
+  "Nicer tutorial checkbox",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4540,7 +4540,8 @@ function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 
 
 function RrtTutorialAnimated({ onDone }) {
   const accent = EXERCISE_COLORS.rrt;
-  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const card =
+    "bg-slate-900 border border-slate-700/70 rounded-xl p-8 min-h-[30rem] flex flex-col justify-center";
   const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
   // step and beat move together. Keeping beat in its own state and zeroing it
   // from an effect let the new step paint once with the old beat, which showed
@@ -4673,8 +4674,8 @@ function RrtTutorialAnimated({ onDone }) {
         The space is in front of you, not on the screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Close your eyes after reading if it helps. It should feel the same as
-        feeling where the door is in your room.
+        Close your eyes after reading if it helps. It should feel like feeling
+        where your door is in the room.
       </p>
     </div>,
   ];
@@ -4682,7 +4683,7 @@ function RrtTutorialAnimated({ onDone }) {
   const isLast = step >= STEPS.length - 1;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full max-w-lg mx-auto">
       <div className="flex items-center gap-2">
         {STEPS.map((_, i) => (
           <div
@@ -4693,6 +4694,8 @@ function RrtTutorialAnimated({ onDone }) {
         ))}
       </div>
 
+      {/* Fixed height and width: every step is the same size, so the card
+          does not grow and shrink as the person moves through it. */}
       <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
         {bodies[step]}
       </div>
@@ -4912,7 +4915,8 @@ function NBackTutorialDemo({ exercise, accent }) {
 function NBackTutorial({ exercise, onDone, level }) {
   const [step, setStep] = useState(0);
   const accent = EXERCISE_COLORS[exercise.key] || "#4CB9D8";
-  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const card =
+    "bg-slate-900 border border-slate-700/70 rounded-xl p-8 min-h-[30rem] flex flex-col justify-center";
   // Every n-back tutorial demonstrates at 2 back, whatever level the player
   // is actually on.
   const n = 2;
@@ -4967,7 +4971,7 @@ function NBackTutorial({ exercise, onDone, level }) {
   const current = steps[Math.min(step, steps.length - 1)];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 w-full max-w-lg mx-auto">
       <div className="flex items-center gap-2">
         {steps.map((_, i) => (
           <div
@@ -10453,13 +10457,36 @@ function NBackSessionApp() {
               </div>
             )}
 
-            <label className="flex items-center gap-3 text-slate-300 text-base cursor-pointer select-none">
+            <label className="w-full max-w-lg mx-auto flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors text-sm cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={tutorialDontShowAgain}
                 onChange={(e) => setTutorialDontShowAgain(e.target.checked)}
-                className="w-5 h-5 rounded border-slate-600 bg-slate-800 accent-indigo-500"
+                className="sr-only peer"
               />
+              <span
+                className="w-4 h-4 shrink-0 rounded-[4px] border border-slate-600 flex items-center justify-center transition-colors peer-checked:border-transparent"
+                style={{
+                  background: tutorialDontShowAgain
+                    ? EXERCISE_COLORS[tutorialStepExercise.key] || "#4CB9D8"
+                    : "transparent",
+                }}
+              >
+                {tutorialDontShowAgain && (
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#0B0D10"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6 9 17l-5-5" />
+                  </svg>
+                )}
+              </span>
               Don't show this tutorial again
             </label>
 
