@@ -4,7 +4,21 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>cortex-game</title>
+    <meta name="theme-color" content="#08090A" />
+    <title>Cortex</title>
+    <!-- Painted before the stylesheet or the bundle arrives, so the first
+         frame is the app's own background instead of a white page that reads
+         as a loading screen. -->
+    <style>
+      html,
+      body,
+      #root {
+        min-height: 100%;
+        margin: 0;
+        background-color: #08090a;
+        color: #f7f8f8;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

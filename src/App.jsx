@@ -533,11 +533,10 @@ function AuthGate({ children }) {
   };
 
   if (session === undefined) {
-    return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
-        <div className="text-slate-400 text-sm">Loading…</div>
-      </div>
-    );
+    // Bare background rather than a "Loading…" line. The wait is one read of
+    // the stored session, and a word on screen for a few hundred
+    // milliseconds reads as a slower app than an empty page does.
+    return <div className="min-h-screen bg-slate-950" />;
   }
 
   // A password-recovery session takes priority over everything else —
@@ -2277,15 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 139;
+const BUILD_VERSION = 140;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:53 PM";
+const BUILD_TIME = "9:58 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Pointer explaining the locked Back button",
-  "Cleaner checkout gem",
+  "No blank flash on first paint",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9733,6 +9731,14 @@ function NBackSessionApp() {
                 </div>
                 <div>
                   Make the 3D MOT balls look better.
+                </div>
+                <div>
+                  And to make this an experience, a ritual of wisdom that is an
+                  experience not just training.
+                </div>
+                <div>
+                  And to make this an experience, a ritual of wisdom that is an
+                  experience not just training.
                 </div>
                 <div>
                   The goal isn't to just be a brain training app, it also is to
