@@ -2280,15 +2280,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 146;
+const BUILD_VERSION = 147;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:37 PM";
+const BUILD_TIME = "10:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial card holds one size",
-  "Celebration tune cannot double up",
+  "Back pointer stays on the conclusion",
+  "N-back running screen fits without scrolling",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4937,7 +4937,7 @@ function NBackTutorialDemo({ exercise, accent }) {
   useEffect(() => {
     const t = setTimeout(
       () => setI((v) => (v >= seq.length - 1 ? -1 : v + 1)),
-      i === -1 ? 1400 : i >= seq.length - 1 ? 3400 : 1900
+      i === -1 ? 1400 : i >= seq.length - 1 ? 5200 : 1900
     );
     return () => clearTimeout(t);
   }, [i, seq.length]);
@@ -8770,7 +8770,7 @@ function NBackSessionApp() {
       // land on the setup screen for the next exercise; user presses Start themselves
     };
     if (goingToOverview) land();
-    else setTimeout(land, 3300);
+    else setTimeout(land, 3600);
   }, []);
 
   useEffect(() => {
@@ -10402,7 +10402,7 @@ function NBackSessionApp() {
                       setTimeout(() => {
                         setSwitchNotice(false);
                         setMainView("home");
-                      }, 3300);
+                      }, 3600);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -11878,7 +11878,7 @@ function NBackSessionApp() {
                 className="h-full rounded-full"
                 style={{
                   background: "var(--ex)",
-                  animation: "switchBar 3.1s linear both",
+                  animation: "switchBar 3.4s linear both",
                 }}
               />
             </div>
@@ -14814,6 +14814,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       {flashOverlay}
       {timerHint}
       {historyHint}
+      {backHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
