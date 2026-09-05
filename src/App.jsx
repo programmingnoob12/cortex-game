@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 120;
+const BUILD_VERSION = 121;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:41 PM";
+const BUILD_TIME = "5:48 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Animated RRT tutorial uses the original wording",
-  "More space above the Motivation heading",
+  "Recap line closes the animated RRT tutorial",
+  "Timer hint reset again",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3284,7 +3284,7 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // Bumped: earlier builds had a version of this that could be dismissed by
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v3";
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v4";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4658,6 +4658,10 @@ function RrtTutorialAnimated({ onDone }) {
         <RrtItemTile item={blue} size={30} />
         <span>?</span>
       </div>
+      <p className="text-slate-300 text-base leading-relaxed text-center">
+        Just like you feel where the door is without looking at it, feel where
+        each item is. Place them, and the answer is already there.
+      </p>
     </div>,
   ];
 
