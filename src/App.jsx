@@ -1671,6 +1671,10 @@ function useBinauralBeats(enabled) {
     };
 
     if (enabled) {
+      // A fade-out cancelled mid-way (the hook unmounting, the tab going to
+      // sleep) can leave the element at full volume, and the next play()
+      // would then start at that level instead of fading up from silence.
+      if (audio.paused) audio.volume = 0;
       const p = audio.play();
       playPromiseRef.current = p;
       if (p && p.catch) {
@@ -1704,7 +1708,7 @@ function useBinauralBeats(enabled) {
         }
       }, 1500);
     } else {
-      fadeTo(0, 500);
+      fadeTo(0, 700);
     }
 
     return () => {
@@ -2276,15 +2280,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 144;
+const BUILD_VERSION = 145;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:22 PM";
+const BUILD_TIME = "10:32 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Keys flank the tutorial grid",
-  "Restart keeps the same puzzle category",
+  "Tutorials fit on one screen",
+  "Binaural always fades in",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4627,7 +4631,7 @@ function Motion3DTutorial({ onDone }) {
         <button
           onClick={onDone}
           style={{ "--ex": accent }}
-          className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+          className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
           I Get It
         </button>
@@ -4867,14 +4871,14 @@ function RrtTutorialAnimated({ onDone }) {
         <button
           onClick={() => goToStep(Math.max(0, step - 1))}
           disabled={step === 0}
-          className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+          className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
         >
           Back
         </button>
         <button
           onClick={() => (isLast ? onDone() : goToStep(step + 1))}
           style={{ "--ex": accent }}
-          className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+          className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
           {isLast ? "I Get It" : "Next"}
         </button>
@@ -4947,7 +4951,7 @@ function NBackTutorialDemo({ exercise, accent }) {
   const keyChip = (m) => (
     <div
       key={m}
-      className="rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors flex flex-col items-center gap-0.5"
+      className="no-sheen rounded-lg px-2.5 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-2"
       style={{
         border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
         color: isMatch ? PR_YELLOW : "#6E717A",
@@ -4955,7 +4959,9 @@ function NBackTutorialDemo({ exercise, accent }) {
       }}
     >
       <span>{MODALITY_META[m].label}</span>
-      <span className="text-lg leading-none">{MODALITY_KEY_LABEL[m]}</span>
+      <span className="text-base leading-none opacity-70">
+        {MODALITY_KEY_LABEL[m]}
+      </span>
     </div>
   );
 
@@ -4978,7 +4984,7 @@ function NBackTutorialDemo({ exercise, accent }) {
     ) : null;
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex flex-col items-center gap-3">
       {/* The 2 is picked out in gold so the label reads as the same "2" the
           demo is about: two back, two places ago. */}
       <div className="text-base tracking-[0.08em] uppercase" style={{ color: accent }}>
@@ -5014,16 +5020,16 @@ function NBackTutorialDemo({ exercise, accent }) {
 
       {/* Keys flank the grid the way they do in the exercise itself, which
           also keeps the card short enough to fit on one screen. */}
-      <div className="flex items-center justify-center gap-4 w-full">
-        <div className="flex flex-col gap-2.5 w-24 shrink-0">
+      <div className="flex items-stretch justify-center gap-4 w-full">
+        <div className="flex flex-col justify-between w-28 shrink-0 py-1">
           {mods.slice(0, Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
         </div>
       <div
         className="shrink-0"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 5.75rem)",
-          gridTemplateRows: "repeat(3, 5.75rem)",
+          gridTemplateColumns: "repeat(3, 5rem)",
+          gridTemplateRows: "repeat(3, 5rem)",
           borderTop: `1px solid ${NBACK_GRID_LINE}`,
           borderLeft: `1px solid ${NBACK_GRID_LINE}`,
           borderRadius: 4,
@@ -5042,18 +5048,18 @@ function NBackTutorialDemo({ exercise, accent }) {
                 transition: "background 0.12s linear",
               }}
             >
-              {active && stimulus(cur, 72)}
+              {active && stimulus(cur, 62)}
             </div>
           );
         })}
       </div>
 
-        <div className="flex flex-col gap-2.5 w-24 shrink-0">
+        <div className="flex flex-col justify-between w-28 shrink-0 py-1">
           {mods.slice(Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
         </div>
       </div>
 
-      <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem] w-full">
+      <div className="flex items-end justify-center gap-3 flex-wrap min-h-[3.6rem] w-full">
         {seq.map((item, idx) => {
           if (idx > i) return null;
           const marked = isMatch && (idx === i || idx === i - n);
@@ -5121,7 +5127,7 @@ function NBackTutorialDemo({ exercise, accent }) {
 function NBackTutorial({ exercise, onDone, level }) {
   const [step, setStep] = useState(0);
   const accent = EXERCISE_COLORS[exercise.key] || "#4CB9D8";
-  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-6";
   // Every n-back tutorial demonstrates at 2 back, whatever level the player
   // is actually on.
   const n = 2;
@@ -5176,7 +5182,7 @@ function NBackTutorial({ exercise, onDone, level }) {
   const current = steps[Math.min(step, steps.length - 1)];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <div className="flex items-center gap-2">
         {steps.map((_, i) => (
           <div
@@ -10644,7 +10650,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "tutorial" && (
-          <div className="space-y-14">
+          <div className="space-y-6">
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 {tutorialStepExercise.title} Tutorial
@@ -14208,7 +14214,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                               color: "#F7F8F8",
                             }}
                           >
-                            See where you placed them
+                            See the spatial model
                           </span>
                           <svg
                             width="30"
@@ -14529,22 +14535,22 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     <>
       <div className="hidden lg:block absolute right-full bottom-[7.8rem] mr-3 w-56">
         <svg
-          width="46"
+          width="40"
           height="22"
-          viewBox="0 0 46 22"
+          viewBox="0 0 40 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ right: -11, top: 6 }}
+          style={{ right: -38, top: 6 }}
           aria-hidden="true"
         >
           <path
-            d="M2 18C2 18 18 4 41 4"
+            d="M2 18C2 18 14 4 35 4"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
           />
           <path
-            d="M34 1 42 4 35 9"
+            d="M28 1 36 4 29 9"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
