@@ -2280,15 +2280,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 147;
+const BUILD_VERSION = 148;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:41 PM";
+const BUILD_TIME = "10:46 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Back pointer stays on the conclusion",
-  "N-back running screen fits without scrolling",
+  "N-back tutorial is the demo alone",
+  "Hints ride with the Show tutorials switch",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5154,23 +5154,6 @@ function NBackTutorial({ exercise, onDone, level }) {
   );
 
   const steps = [];
-
-  steps.push({
-    body: (
-      <div className={`${card} space-y-4`}>
-        <p className="text-slate-100 text-xl leading-relaxed">
-          You will be shown an item. Remember the item.
-        </p>
-        <p className="text-slate-100 text-xl leading-relaxed">
-          When the item you see right now is the same as the item 2 places
-          ago, press the button.
-        </p>
-        <p className="text-slate-100 text-xl leading-relaxed">
-          If it is not, press nothing.
-        </p>
-      </div>
-    ),
-  });
 
   steps.push({
     body: (
@@ -10670,6 +10653,9 @@ function NBackSessionApp() {
                 onDone={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
+                    // Same switch, seen from the other end: opting out here
+                    // turns Show tutorials off on the Account page.
+                    setHideTutorials(true);
                   }
                   setMainView("app");
                   startTask(
@@ -10685,6 +10671,9 @@ function NBackSessionApp() {
                 onDone={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
+                    // Same switch, seen from the other end: opting out here
+                    // turns Show tutorials off on the Account page.
+                    setHideTutorials(true);
                   }
                   // Straight into the round. The setup screen only exists for
                   // people who did not just read the tutorial. RRT runs its
@@ -10698,6 +10687,9 @@ function NBackSessionApp() {
                 onDone={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
+                    // Same switch, seen from the other end: opting out here
+                    // turns Show tutorials off on the Account page.
+                    setHideTutorials(true);
                   }
                   setMainView("app");
                 }}
@@ -10752,6 +10744,9 @@ function NBackSessionApp() {
                 onClick={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
+                    // Same switch, seen from the other end: opting out here
+                    // turns Show tutorials off on the Account page.
+                    setHideTutorials(true);
                   }
                   setMainView("app");
                 }}
@@ -11289,6 +11284,7 @@ function NBackSessionApp() {
                   if (turningOn) {
                     try {
                       RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
+                      localStorage.removeItem(RRT_ANSWERED_KEY);
                     } catch {
                       /* nothing persisted to clear */
                     }
@@ -11297,23 +11293,6 @@ function NBackSessionApp() {
               />
             </div>
 
-            {/* The in-exercise pointers are dismissed for good by their own
-                tick box, which makes them impossible to see again without
-                clearing storage by hand. */}
-            <button
-              onClick={() => {
-                try {
-                  RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
-                  localStorage.removeItem(RRT_ANSWERED_KEY);
-                } catch {
-                  /* nothing to clear without storage */
-                }
-                window.location.reload();
-              }}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 rounded-lg py-5 text-xl font-medium text-left px-7"
-            >
-              Bring back the exercise hints
-            </button>
 
             <button
               onClick={() => setMainView("membership")}
@@ -14059,7 +14038,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             role="checkbox"
             aria-checked={timerRunning}
             title={timerRunning ? "Pause the timer" : "Start the timer on a fresh set"}
-            className={`w-5 h-5 rounded flex items-center justify-center border-2 transition-colors disabled:opacity-40 ${
+            className={`no-lift w-5 h-5 rounded flex items-center justify-center border-2 transition-colors disabled:opacity-40 ${
               timerRunning
                 ? `${accent.border} ${accent.bg}`
                 : "border-slate-500 bg-slate-900 hover:border-slate-300"
