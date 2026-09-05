@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 143;
+const BUILD_VERSION = 144;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:13 PM";
+const BUILD_TIME = "10:22 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Hints clear themselves on every new build",
-  "N-back tutorial back to one column",
+  "Keys flank the tutorial grid",
+  "Restart keeps the same puzzle category",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4944,6 +4944,21 @@ function NBackTutorialDemo({ exercise, accent }) {
   const cur = i >= 0 ? seq[i] : null;
   const isMatch = i >= n && seq[i] === seq[i - n];
 
+  const keyChip = (m) => (
+    <div
+      key={m}
+      className="rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors flex flex-col items-center gap-0.5"
+      style={{
+        border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
+        color: isMatch ? PR_YELLOW : "#6E717A",
+        background: isMatch ? `${PR_YELLOW}1A` : "transparent",
+      }}
+    >
+      <span>{MODALITY_META[m].label}</span>
+      <span className="text-lg leading-none">{MODALITY_KEY_LABEL[m]}</span>
+    </div>
+  );
+
   const stimulus = (item, size) =>
     hasShape || hasColor ? (
       isPrime ? (
@@ -4997,6 +5012,12 @@ function NBackTutorialDemo({ exercise, accent }) {
         )}
       </div>
 
+      {/* Keys flank the grid the way they do in the exercise itself, which
+          also keeps the card short enough to fit on one screen. */}
+      <div className="flex items-center justify-center gap-4 w-full">
+        <div className="flex flex-col gap-2.5 w-24 shrink-0">
+          {mods.slice(0, Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
+        </div>
       <div
         className="shrink-0"
         style={{
@@ -5025,6 +5046,11 @@ function NBackTutorialDemo({ exercise, accent }) {
             </div>
           );
         })}
+      </div>
+
+        <div className="flex flex-col gap-2.5 w-24 shrink-0">
+          {mods.slice(Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
+        </div>
       </div>
 
       <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem] w-full">
@@ -5065,25 +5091,8 @@ function NBackTutorialDemo({ exercise, accent }) {
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-2 flex-nowrap">
-        {mods.map((m) => (
-          <div
-            key={m}
-            className="rounded-lg px-3 py-2 text-sm font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
-            style={{
-              border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
-              color: isMatch ? PR_YELLOW : "#6E717A",
-              background: isMatch ? `${PR_YELLOW}1A` : "transparent",
-            }}
-          >
-            <span>{MODALITY_META[m].label}</span>
-            <span className="text-base leading-none">{MODALITY_KEY_LABEL[m]}</span>
-          </div>
-        ))}
-      </div>
-
       <div
-        className="rounded-lg px-6 py-3 text-lg font-semibold transition-colors"
+        className="rounded-lg px-5 py-2 text-base font-semibold transition-colors"
         style={{
           border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
           color: isMatch ? PR_YELLOW : "#6E717A",
@@ -8753,7 +8762,7 @@ function NBackSessionApp() {
       // land on the setup screen for the next exercise; user presses Start themselves
     };
     if (goingToOverview) land();
-    else setTimeout(land, 3500);
+    else setTimeout(land, 3100);
   }, []);
 
   useEffect(() => {
@@ -9782,6 +9791,10 @@ function NBackSessionApp() {
                   makes it look cool.
                 </div>
                 <div>
+                  Maybe change the overview to a horizontal layout so it fits
+                  on one screen. We'll see.
+                </div>
+                <div>
                   The goal isn't to just be a brain training app, it also is to
                   have psychological solutions that make it feel better and
                   easier, and to essentially nee like a pseudo motivation
@@ -10381,7 +10394,7 @@ function NBackSessionApp() {
                       setTimeout(() => {
                         setSwitchNotice(false);
                         setMainView("home");
-                      }, 3500);
+                      }, 3100);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -11260,7 +11273,19 @@ function NBackSessionApp() {
               </div>
               <Toggle
                 on={!hideTutorials}
-                onToggle={() => setHideTutorials(!hideTutorials)}
+                onToggle={() => {
+                  const turningOn = hideTutorials;
+                  setHideTutorials(!hideTutorials);
+                  // Switching tutorials back on brings the in-exercise
+                  // pointers with them: they are the same kind of help.
+                  if (turningOn) {
+                    try {
+                      RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
+                    } catch {
+                      /* nothing persisted to clear */
+                    }
+                  }
+                }}
               />
             </div>
 
@@ -11845,7 +11870,7 @@ function NBackSessionApp() {
                 className="h-full rounded-full"
                 style={{
                   background: "var(--ex)",
-                  animation: "switchBar 3.3s linear both",
+                  animation: "switchBar 2.9s linear both",
                 }}
               />
             </div>
@@ -13495,6 +13520,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // Back is locked until the conclusion has been reached once, so a round
   // cannot be worked by flicking between premises instead of holding them.
   const [reachedQuestion, setReachedQuestion] = useState(false);
+  // Read inside triggerFlash, which is defined above the hint state below.
+  const hideTimerHintRef = useRef(false);
 
   // Difficulty progression: every 20 correct answers in a row, RRT steps up
   // once. Each premise-count tier has 3 steps — the round length drops 5s
@@ -13638,7 +13665,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       // toggle; branching only applies once there's some scramble to
       // combine it with.
       const useBranching = scrambleFactor > 0 && branchingEnabled;
-      const newPuzzle = generateRrtPuzzle(pc, useBranching);
+      const newPuzzle = generateRrtPuzzle(pc, useBranching, override?.puzzleType);
       newPuzzle.premiseOrder = scramblePremiseOrder(newPuzzle.premises, scrambleFactor);
       setPuzzle(newPuzzle);
       setPremiseIndex(0);
@@ -13681,7 +13708,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // actual clock-running time (ROUND_MS - whatever was left when it ended)
   // to the total duration — 0 if the timer was never armed for the round.
   const triggerFlash = (kind, override) => {
-    const keepTimerRunning = timerRunning;
+    // While the timer pointer is still on screen, the next round does not
+    // arm itself: the person has to use the checkbox, which is the thing the
+    // pointer is teaching. Once it is ticked away, rounds run on.
+    const keepTimerRunning = timerRunning && hideTimerHintRef.current;
     const totalElapsedMs = elapsedMs + Math.max(0, ROUND_MS - msLeft);
     setElapsedMs(totalElapsedMs);
     setFlash(kind);
@@ -13886,6 +13916,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
+  useEffect(() => {
+    hideTimerHintRef.current = hideTimerHint;
+  }, [hideTimerHint]);
   const showTimerHint = !hideTimerHint && !timerRunning && !flash;
 
   // A second pointer, at History, shown once the first round has been
@@ -13926,7 +13959,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
-  const showBackHint = !hideBackHint && !flash && !reachedQuestion;
+  const showBackHint = !hideBackHint && !flash;
 
   if (stage === "setup") {
     return (
@@ -14008,8 +14041,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                 // puzzle, discarding whatever's on screen right now — closes
                 // the "pause, read the premises untimed, then check the box
                 // and answer instantly" loophole. Nothing seen while paused
-                // survives into the timed round.
-                beginRound(true);
+                // survives into the timed round. The replacement is the same
+                // category, so the checkbox cannot be used to skip past a
+                // puzzle type they would rather not get.
+                beginRound(true, { puzzleType: puzzle?.puzzleType });
               }
             }}
             disabled={msLeft === 0 || !!flash}
@@ -14165,7 +14200,14 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       <div className="flex items-center gap-2">
                       {!hideHistoryHint && i === 0 && (
                         <>
-                          <span className="text-sm" style={{ color: EXERCISE_COLORS.rrt }}>
+                          <span
+                            className="rounded-lg px-3 py-2 border text-sm"
+                            style={{
+                              borderColor: `${EXERCISE_COLORS.rrt}66`,
+                              background: "#0F1115",
+                              color: "#F7F8F8",
+                            }}
+                          >
                             See where you placed them
                           </span>
                           <svg
