@@ -2277,14 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 138;
+const BUILD_VERSION = 139;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:29 PM";
+const BUILD_TIME = "9:53 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History pointer waits for a finished round",
+  "Pointer explaining the locked Back button",
+  "Cleaner checkout gem",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3289,6 +3290,7 @@ const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v4";
 // Whether a round has ever been answered, so the History pointer survives a
 // remount of the exercise rather than resetting with component state.
 const RRT_ANSWERED_KEY = "cortex.rrtAnswered.v1";
+const RRT_BACK_HINT_KEY = "cortex.rrtBackHint.v1";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -11224,6 +11226,7 @@ function NBackSessionApp() {
                   localStorage.removeItem(RRT_TIMER_HINT_KEY);
                   localStorage.removeItem(RRT_HISTORY_HINT_KEY);
                   localStorage.removeItem(RRT_ANSWERED_KEY);
+                  localStorage.removeItem(RRT_BACK_HINT_KEY);
                 } catch {
                   /* nothing to clear without storage */
                 }
@@ -13861,6 +13864,25 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // same state the panel itself reads — no separate flag to fall out of sync.
   const showHistoryHint = !hideHistoryHint && !flash && roundHistory.length > 0;
 
+  // A third pointer, on the left, explaining why Back is dead until the
+  // conclusion has been reached.
+  const [hideBackHint, setHideBackHint] = useState(() => {
+    try {
+      return localStorage.getItem(RRT_BACK_HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissBackHint = () => {
+    setHideBackHint(true);
+    try {
+      localStorage.setItem(RRT_BACK_HINT_KEY, "1");
+    } catch {
+      /* a session without persistence just sees it again next time */
+    }
+  };
+  const showBackHint = !hideBackHint && !flash && !reachedQuestion;
+
   if (stage === "setup") {
     return (
       <div className="space-y-6">
@@ -14385,6 +14407,74 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     </>
   ) : null;
 
+  const backHint = showBackHint ? (
+    <>
+      <div className="hidden lg:block absolute right-full bottom-[6.5rem] mr-3 w-56">
+        <svg
+          width="46"
+          height="22"
+          viewBox="0 0 46 22"
+          fill="none"
+          className="absolute pointer-events-none"
+          style={{ right: -38, top: 6 }}
+          aria-hidden="true"
+        >
+          <path
+            d="M2 18C2 18 18 4 41 4"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M34 1 42 4 35 9"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div
+          className="rounded-lg px-3 py-2 border text-sm"
+          style={{
+            borderColor: `${EXERCISE_COLORS.rrt}66`,
+            background: "#0F1115",
+            color: "#F7F8F8",
+          }}
+        >
+          <div>Can't press back until you've constructed the spatial model.</div>
+          <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={dismissBackHint}
+              className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+            />
+            Don't show again
+          </label>
+        </div>
+      </div>
+      <div
+        className="lg:hidden absolute top-full left-0 right-0 mt-48 rounded-lg px-3 py-2 border text-sm"
+        style={{
+          borderColor: `${EXERCISE_COLORS.rrt}66`,
+          background: "#0F1115",
+          color: "#F7F8F8",
+        }}
+      >
+        <div>Can't press back until you've constructed the spatial model.</div>
+        <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={dismissBackHint}
+            className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+          />
+          Don't show again
+        </label>
+      </div>
+    </>
+  ) : null;
+
   const historyHint = showHistoryHint ? (
     <>
       <div className="hidden lg:block absolute left-full top-[1.75rem] ml-3 w-60">
@@ -14490,6 +14580,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         {flashOverlay}
         {timerHint}
         {historyHint}
+        {backHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
