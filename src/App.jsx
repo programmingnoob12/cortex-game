@@ -2276,14 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 118;
+const BUILD_VERSION = 119;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:29 PM";
+const BUILD_TIME = "5:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "New motivation audio wired up",
+  "Animated RRT tutorial on its own home page button",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4466,6 +4466,201 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// An alternative RRT tutorial, built like the n-back one: the items animate
+// into the map as each premise is read, and the conclusion is picked out in
+// gold. Reached from its own button on the home page. The original
+// RrtTutorial below is untouched.
+function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 52 }) {
+  const xs = positions.map((p) => p.x);
+  const ys = positions.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cols = maxX - minX + 1;
+  const rows = maxY - minY + 1;
+  const cells = positions.map((p, i) => ({
+    index: i,
+    item: items[i],
+    col: p.x - minX,
+    row: maxY - p.y,
+  }));
+  return (
+    <div
+      className="mx-auto"
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${cols}, 5.25rem)`,
+        gridTemplateRows: `repeat(${rows}, 5.25rem)`,
+        gap: 0,
+        borderTop: "1px solid #3A3D44",
+        borderLeft: "1px solid #3A3D44",
+        width: "fit-content",
+      }}
+    >
+      {Array.from({ length: cols * rows }).map((_, idx) => {
+        const col = idx % cols;
+        const row = Math.floor(idx / cols);
+        const here = cells.find((c) => c.col === col && c.row === row);
+        const shown = here && revealed.includes(here.index);
+        const lit = here && highlight.includes(here.index);
+        return (
+          <div
+            key={idx}
+            className="flex items-center justify-center"
+            style={{
+              borderRight: "1px solid #3A3D44",
+              borderBottom: "1px solid #3A3D44",
+              background: lit ? `${PR_YELLOW}1A` : "transparent",
+              outline: lit ? `2px solid ${PR_YELLOW}` : "none",
+              outlineOffset: "-2px",
+              transition: "background 0.3s ease, outline-color 0.3s ease",
+            }}
+          >
+            {here ? (
+              <div
+                style={{
+                  opacity: shown ? 1 : 0,
+                  transform: shown ? "scale(1)" : "scale(0.6)",
+                  transition: "opacity 0.45s ease, transform 0.45s ease",
+                }}
+              >
+                <RrtItemTile item={here.item} size={size} />
+              </div>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RrtTutorialAnimated({ onDone }) {
+  const accent = EXERCISE_COLORS.rrt;
+  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
+  const [step, setStep] = useState(0);
+  const [beat, setBeat] = useState(0);
+
+  // Each step reveals one more item a moment after the premise appears, so
+  // the map is seen being built rather than arriving finished.
+  const STEPS = [
+    { revealAt: [[0], [0, 1]], highlight: [] },
+    { revealAt: [[0, 1], [0, 1, 2]], highlight: [] },
+    { revealAt: [[0, 1, 2], [0, 1, 2]], highlight: [0, 2] },
+  ];
+
+  useEffect(() => {
+    setBeat(0);
+    const t = setTimeout(() => setBeat(1), 900);
+    return () => clearTimeout(t);
+  }, [step]);
+
+  const conf = STEPS[step];
+  const revealed = conf.revealAt[Math.min(beat, conf.revealAt.length - 1)];
+  const highlight = beat >= 1 ? conf.highlight : [];
+
+  const row = (a, text, b, lit) => (
+    <div
+      className="flex items-center justify-center gap-3.5 flex-wrap text-center rounded-lg px-3 py-3"
+      style={{
+        background: lit ? `${PR_YELLOW}14` : "transparent",
+        border: `1px solid ${lit ? `${PR_YELLOW}80` : "transparent"}`,
+        transition: "background 0.3s ease, border-color 0.3s ease",
+      }}
+    >
+      <RrtItemTile item={a} size={44} />
+      <span className="text-slate-100 text-xl font-semibold">{text}</span>
+      <RrtItemTile item={b} size={44} />
+    </div>
+  );
+
+  const bodies = [
+    <div className={`${card} space-y-6`} key="s0">
+      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
+        Premise 1
+      </div>
+      {row(orange, "is West of", blue, false)}
+      <RrtTutorialAnimatedMap
+        items={RRT_TUTORIAL_ITEMS}
+        positions={RRT_TUTORIAL_POSITIONS}
+        revealed={revealed}
+        highlight={highlight}
+      />
+      <p className="text-slate-100 text-lg leading-relaxed text-center">
+        Place it. Feel where it sits.
+      </p>
+    </div>,
+    <div className={`${card} space-y-6`} key="s1">
+      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
+        Premise 2
+      </div>
+      {row(green, "is South of", orange, false)}
+      <RrtTutorialAnimatedMap
+        items={RRT_TUTORIAL_ITEMS}
+        positions={RRT_TUTORIAL_POSITIONS}
+        revealed={revealed}
+        highlight={highlight}
+      />
+      <p className="text-slate-100 text-lg leading-relaxed text-center">
+        Now all three are placed.
+      </p>
+    </div>,
+    <div className={`${card} space-y-6`} key="s2">
+      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: PR_YELLOW }}>
+        Conclusion
+      </div>
+      {row(green, "is South-West of", blue, beat >= 1)}
+      <RrtTutorialAnimatedMap
+        items={RRT_TUTORIAL_ITEMS}
+        positions={RRT_TUTORIAL_POSITIONS}
+        revealed={revealed}
+        highlight={highlight}
+      />
+      <p className="text-slate-100 text-lg leading-relaxed text-center">
+        You never worked it out. You read it off the map.
+      </p>
+    </div>,
+  ];
+
+  const isLast = step >= STEPS.length - 1;
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center gap-2">
+        {STEPS.map((_, i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
+      </div>
+
+      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
+        {bodies[step]}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setStep((v) => Math.max(0, v - 1))}
+          disabled={step === 0}
+          className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+        >
+          Back
+        </button>
+        <button
+          onClick={() => (isLast ? onDone() : setStep((v) => v + 1))}
+          style={{ "--ex": accent }}
+          className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        >
+          {isLast ? "I get it" : "Next"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -10001,6 +10196,12 @@ function NBackSessionApp() {
               >
                 Wisdom
               </button>
+              <button
+                onClick={() => setMainView("rrtTutorialAlt")}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-4 text-base"
+              >
+                RRT Tutorial (animated)
+              </button>
               {SHOW_TEST_TOOLS && (
               <button
                 onClick={resetNextSessionForTesting}
@@ -10302,6 +10503,17 @@ function NBackSessionApp() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {mainView === "rrtTutorialAlt" && (
+          <div className="space-y-14">
+            <div>
+              <h1 className="text-4xl font-semibold tracking-tight">
+                RRT Tutorial
+              </h1>
+            </div>
+            <RrtTutorialAnimated onDone={() => setMainView("home")} />
           </div>
         )}
 
