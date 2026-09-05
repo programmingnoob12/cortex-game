@@ -2276,14 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 122;
+const BUILD_VERSION = 123;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:13 PM";
+const BUILD_TIME = "6:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Closing page added to the animated RRT tutorial",
+  "Animated version is now the RRT tutorial",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4470,10 +4470,8 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
   );
 }
 
-// An alternative RRT tutorial, built like the n-back one: the items animate
-// into the map as each premise is read, and the conclusion is picked out in
-// gold. Reached from its own button on the home page. The original
-// RrtTutorial below is untouched.
+// The RRT tutorial: the items animate into the map as each premise is read,
+// and the conclusion is picked out in gold.
 function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 52 }) {
   const xs = positions.map((p) => p.x);
   const ys = positions.map((p) => p.y);
@@ -4610,7 +4608,7 @@ function RrtTutorialAnimated({ onDone }) {
         Feel where the chair is.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Feel where the roof is.
+        Feel where the table is.
       </p>
     </div>,
 
@@ -4619,8 +4617,9 @@ function RrtTutorialAnimated({ onDone }) {
         This is spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        In RRT you spatialize the items. You don't imagine them. You feel
-        where each item is in relation to each other.
+        In RRT you spatialize the items. You don't imagine them. You{" "}
+        <em className="italic">feel</em> where each item is in relation to each
+        other.
       </p>
     </div>,
 
@@ -4668,6 +4667,11 @@ function RrtTutorialAnimated({ onDone }) {
       <p className="text-slate-100 text-lg leading-relaxed">
         Just feel the spatial model in front of you, not on the screen.
       </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        After reading the items, close your eyes if that helps. Just make sure
+        the feeling is the same as when you feel where the door is in your
+        room.
+      </p>
     </div>,
   ];
 
@@ -4705,156 +4709,6 @@ function RrtTutorialAnimated({ onDone }) {
           {isLast ? "I Get It" : "Next"}
         </button>
       </div>
-    </div>
-  );
-}
-
-function RrtTutorial({ onDone }) {
-  const [step, setStep] = useState(0);
-  const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
-  const accent = EXERCISE_COLORS.rrt;
-
-  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
-  const nav = (label, onClick) => (
-    <div className="flex items-center justify-between gap-3">
-      <button
-        onClick={() => setStep((v) => Math.max(0, v - 1))}
-        disabled={step === 0}
-        className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
-      >
-        Back
-      </button>
-      <button
-        onClick={onClick}
-        style={{ "--ex": accent }}
-        className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
-      >
-        {label}
-      </button>
-    </div>
-  );
-  const premise = (a, dir, b) => (
-    <div className={card}>
-      <div className="flex items-center justify-center gap-5 flex-wrap">
-        <RrtItemTile item={a} size={56} />
-        <span className="text-slate-100 text-lg">is {dir} of</span>
-        <RrtItemTile item={b} size={56} />
-      </div>
-    </div>
-  );
-
-  const steps = [
-    {
-      body: (
-        <div className={`${card} space-y-4`}>
-          <p className="text-slate-200 text-xl leading-relaxed">
-            Close your eyes and feel where different objects are in your room.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Don't imagine the object.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Feel where the door is.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Feel the space. Feel the direction.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Feel where the chair is.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            Feel where the roof is.
-          </p>
-        </div>
-      ),
-      action: nav("Next", () => setStep(1)),
-    },
-    {
-      body: (
-        <div className={`${card} space-y-4`}>
-          <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
-            That is spatializing.
-          </p>
-          <p className="text-slate-100 text-lg leading-relaxed">
-            In RRT you spatialize the items. You do not imagine them. You feel
-            where each item is in relation to each other.
-          </p>
-        </div>
-      ),
-      action: nav("Next", () => setStep(2)),
-    },
-    {
-      body: (
-        <div className="space-y-4">
-          {premise(orange, "West", blue)}
-          {premise(green, "South", orange)}
-          <p className="text-slate-100 text-lg leading-relaxed pt-2">
-            Feel where each item is.
-          </p>
-        </div>
-      ),
-      action: nav("Next", () => setStep(3)),
-    },
-    {
-      body: (
-        <div className="space-y-4">
-          <div className={card}>
-            <RrtTutorialMap
-              items={RRT_TUTORIAL_ITEMS}
-              positions={RRT_TUTORIAL_POSITIONS}
-            />
-          </div>
-          {/* Laid out exactly as the exercise lays out a conclusion: the
-              italic caps label, then the two tiles and the relation. */}
-          <div className={card}>
-            <div className="text-center">
-              <div
-                className="italic font-bold tracking-wide text-lg"
-                style={{ color: accent }}
-              >
-                CONCLUSION
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-3.5 py-5 flex-wrap text-center">
-              <RrtItemTile item={green} size={46} />
-              <span className="text-slate-100 text-2xl font-medium">
-                is South-West of
-              </span>
-              <RrtItemTile item={blue} size={46} />
-            </div>
-            <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-100 text-lg">
-              <span>Can you feel how</span>
-              <RrtItemTile item={green} size={30} />
-              <span>is south-west of</span>
-              <RrtItemTile item={blue} size={30} />
-              <span>?</span>
-            </div>
-          </div>
-        </div>
-      ),
-      action: nav("I get it", onDone),
-    },
-  ];
-
-  const current = steps[Math.min(step, steps.length - 1)];
-
-  return (
-    <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        {steps.map((_, i) => (
-          <div
-            key={i}
-            className="h-1 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? accent : "#1E293B" }}
-          />
-        ))}
-      </div>
-
-      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
-        {current.body}
-      </div>
-
-      {current.action}
     </div>
   );
 }
@@ -10240,12 +10094,6 @@ function NBackSessionApp() {
               >
                 Wisdom
               </button>
-              <button
-                onClick={() => setMainView("rrtTutorialAlt")}
-                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-4 text-base"
-              >
-                RRT Tutorial (animated)
-              </button>
               {SHOW_TEST_TOOLS && (
               <button
                 onClick={resetNextSessionForTesting}
@@ -10550,17 +10398,6 @@ function NBackSessionApp() {
           </div>
         )}
 
-        {mainView === "rrtTutorialAlt" && (
-          <div className="space-y-14">
-            <div>
-              <h1 className="text-4xl font-semibold tracking-tight">
-                RRT Tutorial
-              </h1>
-            </div>
-            <RrtTutorialAnimated onDone={() => setMainView("home")} />
-          </div>
-        )}
-
         {mainView === "tutorial" && (
           <div className="space-y-14">
             <div>
@@ -10585,7 +10422,7 @@ function NBackSessionApp() {
                 }}
               />
             ) : tutorialStepExercise.key === "rrt" ? (
-              <RrtTutorial
+              <RrtTutorialAnimated
                 onDone={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
