@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 126;
+const BUILD_VERSION = 127;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:01 PM";
+const BUILD_TIME = "7:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorial sizing reverted",
-  "Closing page wording",
+  "RRT tutorial starts the round properly",
+  "Motivation audio v6",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4674,7 +4674,7 @@ function RrtTutorialAnimated({ onDone }) {
         Close your eyes after reading if it helps.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        It should feel like feeling where your door is in the room.
+        It should be like feeling where your door is in your room.
       </p>
     </div>,
   ];
@@ -9164,6 +9164,7 @@ function NBackSessionApp() {
   // The whole app scrolls inside one container, so moving between screens
   // kept whatever scroll position the last one was left at — which is why a
   // long page opened partway down. Reset it on every change of view.
+  const [rrtAutoStart, setRrtAutoStart] = useState(0);
   const scrollRootRef = useRef(null);
   useEffect(() => {
     if (scrollRootRef.current) scrollRootRef.current.scrollTop = 0;
@@ -10438,9 +10439,10 @@ function NBackSessionApp() {
                     setTutorialDismissed(tutorialStepExercise.key, true);
                   }
                   // Straight into the round. The setup screen only exists for
-                  // people who did not just read the tutorial.
+                  // people who did not just read the tutorial. RRT runs its
+                  // own setup stage, so it gets a nudge rather than startTask.
                   setMainView("app");
-                  startTask(tutorialStepExercise, n);
+                  setRrtAutoStart((v) => v + 1);
                 }}
               />
             ) : (
@@ -10453,7 +10455,7 @@ function NBackSessionApp() {
               </div>
             )}
 
-            <label className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3 text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors text-sm cursor-pointer select-none">
+            <label className="flex items-center gap-3 text-slate-400 hover:text-slate-200 transition-colors text-sm cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={tutorialDontShowAgain}
@@ -12105,6 +12107,7 @@ function NBackSessionApp() {
             paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
             scrambleFactor={rrtScrambleFactor}
             branchingEnabled={true}
+            autoStart={rrtAutoStart}
           />
         )}
 
@@ -13212,7 +13215,7 @@ const RRT_DROP_AFTER_WRONG = 10;
 
 const RRT_FOOTER_MIN_HEIGHT = 116;
 
-function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true }) {
+function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0 }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
@@ -13387,6 +13390,12 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // triggerFlash's own `override` param (see answer() above) guarantees it
   // even when the increment hasn't been reflected in state/re-render yet.
   const beginRoundRef = useRef(beginRound);
+  // Bumped by the parent when the tutorial finishes, so "I Get It" drops
+  // straight into a round instead of the setup screen.
+  useEffect(() => {
+    if (autoStart > 0) beginRoundRef.current(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart]);
   useEffect(() => {
     beginRoundRef.current = beginRound;
   }, [beginRound]);
@@ -14604,7 +14613,7 @@ function motProjectToScreen(position, camera, width, height) {
 // The track lives in public/audio. The filename has spaces, so it is
 // percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "/audio/Cortex%20Hypnosis%20v1.mp3",
+  url: "/audio/Cortex%20Hypnosis%20v6.mp3",
   title: "Motivation",
   length: "10 min",
   blurb:
