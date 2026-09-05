@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 130;
+const BUILD_VERSION = 131;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:42 PM";
+const BUILD_TIME = "7:49 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation audio v9 and playback fix",
-  "Back locked until the conclusion",
+  "3D MOT tutorial placeholder",
+  "Over-training note on Done for Today",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3286,7 +3286,7 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
 const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v5";
-const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v1";
+const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v2";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4475,6 +4475,50 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
 
 // The RRT tutorial: the items animate into the map as each premise is read,
 // and the conclusion is picked out in gold.
+// Placeholder walkthrough for 3D MOT. Same shape as the others so the real
+// steps can be dropped in without touching the screen around it.
+function Motion3DTutorial({ onDone }) {
+  const accent = EXERCISE_COLORS.motion3d;
+  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center gap-2">
+        <div
+          className="h-1 flex-1 rounded-full"
+          style={{ background: accent }}
+        />
+      </div>
+
+      <div className={`${card} space-y-4`}>
+        <p className="text-slate-100 text-xl leading-relaxed">
+          A set of balls light up. Those are the ones to follow.
+        </p>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          They go dark and every ball starts moving. Keep your attention on the
+          ones that were lit.
+        </p>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          When they stop, name them by their letters.
+        </p>
+        <p className="text-slate-500 text-base leading-relaxed pt-2">
+          A full walkthrough with the visuals is coming.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end">
+        <button
+          onClick={onDone}
+          style={{ "--ex": accent }}
+          className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        >
+          I Get It
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 52 }) {
   const xs = positions.map((p) => p.x);
   const ys = positions.map((p) => p.y);
@@ -10097,6 +10141,20 @@ function NBackSessionApp() {
             </div>
 
             <div className="flex flex-col gap-5 pt-4">
+              {/* Wrapper, because a disabled button fires no hover events of
+                  its own — the note has to live on something around it. */}
+              <div className="relative group">
+              {trainedToday && !sessionInProgress && !sessionParked && (
+                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-11 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-3 py-2 border text-sm whitespace-nowrap z-10"
+                  style={{
+                    borderColor: "#2A2E37",
+                    background: "#0F1115",
+                    color: "#F7F8F8",
+                  }}
+                >
+                  Over training will hurt your results.
+                </div>
+              )}
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
@@ -10110,6 +10168,7 @@ function NBackSessionApp() {
                   ? "Done for Today"
                   : "Start Training"}
               </button>
+              </div>
               <button
                 onClick={goToOverview}
                 className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
@@ -10477,6 +10536,15 @@ function NBackSessionApp() {
                   setRrtAutoStart((v) => v + 1);
                 }}
               />
+            ) : tutorialStepExercise.key === "motion3d" ? (
+              <Motion3DTutorial
+                onDone={() => {
+                  if (tutorialDontShowAgain) {
+                    setTutorialDismissed(tutorialStepExercise.key, true);
+                  }
+                  setMainView("app");
+                }}
+              />
             ) : (
               /* Placeholder — real per-exercise walkthroughs go here as they
                  get built, the way RRT's has. */
@@ -10522,7 +10590,7 @@ function NBackSessionApp() {
 
             {/* RRT's walkthrough carries its own step buttons; the generic
                 Next would be a second way out of the same screen. */}
-            {!["rrt", "dual", "quad", "iqnb"].includes(tutorialStepExercise.key) && (
+            {!["rrt", "dual", "quad", "iqnb", "motion3d"].includes(tutorialStepExercise.key) && (
               <button
                 onClick={() => {
                   if (tutorialDontShowAgain) {
@@ -14751,7 +14819,7 @@ const HYPNOSIS_TRACK = {
   // of showing 0:00 and then jumping.
   seconds: 631,
   blurb:
-    "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost.",
+    "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost. Results are best in the morning and at night right before sleep.",
 };
 
 // Deliberately bare: a play button and a volume slider, nothing else. No
