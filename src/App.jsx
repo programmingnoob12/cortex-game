@@ -2205,7 +2205,7 @@ const MOTIVATION_LINES = [
   { id: 5, text: "OUTTHINK. OUTREACT. OUTPERFORM." },
   { id: 6, text: "GET AHEAD." },
   { id: 7, text: "MAKE YOUR MIND STRONGER." },
-  { id: 8, text: "BECOME MENTALLY SUPERIOR. KEEP CLIMBING." },
+  { id: 8, text: "BECOME MENTALLY SUPERIOR." },
   { id: 9, text: "BECOME MENTALLY UNSTOPPABLE." },
   { id: 10, text: "Another day, another win." },
   { id: 11, text: "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection." },
@@ -2240,6 +2240,7 @@ const MOTIVATION_LINES = [
   { id: 41, text: "Your opponents aren't ready." },
   { id: 42, text: "The closest thing we have to a superpower is intellect." },
   { id: 43, text: "Dominate everyone." },
+  { id: 44, text: "KEEP CLIMBING." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2276,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 127;
+const BUILD_VERSION = 128;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:07 PM";
+const BUILD_TIME = "7:23 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT tutorial starts the round properly",
-  "Motivation audio v6",
+  "History hint after the first answer",
+  "Motivation audio v7",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3284,7 +3285,8 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // Bumped: earlier builds had a version of this that could be dismissed by
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v4";
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v5";
+const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v1";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4671,7 +4673,8 @@ function RrtTutorialAnimated({ onDone }) {
         screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Close your eyes after reading if it helps.
+        If it helps, you can close your eyes until you get the hang of
+        spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         It should be like feeling where your door is in your room.
@@ -13223,6 +13226,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // Back stays locked until every premise has been read once, so the round
   // cannot be answered by flicking back and forth instead of holding them.
   const [maxPremiseSeen, setMaxPremiseSeen] = useState(0);
+  const [answeredAny, setAnsweredAny] = useState(false);
 
   // Difficulty progression: every 20 correct answers in a row, RRT steps up
   // once. Each premise-count tier has 3 steps — the round length drops 5s
@@ -13588,6 +13592,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         setWrongStreak(nextWrong);
       }
     }
+    setAnsweredAny(true);
     triggerFlash(correct ? "correct" : "wrong", override);
   };
 
@@ -13611,6 +13616,25 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     }
   };
   const showTimerHint = !hideTimerHint && !timerRunning && !flash;
+
+  // A second pointer, at History, shown once the first round has been
+  // answered. Its own tick box, its own storage key.
+  const [hideHistoryHint, setHideHistoryHint] = useState(() => {
+    try {
+      return localStorage.getItem(RRT_HISTORY_HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const dismissHistoryHint = () => {
+    setHideHistoryHint(true);
+    try {
+      localStorage.setItem(RRT_HISTORY_HINT_KEY, "1");
+    } catch {
+      /* a session without persistence just sees it again next time */
+    }
+  };
+  const showHistoryHint = !hideHistoryHint && answeredAny && !flash;
 
   if (stage === "setup") {
     return (
@@ -14136,6 +14160,74 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     </>
   ) : null;
 
+  const historyHint = showHistoryHint ? (
+    <>
+      <div className="hidden lg:block absolute left-full top-[1.4rem] ml-3 w-60">
+        <svg
+          width="76"
+          height="22"
+          viewBox="0 0 76 22"
+          fill="none"
+          className="absolute pointer-events-none"
+          style={{ left: -70, top: 6 }}
+          aria-hidden="true"
+        >
+          <path
+            d="M74 18C74 18 50 4 5 4"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <path
+            d="M12 1 4 4 11 9"
+            stroke={EXERCISE_COLORS.rrt}
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <div
+          className="rounded-lg px-3 py-2 border text-sm"
+          style={{
+            borderColor: `${EXERCISE_COLORS.rrt}66`,
+            background: "#0F1115",
+            color: "#F7F8F8",
+          }}
+        >
+          <div>Check History to see if your spatial model is accurate.</div>
+          <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={false}
+              onChange={dismissHistoryHint}
+              className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+            />
+            Don't show again
+          </label>
+        </div>
+      </div>
+      <div
+        className="lg:hidden absolute top-full left-0 right-0 mt-24 rounded-lg px-3 py-2 border text-sm"
+        style={{
+          borderColor: `${EXERCISE_COLORS.rrt}66`,
+          background: "#0F1115",
+          color: "#F7F8F8",
+        }}
+      >
+        <div>Check History to see if your spatial model is accurate.</div>
+        <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={false}
+            onChange={dismissHistoryHint}
+            className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+          />
+          Don't show again
+        </label>
+      </div>
+    </>
+  ) : null;
+
   // Verdict flash: a tinted wash plus a hard inset ring in the verdict colour,
   // with the label set small and letter-spaced over it. The puzzle stays
   // readable underneath instead of being painted out by a full-bleed block
@@ -14172,6 +14264,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       <div className="relative max-w-sm mx-auto">
         {flashOverlay}
         {timerHint}
+        {historyHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
@@ -14277,6 +14370,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     <div className="relative max-w-sm mx-auto">
       {flashOverlay}
       {timerHint}
+      {historyHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
@@ -14613,7 +14707,7 @@ function motProjectToScreen(position, camera, width, height) {
 // The track lives in public/audio. The filename has spaces, so it is
 // percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "/audio/Cortex%20Hypnosis%20v6.mp3",
+  url: "/audio/Cortex%20Hypnosis%20v7.mp3",
   title: "Motivation",
   length: "10 min",
   blurb:
@@ -14814,7 +14908,7 @@ function HypnosisScreen({ onDone, afterSession }) {
           onClick={onDone}
           className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
         >
-          Skip
+          Done
         </button>
       )}
     </div>
