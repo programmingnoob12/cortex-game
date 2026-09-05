@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 128;
+const BUILD_VERSION = 129;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:23 PM";
+const BUILD_TIME = "7:32 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History hint after the first answer",
-  "Motivation audio v7",
+  "Softer button motion",
+  "Motivation audio starts from the top",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4797,8 +4797,20 @@ function NBackTutorialDemo({ exercise, accent }) {
 
   return (
     <div className="flex flex-col items-center gap-5">
+      {/* The 2 is picked out in gold so the label reads as the same "2" the
+          demo is about: two back, two places ago. */}
       <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
-        {label}
+        {isPrime ? (
+          <>
+            QNB'{" "}
+            <span style={{ color: PR_YELLOW, fontWeight: 600 }}>2.00</span>
+          </>
+        ) : (
+          <>
+            {exercise.abbrev}
+            <span style={{ color: PR_YELLOW, fontWeight: 600 }}>2</span>B
+          </>
+        )}
       </div>
 
       <div
@@ -14126,7 +14138,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             color: "#F7F8F8",
           }}
         >
-          <div>Tick this to start the round.</div>
+          <div>Tick this to start or stop the round.</div>
           <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
             <input
               type="checkbox"
@@ -14146,7 +14158,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           color: "#F7F8F8",
         }}
       >
-        <div>Tick the box next to TIMER to start the round.</div>
+        <div>Tick the box next to TIMER to start or stop the round.</div>
         <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
           <input
             type="checkbox"
@@ -14164,16 +14176,16 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     <>
       <div className="hidden lg:block absolute left-full top-[1.4rem] ml-3 w-60">
         <svg
-          width="76"
+          width="92"
           height="22"
-          viewBox="0 0 76 22"
+          viewBox="0 0 92 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ left: -70, top: 6 }}
+          style={{ left: -86, top: 6 }}
           aria-hidden="true"
         >
           <path
-            d="M74 18C74 18 50 4 5 4"
+            d="M90 18C90 18 58 4 5 4"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
@@ -14710,6 +14722,9 @@ const HYPNOSIS_TRACK = {
   url: "/audio/Cortex%20Hypnosis%20v7.mp3",
   title: "Motivation",
   length: "10 min",
+  // Known length, so the bar reads correctly before metadata arrives instead
+  // of showing 0:00 and then jumping.
+  seconds: 631,
   blurb:
     "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost.",
 };
@@ -14722,7 +14737,7 @@ function HypnosisScreen({ onDone, afterSession }) {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(0.8);
   const [elapsed, setElapsed] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(HYPNOSIS_TRACK.seconds);
 
   // Stop on leaving, so it cannot keep playing underneath the rest of the app.
   useEffect(() => {
@@ -14760,6 +14775,10 @@ function HypnosisScreen({ onDone, afterSession }) {
     if (!el) return;
     if (el.paused) {
       el.volume = volume;
+      // Some browsers begin playback from wherever the buffer happens to
+      // start, clipping the first word. Pinning it to 0 on a fresh play
+      // stops the intro being cut off.
+      if (el.currentTime < 0.5) el.currentTime = 0;
       el.play().then(() => setPlaying(true)).catch(() => setPlaying(false));
     } else {
       el.pause();
@@ -14792,11 +14811,13 @@ function HypnosisScreen({ onDone, afterSession }) {
         <audio
           ref={audioRef}
           src={HYPNOSIS_TRACK.url}
-          preload="metadata"
+          preload="auto"
           onEnded={() => setPlaying(false)}
           onPause={() => setPlaying(false)}
           onPlay={() => setPlaying(true)}
-          onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+          onLoadedMetadata={(e) =>
+            setDuration(e.currentTarget.duration || HYPNOSIS_TRACK.seconds)
+          }
           onTimeUpdate={(e) => setElapsed(e.currentTarget.currentTime)}
         />
         <div className="flex items-center gap-6">
