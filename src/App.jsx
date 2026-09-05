@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 142;
+const BUILD_VERSION = 143;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:09 PM";
+const BUILD_TIME = "10:13 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Pointer at Explanation in History",
-  "Wider n-back tutorial layout",
+  "Hints clear themselves on every new build",
+  "N-back tutorial back to one column",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3290,6 +3290,25 @@ const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v5";
 // remount of the exercise rather than resetting with component state.
 const RRT_ANSWERED_KEY = "cortex.rrtAnswered.v1";
 const RRT_BACK_HINT_KEY = "cortex.rrtBackHint.v1";
+const RRT_HINT_KEYS = [
+  RRT_TIMER_HINT_KEY,
+  RRT_HISTORY_HINT_KEY,
+  RRT_BACK_HINT_KEY,
+];
+// Ticking "Don't show again" writes a flag that never expires, which makes a
+// dismissed pointer impossible to see again without clearing storage by hand.
+// Clearing them whenever the build changes keeps them visible through a round
+// of changes without needing a new storage key each time.
+const RRT_HINT_BUILD_KEY = "cortex.rrtHintBuild";
+(() => {
+  try {
+    if (localStorage.getItem(RRT_HINT_BUILD_KEY) === String(BUILD_VERSION)) return;
+    RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
+    localStorage.setItem(RRT_HINT_BUILD_KEY, String(BUILD_VERSION));
+  } catch {
+    /* no storage: nothing was persisted to clear */
+  }
+})();
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4978,7 +4997,6 @@ function NBackTutorialDemo({ exercise, accent }) {
         )}
       </div>
 
-      <div className="flex flex-col md:flex-row items-center md:items-center justify-center gap-8 w-full">
       <div
         className="shrink-0"
         style={{
@@ -5009,7 +5027,6 @@ function NBackTutorialDemo({ exercise, accent }) {
         })}
       </div>
 
-      <div className="flex flex-col items-center gap-5 md:min-w-[19rem]">
       <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem] w-full">
         {seq.map((item, idx) => {
           if (idx > i) return null;
@@ -5048,11 +5065,11 @@ function NBackTutorialDemo({ exercise, accent }) {
         })}
       </div>
 
-      <div className="flex items-center justify-center gap-2 flex-wrap">
+      <div className="flex items-center justify-center gap-2 flex-nowrap">
         {mods.map((m) => (
           <div
             key={m}
-            className="rounded-lg px-4 py-2 text-base font-semibold transition-colors flex items-center gap-2"
+            className="rounded-lg px-3 py-2 text-sm font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
             style={{
               border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
               color: isMatch ? PR_YELLOW : "#6E717A",
@@ -5087,8 +5104,6 @@ function NBackTutorialDemo({ exercise, accent }) {
           : i < n
           ? "Nothing to compare it to yet."
           : "Not the same as 2 places ago."}
-      </div>
-      </div>
       </div>
     </div>
   );
@@ -11255,10 +11270,8 @@ function NBackSessionApp() {
             <button
               onClick={() => {
                 try {
-                  localStorage.removeItem(RRT_TIMER_HINT_KEY);
-                  localStorage.removeItem(RRT_HISTORY_HINT_KEY);
+                  RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
                   localStorage.removeItem(RRT_ANSWERED_KEY);
-                  localStorage.removeItem(RRT_BACK_HINT_KEY);
                 } catch {
                   /* nothing to clear without storage */
                 }
@@ -11832,7 +11845,7 @@ function NBackSessionApp() {
                 className="h-full rounded-full"
                 style={{
                   background: "var(--ex)",
-                  animation: "switchBar 4.2s linear both",
+                  animation: "switchBar 3.3s linear both",
                 }}
               />
             </div>
