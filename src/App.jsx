@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 133;
+const BUILD_VERSION = 134;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:58 PM";
+const BUILD_TIME = "8:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Hint reset button on the Account page",
-  "History link no longer shifts on hover",
+  "3D MOT tutorial is one page",
+  "RRT page on reading every premise first",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4473,8 +4473,6 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
   );
 }
 
-// The RRT tutorial: the items animate into the map as each premise is read,
-// and the conclusion is picked out in gold.
 // The 3D MOT walkthrough. Ten dots in a box: five glow gold, then every dot
 // looks the same and the set drifts, then it freezes and the five you were
 // meant to hold are picked back out. Flat and 2D on purpose — the real
@@ -4574,65 +4572,31 @@ function Motion3DTutorialDemo({ accent }) {
 
 function Motion3DTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.motion3d;
-  const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
-  const [step, setStep] = useState(0);
-
-  const steps = [
-    <div className={`${card} space-y-4`} key="m0">
-      <p className="text-slate-100 text-xl leading-relaxed">
-        A few balls light up. Those are the ones to follow.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
-        They go dark and every ball starts moving. Don't look at them one at a
-        time. Hold the whole set at once.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
-        When everything stops, pick the ones you were following.
-      </p>
-    </div>,
-    <div className={card} key="m1">
-      <Motion3DTutorialDemo accent={accent} />
-    </div>,
-  ];
-
-  const isLast = step >= steps.length - 1;
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        {steps.map((_, i) => (
-          <div
-            key={i}
-            className="h-1 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? accent : "#1E293B" }}
-          />
-        ))}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6">
+        <p className="text-slate-100 text-xl leading-relaxed text-center">
+          Follow the balls that light up. Pick them out when everything stops.
+        </p>
+        <Motion3DTutorialDemo accent={accent} />
       </div>
 
-      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
-        {steps[step]}
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-end">
         <button
-          onClick={() => setStep((v) => Math.max(0, v - 1))}
-          disabled={step === 0}
-          className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
-        >
-          Back
-        </button>
-        <button
-          onClick={() => (isLast ? onDone() : setStep((v) => v + 1))}
+          onClick={onDone}
           style={{ "--ex": accent }}
           className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
         >
-          {isLast ? "I Get It" : "Next"}
+          I Get It
         </button>
       </div>
     </div>
   );
 }
 
+// The RRT tutorial: the items animate into the map as each premise is read,
+// and the conclusion is picked out in gold.
 function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 52 }) {
   const xs = positions.map((p) => p.x);
   const ys = positions.map((p) => p.y);
@@ -4717,6 +4681,7 @@ function RrtTutorialAnimated({ onDone }) {
     { revealAt: [[0], [0, 1]], highlight: [] },
     { revealAt: [[0, 1], [0, 1, 2]], highlight: [] },
     { revealAt: [[0, 1, 2], [0, 1, 2]], highlight: [0, 2] },
+    { revealAt: [[], []], highlight: [] },
     { revealAt: [[], []], highlight: [] },
   ];
 
@@ -4823,6 +4788,19 @@ function RrtTutorialAnimated({ onDone }) {
         <RrtItemTile item={blue} size={30} />
         <span>?</span>
       </div>
+    </div>,
+
+    <div className={`${card} space-y-4`} key="s5a">
+      <p className="text-slate-100 text-xl leading-relaxed">
+        Read every premise before you go back.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Place each item as it comes, then look over the whole model once.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Only go back if a spot feels unclear. Back is locked until you reach
+        the conclusion.
+      </p>
     </div>,
 
     <div className={`${card} space-y-4`} key="s5">
