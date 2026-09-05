@@ -2277,15 +2277,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 131;
+const BUILD_VERSION = 132;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:49 PM";
+const BUILD_TIME = "7:54 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "3D MOT tutorial placeholder",
-  "Over-training note on Done for Today",
+  "3D MOT tutorial demo",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4475,44 +4474,158 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
 
 // The RRT tutorial: the items animate into the map as each premise is read,
 // and the conclusion is picked out in gold.
-// Placeholder walkthrough for 3D MOT. Same shape as the others so the real
-// steps can be dropped in without touching the screen around it.
+// The 3D MOT walkthrough. Ten dots in a box: five glow gold, then every dot
+// looks the same and the set drifts, then it freezes and the five you were
+// meant to hold are picked back out. Flat and 2D on purpose — the real
+// exercise adds depth, but the rule is easier to read without it.
+function Motion3DTutorialDemo({ accent }) {
+  const COUNT = 10;
+  const TARGETS = 5;
+  const W = 320;
+  const H = 210;
+  const R = 15;
+
+  const spread = () =>
+    Array.from({ length: COUNT }, () => ({
+      x: R + Math.random() * (W - 2 * R),
+      y: R + Math.random() * (H - 2 * R),
+    }));
+
+  const [spots, setSpots] = useState(() => spread());
+  // 0 = targets lit, 1 = everything drifting, 2 = frozen and revealed.
+  const [phase, setPhase] = useState(0);
+  const letters = MOT_KEY_LETTERS.slice(0, COUNT);
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setPhase(1), 2000),
+      setTimeout(() => setPhase(2), 9200),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 1) return undefined;
+    const id = setInterval(() => setSpots(spread()), 1600);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
+  const caption =
+    phase === 0
+      ? "These five are yours. Hold them."
+      : phase === 1
+      ? "Now they all look the same, and everything moves."
+      : "Frozen. These were the five.";
+
+  return (
+    <div className="flex flex-col items-center gap-5">
+      <div
+        className="relative rounded-xl overflow-hidden"
+        style={{
+          width: W,
+          height: H,
+          border: `1px solid ${NBACK_GRID_LINE}`,
+          background: "#0B0D10",
+        }}
+      >
+        {spots.map((p, i) => {
+          const isTarget = i < TARGETS;
+          const lit = phase === 0 && isTarget;
+          const revealed = phase === 2 && isTarget;
+          return (
+            <div
+              key={i}
+              className="absolute flex items-center justify-center rounded-full"
+              style={{
+                width: R * 2,
+                height: R * 2,
+                left: 0,
+                top: 0,
+                transform: `translate(${p.x - R}px, ${p.y - R}px)`,
+                transition: "transform 1.6s linear, background 0.35s ease, box-shadow 0.35s ease",
+                background: lit || revealed ? PR_YELLOW : "#2C313A",
+                boxShadow: lit
+                  ? `0 0 14px ${PR_YELLOW}99`
+                  : revealed
+                  ? `0 0 0 2px ${PR_YELLOW}`
+                  : "none",
+                color: revealed ? "#0B0D10" : "transparent",
+                fontSize: 13,
+                fontWeight: 700,
+              }}
+            >
+              {letters[i].toUpperCase()}
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        className="text-base text-center min-h-[1.5rem]"
+        style={{ color: phase === 1 ? "#6E717A" : PR_YELLOW }}
+      >
+        {caption}
+      </div>
+    </div>
+  );
+}
+
 function Motion3DTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.motion3d;
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
+  const [step, setStep] = useState(0);
+
+  const steps = [
+    <div className={`${card} space-y-4`} key="m0">
+      <p className="text-slate-100 text-xl leading-relaxed">
+        A few balls light up. Those are the ones to follow.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        They go dark and every ball starts moving. Don't look at them one at a
+        time. Hold the whole set at once.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        When everything stops, pick the ones you were following.
+      </p>
+    </div>,
+    <div className={card} key="m1">
+      <Motion3DTutorialDemo accent={accent} />
+    </div>,
+  ];
+
+  const isLast = step >= steps.length - 1;
 
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-2">
-        <div
-          className="h-1 flex-1 rounded-full"
-          style={{ background: accent }}
-        />
+        {steps.map((_, i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
       </div>
 
-      <div className={`${card} space-y-4`}>
-        <p className="text-slate-100 text-xl leading-relaxed">
-          A set of balls light up. Those are the ones to follow.
-        </p>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          They go dark and every ball starts moving. Keep your attention on the
-          ones that were lit.
-        </p>
-        <p className="text-slate-100 text-lg leading-relaxed">
-          When they stop, name them by their letters.
-        </p>
-        <p className="text-slate-500 text-base leading-relaxed pt-2">
-          A full walkthrough with the visuals is coming.
-        </p>
+      <div key={step} style={{ animation: "switchIn 0.5s ease-out both" }}>
+        {steps[step]}
       </div>
 
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-between gap-3">
         <button
-          onClick={onDone}
+          onClick={() => setStep((v) => Math.max(0, v - 1))}
+          disabled={step === 0}
+          className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+        >
+          Back
+        </button>
+        <button
+          onClick={() => (isLast ? onDone() : setStep((v) => v + 1))}
           style={{ "--ex": accent }}
           className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
         >
-          I Get It
+          {isLast ? "I Get It" : "Next"}
         </button>
       </div>
     </div>
@@ -10152,7 +10265,7 @@ function NBackSessionApp() {
                     color: "#F7F8F8",
                   }}
                 >
-                  Over training will hurt your results.
+                  Overtraining will hurt your results.
                 </div>
               )}
               <button
@@ -14267,16 +14380,16 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     <>
       <div className="hidden lg:block absolute left-full top-[1.75rem] ml-3 w-60">
         <svg
-          width="64"
+          width="46"
           height="22"
-          viewBox="0 0 64 22"
+          viewBox="0 0 46 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ left: -58, top: 6 }}
+          style={{ left: -38, top: 6 }}
           aria-hidden="true"
         >
           <path
-            d="M62 18C62 18 40 4 5 4"
+            d="M44 18C44 18 28 4 5 4"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
