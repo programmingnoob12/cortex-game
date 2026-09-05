@@ -2277,15 +2277,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 137;
+const BUILD_VERSION = 138;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:20 PM";
+const BUILD_TIME = "8:29 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History pointer always on until dismissed",
-  "Shorter hand-off, slower ball drift",
+  "History pointer waits for a finished round",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13858,9 +13857,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
-  // Deliberately not gated on anything but its own dismissal: every
-  // condition tried on top of that ended up hiding it.
-  const showHistoryHint = !hideHistoryHint && !flash;
+  // Gated on the History list actually having something in it, which is the
+  // same state the panel itself reads — no separate flag to fall out of sync.
+  const showHistoryHint = !hideHistoryHint && !flash && roundHistory.length > 0;
 
   if (stage === "setup") {
     return (
