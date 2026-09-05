@@ -2277,14 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 132;
+const BUILD_VERSION = 133;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:54 PM";
+const BUILD_TIME = "7:58 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "3D MOT tutorial demo",
+  "Hint reset button on the Account page",
+  "History link no longer shifts on hover",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3284,8 +3285,8 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // Bumped: earlier builds had a version of this that could be dismissed by
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v5";
-const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v2";
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v6";
+const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v3";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -9759,6 +9760,9 @@ function NBackSessionApp() {
                   One of the pages has its text off-centre, unlike the others.
                 </div>
                 <div>
+                  Make the 3D MOT balls look better.
+                </div>
+                <div>
                   The goal isn't to just be a brain training app, it also is to
                   have psychological solutions that make it feel better and
                   easier, and to essentially nee like a pseudo motivation
@@ -11240,6 +11244,24 @@ function NBackSessionApp() {
                 onToggle={() => setHideTutorials(!hideTutorials)}
               />
             </div>
+
+            {/* The in-exercise pointers are dismissed for good by their own
+                tick box, which makes them impossible to see again without
+                clearing storage by hand. */}
+            <button
+              onClick={() => {
+                try {
+                  localStorage.removeItem(RRT_TIMER_HINT_KEY);
+                  localStorage.removeItem(RRT_HISTORY_HINT_KEY);
+                } catch {
+                  /* nothing to clear without storage */
+                }
+                window.location.reload();
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 rounded-lg py-5 text-xl font-medium text-left px-7"
+            >
+              Bring back the exercise hints
+            </button>
 
             <button
               onClick={() => setMainView("membership")}
@@ -13905,7 +13927,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               setTimerRunning(false);
               setHistoryOpen(true);
             }}
-            className="text-sm text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2 transition-colors"
+            className="no-lift text-sm text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2 transition-colors"
           >
             History
           </button>
