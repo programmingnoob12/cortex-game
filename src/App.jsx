@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 134;
+const BUILD_VERSION = 135;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:03 PM";
+const BUILD_TIME = "8:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "3D MOT tutorial is one page",
-  "RRT page on reading every premise first",
+  "History pointer no longer resets",
+  "3D MOT balls stop and light on the same beat",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3287,6 +3287,9 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // someone who had never actually seen it.
 const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v6";
 const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v3";
+// Whether a round has ever been answered, so the History pointer survives a
+// remount of the exercise rather than resetting with component state.
+const RRT_ANSWERED_KEY = "cortex.rrtAnswered.v1";
 
 // Interference for every N-back exercise. Fixed rather than adjustable, for
 // the same reason as the scramble factor: it is part of what a level means,
@@ -4496,9 +4499,11 @@ function Motion3DTutorialDemo({ accent }) {
   const letters = MOT_KEY_LETTERS.slice(0, COUNT);
 
   useEffect(() => {
+    // 2000 + five 1600ms moves: the freeze lands exactly as the last move
+    // finishes, so the balls stop and light up on the same beat.
     const timers = [
       setTimeout(() => setPhase(1), 2000),
-      setTimeout(() => setPhase(2), 9200),
+      setTimeout(() => setPhase(2), 2000 + 5 * 1600),
     ];
     return () => timers.forEach(clearTimeout);
   }, []);
@@ -4682,7 +4687,6 @@ function RrtTutorialAnimated({ onDone }) {
     { revealAt: [[0, 1], [0, 1, 2]], highlight: [] },
     { revealAt: [[0, 1, 2], [0, 1, 2]], highlight: [0, 2] },
     { revealAt: [[], []], highlight: [] },
-    { revealAt: [[], []], highlight: [] },
   ];
 
   useEffect(() => {
@@ -4788,19 +4792,6 @@ function RrtTutorialAnimated({ onDone }) {
         <RrtItemTile item={blue} size={30} />
         <span>?</span>
       </div>
-    </div>,
-
-    <div className={`${card} space-y-4`} key="s5a">
-      <p className="text-slate-100 text-xl leading-relaxed">
-        Read every premise before you go back.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
-        Place each item as it comes, then look over the whole model once.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
-        Only go back if a spot feels unclear. Back is locked until you reach
-        the conclusion.
-      </p>
     </div>,
 
     <div className={`${card} space-y-4`} key="s5">
@@ -11231,6 +11222,7 @@ function NBackSessionApp() {
                 try {
                   localStorage.removeItem(RRT_TIMER_HINT_KEY);
                   localStorage.removeItem(RRT_HISTORY_HINT_KEY);
+                  localStorage.removeItem(RRT_ANSWERED_KEY);
                 } catch {
                   /* nothing to clear without storage */
                 }
@@ -13436,7 +13428,21 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // Back stays locked until every premise has been read once, so the round
   // cannot be answered by flicking back and forth instead of holding them.
   const [maxPremiseSeen, setMaxPremiseSeen] = useState(0);
-  const [answeredAny, setAnsweredAny] = useState(false);
+  const [answeredAny, setAnsweredAny] = useState(() => {
+    try {
+      return localStorage.getItem(RRT_ANSWERED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const markAnswered = () => {
+    setAnsweredAny(true);
+    try {
+      localStorage.setItem(RRT_ANSWERED_KEY, "1");
+    } catch {
+      /* no persistence: the hint just waits for this session's first answer */
+    }
+  };
   // Back is locked until the conclusion has been reached once, so a round
   // cannot be worked by flicking between premises instead of holding them.
   const [reachedQuestion, setReachedQuestion] = useState(false);
@@ -13808,7 +13814,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
         setWrongStreak(nextWrong);
       }
     }
-    setAnsweredAny(true);
+    markAnswered();
     triggerFlash(correct ? "correct" : "wrong", override);
   };
 
