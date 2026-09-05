@@ -2276,15 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 116;
+const BUILD_VERSION = 117;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:18 PM";
+const BUILD_TIME = "5:23 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Demo runs once to the first match and stops",
-  "Letter is spoken instead of written",
+  "Arrow lands on the checkbox",
+  "Demo shows the keys and uses the recorded voice",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4641,15 +4641,15 @@ function NBackTutorialDemo({ exercise, accent }) {
   const hasAudio = mods.includes("audio");
   const isPrime = exercise.key === "iqnb";
   const shapeSet = isPrime ? QNB_PRIME_SHAPES : SHAPE_TYPES;
-  const label = isPrime ? "Q2B'" : `${exercise.abbrev}2B`;
+  const label = isPrime ? "QNB' 2.00" : `${exercise.abbrev}2B`;
 
   // Four distinct items, then a run where item B repeats exactly two places
   // later, twice.
   const defs = [
     { pos: 0, color: COLORS[0], shape: shapeSet[0], letter: "K" },
-    { pos: 4, color: COLORS[3], shape: shapeSet[1], letter: "T" },
-    { pos: 8, color: COLORS[2], shape: shapeSet[2], letter: "L" },
-    { pos: 6, color: COLORS[4], shape: shapeSet[3], letter: "R" },
+    { pos: 4, color: COLORS[3], shape: shapeSet[1], letter: "L" },
+    { pos: 8, color: COLORS[2], shape: shapeSet[2], letter: "R" },
+    { pos: 6, color: COLORS[4], shape: shapeSet[3], letter: "Z" },
   ];
   // Four trials: three new items, then the second one again. It runs once and
   // stops on the match, so the last thing on screen is the thing to learn.
@@ -4657,9 +4657,16 @@ function NBackTutorialDemo({ exercise, accent }) {
 
   const [i, setI] = useState(-1);
 
+  // The tutorial is only ever reached by clicking, so the context can be
+  // resumed here. Without this the first letters fall through to speech
+  // synthesis while the samples are still being fetched.
+  useEffect(() => {
+    if (hasAudio) unlockLetterAudio();
+  }, [hasAudio]);
+
   useEffect(() => {
     if (i >= seq.length - 1) return undefined;
-    const t = setTimeout(() => setI((v) => v + 1), i === -1 ? 900 : 1900);
+    const t = setTimeout(() => setI((v) => v + 1), i === -1 ? 1400 : 1900);
     return () => clearTimeout(t);
   }, [i, seq.length]);
 
@@ -4691,7 +4698,7 @@ function NBackTutorialDemo({ exercise, accent }) {
 
   return (
     <div className="flex flex-col items-center gap-5">
-      <div className="text-sm tracking-[0.2em] uppercase" style={{ color: accent }}>
+      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
         {label}
       </div>
 
@@ -4760,6 +4767,23 @@ function NBackTutorialDemo({ exercise, accent }) {
             </div>
           );
         })}
+      </div>
+
+      <div className="flex items-center justify-center gap-2 flex-wrap">
+        {mods.map((m) => (
+          <div
+            key={m}
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors flex items-center gap-2"
+            style={{
+              border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
+              color: isMatch ? PR_YELLOW : "#6E717A",
+              background: isMatch ? `${PR_YELLOW}1A` : "transparent",
+            }}
+          >
+            <span>{MODALITY_META[m].label}</span>
+            <span className="text-base leading-none">{MODALITY_KEY_LABEL[m]}</span>
+          </div>
+        ))}
       </div>
 
       <div
@@ -13905,23 +13929,24 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // so it drops underneath instead.
   const timerHint = showTimerHint ? (
     <>
-      <div className="hidden lg:flex absolute left-full top-[6.4rem] ml-3 items-start gap-2 w-60">
+      <div className="hidden lg:block absolute left-full top-[6.4rem] ml-3 w-60">
         <svg
-          width="38"
+          width="58"
           height="22"
-          viewBox="0 0 38 22"
+          viewBox="0 0 58 22"
           fill="none"
-          className="shrink-0 mt-2"
+          className="absolute"
+          style={{ left: -52, top: 6 }}
           aria-hidden="true"
         >
           <path
-            d="M36 16C36 16 28 4 4 4"
+            d="M56 18C56 18 42 4 5 4"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
           />
           <path
-            d="M11 1 3 4 10 9"
+            d="M12 1 4 4 11 9"
             stroke={EXERCISE_COLORS.rrt}
             strokeWidth="2"
             strokeLinecap="round"
