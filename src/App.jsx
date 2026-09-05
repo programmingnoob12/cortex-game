@@ -2276,14 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 140;
+const BUILD_VERSION = 141;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:58 PM";
+const BUILD_TIME = "10:00 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "No blank flash on first paint",
+  "Tutorial demos loop",
+  "Bigger n-back tutorial visuals",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3283,8 +3284,8 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // Bumped: earlier builds had a version of this that could be dismissed by
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
-const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v6";
-const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v4";
+const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v7";
+const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v5";
 // Whether a round has ever been answered, so the History pointer survives a
 // remount of the exercise rather than resetting with component state.
 const RRT_ANSWERED_KEY = "cortex.rrtAnswered.v1";
@@ -4482,9 +4483,9 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
 function Motion3DTutorialDemo() {
   const COUNT = 10;
   const TARGETS = 5;
-  const W = 320;
-  const H = 210;
-  const R = 15;
+  const W = 420;
+  const H = 270;
+  const R = 18;
   const MOVE_MS = 1100;
   const MOVES = 3;
   const LIT_MS = 1400;
@@ -4516,19 +4517,25 @@ function Motion3DTutorialDemo() {
   // Explicit timeouts rather than an interval: the freeze has to land on the
   // exact tick the last move finishes, or the balls light up while still
   // sliding.
+  // `run` restarts the whole sequence: it holds on the answer for a few
+  // seconds, then plays again, so missing it the first time costs nothing.
+  const [run, setRun] = useState(0);
+
   useEffect(() => {
+    setPhase(0);
+    setSpots(spread());
     const timers = [setTimeout(() => setPhase(1), LIT_MS)];
     for (let i = 0; i < MOVES; i += 1) {
       timers.push(
         setTimeout(() => setSpots((prev) => drift(prev)), LIT_MS + i * MOVE_MS)
       );
     }
-    timers.push(
-      setTimeout(() => setPhase(2), LIT_MS + MOVES * MOVE_MS + 60)
-    );
+    const endAt = LIT_MS + MOVES * MOVE_MS + 60;
+    timers.push(setTimeout(() => setPhase(2), endAt));
+    timers.push(setTimeout(() => setRun((v) => v + 1), endAt + 3000));
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [run]);
 
   return (
     <div className="flex justify-center">
@@ -4563,7 +4570,7 @@ function Motion3DTutorialDemo() {
                   ? `0 0 0 2px ${PR_YELLOW}`
                   : "none",
                 color: lit || revealed ? "#0B0D10" : "#6E717A",
-                fontSize: 13,
+                fontSize: 15,
                 fontWeight: 700,
               }}
             >
@@ -4891,9 +4898,13 @@ function NBackTutorialDemo({ exercise, accent }) {
     if (hasAudio) unlockLetterAudio();
   }, [hasAudio]);
 
+  // Loops: it holds on the match for a few seconds, then runs again, so
+  // missing it the first time costs nothing.
   useEffect(() => {
-    if (i >= seq.length - 1) return undefined;
-    const t = setTimeout(() => setI((v) => v + 1), i === -1 ? 1400 : 1900);
+    const t = setTimeout(
+      () => setI((v) => (v >= seq.length - 1 ? -1 : v + 1)),
+      i === -1 ? 1400 : i >= seq.length - 1 ? 3400 : 1900
+    );
     return () => clearTimeout(t);
   }, [i, seq.length]);
 
@@ -4927,7 +4938,7 @@ function NBackTutorialDemo({ exercise, accent }) {
     <div className="flex flex-col items-center gap-5">
       {/* The 2 is picked out in gold so the label reads as the same "2" the
           demo is about: two back, two places ago. */}
-      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
+      <div className="text-base tracking-[0.08em] uppercase" style={{ color: accent }}>
         {isPrime ? (
           <>
             QNB'{" "}
@@ -4961,8 +4972,8 @@ function NBackTutorialDemo({ exercise, accent }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 4rem)",
-          gridTemplateRows: "repeat(3, 4rem)",
+          gridTemplateColumns: "repeat(3, 5.75rem)",
+          gridTemplateRows: "repeat(3, 5.75rem)",
           borderTop: `1px solid ${NBACK_GRID_LINE}`,
           borderLeft: `1px solid ${NBACK_GRID_LINE}`,
           borderRadius: 4,
@@ -4981,13 +4992,13 @@ function NBackTutorialDemo({ exercise, accent }) {
                 transition: "background 0.12s linear",
               }}
             >
-              {active && stimulus(cur, 50)}
+              {active && stimulus(cur, 72)}
             </div>
           );
         })}
       </div>
 
-      <div className="flex items-end justify-center gap-2 flex-wrap min-h-[3.4rem]">
+      <div className="flex items-end justify-center gap-3 flex-wrap min-h-[4.2rem]">
         {seq.map((item, idx) => {
           if (idx > i) return null;
           const marked = isMatch && (idx === i || idx === i - n);
@@ -4996,8 +5007,8 @@ function NBackTutorialDemo({ exercise, accent }) {
               <div
                 className="flex items-center justify-center"
                 style={{
-                  width: "1.7rem",
-                  height: "1.7rem",
+                  width: "2.5rem",
+                  height: "2.5rem",
                   border: `1px solid ${NBACK_GRID_LINE}`,
                   outline: marked ? `2px solid ${PR_YELLOW}` : "none",
                   outlineOffset: "2px",
@@ -5007,15 +5018,15 @@ function NBackTutorialDemo({ exercise, accent }) {
                 }}
               >
                 {hasShape || hasColor ? (
-                  stimulus(item, 21)
+                  stimulus(item, 32)
                 ) : (
-                  <span className="text-[0.7rem] font-semibold text-slate-900">
+                  <span className="text-base font-semibold text-slate-900">
                     {item.letter}
                   </span>
                 )}
               </div>
               <div
-                className="text-[0.65rem] tabular-nums"
+                className="text-sm tabular-nums"
                 style={{ color: marked ? PR_YELLOW : "#6E717A" }}
               >
                 {idx + 1}
@@ -5029,7 +5040,7 @@ function NBackTutorialDemo({ exercise, accent }) {
         {mods.map((m) => (
           <div
             key={m}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors flex items-center gap-2"
+            className="rounded-lg px-4 py-2 text-base font-semibold transition-colors flex items-center gap-2"
             style={{
               border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
               color: isMatch ? PR_YELLOW : "#6E717A",
@@ -5043,7 +5054,7 @@ function NBackTutorialDemo({ exercise, accent }) {
       </div>
 
       <div
-        className="rounded-lg px-5 py-2.5 text-base font-semibold transition-colors"
+        className="rounded-lg px-6 py-3 text-lg font-semibold transition-colors"
         style={{
           border: `1px solid ${isMatch ? PR_YELLOW : "#2A2E37"}`,
           color: isMatch ? PR_YELLOW : "#6E717A",
@@ -5054,7 +5065,7 @@ function NBackTutorialDemo({ exercise, accent }) {
       </div>
 
       <div
-        className="text-sm text-center min-h-[1.25rem]"
+        className="text-base text-center min-h-[1.5rem]"
         style={{ color: isMatch ? PR_YELLOW : "#6E717A" }}
       >
         {i < 0
@@ -9737,8 +9748,7 @@ function NBackSessionApp() {
                   experience not just training.
                 </div>
                 <div>
-                  And to make this an experience, a ritual of wisdom that is an
-                  experience not just training.
+                  Write more motivational lines and psychology-boosting lines.
                 </div>
                 <div>
                   The goal isn't to just be a brain training app, it also is to
@@ -14415,14 +14425,14 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   const backHint = showBackHint ? (
     <>
-      <div className="hidden lg:block absolute right-full bottom-[6.5rem] mr-3 w-56">
+      <div className="hidden lg:block absolute right-full bottom-[7.8rem] mr-3 w-56">
         <svg
           width="46"
           height="22"
           viewBox="0 0 46 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ right: -38, top: 6 }}
+          style={{ right: -11, top: 6 }}
           aria-hidden="true"
         >
           <path
