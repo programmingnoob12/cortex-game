@@ -2276,14 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 119;
+const BUILD_VERSION = 120;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:35 PM";
+const BUILD_TIME = "5:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Animated RRT tutorial on its own home page button",
+  "Animated RRT tutorial uses the original wording",
+  "More space above the Motivation heading",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4546,9 +4547,12 @@ function RrtTutorialAnimated({ onDone }) {
   const [step, setStep] = useState(0);
   const [beat, setBeat] = useState(0);
 
-  // Each step reveals one more item a moment after the premise appears, so
-  // the map is seen being built rather than arriving finished.
+  // Only the last three steps touch the map. Each reveals one more item a
+  // moment after its premise appears, so the map is seen being built rather
+  // than arriving finished.
   const STEPS = [
+    { revealAt: [[], []], highlight: [] },
+    { revealAt: [[], []], highlight: [] },
     { revealAt: [[0], [0, 1]], highlight: [] },
     { revealAt: [[0, 1], [0, 1, 2]], highlight: [] },
     { revealAt: [[0, 1, 2], [0, 1, 2]], highlight: [0, 2] },
@@ -4564,6 +4568,15 @@ function RrtTutorialAnimated({ onDone }) {
   const revealed = conf.revealAt[Math.min(beat, conf.revealAt.length - 1)];
   const highlight = beat >= 1 ? conf.highlight : [];
 
+  const map = (
+    <RrtTutorialAnimatedMap
+      items={RRT_TUTORIAL_ITEMS}
+      positions={RRT_TUTORIAL_POSITIONS}
+      revealed={revealed}
+      highlight={highlight}
+    />
+  );
+
   const row = (a, text, b, lit) => (
     <div
       className="flex items-center justify-center gap-3.5 flex-wrap text-center rounded-lg px-3 py-3"
@@ -4573,57 +4586,78 @@ function RrtTutorialAnimated({ onDone }) {
         transition: "background 0.3s ease, border-color 0.3s ease",
       }}
     >
-      <RrtItemTile item={a} size={44} />
-      <span className="text-slate-100 text-xl font-semibold">{text}</span>
-      <RrtItemTile item={b} size={44} />
+      <RrtItemTile item={a} size={46} />
+      <span className="text-slate-100 text-xl font-medium">{text}</span>
+      <RrtItemTile item={b} size={46} />
     </div>
   );
 
   const bodies = [
-    <div className={`${card} space-y-6`} key="s0">
-      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
-        Premise 1
-      </div>
-      {row(orange, "is West of", blue, false)}
-      <RrtTutorialAnimatedMap
-        items={RRT_TUTORIAL_ITEMS}
-        positions={RRT_TUTORIAL_POSITIONS}
-        revealed={revealed}
-        highlight={highlight}
-      />
-      <p className="text-slate-100 text-lg leading-relaxed text-center">
-        Place it. Feel where it sits.
+    <div className={`${card} space-y-4`} key="s0">
+      <p className="text-slate-200 text-xl leading-relaxed">
+        Close your eyes and feel where different objects are in your room.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Don't imagine the object.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Feel where the door is.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Feel the space. Feel the direction.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Feel where the chair is.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Feel where the roof is.
       </p>
     </div>,
-    <div className={`${card} space-y-6`} key="s1">
-      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: accent }}>
-        Premise 2
-      </div>
-      {row(green, "is South of", orange, false)}
-      <RrtTutorialAnimatedMap
-        items={RRT_TUTORIAL_ITEMS}
-        positions={RRT_TUTORIAL_POSITIONS}
-        revealed={revealed}
-        highlight={highlight}
-      />
-      <p className="text-slate-100 text-lg leading-relaxed text-center">
-        Now all three are placed.
+
+    <div className={`${card} space-y-4`} key="s1">
+      <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
+        That is spatializing.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        In RRT you spatialize the items. You do not imagine them. You feel
+        where each item is in relation to each other.
       </p>
     </div>,
+
     <div className={`${card} space-y-6`} key="s2">
-      <div className="text-sm tracking-[0.08em] uppercase" style={{ color: PR_YELLOW }}>
-        Conclusion
+      {row(orange, "is West of", blue, false)}
+      {map}
+      <p className="text-slate-100 text-lg leading-relaxed text-center">
+        Feel where each item is.
+      </p>
+    </div>,
+
+    <div className={`${card} space-y-6`} key="s3">
+      {row(green, "is South of", orange, false)}
+      {map}
+      <p className="text-slate-100 text-lg leading-relaxed text-center">
+        Feel where each item is.
+      </p>
+    </div>,
+
+    <div className={`${card} space-y-6`} key="s4">
+      {map}
+      <div className="text-center">
+        <div
+          className="italic font-bold tracking-wide text-lg"
+          style={{ color: accent }}
+        >
+          CONCLUSION
+        </div>
       </div>
       {row(green, "is South-West of", blue, beat >= 1)}
-      <RrtTutorialAnimatedMap
-        items={RRT_TUTORIAL_ITEMS}
-        positions={RRT_TUTORIAL_POSITIONS}
-        revealed={revealed}
-        highlight={highlight}
-      />
-      <p className="text-slate-100 text-lg leading-relaxed text-center">
-        You never worked it out. You read it off the map.
-      </p>
+      <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-100 text-lg">
+        <span>Can you feel how</span>
+        <RrtItemTile item={green} size={30} />
+        <span>is south-west of</span>
+        <RrtItemTile item={blue} size={30} />
+        <span>?</span>
+      </div>
     </div>,
   ];
 
@@ -14747,7 +14781,7 @@ function HypnosisScreen({ onDone, afterSession }) {
         {!afterSession && (
           <button
             onClick={onDone}
-            className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+            className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-10"
           >
             &lsaquo; Back
           </button>
