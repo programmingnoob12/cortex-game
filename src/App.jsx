@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 135;
+const BUILD_VERSION = 136;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:09 PM";
+const BUILD_TIME = "8:14 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History pointer no longer resets",
-  "3D MOT balls stop and light on the same beat",
+  "History pointer shows at the conclusion",
+  "Shorter 3D MOT demo",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4480,12 +4480,15 @@ function RrtTutorialMap({ items, positions, size = 46 }) {
 // looks the same and the set drifts, then it freezes and the five you were
 // meant to hold are picked back out. Flat and 2D on purpose — the real
 // exercise adds depth, but the rule is easier to read without it.
-function Motion3DTutorialDemo({ accent }) {
+function Motion3DTutorialDemo() {
   const COUNT = 10;
   const TARGETS = 5;
   const W = 320;
   const H = 210;
   const R = 15;
+  const MOVE_MS = 1100;
+  const MOVES = 3;
+  const LIT_MS = 1400;
 
   const spread = () =>
     Array.from({ length: COUNT }, () => ({
@@ -4498,32 +4501,23 @@ function Motion3DTutorialDemo({ accent }) {
   const [phase, setPhase] = useState(0);
   const letters = MOT_KEY_LETTERS.slice(0, COUNT);
 
+  // Explicit timeouts rather than an interval: the freeze has to land on the
+  // exact tick the last move finishes, or the balls light up while still
+  // sliding.
   useEffect(() => {
-    // 2000 + five 1600ms moves: the freeze lands exactly as the last move
-    // finishes, so the balls stop and light up on the same beat.
-    const timers = [
-      setTimeout(() => setPhase(1), 2000),
-      setTimeout(() => setPhase(2), 2000 + 5 * 1600),
-    ];
+    const timers = [setTimeout(() => setPhase(1), LIT_MS)];
+    for (let i = 0; i < MOVES; i += 1) {
+      timers.push(setTimeout(() => setSpots(spread()), LIT_MS + i * MOVE_MS));
+    }
+    timers.push(
+      setTimeout(() => setPhase(2), LIT_MS + MOVES * MOVE_MS + 60)
+    );
     return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (phase !== 1) return undefined;
-    const id = setInterval(() => setSpots(spread()), 1600);
-    return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
-
-  const caption =
-    phase === 0
-      ? "These five are yours. Hold them."
-      : phase === 1
-      ? "Now they all look the same, and everything moves."
-      : "Frozen. These were the five.";
-
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex justify-center">
       <div
         className="relative rounded-xl overflow-hidden"
         style={{
@@ -4547,14 +4541,14 @@ function Motion3DTutorialDemo({ accent }) {
                 left: 0,
                 top: 0,
                 transform: `translate(${p.x - R}px, ${p.y - R}px)`,
-                transition: "transform 1.6s linear, background 0.35s ease, box-shadow 0.35s ease",
+                transition: `transform ${MOVE_MS}ms linear, background 0.3s ease, box-shadow 0.3s ease, color 0.3s ease`,
                 background: lit || revealed ? PR_YELLOW : "#2C313A",
                 boxShadow: lit
                   ? `0 0 14px ${PR_YELLOW}99`
                   : revealed
                   ? `0 0 0 2px ${PR_YELLOW}`
                   : "none",
-                color: revealed ? "#0B0D10" : "transparent",
+                color: lit || revealed ? "#0B0D10" : "#6E717A",
                 fontSize: 13,
                 fontWeight: 700,
               }}
@@ -4563,13 +4557,6 @@ function Motion3DTutorialDemo({ accent }) {
             </div>
           );
         })}
-      </div>
-
-      <div
-        className="text-base text-center min-h-[1.5rem]"
-        style={{ color: phase === 1 ? "#6E717A" : PR_YELLOW }}
-      >
-        {caption}
       </div>
     </div>
   );
@@ -4582,9 +4569,9 @@ function Motion3DTutorial({ onDone }) {
     <div className="space-y-8">
       <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6">
         <p className="text-slate-100 text-xl leading-relaxed text-center">
-          Follow the balls that light up. Pick them out when everything stops.
+          Follow the balls.
         </p>
-        <Motion3DTutorialDemo accent={accent} />
+        <Motion3DTutorialDemo />
       </div>
 
       <div className="flex items-center justify-end">
@@ -13856,7 +13843,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
-  const showHistoryHint = !hideHistoryHint && answeredAny && !flash;
+  // Gated on the stage as well as the answered flag: whatever else happens to
+  // component state, reaching a conclusion is enough to show it.
+  const showHistoryHint =
+    !hideHistoryHint && !flash && (answeredAny || stage === "question");
 
   if (stage === "setup") {
     return (
