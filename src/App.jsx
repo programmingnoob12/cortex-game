@@ -2276,14 +2276,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 123;
+const BUILD_VERSION = 124;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:20 PM";
+const BUILD_TIME = "6:28 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Animated version is now the RRT tutorial",
+  "Tutorial runs straight into the round",
+  "RRT Back locked until every premise is read",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4541,8 +4542,11 @@ function RrtTutorialAnimated({ onDone }) {
   const accent = EXERCISE_COLORS.rrt;
   const card = "bg-slate-900 border border-slate-700/70 rounded-xl p-8";
   const [blue, orange, green] = RRT_TUTORIAL_ITEMS;
-  const [step, setStep] = useState(0);
-  const [beat, setBeat] = useState(0);
+  // step and beat move together. Keeping beat in its own state and zeroing it
+  // from an effect let the new step paint once with the old beat, which showed
+  // the incoming item for a frame before the animation ran.
+  const [{ step, beat }, setPos] = useState({ step: 0, beat: 0 });
+  const goToStep = (next) => setPos({ step: next, beat: 0 });
 
   // Only the last three steps touch the map. Each reveals one more item a
   // moment after its premise appears, so the map is seen being built rather
@@ -4557,8 +4561,10 @@ function RrtTutorialAnimated({ onDone }) {
   ];
 
   useEffect(() => {
-    setBeat(0);
-    const t = setTimeout(() => setBeat(1), 900);
+    const t = setTimeout(
+      () => setPos((p) => (p.step === step ? { step, beat: 1 } : p)),
+      900
+    );
     return () => clearTimeout(t);
   }, [step]);
 
@@ -4602,13 +4608,13 @@ function RrtTutorialAnimated({ onDone }) {
         Feel where the door is.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Feel the space. Feel the direction.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
         Feel where the chair is.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         Feel where the table is.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Feel the space. Feel the direction.
       </p>
     </div>,
 
@@ -4618,7 +4624,7 @@ function RrtTutorialAnimated({ onDone }) {
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         In RRT you spatialize the items. You don't imagine them. You{" "}
-        <em className="italic">feel</em> where each item is in relation to each
+        <em className="italic">feel</em> where the items are in relation to each
         other.
       </p>
     </div>,
@@ -4661,16 +4667,14 @@ function RrtTutorialAnimated({ onDone }) {
 
     <div className={`${card} space-y-4`} key="s5">
       <p className="text-slate-100 text-lg leading-relaxed">
-        It's important to feel where the item is. Don't imagine it moving
-        around on the screen.
+        Feel where each item is. Don't picture it on the screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Just feel the spatial model in front of you, not on the screen.
+        The space is in front of you, not on the screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        After reading the items, close your eyes if that helps. Just make sure
-        the feeling is the same as when you feel where the door is in your
-        room.
+        Close your eyes after reading if it helps. It should feel the same as
+        feeling where the door is in your room.
       </p>
     </div>,
   ];
@@ -4695,14 +4699,14 @@ function RrtTutorialAnimated({ onDone }) {
 
       <div className="flex items-center justify-between gap-3">
         <button
-          onClick={() => setStep((v) => Math.max(0, v - 1))}
+          onClick={() => goToStep(Math.max(0, step - 1))}
           disabled={step === 0}
           className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
         >
           Back
         </button>
         <button
-          onClick={() => (isLast ? onDone() : setStep((v) => v + 1))}
+          onClick={() => (isLast ? onDone() : goToStep(step + 1))}
           style={{ "--ex": accent }}
           className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
         >
@@ -10419,6 +10423,12 @@ function NBackSessionApp() {
                     setTutorialDismissed(tutorialStepExercise.key, true);
                   }
                   setMainView("app");
+                  startTask(
+                    tutorialStepExercise,
+                    tutorialStepExercise.key === "iqnb"
+                      ? Math.floor(qnbPrimeLevel)
+                      : n
+                  );
                 }}
               />
             ) : tutorialStepExercise.key === "rrt" ? (
@@ -10427,7 +10437,10 @@ function NBackSessionApp() {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
                   }
+                  // Straight into the round. The setup screen only exists for
+                  // people who did not just read the tutorial.
                   setMainView("app");
+                  startTask(tutorialStepExercise, n);
                 }}
               />
             ) : (
@@ -13181,6 +13194,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
   const [premiseIndex, setPremiseIndex] = useState(0);
+  // Back stays locked until every premise has been read once, so the round
+  // cannot be answered by flicking back and forth instead of holding them.
+  const [maxPremiseSeen, setMaxPremiseSeen] = useState(0);
 
   // Difficulty progression: every 20 correct answers in a row, RRT steps up
   // once. Each premise-count tier has 3 steps — the round length drops 5s
@@ -13328,6 +13344,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       newPuzzle.premiseOrder = scramblePremiseOrder(newPuzzle.premises, scrambleFactor);
       setPuzzle(newPuzzle);
       setPremiseIndex(0);
+      setMaxPremiseSeen(0);
       setMsLeft(rm);
       setTimerRunning(keepTimerRunning);
       setFlash(null);
@@ -14027,8 +14044,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           height="22"
           viewBox="0 0 58 22"
           fill="none"
-          className="absolute"
-          style={{ left: -52, top: 6 }}
+          className="absolute pointer-events-none"
+          style={{ left: -44, top: 6 }}
           aria-hidden="true"
         >
           <path
@@ -14156,7 +14173,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               <div className="flex gap-3">
                 <button
                   onClick={() => setPremiseIndex((i) => Math.max(0, i - 1))}
-                  disabled={isFirst}
+                  disabled={isFirst || maxPremiseSeen < puzzle.premises.length - 1}
                   className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:hover:bg-slate-700 transition-colors rounded-lg py-2 text-base font-medium"
                 >
                   Back
@@ -14167,6 +14184,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       setStage("question");
                     } else {
                       setPremiseIndex((i) => i + 1);
+                      setMaxPremiseSeen((m) => Math.max(m, premiseIndex + 1));
                     }
                   }}
                   disabled={!timerRunning}
@@ -14259,6 +14277,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
               <button
                 onClick={() => {
                   setPremiseIndex(puzzle.premises.length - 1);
+                  setMaxPremiseSeen(puzzle.premises.length - 1);
                   setStage("premises");
                 }}
                 className="flex-1 bg-slate-700 hover:bg-slate-600 transition-colors rounded-lg py-2 text-base font-medium"
