@@ -2277,15 +2277,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 136;
+const BUILD_VERSION = 137;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:14 PM";
+const BUILD_TIME = "8:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History pointer shows at the conclusion",
-  "Shorter 3D MOT demo",
+  "History pointer always on until dismissed",
+  "Shorter hand-off, slower ball drift",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3286,7 +3286,7 @@ const RRT_SCRAMBLE_FACTOR = 0.8;
 // accident, and a stale "hidden" flag meant the pointer never appeared for
 // someone who had never actually seen it.
 const RRT_TIMER_HINT_KEY = "cortex.rrtTimerHint.v6";
-const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v3";
+const RRT_HISTORY_HINT_KEY = "cortex.rrtHistoryHint.v4";
 // Whether a round has ever been answered, so the History pointer survives a
 // remount of the exercise rather than resetting with component state.
 const RRT_ANSWERED_KEY = "cortex.rrtAnswered.v1";
@@ -4496,6 +4496,19 @@ function Motion3DTutorialDemo() {
       y: R + Math.random() * (H - 2 * R),
     }));
 
+  // Each move is a short hop from where the ball already is, not a jump to a
+  // fresh spot: half the speed across the same run time.
+  const HOP = 52;
+  const drift = (prev) =>
+    prev.map((p) => {
+      const a = Math.random() * Math.PI * 2;
+      const d = HOP * (0.5 + Math.random() * 0.5);
+      return {
+        x: Math.min(W - R, Math.max(R, p.x + Math.cos(a) * d)),
+        y: Math.min(H - R, Math.max(R, p.y + Math.sin(a) * d)),
+      };
+    });
+
   const [spots, setSpots] = useState(() => spread());
   // 0 = targets lit, 1 = everything drifting, 2 = frozen and revealed.
   const [phase, setPhase] = useState(0);
@@ -4507,7 +4520,9 @@ function Motion3DTutorialDemo() {
   useEffect(() => {
     const timers = [setTimeout(() => setPhase(1), LIT_MS)];
     for (let i = 0; i < MOVES; i += 1) {
-      timers.push(setTimeout(() => setSpots(spread()), LIT_MS + i * MOVE_MS));
+      timers.push(
+        setTimeout(() => setSpots((prev) => drift(prev)), LIT_MS + i * MOVE_MS)
+      );
     }
     timers.push(
       setTimeout(() => setPhase(2), LIT_MS + MOVES * MOVE_MS + 60)
@@ -8701,7 +8716,7 @@ function NBackSessionApp() {
       // land on the setup screen for the next exercise; user presses Start themselves
     };
     if (goingToOverview) land();
-    else setTimeout(land, 4400);
+    else setTimeout(land, 3500);
   }, []);
 
   useEffect(() => {
@@ -10318,7 +10333,7 @@ function NBackSessionApp() {
                       setTimeout(() => {
                         setSwitchNotice(false);
                         setMainView("home");
-                      }, 4400);
+                      }, 3500);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -13843,10 +13858,9 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
       /* a session without persistence just sees it again next time */
     }
   };
-  // Gated on the stage as well as the answered flag: whatever else happens to
-  // component state, reaching a conclusion is enough to show it.
-  const showHistoryHint =
-    !hideHistoryHint && !flash && (answeredAny || stage === "question");
+  // Deliberately not gated on anything but its own dismissal: every
+  // condition tried on top of that ended up hiding it.
+  const showHistoryHint = !hideHistoryHint && !flash;
 
   if (stage === "setup") {
     return (
