@@ -2280,15 +2280,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 145;
+const BUILD_VERSION = 146;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:32 PM";
+const BUILD_TIME = "10:37 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorials fit on one screen",
-  "Binaural always fades in",
+  "Tutorial card holds one size",
+  "Celebration tune cannot double up",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2949,7 +2949,9 @@ function playLevelUp() {
     // enough; anything inside a quarter second of the last is the same
     // event arriving by a second route.
     const t = Date.now();
-    if (t - lastLevelUpAt < 120) return;
+    // 120ms was too tight: the second caller can arrive a few hundred
+    // milliseconds later, once a queued achievement resolves.
+    if (t - lastLevelUpAt < 700) return;
     lastLevelUpAt = t;
     const ctx = uiAudioContext();
     if (!ctx) return;
@@ -5061,10 +5063,16 @@ function NBackTutorialDemo({ exercise, accent }) {
 
       <div className="flex items-end justify-center gap-3 flex-wrap min-h-[3.6rem] w-full">
         {seq.map((item, idx) => {
-          if (idx > i) return null;
+          // Every slot is always rendered, just invisible until its trial
+          // arrives, so the card keeps one width for the whole run.
+          const shown = idx <= i;
           const marked = isMatch && (idx === i || idx === i - n);
           return (
-            <div key={idx} className="flex flex-col items-center gap-1.5">
+            <div
+              key={idx}
+              className="flex flex-col items-center gap-1.5"
+              style={{ visibility: shown ? "visible" : "hidden" }}
+            >
               <div
                 className="flex items-center justify-center"
                 style={{
@@ -5112,13 +5120,7 @@ function NBackTutorialDemo({ exercise, accent }) {
         className="text-base text-center min-h-[1.5rem]"
         style={{ color: isMatch ? PR_YELLOW : "#6E717A" }}
       >
-        {i < 0
-          ? "\u00A0"
-          : isMatch
-          ? "Same item as 2 places ago."
-          : i < n
-          ? "Nothing to compare it to yet."
-          : "Not the same as 2 places ago."}
+        {isMatch ? "Same item as 2 places ago." : "\u00A0"}
       </div>
     </div>
   );
@@ -8768,7 +8770,7 @@ function NBackSessionApp() {
       // land on the setup screen for the next exercise; user presses Start themselves
     };
     if (goingToOverview) land();
-    else setTimeout(land, 3100);
+    else setTimeout(land, 3300);
   }, []);
 
   useEffect(() => {
@@ -10400,7 +10402,7 @@ function NBackSessionApp() {
                       setTimeout(() => {
                         setSwitchNotice(false);
                         setMainView("home");
-                      }, 3100);
+                      }, 3300);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -11876,7 +11878,7 @@ function NBackSessionApp() {
                 className="h-full rounded-full"
                 style={{
                   background: "var(--ex)",
-                  animation: "switchBar 2.9s linear both",
+                  animation: "switchBar 3.1s linear both",
                 }}
               />
             </div>
