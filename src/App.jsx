@@ -2276,15 +2276,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 121;
+const BUILD_VERSION = 122;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:48 PM";
+const BUILD_TIME = "6:13 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Recap line closes the animated RRT tutorial",
-  "Timer hint reset again",
+  "Closing page added to the animated RRT tutorial",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4556,6 +4555,7 @@ function RrtTutorialAnimated({ onDone }) {
     { revealAt: [[0], [0, 1]], highlight: [] },
     { revealAt: [[0, 1], [0, 1, 2]], highlight: [] },
     { revealAt: [[0, 1, 2], [0, 1, 2]], highlight: [0, 2] },
+    { revealAt: [[], []], highlight: [] },
   ];
 
   useEffect(() => {
@@ -4616,10 +4616,10 @@ function RrtTutorialAnimated({ onDone }) {
 
     <div className={`${card} space-y-4`} key="s1">
       <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
-        That is spatializing.
+        This is spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        In RRT you spatialize the items. You do not imagine them. You feel
+        In RRT you spatialize the items. You don't imagine them. You feel
         where each item is in relation to each other.
       </p>
     </div>,
@@ -4658,9 +4658,15 @@ function RrtTutorialAnimated({ onDone }) {
         <RrtItemTile item={blue} size={30} />
         <span>?</span>
       </div>
-      <p className="text-slate-300 text-base leading-relaxed text-center">
-        Just like you feel where the door is without looking at it, feel where
-        each item is. Place them, and the answer is already there.
+    </div>,
+
+    <div className={`${card} space-y-4`} key="s5">
+      <p className="text-slate-100 text-lg leading-relaxed">
+        It's important to feel where the item is. Don't imagine it moving
+        around on the screen.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Just feel the spatial model in front of you, not on the screen.
       </p>
     </div>,
   ];
@@ -4696,7 +4702,7 @@ function RrtTutorialAnimated({ onDone }) {
           style={{ "--ex": accent }}
           className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
         >
-          {isLast ? "I get it" : "Next"}
+          {isLast ? "I Get It" : "Next"}
         </button>
       </div>
     </div>
