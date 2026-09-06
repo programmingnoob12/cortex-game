@@ -2280,14 +2280,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 149;
+const BUILD_VERSION = 150;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:19 AM";
+const BUILD_TIME = "12:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Slower hand-off between exercises",
+  "Motivation audio v10",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -15130,7 +15130,7 @@ function motProjectToScreen(position, camera, width, height) {
 // The track lives in public/audio. The filename has spaces, so it is
 // percent-encoded here rather than relying on the browser to do it.
 const HYPNOSIS_TRACK = {
-  url: "/audio/Cortex%20Hypnosis%20v9.mp3",
+  url: "/audio/Cortex%20Hypnosis%20v10%20%281db%20quieter%20%2B%20fade%20out%20way%20of%20life%29.mp3",
   title: "Motivation",
   length: "10 min",
   // Known length, so the bar reads correctly before metadata arrives instead
