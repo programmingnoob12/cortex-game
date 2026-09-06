@@ -2282,14 +2282,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 164;
+const BUILD_VERSION = 165;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:00 PM";
+const BUILD_TIME = "3:43 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Graph panel carries its own exercise switch",
+  "Spreadsheet gets the same exercise switch",
+  "Regime pickers removed",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11897,34 +11898,6 @@ function NBackSessionApp() {
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
           <div className="space-y-8">
-            {/* Looking at the Overview from Home is browsing, so the regime
-                picker belongs there. Reaching it at the end of a session is a
-                report on what was just done, and switching regimes on it
-                would be nonsense. */}
-            {overviewSource === "home" && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
-                  Regime
-                </span>
-                {REGIMES.map((r) => {
-                  const on = r.key === overviewRegime.key;
-                  return (
-                    <button
-                      key={r.key}
-                      onClick={() => setOverviewRegimeKey(r.key)}
-                      className={`rounded-lg border px-4 py-2 text-base transition-colors ${
-                        on
-                          ? "bg-slate-700 border-slate-700 text-slate-100"
-                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
-                      }`}
-                    >
-                      {r.title}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Overview
@@ -12075,42 +12048,13 @@ function NBackSessionApp() {
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
           <div className="space-y-5">
-            <div>
-              <button
-                onClick={() => setOverviewView("summary")}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
-              >
-                ‹ Back
-              </button>
-            </div>
-            {overviewSource === "home" && (
-              <div className="flex items-center gap-3 flex-wrap -mt-10">
-                <span className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
-                  Regime
-                </span>
-                {REGIMES.map((r) => {
-                  const on = r.key === overviewRegime.key;
-                  return (
-                    <button
-                      key={r.key}
-                      onClick={() => setOverviewRegimeKey(r.key)}
-                      className={`rounded-lg border px-4 py-2 text-base transition-colors ${
-                        on
-                          ? "bg-slate-700 border-slate-700 text-slate-100"
-                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
-                      }`}
-                    >
-                      {r.title}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div
-              className={`flex items-start justify-between gap-4 ${
-                overviewSource === "home" ? "-mt-8" : "-mt-12"
-              }`}
+            <button
+              onClick={() => setOverviewView("summary")}
+              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium self-start"
             >
+              ‹ Back
+            </button>
+            <div className="flex items-center justify-between gap-4">
               <h1 className="text-4xl font-semibold tracking-tight">
                 Stats
               </h1>
@@ -12124,10 +12068,9 @@ function NBackSessionApp() {
               </button>
             </div>
 
-            {/* The graph shows one exercise at a time so it gets the whole
-                width; the spreadsheet is a single table with a column pair
-                per exercise. */}
-            <div className="space-y-12">
+            {/* Both views show one exercise at a time, chosen from the switch
+                inside the panel. */}
+            <div>
             {statsDisplay === "chart"
               ? (statsChartExercise ? [statsChartExercise] : []).map((e) => {
               const history = exerciseHistory[e.key] || [];
@@ -12354,51 +12297,30 @@ function NBackSessionApp() {
               );
             })
               : (() => {
-              // One sheet for the whole regime rather than one per exercise:
-              // a day is a row, and every exercise contributes a Best/Avg
-              // pair of columns, so a single date reads across in one line.
-              const perExercise = overviewSummaryExercises.map((e) => {
-                const list = markDayRecords(
-                  buildExerciseDailyRows(exerciseHistory[e.key], e)
-                    .slice()
-                    .reverse()
-                    .map((r) => ({ ...r, level: sessionLevel(e, r) }))
-                ).reverse();
-                const byDay = new Map(list.map((r) => [r.dateKey, r]));
-                return { e, list, byDay };
-              });
-
-              // Every day any exercise knows about, newest first.
-              const dayMap = new Map();
-              perExercise.forEach(({ list }) =>
-                list.forEach((r) => {
-                  const prev = dayMap.get(r.dateKey);
-                  if (!prev || r.ts > prev) dayMap.set(r.dateKey, r.ts);
-                })
-              );
-              const days = Array.from(dayMap.entries())
-                .sort((a, b) => b[1] - a[1])
-                .map(([dateKey, ts]) => ({ dateKey, ts }));
-
-              if (days.length === 0) {
-                return (
-                  <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-8 text-center text-slate-500 text-base">
-                    No completed sessions yet.
-                  </div>
-                );
-              }
-
+              // One exercise at a time, chosen with the same switch the graph
+              // uses, so the two views behave identically.
+              const e = statsChartExercise;
+              if (!e) return null;
+              const rows = markDayRecords(
+                buildExerciseDailyRows(exerciseHistory[e.key], e)
+                  .slice()
+                  .reverse()
+                  .map((r) => ({ ...r, level: sessionLevel(e, r) }))
+              ).reverse();
+              const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const pageCount = Math.max(
                 1,
-                Math.ceil(days.length / HISTORY_PAGE_SIZE)
+                Math.ceil(rows.length / HISTORY_PAGE_SIZE)
               );
-              const page = Math.min(historyPage.sheet || 0, pageCount - 1);
-              const pageDays = days.slice(
+              const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
+              const pageRows = rows.slice(
                 page * HISTORY_PAGE_SIZE,
                 page * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
               );
 
-              const prCell = (isRecord, content) => (
+              // The tag is always in the markup and only hidden, so a record
+              // row is exactly as wide as every other row.
+              const cell = (isRecord, content) => (
                 <td
                   className="px-2.5 sm:px-4 py-2.5 font-medium"
                   style={
@@ -12412,143 +12334,144 @@ function NBackSessionApp() {
                   }
                 >
                   {content}
-                  {isRecord && (
-                    <span className="ml-2 text-[0.65rem] font-semibold align-middle">
-                      New PR!
-                    </span>
-                  )}
+                  <span
+                    className="ml-2 text-[0.65rem] font-semibold align-middle"
+                    style={{ visibility: isRecord ? "visible" : "hidden" }}
+                  >
+                    New PR!
+                  </span>
                 </td>
               );
 
               return (
-                <div className="space-y-4">
-                  <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-x-auto">
-                    <table className="w-full text-xs sm:text-sm whitespace-nowrap">
-                      <thead>
-                        <tr
-                          className="border-b border-slate-700/70 text-left text-slate-100"
-                          style={{ height: SHEET_ROW_H }}
-                        >
-                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
-                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
-                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
-                          {perExercise.map(({ e }) => (
-                            <th
-                              key={`hb-${e.key}`}
-                              colSpan={2}
-                              className="px-2.5 sm:px-4 py-2.5 font-medium border-l border-slate-700/70"
-                            >
-                              <span className="flex items-center gap-2">
-                                <span
-                                  className="w-2 h-2 rounded-full shrink-0"
-                                  style={{
-                                    backgroundColor:
-                                      EXERCISE_COLORS[e.key] || "#4CB9D8",
-                                  }}
-                                />
-                                {e.title}
-                              </span>
-                            </th>
-                          ))}
-                        </tr>
-                        <tr
-                          className="border-b border-slate-700/70 text-left text-slate-400 text-[0.7rem] uppercase tracking-wide"
-                          style={{ height: 30 }}
-                        >
-                          <th className="px-2.5 sm:px-4 font-medium" colSpan={3} />
-                          {perExercise.map(({ e }) => (
-                            <Fragment key={`sh-${e.key}`}>
-                              <th className="px-2.5 sm:px-4 font-medium border-l border-slate-700/70">
-                                Best
-                              </th>
-                              <th className="px-2.5 sm:px-4 font-medium">Avg</th>
-                            </Fragment>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pageDays.map(({ dateKey, ts }) => {
-                          const d = new Date(ts);
-                          const cells = perExercise.map(({ e, byDay }) => ({
-                            e,
-                            row: byDay.get(dateKey),
-                          }));
-                          const trained = cells.some(
-                            ({ row }) => row && row.level != null
-                          );
-                          const totalMs = cells.reduce(
-                            (sum, { row }) => sum + (row?.durationMs || 0),
-                            0
-                          );
+                <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: exColor }}
+                      />
+                      {e.title}
+                    </div>
+                    {overviewSummaryExercises.length > 1 && (
+                      <div
+                        className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
+                        role="group"
+                        aria-label="Choose an exercise"
+                      >
+                        {overviewSummaryExercises.map((opt) => {
+                          const on = opt.key === e.key;
                           return (
-                            <tr
-                              key={dateKey}
-                              className="border-b border-slate-800/70 last:border-0"
-                              style={{
-                                height: SHEET_ROW_H,
-                                backgroundColor: trained
-                                  ? "rgba(30,152,43,0.12)"
-                                  : "rgba(151,20,38,0.14)",
-                              }}
+                            <button
+                              key={opt.key}
+                              onClick={() => setStatsExerciseKey(opt.key)}
+                              aria-pressed={on}
+                              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                                on
+                                  ? "bg-slate-700 text-slate-100"
+                                  : "text-slate-400 hover:text-slate-100"
+                              }`}
                             >
-                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                {d.toLocaleDateString(undefined, {
-                                  weekday: "short",
-                                })}
-                              </td>
-                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                {d.toLocaleDateString()}
-                              </td>
-                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                {totalMs ? formatDuration(totalMs) : "\u2014"}
-                              </td>
-                              {cells.map(({ e, row }) => (
-                                <Fragment key={`${dateKey}-${e.key}`}>
-                                  {prCell(
-                                    !!row?.isPR,
-                                    row ? formatScoreCell(e, row) : "\u2014"
-                                  )}
-                                  {prCell(
-                                    !!row?.isAvgPR,
-                                    row ? formatLevelValue(e, row.dayAvg) : "\u2014"
-                                  )}
-                                </Fragment>
-                              ))}
-                            </tr>
+                              {opt.title}
+                            </button>
                           );
                         })}
-                      </tbody>
-                    </table>
+                      </div>
+                    )}
                   </div>
 
-                  {pageCount > 1 && (
-                    <div className="flex items-center justify-between gap-4">
-                      <button
-                        onClick={() =>
-                          setHistoryPage((prev) => ({
-                            ...prev,
-                            sheet: Math.max(0, page - 1),
-                          }))
-                        }
-                        disabled={page === 0}
-                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
-                      >
-                        Back
-                      </button>
-                      <span aria-hidden="true" />
-                      <button
-                        onClick={() =>
-                          setHistoryPage((prev) => ({
-                            ...prev,
-                            sheet: Math.min(pageCount - 1, page + 1),
-                          }))
-                        }
-                        disabled={page >= pageCount - 1}
-                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
-                      >
-                        Next
-                      </button>
+                  {rows.length === 0 ? (
+                    <div className="rounded-lg border border-slate-700/60 p-8 text-center text-slate-500 text-base">
+                      No completed sessions yet.
                     </div>
+                  ) : (
+                    <>
+                      <div className="rounded-lg border border-slate-700/60 overflow-x-auto">
+                        <table className="w-full text-xs sm:text-sm whitespace-nowrap">
+                          <thead>
+                            <tr
+                              className="border-b border-slate-700/70 text-left text-slate-100"
+                              style={{ height: SHEET_ROW_H }}
+                            >
+                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
+                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
+                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
+                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Best score</th>
+                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Avg</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageRows.map((row) => {
+                              const d = new Date(row.ts);
+                              return (
+                                <tr
+                                  key={row.dateKey}
+                                  className="border-b border-slate-800/70 last:border-0"
+                                  style={{
+                                    height: SHEET_ROW_H,
+                                    backgroundColor:
+                                      row.level == null
+                                        ? "rgba(151,20,38,0.14)"
+                                        : "rgba(30,152,43,0.12)",
+                                  }}
+                                >
+                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                    {d.toLocaleDateString(undefined, {
+                                      weekday: "short",
+                                    })}
+                                  </td>
+                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                    {d.toLocaleDateString()}
+                                  </td>
+                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                    {row.durationMs
+                                      ? formatDuration(row.durationMs)
+                                      : "\u2014"}
+                                  </td>
+                                  {cell(!!row.isPR, formatScoreCell(e, row))}
+                                  {cell(
+                                    !!row.isAvgPR,
+                                    formatLevelValue(e, row.dayAvg)
+                                  )}
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {pageCount > 1 && (
+                        <div className="flex items-center justify-between gap-4">
+                          <button
+                            onClick={() =>
+                              setHistoryPage((prev) => ({
+                                ...prev,
+                                [e.key]: Math.max(0, page - 1),
+                              }))
+                            }
+                            disabled={page === 0}
+                            className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                          >
+                            Back
+                          </button>
+                          <span className="text-sm text-slate-500">
+                            Page {page + 1} of {pageCount}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setHistoryPage((prev) => ({
+                                ...prev,
+                                [e.key]: Math.min(pageCount - 1, page + 1),
+                              }))
+                            }
+                            disabled={page >= pageCount - 1}
+                            className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );
