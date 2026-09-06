@@ -2232,7 +2232,7 @@ const MOTIVATION_LINES = [
   { id: 29, text: "New personal record! Nice work.", cond: "pr" },
   { id: 30, text: "{n} day streak. Keep it going.", cond: "streak" },
   { id: 31, text: "Some days are hard. Just focus on being consistent.", cond: "worse" },
-  { id: 32, text: "Others aren't willing to do what you do. That's why you're better than them." },
+  { id: 32, text: "Other people aren't willing to do what you do. That's why you have an edge." },
   { id: 33, text: "Most people never train this. That's why you have an edge." },
   { id: 34, text: "Your edge is built on days like this." },
   { id: 35, text: "You're building the thing everyone else calls talent." },
@@ -2282,14 +2282,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 160;
+const BUILD_VERSION = 161;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:09 PM";
+const BUILD_TIME = "2:24 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Quick regime keeps a normal card width",
+  "One spreadsheet for the whole regime",
+  "Graph picks one exercise at a time",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7265,6 +7266,9 @@ function NBackSessionApp() {
     regimeKeyRef.current = regimeKey;
   }, [regimeKey]);
   const [overviewView, setOverviewView] = useState("summary"); // "summary" | "graph"
+  // Which exercise the graph view is showing. One chart at a time, full
+  // width, picked with the buttons above it.
+  const [statsExerciseKey, setStatsExerciseKey] = useState(null);
   const [statsDisplay, setStatsDisplay] = useState("chart"); // "chart" | "spreadsheet" — which form the stats/graph screen shows session history in
   // True only on the end-of-regime path, where Motivation is the last step
   // of the session. Opened from Home it is just a page. Inferring this from
@@ -8852,6 +8856,11 @@ function NBackSessionApp() {
   const overviewSummaryExercises = Array.from(
     new Set(overviewRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
+
+  const statsChartExercise =
+    overviewSummaryExercises.find((e) => e.key === statsExerciseKey) ||
+    overviewSummaryExercises[0] ||
+    null;
 
   // Training history is stored per EXERCISE, never per regime, so switching
   // from Quick to Balanced and back never loses anything. Reaching Stats at
@@ -12116,12 +12125,39 @@ function NBackSessionApp() {
               </button>
             </div>
 
-            {/* Two across from large screens up: a chart needs real width, so
-                three would be unreadable, but stacking them one per screen
-                meant scrolling past every exercise to reach the last. */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-12 items-start">
+            {statsDisplay === "chart" && overviewSummaryExercises.length > 1 && (
+              <div className="flex items-center gap-3 flex-wrap">
+                {overviewSummaryExercises.map((e) => {
+                  const on = e.key === statsChartExercise?.key;
+                  return (
+                    <button
+                      key={e.key}
+                      onClick={() => setStatsExerciseKey(e.key)}
+                      className={`rounded-lg border px-4 py-2 text-base transition-colors flex items-center gap-2.5 ${
+                        on
+                          ? "bg-slate-700 border-slate-700 text-slate-100"
+                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
+                        }}
+                      />
+                      {e.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* The graph shows one exercise at a time so it gets the whole
+                width; the spreadsheet is a single table with a column pair
+                per exercise. */}
+            <div className="space-y-12">
             {statsDisplay === "chart"
-              ? overviewSummaryExercises.map((e) => {
+              ? (statsChartExercise ? [statsChartExercise] : []).map((e) => {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
@@ -12155,7 +12191,7 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-5 h-[20rem] sm:h-[24rem]">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6 h-[24rem] sm:h-[30rem]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
@@ -12309,155 +12345,181 @@ function NBackSessionApp() {
                 </div>
               );
             })
-              : overviewSummaryExercises.map((e) => {
-              const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
-              // Averages and records only make sense oldest-first, so build
-              // them that way and flip back to newest-first for display.
-              const rows = markDayRecords(
-                buildExerciseDailyRows(exerciseHistory[e.key], e)
-                  .slice()
-                  .reverse()
-                  .map((r) => ({ ...r, level: sessionLevel(e, r) }))
-              ).reverse();
-              const pageCount = Math.max(1, Math.ceil(rows.length / HISTORY_PAGE_SIZE));
-              const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
-              const pageRows = rows.slice(
+              : (() => {
+              // One sheet for the whole regime rather than one per exercise:
+              // a day is a row, and every exercise contributes a Best/Avg
+              // pair of columns, so a single date reads across in one line.
+              const perExercise = overviewSummaryExercises.map((e) => {
+                const list = markDayRecords(
+                  buildExerciseDailyRows(exerciseHistory[e.key], e)
+                    .slice()
+                    .reverse()
+                    .map((r) => ({ ...r, level: sessionLevel(e, r) }))
+                ).reverse();
+                const byDay = new Map(list.map((r) => [r.dateKey, r]));
+                return { e, list, byDay };
+              });
+
+              // Every day any exercise knows about, newest first.
+              const dayMap = new Map();
+              perExercise.forEach(({ list }) =>
+                list.forEach((r) => {
+                  const prev = dayMap.get(r.dateKey);
+                  if (!prev || r.ts > prev) dayMap.set(r.dateKey, r.ts);
+                })
+              );
+              const days = Array.from(dayMap.entries())
+                .sort((a, b) => b[1] - a[1])
+                .map(([dateKey, ts]) => ({ dateKey, ts }));
+
+              if (days.length === 0) {
+                return (
+                  <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-8 text-center text-slate-500 text-base">
+                    No completed sessions yet.
+                  </div>
+                );
+              }
+
+              const pageCount = Math.max(
+                1,
+                Math.ceil(days.length / HISTORY_PAGE_SIZE)
+              );
+              const page = Math.min(historyPage.sheet || 0, pageCount - 1);
+              const pageDays = days.slice(
                 page * HISTORY_PAGE_SIZE,
                 page * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
               );
-              return (
-                <div key={e.key} className="space-y-4">
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8" }}
-                    />
-                    {e.title}
-                  </h2>
-                  {rows.length === 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-8 text-center text-slate-500 text-base">
-                      No completed sessions yet.
-                    </div>
-                  ) : (
-                    <div className="relative">
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-x-auto">
-                      <table className="w-full min-w-[34rem] text-xs sm:text-sm whitespace-nowrap">
-                        <thead>
-                          <tr
-                            className="border-b border-slate-700/70 text-left text-slate-100"
-                            style={{ height: SHEET_ROW_H }}
-                          >
-                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
-                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
-                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
-                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Best score</th>
-                            <th className="px-2.5 sm:px-4 py-2.5 font-medium">Avg</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {pageRows.map((row) => {
-                            const d = new Date(row.ts);
-                            return (
-                              <tr
-                                key={row.dateKey}
-                                className="border-b border-slate-800/70 last:border-0"
-                                style={{
-                                  height: SHEET_ROW_H,
-                                  // Red covers both "did not train" and
-                                  // "started but never finished a run" —
-                                  // either way no score was set that day.
-                                  backgroundColor:
-                                    row.level == null
-                                      ? "rgba(151,20,38,0.14)"
-                                      : "rgba(30,152,43,0.12)",
-                                }}
-                              >
-                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                  {d.toLocaleDateString(undefined, { weekday: "short" })}
-                                </td>
-                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                  {d.toLocaleDateString()}
-                                </td>
-                                <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                  {row.durationMs ? formatDuration(row.durationMs) : "—"}
-                                </td>
-                                <td
-                                  className="px-2.5 sm:px-4 py-2.5 font-medium"
-                                  style={
-                                    row.isPR
-                                      ? {
-                                          color: PR_YELLOW,
-                                          backgroundColor: `${PR_YELLOW}26`,
-                                          boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
-                                        }
-                                      : { color: "#F7F8F8" }
-                                  }
-                                >
-                                  {formatScoreCell(e, row)}
-                                  {row.isPR && (
-                                    <span className="lg:hidden ml-2 text-xs font-semibold">
-                                      New PR!
-                                    </span>
-                                  )}
-                                </td>
-                                <td
-                                  className="px-2.5 sm:px-4 py-2.5 font-medium"
-                                  style={
-                                    row.isAvgPR
-                                      ? {
-                                          color: PR_YELLOW,
-                                          backgroundColor: `${PR_YELLOW}26`,
-                                          boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
-                                        }
-                                      : { color: "#F7F8F8" }
-                                  }
-                                >
-                                  {formatLevelValue(e, row.dayAvg)}
-                                  {row.isAvgPR && (
-                                    <span className="lg:hidden ml-2 text-xs font-semibold">
-                                      New PR!
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                    {/* Gutter outside the table. Every row is a fixed height,
-                        so a marker can be placed at exactly its row without
-                        measuring the DOM. */}
-                    <div
-                      className="hidden lg:block absolute top-0 left-full ml-3 w-24 pointer-events-none"
-                      style={{ height: SHEET_ROW_H * (pageRows.length + 1) }}
-                    >
-                      {pageRows.map((row, i) =>
-                        row.isPR || row.isAvgPR ? (
-                          <div
-                            key={row.dateKey}
-                            className="absolute left-0 right-0 flex items-center gap-1.5 text-xs font-semibold whitespace-nowrap"
-                            style={{
-                              top: SHEET_ROW_H * (i + 1),
-                              height: SHEET_ROW_H,
-                              color: PR_YELLOW,
-                            }}
-                          >
-                            <span aria-hidden="true">←</span>
-                            New PR!
-                          </div>
-                        ) : null
-                      )}
-                    </div>
-                    </div>
+
+              const prCell = (isRecord, content) => (
+                <td
+                  className="px-2.5 sm:px-4 py-2.5 font-medium"
+                  style={
+                    isRecord
+                      ? {
+                          color: PR_YELLOW,
+                          backgroundColor: `${PR_YELLOW}26`,
+                          boxShadow: `inset 0 0 0 1px ${PR_YELLOW}66`,
+                        }
+                      : { color: "#F7F8F8" }
+                  }
+                >
+                  {content}
+                  {isRecord && (
+                    <span className="ml-2 text-[0.65rem] font-semibold align-middle">
+                      New PR!
+                    </span>
                   )}
+                </td>
+              );
+
+              return (
+                <div className="space-y-4">
+                  <div className="bg-slate-900 border border-slate-700/70 rounded-lg overflow-x-auto">
+                    <table className="w-full text-xs sm:text-sm whitespace-nowrap">
+                      <thead>
+                        <tr
+                          className="border-b border-slate-700/70 text-left text-slate-100"
+                          style={{ height: SHEET_ROW_H }}
+                        >
+                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
+                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
+                          <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
+                          {perExercise.map(({ e }) => (
+                            <th
+                              key={`hb-${e.key}`}
+                              colSpan={2}
+                              className="px-2.5 sm:px-4 py-2.5 font-medium border-l border-slate-700/70"
+                            >
+                              <span className="flex items-center gap-2">
+                                <span
+                                  className="w-2 h-2 rounded-full shrink-0"
+                                  style={{
+                                    backgroundColor:
+                                      EXERCISE_COLORS[e.key] || "#4CB9D8",
+                                  }}
+                                />
+                                {e.title}
+                              </span>
+                            </th>
+                          ))}
+                        </tr>
+                        <tr
+                          className="border-b border-slate-700/70 text-left text-slate-400 text-[0.7rem] uppercase tracking-wide"
+                          style={{ height: 30 }}
+                        >
+                          <th className="px-2.5 sm:px-4 font-medium" colSpan={3} />
+                          {perExercise.map(({ e }) => (
+                            <Fragment key={`sh-${e.key}`}>
+                              <th className="px-2.5 sm:px-4 font-medium border-l border-slate-700/70">
+                                Best
+                              </th>
+                              <th className="px-2.5 sm:px-4 font-medium">Avg</th>
+                            </Fragment>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pageDays.map(({ dateKey, ts }) => {
+                          const d = new Date(ts);
+                          const cells = perExercise.map(({ e, byDay }) => ({
+                            e,
+                            row: byDay.get(dateKey),
+                          }));
+                          const trained = cells.some(
+                            ({ row }) => row && row.level != null
+                          );
+                          const totalMs = cells.reduce(
+                            (sum, { row }) => sum + (row?.durationMs || 0),
+                            0
+                          );
+                          return (
+                            <tr
+                              key={dateKey}
+                              className="border-b border-slate-800/70 last:border-0"
+                              style={{
+                                height: SHEET_ROW_H,
+                                backgroundColor: trained
+                                  ? "rgba(30,152,43,0.12)"
+                                  : "rgba(151,20,38,0.14)",
+                              }}
+                            >
+                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                {d.toLocaleDateString(undefined, {
+                                  weekday: "short",
+                                })}
+                              </td>
+                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                {d.toLocaleDateString()}
+                              </td>
+                              <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
+                                {totalMs ? formatDuration(totalMs) : "\u2014"}
+                              </td>
+                              {cells.map(({ e, row }) => (
+                                <Fragment key={`${dateKey}-${e.key}`}>
+                                  {prCell(
+                                    !!row?.isPR,
+                                    row ? formatScoreCell(e, row) : "\u2014"
+                                  )}
+                                  {prCell(
+                                    !!row?.isAvgPR,
+                                    row ? formatLevelValue(e, row.dayAvg) : "\u2014"
+                                  )}
+                                </Fragment>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
                   {pageCount > 1 && (
                     <div className="flex items-center justify-between gap-4">
                       <button
                         onClick={() =>
                           setHistoryPage((prev) => ({
                             ...prev,
-                            [e.key]: Math.max(0, page - 1),
+                            sheet: Math.max(0, page - 1),
                           }))
                         }
                         disabled={page === 0}
@@ -12470,7 +12532,7 @@ function NBackSessionApp() {
                         onClick={() =>
                           setHistoryPage((prev) => ({
                             ...prev,
-                            [e.key]: Math.min(pageCount - 1, page + 1),
+                            sheet: Math.min(pageCount - 1, page + 1),
                           }))
                         }
                         disabled={page >= pageCount - 1}
@@ -12482,7 +12544,7 @@ function NBackSessionApp() {
                   )}
                 </div>
               );
-            })}
+            })()            }
             </div>
 
             <button
