@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 181;
+const BUILD_VERSION = 182;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:06 PM";
+const BUILD_TIME = "10:08 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT tutorial speaks the numbers",
+  "Harsher error beep",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2542,8 +2542,9 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A short, high beep for a wrong answer. Square wave, flat pitch, 110ms:
-// sharp enough to sting without dragging into the next number.
+// A short, high buzz for a wrong answer. Two squares a few Hz apart beat
+// against each other, which the ear hears as roughness rather than a note,
+// plus a bright partial on top. Hard attack, no ramp in: it should sting.
 function playError() {
   try {
     const ctx = uiAudioContext();
@@ -2551,16 +2552,33 @@ function playError() {
     const now = ctx.currentTime;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.13, now + 0.004);
-    gain.gain.setValueAtTime(0.13, now + 0.085);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    gain.gain.linearRampToValueAtTime(0.2, now + 0.001);
+    gain.gain.setValueAtTime(0.2, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.135);
     gain.connect(ctx.destination);
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(1180, now);
-    osc.connect(gain);
-    osc.start(now);
-    osc.stop(now + 0.13);
+
+    // 1180 and 1217 sit ~37Hz apart, right in the band the ear reads as
+    // dissonant roughness instead of two pitches.
+    [1180, 1217].forEach((freq) => {
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.setValueAtTime(freq * 0.94, now + 0.1);
+      osc.connect(gain);
+      osc.start(now);
+      osc.stop(now + 0.15);
+    });
+
+    const bite = ctx.createGain();
+    bite.gain.setValueAtTime(0.055, now);
+    bite.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
+    bite.connect(ctx.destination);
+    const top = ctx.createOscillator();
+    top.type = "square";
+    top.frequency.setValueAtTime(2630, now);
+    top.connect(bite);
+    top.start(now);
+    top.stop(now + 0.1);
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
   }
