@@ -2367,14 +2367,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 168;
+const BUILD_VERSION = 169;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:03 PM";
+const BUILD_TIME = "4:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Note about moving fast on the reminder list",
+  "CCT tutorial, countdown and single digits",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4703,6 +4703,97 @@ function Motion3DTutorialDemo() {
   );
 }
 
+// The CCT walkthrough. Numbers arrive one at a time; the last two light up
+// and their sum is spelled out, which is the whole rule.
+function CctTutorialDemo() {
+  const accent = EXERCISE_COLORS.cct;
+  const seq = [5, 3, 3, 7, 2];
+  const STEP_MS = 1600;
+  const [i, setI] = useState(0);
+
+  useEffect(() => {
+    const t = setTimeout(
+      () => setI((v) => (v >= seq.length - 1 ? 0 : v + 1)),
+      i >= seq.length - 1 ? 3000 : STEP_MS
+    );
+    return () => clearTimeout(t);
+  }, [i, seq.length]);
+
+  const answer = i >= 1 ? seq[i - 1] + seq[i] : null;
+
+  return (
+    <div className="flex flex-col items-center gap-6">
+      <div className="flex items-end justify-center gap-3 flex-wrap">
+        {seq.map((n, idx) => {
+          const shown = idx <= i;
+          const marked = idx === i || idx === i - 1;
+          return (
+            <div
+              key={idx}
+              className="flex items-center justify-center rounded-lg text-2xl font-semibold"
+              style={{
+                width: "3.25rem",
+                height: "3.25rem",
+                visibility: shown ? "visible" : "hidden",
+                border: `1px solid ${marked ? PR_YELLOW : NBACK_GRID_LINE}`,
+                background: marked ? `${PR_YELLOW}1A` : "transparent",
+                color: marked ? PR_YELLOW : "#6E717A",
+                transition: "color 0.2s ease, background 0.2s ease, border-color 0.2s ease",
+              }}
+            >
+              {n}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="text-3xl font-semibold tabular-nums min-h-[2.5rem] flex items-center gap-3">
+        {answer == null ? (
+          <span className="text-slate-500 text-lg">Listen</span>
+        ) : (
+          <>
+            <span style={{ color: PR_YELLOW }}>{seq[i - 1]}</span>
+            <span className="text-slate-500 text-2xl">+</span>
+            <span style={{ color: PR_YELLOW }}>{seq[i]}</span>
+            <span className="text-slate-500 text-2xl">=</span>
+            <span style={{ color: accent }}>{answer}</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CctTutorial({ onDone }) {
+  const accent = EXERCISE_COLORS.cct;
+
+  return (
+    <div className="space-y-5">
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6">
+        <p className="text-slate-100 text-xl leading-relaxed text-center">
+          Numbers are spoken one at a time. Add the new one to the one before
+          it.
+        </p>
+        <CctTutorialDemo />
+        <p className="text-slate-400 text-base leading-relaxed text-center">
+          Answer before the next number arrives. Three right in a row and they
+          come faster.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end">
+        <button
+          onClick={onDone}
+          style={{ "--ex": accent }}
+          className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
+        >
+          I Get It
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Motion3DTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.motion3d;
 
@@ -6609,6 +6700,7 @@ const TUTORIAL_CONTENT = {
   rrt: "🚧 Tutorial placeholder: Relational Reasoning Training instructions go here.",
   iqnb: "🚧 Tutorial placeholder: IQ N-Back instructions go here.",
   motion3d: "🚧 Tutorial placeholder: 3D MOT instructions go here.",
+  cct: "Numbers are spoken one at a time. Add each to the one before it.",
 };
 
 // Rough draft placeholder leaderboard data — no real backend/accounts yet.
@@ -10778,6 +10870,16 @@ function NBackSessionApp() {
                   setRrtAutoStart((v) => v + 1);
                 }}
               />
+            ) : tutorialStepExercise.key === "cct" ? (
+              <CctTutorial
+                onDone={() => {
+                  if (tutorialDontShowAgain) {
+                    setTutorialDismissed(tutorialStepExercise.key, true);
+                    setHideTutorials(true);
+                  }
+                  setMainView("app");
+                }}
+              />
             ) : tutorialStepExercise.key === "motion3d" ? (
               <Motion3DTutorial
                 onDone={() => {
@@ -10835,7 +10937,7 @@ function NBackSessionApp() {
 
             {/* RRT's walkthrough carries its own step buttons; the generic
                 Next would be a second way out of the same screen. */}
-            {!["rrt", "dual", "quad", "iqnb", "motion3d"].includes(tutorialStepExercise.key) && (
+            {!["rrt", "dual", "quad", "iqnb", "motion3d", "cct"].includes(tutorialStepExercise.key) && (
               <button
                 onClick={() => {
                   if (tutorialDontShowAgain) {
@@ -13710,7 +13812,7 @@ const RRT_FOOTER_MIN_HEIGHT = 116;
 // =======================================================================
 // CCT — Continuous Calculation Task
 // =======================================================================
-// Numbers 1-18 are spoken one after another at a fixed gap. From the second
+// Single digits are spoken one after another at a fixed gap. From the second
 // number on, the answer is that number plus the one before it: 5, 3 -> 8,
 // then another 3 -> 6. Three correct in a row shortens the gap by 100ms,
 // down to a 500ms floor. First draft: no history or achievements wired up
@@ -13719,16 +13821,18 @@ const CCT_START_MS = 1500;
 const CCT_MIN_MS = 500;
 const CCT_STEP_MS = 100;
 const CCT_STREAK_TO_SPEED_UP = 3;
+// Single digits only, so the largest sum is 9 + 9.
+const CCT_MAX_SPOKEN = 9;
 
 function CCTExercise({ exercise, onFinish, paused }) {
   const accent = EXERCISE_COLORS.cct;
-  const [stage, setStage] = useState("setup"); // setup | running
+  const [stage, setStage] = useState("setup"); // setup | countdown | running
+  const [count, setCount] = useState(3);
   const [intervalMs, setIntervalMs] = useState(CCT_START_MS);
-  const [spoken, setSpoken] = useState([]); // every number this run, in order
+  const [spoken, setSpoken] = useState([]);
   const [entry, setEntry] = useState("");
   const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
   const [tally, setTally] = useState({ correct: 0, wrong: 0 });
-  const [streak, setStreak] = useState(0);
   const [startedAt, setStartedAt] = useState(null);
 
   const spokenRef = useRef(spoken);
@@ -13737,17 +13841,13 @@ function CCTExercise({ exercise, onFinish, paused }) {
   const intervalRef = useRef(intervalMs);
   const streakRef = useRef(0);
   const timerRef = useRef(null);
-  const pausedRef = useRef(paused);
 
   useEffect(() => { spokenRef.current = spoken; }, [spoken]);
   useEffect(() => { entryRef.current = entry; }, [entry]);
   useEffect(() => { intervalRef.current = intervalMs; }, [intervalMs]);
-  useEffect(() => { pausedRef.current = paused; }, [paused]);
 
-  const expected = (() => {
-    if (spoken.length < 2) return null;
-    return spoken[spoken.length - 2] + spoken[spoken.length - 1];
-  })();
+  const expected =
+    spoken.length < 2 ? null : spoken[spoken.length - 2] + spoken[spoken.length - 1];
 
   const score = (correct, wrong) =>
     correct + wrong === 0 ? 0 : Math.round((correct / (correct + wrong)) * 100);
@@ -13765,15 +13865,12 @@ function CCTExercise({ exercise, onFinish, paused }) {
     }));
     if (right) {
       streakRef.current += 1;
-      setStreak(streakRef.current);
       if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
         streakRef.current = 0;
-        setStreak(0);
         setIntervalMs((v) => Math.max(CCT_MIN_MS, v - CCT_STEP_MS));
       }
     } else {
       streakRef.current = 0;
-      setStreak(0);
     }
     setEntry("");
   };
@@ -13787,10 +13884,9 @@ function CCTExercise({ exercise, onFinish, paused }) {
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
       streakRef.current = 0;
-      setStreak(0);
       setEntry("");
     }
-    const n = 1 + Math.floor(Math.random() * CCT_MAX_NUMBER);
+    const n = 1 + Math.floor(Math.random() * CCT_MAX_SPOKEN);
     speakNumber(n);
     setSpoken((prev) => {
       const next = [...prev, n];
@@ -13806,15 +13902,26 @@ function CCTExercise({ exercise, onFinish, paused }) {
     setEntry("");
     setFlash(null);
     setTally({ correct: 0, wrong: 0 });
-    setStreak(0);
     streakRef.current = 0;
     answeredRef.current = true;
     setIntervalMs(CCT_START_MS);
     intervalRef.current = CCT_START_MS;
-    setStartedAt(Date.now());
-    setStage("running");
-    timerRef.current = setTimeout(speakNext, 600);
+    setCount(3);
+    setStage("countdown");
   };
+
+  // 3, 2, 1, then the first number: a moment to settle before it starts.
+  useEffect(() => {
+    if (stage !== "countdown") return undefined;
+    if (count === 0) {
+      setStage("running");
+      setStartedAt(Date.now());
+      timerRef.current = setTimeout(speakNext, 250);
+      return undefined;
+    }
+    const id = setTimeout(() => setCount((c) => c - 1), 850);
+    return () => clearTimeout(id);
+  }, [stage, count, speakNext]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -13836,20 +13943,19 @@ function CCTExercise({ exercise, onFinish, paused }) {
     return () => clearTimeout(id);
   }, [flash]);
 
+  // Sums run from 2 to 18, so only a leading 1 can be part of a two-digit
+  // answer; every other first digit is already the whole answer.
   const press = (digit) => {
     if (stage !== "running" || spokenRef.current.length < 2) return;
     const next = (entryRef.current + digit).slice(0, 2);
     setEntry(next);
-    // Sums run from 2 to 36, so two digits is always a finished answer, and
-    // so is a leading digit that cannot start a two-digit sum.
-    if (next.length === 2 || Number(next) > 3) judge(next);
+    if (next.length === 2 || next !== "1") judge(next);
   };
 
   useEffect(() => {
     if (stage !== "running") return undefined;
     const onKey = (ev) => {
       if (ev.key >= "0" && ev.key <= "9") press(ev.key);
-      else if (ev.key === "Enter" && entryRef.current) judge(entryRef.current);
       else if (ev.key === "Backspace") setEntry((v) => v.slice(0, -1));
     };
     window.addEventListener("keydown", onKey);
@@ -13859,19 +13965,20 @@ function CCTExercise({ exercise, onFinish, paused }) {
 
   if (stage === "setup") {
     return (
-      <div className="space-y-6 max-w-sm mx-auto">
-        <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+        </div>
 
         <div
-          className="rounded-xl p-6 space-y-3 border"
-          style={{
-            borderColor: `${accent}55`,
-            background: `${accent}14`,
-          }}
+          className="rounded-xl border p-6 space-y-3"
+          style={{ borderColor: `${accent}55`, background: `${accent}14` }}
         >
           <div className="text-lg text-slate-300">
-            Gap:{" "}
-            <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
+            Gap: <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
+          </div>
+          <div className="text-lg text-slate-400">
+            Range: <span className="text-slate-200 font-medium">1 to 9</span>
           </div>
           <p className="text-slate-400 text-base">
             Add each number to the one before it. 3 in a row = 100ms faster,
@@ -13882,10 +13989,24 @@ function CCTExercise({ exercise, onFinish, paused }) {
         <button
           onClick={begin}
           style={{ "--ex": accent }}
-          className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+          className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
         >
           Start
         </button>
+      </div>
+    );
+  }
+
+  if (stage === "countdown") {
+    return (
+      <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 flex items-center justify-center h-[26rem]">
+        <div
+          key={count}
+          className="text-8xl font-semibold tabular-nums"
+          style={{ color: accent, animation: "switchIn 0.4s ease-out both" }}
+        >
+          {count}
+        </div>
       </div>
     );
   }
@@ -13896,80 +14017,48 @@ function CCTExercise({ exercise, onFinish, paused }) {
     flash === "correct" ? "#4CB782" : flash === "wrong" ? "#EB5757" : null;
 
   return (
-    <div className="space-y-6 max-w-sm mx-auto">
+    <div className="space-y-5">
       <div className="flex items-center justify-between text-base text-slate-400 font-medium">
         <span>{score(tally.correct, tally.wrong)}%</span>
         <span>{intervalMs} ms</span>
       </div>
 
       <div
-        className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-6 space-y-6 text-center"
-        style={
-          flashColor
-            ? { boxShadow: `inset 0 0 0 2px ${flashColor}` }
-            : undefined
-        }
+        className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 space-y-6 text-center"
+        style={flashColor ? { boxShadow: `inset 0 0 0 2px ${flashColor}` } : undefined}
       >
-        <div className="text-sm uppercase tracking-[0.18em] text-slate-500">
-          {spoken.length < 2 ? "Listen" : "Add the last two"}
-        </div>
-
-        <div className="flex items-center justify-center gap-4 text-slate-500 text-2xl font-medium">
+        <div className="flex items-center justify-center gap-5 text-3xl font-medium text-slate-500">
           <span>{prev ?? "\u2014"}</span>
-          <span>+</span>
+          <span className="text-2xl">+</span>
           <span style={{ color: accent }}>{last ?? "\u2014"}</span>
         </div>
 
         <div
-          className="text-6xl font-semibold tabular-nums h-16 flex items-center justify-center"
+          className="text-7xl font-semibold tabular-nums h-20 flex items-center justify-center"
           style={{ color: flashColor || "#F7F8F8" }}
         >
           {entry || (flash === "wrong" && expected != null ? expected : "")}
         </div>
 
-        <div className="grid grid-cols-3 gap-2.5">
+        <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
             <button
               key={d}
               onClick={() => press(String(d))}
-              className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-2xl font-medium"
+              className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-2xl font-medium"
             >
               {d}
             </button>
           ))}
-          <button
-            onClick={() => setEntry("")}
-            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium text-slate-400"
-          >
-            Clear
-          </button>
+          <span />
           <button
             onClick={() => press("0")}
-            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-2xl font-medium"
+            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-2xl font-medium"
           >
             0
           </button>
-          <button
-            onClick={() => entry && judge(entry)}
-            style={{ "--ex": accent }}
-            className="deep-fill rounded-lg py-3 text-base font-medium"
-          >
-            Enter
-          </button>
+          <span />
         </div>
-      </div>
-
-      <div className="flex items-center justify-between text-sm text-slate-500">
-        <span>{streak}/{CCT_STREAK_TO_SPEED_UP} to speed up</span>
-        <button
-          onClick={() => {
-            clearTimeout(timerRef.current);
-            setStage("setup");
-          }}
-          className="text-slate-400 hover:text-slate-200 transition-colors font-medium"
-        >
-          Stop
-        </button>
       </div>
     </div>
   );
