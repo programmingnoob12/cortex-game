@@ -42,6 +42,7 @@ const THEME_CSS = `
 --green:#4CB782;--red:#EB5757;--yellow:#F2C94C;--cyan:#4CB9D8;--violet:#8B7FE8;--lime:#68CC58;
 color-scheme:dark;}
 html,body{background-color:#08090A;color:#F7F8F8;}
+html{scrollbar-gutter:stable;}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -2281,15 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 154;
+const BUILD_VERSION = 155;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:16 PM";
+const BUILD_TIME = "1:21 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Regime picker no longer changes Home",
-  "Scrollbar gutter reserved",
+  "Stats scoped to the regime, with its own picker",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8853,23 +8853,10 @@ function NBackSessionApp() {
     new Set(overviewRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
 
-  // Stats is not scoped to the current regime. Training history is stored per
-  // EXERCISE, never per regime, so switching from Quick to Balanced and back
-  // never loses anything — but listing only the current regime's exercises
-  // hid the rest, which looked exactly like data loss. This lists the current
-  // regime's exercises first, then every other exercise that has any history,
-  // so a run of Quick in August still shows after a September on Balanced.
-  const statsExercises = (() => {
-    const inRegime = new Set(currentRegime.steps.map((st) => st.key));
-    const others = Object.values(EXERCISE_LIBRARY).filter(
-      (e) =>
-        e.key !== "overview" &&
-        !inRegime.has(e.key) &&
-        (exerciseHistory[e.key] || []).length > 0
-    );
-    return [...overviewExercises, ...others];
-  })();
-
+  // Training history is stored per EXERCISE, never per regime, so switching
+  // from Quick to Balanced and back never loses anything. Reaching Stats at
+  // the end of a session shows that session's regime; reaching it from Home,
+  // the regime picker is how the other exercises are read.
   // The tutorial now always shows for exactly the one exercise that's about
   // to start (gated in proceedStartFromHome / forceSwitchToNext below) —
   // no more walking through every exercise in the regime up front.
@@ -12073,7 +12060,34 @@ function NBackSessionApp() {
                 ‹ Back
               </button>
             </div>
-            <div className="flex items-start justify-between gap-4 -mt-12">
+            {overviewSource === "home" && (
+              <div className="flex items-center gap-3 flex-wrap -mt-10">
+                <span className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
+                  Regime
+                </span>
+                {REGIMES.map((r) => {
+                  const on = r.key === overviewRegime.key;
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => setOverviewRegimeKey(r.key)}
+                      className={`rounded-lg border px-4 py-2 text-base transition-colors ${
+                        on
+                          ? "bg-slate-700 border-slate-700 text-slate-100"
+                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {r.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <div
+              className={`flex items-start justify-between gap-4 ${
+                overviewSource === "home" ? "-mt-8" : "-mt-12"
+              }`}
+            >
               <h1 className="text-4xl font-semibold tracking-tight">
                 Stats
               </h1>
@@ -12092,7 +12106,7 @@ function NBackSessionApp() {
                 meant scrolling past every exercise to reach the last. */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-12 items-start">
             {statsDisplay === "chart"
-              ? statsExercises.map((e) => {
+              ? overviewSummaryExercises.map((e) => {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               const avgColor = `color-mix(in srgb, ${exColor} 45%, #8A8F98)`;
@@ -12280,7 +12294,7 @@ function NBackSessionApp() {
                 </div>
               );
             })
-              : statsExercises.map((e) => {
+              : overviewSummaryExercises.map((e) => {
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
               // Averages and records only make sense oldest-first, so build
               // them that way and flip back to newest-first for display.
