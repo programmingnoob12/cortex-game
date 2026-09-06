@@ -1103,6 +1103,21 @@ function formatDuration(ms) {
   return `${minutes} min ${seconds} sec`;
 }
 
+// Total time trained reads better broken down than as a minute count: at any
+// real usage it is hours and days, not "4213 min".
+function formatLongDuration(ms) {
+  const totalMinutes = Math.floor(ms / 60000);
+  if (totalMinutes < 1) return `${Math.floor(ms / 1000)} sec`;
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours}h`);
+  if (minutes || parts.length === 0) parts.push(`${minutes}m`);
+  return parts.join(" ");
+}
+
 function formatHours(ms) {
   const hours = ms / 3600000;
   return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
@@ -2282,15 +2297,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 165;
+const BUILD_VERSION = 166;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:43 PM";
+const BUILD_TIME = "3:49 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Spreadsheet gets the same exercise switch",
-  "Regime pickers removed",
+  "Sheet columns hold their width",
+  "Total duration in days and hours",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11915,11 +11930,11 @@ function NBackSessionApp() {
             >
               <Stat
                 label={overviewSource === "home" ? "Total duration" : "Duration"}
-                value={formatDuration(
+                value={
                   overviewSource === "home"
-                    ? msTrainedTotal(exerciseHistory)
-                    : msTrainedToday(exerciseHistory)
-                )}
+                    ? formatLongDuration(msTrainedTotal(exerciseHistory))
+                    : formatDuration(msTrainedToday(exerciseHistory))
+                }
               />
             </div>
 
@@ -12099,7 +12114,12 @@ function NBackSessionApp() {
               return (
                 <div key={e.key}>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
+                    <div
+                      className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
+                      // Both views declare the same height, so moving between
+                      // Graph and Spreadsheet does not resize the page.
+                      style={{ minHeight: "min(calc(100vh - 15rem), 36rem)" }}
+                    >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
                       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -12344,7 +12364,10 @@ function NBackSessionApp() {
               );
 
               return (
-                <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
+                <div
+                  className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
+                  style={{ minHeight: "min(calc(100vh - 15rem), 36rem)" }}
+                >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
                       <span
@@ -12387,7 +12410,20 @@ function NBackSessionApp() {
                   ) : (
                     <>
                       <div className="rounded-lg border border-slate-700/60 overflow-x-auto">
-                        <table className="w-full text-xs sm:text-sm whitespace-nowrap">
+                        {/* Fixed layout with declared widths: an auto table
+                            re-measures its columns from the values in view, so
+                            switching exercise or view resized every cell. */}
+                        <table
+                          className="w-full text-xs sm:text-sm whitespace-nowrap"
+                          style={{ tableLayout: "fixed" }}
+                        >
+                          <colgroup>
+                            <col style={{ width: "12%" }} />
+                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "20%" }} />
+                            <col style={{ width: "24%" }} />
+                            <col style={{ width: "24%" }} />
+                          </colgroup>
                           <thead>
                             <tr
                               className="border-b border-slate-700/70 text-left text-slate-100"
