@@ -2390,15 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 177;
+const BUILD_VERSION = 178;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:01 PM";
+const BUILD_TIME = "6:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Error buzz on a wrong CCT answer",
-  "Session lines never repeat back to back",
+  "Wrong answer is a short high beep",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2543,32 +2542,25 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A deliberately unpleasant buzz for a wrong answer: two detuned saws
-// through a lowpass, short and flat. It is meant to be worth avoiding.
+// A short, high beep for a wrong answer. Square wave, flat pitch, 110ms:
+// sharp enough to sting without dragging into the next number.
 function playError() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.2, now + 0.008);
-    master.gain.setValueAtTime(0.2, now + 0.16);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 1400;
-    lp.connect(master);
-    master.connect(ctx.destination);
-    [138, 146].forEach((hz) => {
-      const osc = ctx.createOscillator();
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(hz, now);
-      osc.frequency.linearRampToValueAtTime(hz * 0.82, now + 0.26);
-      osc.connect(lp);
-      osc.start(now);
-      osc.stop(now + 0.28);
-    });
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.13, now + 0.004);
+    gain.gain.setValueAtTime(0.13, now + 0.085);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+    gain.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1180, now);
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(now + 0.13);
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
   }
