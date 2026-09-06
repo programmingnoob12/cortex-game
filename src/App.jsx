@@ -2367,15 +2367,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 167;
+const BUILD_VERSION = 168;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:01 PM";
+const BUILD_TIME = "4:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT first draft",
-  "Anti-brainrot regime unlocked",
+  "Note about moving fast on the reminder list",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9891,6 +9890,15 @@ function NBackSessionApp() {
                 <div>
                   Glorify it: animations, edits, TikToks, songs, anything that
                   makes it look cool.
+                </div>
+                <div>
+                  Consolidate and get this to take off and make bank before
+                  competitors start to catch on and copy what I'm doing. I need
+                  to already be flying and doing well, and potentially cashing
+                  out of the business, before people even get a chance to start
+                  competing. Don't give them any time to catch up before I've
+                  already made it and got all the value I can out of this
+                  business, ideally with an exit.
                 </div>
                 <div>
                   Maybe change the overview to a horizontal layout so it fits
