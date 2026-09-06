@@ -2280,15 +2280,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 151;
+const BUILD_VERSION = 152;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:58 PM";
+const BUILD_TIME = "1:02 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview lays out horizontally",
-  "Regime picker when opened from Home",
+  "Overview uses the full width and aligns its rows",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9740,7 +9739,15 @@ function NBackSessionApp() {
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
                 maxWidth:
-                  mainView === "app" && screen === "running" ? "100%" : "42rem",
+                  mainView === "app" && screen === "running"
+                    ? "100%"
+                    : mainView === "app" &&
+                      exercise.key === "overview" &&
+                      overviewView === "summary"
+                    ? // The summary lays its exercises out in columns, so it
+                      // needs more than the reading width the other screens use.
+                      "76rem"
+                    : "42rem",
               }
         }
       >
@@ -11925,55 +11932,87 @@ function NBackSessionApp() {
             />
 
             {/* One column per exercise instead of a stack, so a whole regime
-                fits on screen without scrolling. */}
-            <div
-              className="grid gap-6 items-start"
-              style={{
-                gridTemplateColumns: `repeat(${overviewExercises.length}, minmax(0, 1fr))`,
-              }}
-            >
-            {overviewExercises.map((e) => {
-              const stat = exerciseStats[e.key];
-              const isAccuracy = e.scoreType === "accuracy";
-              const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
-              const bestLabel = isAccuracy ? "Best accuracy" : "Best score";
-              const avgLabel = isAccuracy ? "Avg accuracy" : "Avg score";
-              const bestValue = stat
-                ? e.key === "motion3d"
-                  ? formatScoreValue(e, stat.bestAccuracy)
-                  : e.key === "iqnb"
-                  ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
-                  : e.key === "rrt"
-                  ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
-                  : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} · ${formatScoreValue(
-                      e,
-                      stat.bestAccuracy
-                    )}`
-                : "\u2014";
-              const avgValue = stat ? formatScoreValue(e, avgVal) : "\u2014";
+                fits on screen without scrolling. Headings and the two stat
+                rows are three bands of ONE grid rather than three separate
+                stacks, so a name that wraps onto two lines cannot push its
+                column's cards out of line with the others. */}
+            {(() => {
+              const cols = overviewExercises.length;
+              const rows = overviewExercises.map((e) => {
+                const stat = exerciseStats[e.key];
+                const isAccuracy = e.scoreType === "accuracy";
+                const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
+                const bestValue = stat
+                  ? e.key === "motion3d"
+                    ? formatScoreValue(e, stat.bestAccuracy)
+                    : e.key === "iqnb"
+                    ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
+                    : e.key === "rrt"
+                    ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
+                    : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} \u00B7 ${formatScoreValue(
+                        e,
+                        stat.bestAccuracy
+                      )}`
+                  : "\u2014";
+                return {
+                  e,
+                  isAccuracy,
+                  avgVal,
+                  stat,
+                  bestLabel: isAccuracy ? "Best accuracy" : "Best score",
+                  avgLabel: isAccuracy ? "Avg accuracy" : "Avg score",
+                  bestValue,
+                  avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
+                };
+              });
               return (
-                <div key={e.key} className="space-y-4">
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8" }}
+                <div
+                  className="grid gap-x-6 gap-y-4"
+                  style={{
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {rows.map(({ e }) => (
+                    <h2
+                      key={`h-${e.key}`}
+                      className={`font-semibold tracking-tight text-slate-100 flex items-center gap-3 self-end ${
+                        cols > 3 ? "text-2xl" : "text-3xl"
+                      }`}
+                    >
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{
+                          backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
+                        }}
+                      />
+                      {e.title}
+                    </h2>
+                  ))}
+                  {rows.map((r) => (
+                    <Stat
+                      key={`b-${r.e.key}`}
+                      label={r.bestLabel}
+                      value={r.bestValue}
+                      color={
+                        r.stat && r.isAccuracy
+                          ? accuracyColor(r.stat.bestAccuracy)
+                          : undefined
+                      }
                     />
-                    {e.title}
-                  </h2>
-                  <Stat
-                    label={bestLabel}
-                    value={bestValue}
-                    color={stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined}
-                  />
-                  <Stat
-                    label={avgLabel}
-                    value={avgValue}
-                    color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
-                  />
+                  ))}
+                  {rows.map((r) => (
+                    <Stat
+                      key={`a-${r.e.key}`}
+                      label={r.avgLabel}
+                      value={r.avgValue}
+                      color={
+                        r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
+                      }
+                    />
+                  ))}
                 </div>
               );
-            })}
-            </div>
+            })()}
 
             <div className="flex gap-6 pt-4">
               <button
