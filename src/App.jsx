@@ -1446,7 +1446,7 @@ const EXERCISE_LIBRARY = {
     defaultN: 1,
     stimMs: 0,
     comingSoon: false,
-    scoreType: "decimal",
+    scoreType: "accuracy",
     description:
       "Continuous Calculation Task. Numbers are spoken one after another; add each new number to the one before it and answer before the next arrives. Three right in a row and the gap between numbers shortens.",
   },
@@ -2390,14 +2390,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 178;
+const BUILD_VERSION = 179;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:18 PM";
+const BUILD_TIME = "6:59 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Wrong answer is a short high beep",
+  "Three wrong in a row eases CCT back",
+  "CCT scores on accuracy and best run",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8414,9 +8415,9 @@ function NBackSessionApp() {
   // score (a number that rises as someone gets better, which the charts
   // need), and the speed step reached as the level behind the gem.
   const recordCctSessionEnd = useCallback(
-    ({ correct, wrong, durationMs, speedStep }) => {
-      const minutes = Math.max(1, durationMs) / 60000;
-      const scoreValue = Math.round((correct / minutes) * 100) / 100;
+    ({ correct, wrong, bestStreak, durationMs, speedStep }) => {
+      const answered = correct + wrong;
+      const scoreValue = answered === 0 ? 0 : Math.round((correct / answered) * 100);
       const prevStat = exerciseStatsRef.current.cct || {
         sessions: 0,
         totalAccuracy: 0,
@@ -8429,6 +8430,7 @@ function NBackSessionApp() {
         sessions: prevStat.sessions + 1,
         totalAccuracy: prevStat.totalAccuracy + scoreValue,
         bestAccuracy: Math.max(prevStat.bestAccuracy, scoreValue),
+        bestStreak: Math.max(prevStat.bestStreak || 0, bestStreak || 0),
         bestN: Math.max(prevStat.bestN, speedStep),
         lastAccuracy: scoreValue,
       };
@@ -8447,7 +8449,7 @@ function NBackSessionApp() {
             ts: Date.now(),
             accuracy: scoreValue,
             n: speedStep,
-            streak: wrong,
+            streak: bestStreak || 0,
             durationMs,
           },
         ].slice(-MAX_HISTORY_ENTRIES);
@@ -12247,6 +12249,10 @@ function NBackSessionApp() {
                     ? formatScoreValue(e, stat.bestAccuracy)
                     : e.key === "iqnb"
                     ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
+                    : e.key === "cct"
+                    ? `${formatScoreValue(e, stat.bestAccuracy)} \u00B7 ${
+                        stat.bestStreak ?? 0
+                      } in a row`
                     : e.key === "rrt"
                     ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
                     : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} \u00B7 ${formatScoreValue(
@@ -13960,6 +13966,7 @@ const CCT_START_MS = 1500;
 const CCT_MIN_MS = 500;
 const CCT_STEP_MS = 100;
 const CCT_STREAK_TO_SPEED_UP = 3;
+const CCT_STREAK_TO_SLOW_DOWN = 3;
 // Single digits only, so the largest sum is 9 + 9.
 const CCT_MAX_SPOKEN = 9;
 
@@ -13975,6 +13982,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const [startedAt, setStartedAt] = useState(null);
   const [msLeft, setMsLeft] = useState(null);
   // The last few verdicts, newest last, purely for the row of markers.
+  // The current run of same-verdict answers, for the row of squares. Green
+  // for right, red for wrong; three of either moves the interval.
   const [marks, setMarks] = useState([]);
   const [depositing, setDepositing] = useState(false);
 
@@ -13983,6 +13992,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const answeredRef = useRef(true); // the first number has no answer
   const intervalRef = useRef(intervalMs);
   const streakRef = useRef(0);
+  const wrongStreakRef = useRef(0);
+  const bestStreakRef = useRef(0);
   const timerRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -14008,14 +14019,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       correct: t.correct + (right ? 1 : 0),
       wrong: t.wrong + (right ? 0 : 1),
     }));
-    // A wrong answer wipes the row: the greens only mean anything as an
-    // unbroken run toward the next speed-up.
+    // The row only ever shows one unbroken run, so a verdict that breaks the
+    // run starts a new row in its own colour.
     setMarks((m) =>
-      right
-        ? [...(m[m.length - 1] === false ? [] : m), true].slice(
-            -CCT_STREAK_TO_SPEED_UP
-          )
-        : [false]
+      m[m.length - 1] === right ? [...m, right].slice(-3) : [right]
     );
     if (!right) playError();
     // The answer drops out of the box rather than sitting there: it has been
@@ -14026,7 +14033,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       setEntry("");
     }, 260);
     if (right) {
+      wrongStreakRef.current = 0;
       streakRef.current += 1;
+      if (streakRef.current > bestStreakRef.current) {
+        bestStreakRef.current = streakRef.current;
+      }
       if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
         streakRef.current = 0;
         setMarks([]);
@@ -14034,6 +14045,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       }
     } else {
       streakRef.current = 0;
+      wrongStreakRef.current += 1;
+      // Three wrong in a row eases the interval back out, the mirror of the
+      // speed-up, so a run that has got away from someone comes back.
+      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
+        wrongStreakRef.current = 0;
+        setMarks([]);
+        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+      }
     }
   };
 
@@ -14045,9 +14064,15 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       answeredRef.current = true;
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
-      setMarks([false]);
+      setMarks((m) => (m[m.length - 1] === false ? [...m, false].slice(-3) : [false]));
       playError();
       streakRef.current = 0;
+      wrongStreakRef.current += 1;
+      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
+        wrongStreakRef.current = 0;
+        setMarks([]);
+        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+      }
     }
     // The last answer stays visible right up to the next number, so a typed
     // digit is never wiped the instant it lands.
@@ -14070,6 +14095,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     setTally({ correct: 0, wrong: 0 });
     setMarks([]);
     streakRef.current = 0;
+    wrongStreakRef.current = 0;
+    bestStreakRef.current = 0;
     answeredRef.current = true;
     setIntervalMs(CCT_START_MS);
     intervalRef.current = CCT_START_MS;
@@ -14098,12 +14125,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const finish = (simulated) => {
     clearTimeout(timerRef.current);
     const durationMs = startedAt ? Date.now() - startedAt : 60000;
-    const correct = simulated && tally.correct === 0 ? 26 : tally.correct;
-    const wrong = simulated && tally.correct === 0 ? 4 : tally.wrong;
-    const finalInterval = simulated && tally.correct === 0 ? 1200 : intervalMs;
+    const blank = simulated && tally.correct === 0;
+    const correct = blank ? 26 : tally.correct;
+    const wrong = blank ? 4 : tally.wrong;
+    const finalInterval = blank ? 1200 : intervalMs;
     onSessionEnd?.({
       correct,
       wrong,
+      bestStreak: blank ? 9 : bestStreakRef.current,
       durationMs,
       intervalMs: finalInterval,
       // 1500ms is step 1, every 100ms faster is one step up, 500ms is step 11.
