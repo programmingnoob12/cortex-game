@@ -2390,15 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 179;
+const BUILD_VERSION = 180;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:59 PM";
+const BUILD_TIME = "TBD";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Three wrong in a row eases CCT back",
-  "CCT scores on accuracy and best run",
+  "Reminder wording",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10108,7 +10107,7 @@ function NBackSessionApp() {
                 </div>
                 <div>
                   Glorify it: animations, edits, TikToks, songs, anything that
-                  makes it look cool.
+                  makes it look cool and HARD as fuck.
                 </div>
                 <div>
                   Show up differently. Make all the little details higher
