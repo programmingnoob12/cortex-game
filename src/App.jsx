@@ -2282,15 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 161;
+const BUILD_VERSION = 162;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:24 PM";
+const BUILD_TIME = "2:41 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One spreadsheet for the whole regime",
-  "Graph picks one exercise at a time",
+  "Graph sized to the viewport",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12191,7 +12190,10 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6 h-[24rem] sm:h-[30rem]">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6"
+                      // Sized off the viewport so the whole Stats screen fits
+                      // without scrolling, whatever the window height.
+                      style={{ height: "min(56vh, 26rem)", minHeight: "16rem" }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
