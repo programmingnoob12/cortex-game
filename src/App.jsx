@@ -2339,6 +2339,7 @@ const MOTIVATION_LINES = [
   { id: 43, text: "Dominate everyone." },
   { id: 44, text: "KEEP CLIMBING." },
   { id: 45, text: "The goal is progress, not perfection." },
+  { id: 46, text: "Feel like a God. Be a God." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2375,14 +2376,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 172;
+const BUILD_VERSION = 173;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:34 PM";
+const BUILD_TIME = "5:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT hides the numbers, countdown has pips",
+  "New line: Feel like a God",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
