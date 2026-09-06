@@ -1446,7 +1446,7 @@ const EXERCISE_LIBRARY = {
     defaultN: 1,
     stimMs: 0,
     comingSoon: false,
-    scoreType: "points",
+    scoreType: "decimal",
     description:
       "Continuous Calculation Task. Numbers are spoken one after another; add each new number to the one before it and answer before the next arrives. Three right in a row and the gap between numbers shortens.",
   },
@@ -2339,7 +2339,7 @@ const MOTIVATION_LINES = [
   { id: 43, text: "Dominate everyone." },
   { id: 44, text: "KEEP CLIMBING." },
   { id: 45, text: "The goal is progress, not perfection." },
-  { id: 46, text: "Feel like a God. Be a God." },
+  { id: 46, text: "Feel like a God." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2376,14 +2376,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 173;
+const BUILD_VERSION = 174;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:05 PM";
+const BUILD_TIME = "5:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "New line: Feel like a God",
+  "CCT records a session result",
+  "Typed answer stays on screen",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8372,6 +8373,56 @@ function NBackSessionApp() {
     [checkForNewAchievements]
   );
 
+  // CCT reports one result per session: correct answers a minute as the
+  // score (a number that rises as someone gets better, which the charts
+  // need), and the speed step reached as the level behind the gem.
+  const recordCctSessionEnd = useCallback(
+    ({ correct, wrong, durationMs, speedStep }) => {
+      const minutes = Math.max(1, durationMs) / 60000;
+      const scoreValue = Math.round((correct / minutes) * 100) / 100;
+      const prevStat = exerciseStatsRef.current.cct || {
+        sessions: 0,
+        totalAccuracy: 0,
+        bestAccuracy: 0,
+        bestN: 0,
+        bestStreak: 0,
+      };
+      const newStat = {
+        ...prevStat,
+        sessions: prevStat.sessions + 1,
+        totalAccuracy: prevStat.totalAccuracy + scoreValue,
+        bestAccuracy: Math.max(prevStat.bestAccuracy, scoreValue),
+        bestN: Math.max(prevStat.bestN, speedStep),
+        lastAccuracy: scoreValue,
+      };
+      if (window.storage) {
+        safeStorageSet("stats-cct", JSON.stringify(newStat), false);
+      }
+      const finalStats = { ...exerciseStatsRef.current, cct: newStat };
+      setExerciseStats(finalStats);
+      checkForNewAchievements(finalStats);
+
+      setExerciseHistory((prev) => {
+        const prevHistory = prev.cct || [];
+        const newHistory = [
+          ...prevHistory,
+          {
+            ts: Date.now(),
+            accuracy: scoreValue,
+            n: speedStep,
+            streak: wrong,
+            durationMs,
+          },
+        ].slice(-MAX_HISTORY_ENTRIES);
+        if (window.storage) {
+          safeStorageSet("history-cct", JSON.stringify(newHistory), false);
+        }
+        return { ...prev, cct: newHistory };
+      });
+    },
+    [checkForNewAchievements]
+  );
+
   // Same idea as recordRrtLevelUp, called by Motion3DExercise whenever the
   // ball speed crosses into a new tier (up OR down — the speed staircase
   // can drop back below a tier after a miss, same as RRT easing back down;
@@ -12733,6 +12784,7 @@ function NBackSessionApp() {
           <CCTExercise
             exercise={exercise}
             onStageChange={setCctStage}
+            onSessionEnd={recordCctSessionEnd}
             onFinish={() => forceSwitchToNext(exerciseIndex)}
             paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
           />
@@ -13858,7 +13910,7 @@ const CCT_STREAK_TO_SPEED_UP = 3;
 // Single digits only, so the largest sum is 9 + 9.
 const CCT_MAX_SPOKEN = 9;
 
-function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
+function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }) {
   const accent = EXERCISE_COLORS.cct;
   const [stage, setStage] = useState("setup"); // setup | countdown | running
   const [count, setCount] = useState(3);
@@ -13908,7 +13960,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
     } else {
       streakRef.current = 0;
     }
-    setEntry("");
   };
 
   // One number, then the gap, then the next. The gap is read from a ref so a
@@ -13920,8 +13971,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
       streakRef.current = 0;
-      setEntry("");
     }
+    // The last answer stays visible right up to the next number, so a typed
+    // digit is never wiped the instant it lands.
+    setEntry("");
     const n = 1 + Math.floor(Math.random() * CCT_MAX_SPOKEN);
     speakNumber(n);
     setSpoken((prev) => {
@@ -13962,17 +14015,36 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
+  // Ends the run and reports it. `simulated` fills in a plausible result so
+  // the test button has something to put on the Overview.
+  const finish = (simulated) => {
+    clearTimeout(timerRef.current);
+    const durationMs = startedAt ? Date.now() - startedAt : 60000;
+    const correct = simulated && tally.correct === 0 ? 26 : tally.correct;
+    const wrong = simulated && tally.correct === 0 ? 4 : tally.wrong;
+    const finalInterval = simulated && tally.correct === 0 ? 1200 : intervalMs;
+    onSessionEnd?.({
+      correct,
+      wrong,
+      durationMs,
+      intervalMs: finalInterval,
+      // 1500ms is step 1, every 100ms faster is one step up, 500ms is step 11.
+      speedStep:
+        Math.round((CCT_START_MS - finalInterval) / CCT_STEP_MS) + 1,
+    });
+    setStage("setup");
+    onFinish?.();
+  };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
+
   // Session budget, the same way the other timed exercises end themselves.
   useEffect(() => {
     if (stage !== "running" || !startedAt) return undefined;
     const budget = exercise.sessionDurationMs || 15 * 60 * 1000;
-    const id = setTimeout(() => {
-      clearTimeout(timerRef.current);
-      setStage("setup");
-      onFinish?.();
-    }, budget);
+    const id = setTimeout(() => finishRef.current(false), budget);
     return () => clearTimeout(id);
-  }, [stage, startedAt, exercise.sessionDurationMs, onFinish]);
+  }, [stage, startedAt, exercise.sessionDurationMs]);
 
   // Remaining time, ticked once a second rather than per frame: nothing here
   // moves fast enough to need more.
@@ -14025,6 +14097,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
           <div className="text-lg text-slate-300">
             Interval:{" "}
             <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
+          </div>
+          <div className="text-lg text-slate-400">
+            Minimum:{" "}
+            <span className="text-slate-200 font-medium">{CCT_MIN_MS} ms</span>
           </div>
           <p className="text-slate-400 text-base">
             3 in a row = 100ms faster.
@@ -14089,21 +14165,17 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
             className="text-6xl font-semibold tabular-nums"
             style={{ color: flashColor || "#F7F8F8" }}
           >
-            {entry || (flash === "wrong" && expected != null ? expected : "")}
+            {entry}
           </span>
         </div>
 
       </div>
 
       <button
-        onClick={() => {
-          clearTimeout(timerRef.current);
-          setStage("setup");
-          onFinish?.();
-        }}
+        onClick={() => finish(true)}
         className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-base"
       >
-        🧪 Test: finish this session
+        🧪 Test: finish this session with a result
       </button>
     </div>
   );
