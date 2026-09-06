@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 158;
+const BUILD_VERSION = 159;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:54 PM";
+const BUILD_TIME = "2:03 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview always uses a four-column track",
+  "Overview fills the width again",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11942,14 +11942,12 @@ function NBackSessionApp() {
               />
             </div>
 
-            {/* Always four columns, whatever the regime holds: a track that
-                counted the exercises made every card change size when the
-                regime changed. Unused columns are simply left empty, and the
-                three bands are one grid so wrapped names cannot knock the
-                cards out of line. */}
+            {/* The exercises fill the width; the Duration card above keeps a
+                fixed quarter-width track so it never moves when the regime
+                changes. The three bands are one grid so a wrapped name cannot
+                knock the cards out of line with their neighbours. */}
             {(() => {
-              const SLOTS = 4;
-              const rows = overviewSummaryExercises.slice(0, SLOTS).map((e) => {
+              const rows = overviewSummaryExercises.map((e) => {
                 const stat = exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
                 const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
@@ -11976,11 +11974,12 @@ function NBackSessionApp() {
                   avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
                 };
               });
-              const blanks = Array.from({ length: SLOTS - rows.length });
               return (
                 <div
                   className="grid gap-x-6 gap-y-4"
-                  style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+                  style={{
+                    gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))`,
+                  }}
                 >
                   {rows.map(({ e }) => (
                     <h2
@@ -11996,9 +11995,6 @@ function NBackSessionApp() {
                       <span className="truncate">{e.title}</span>
                     </h2>
                   ))}
-                  {blanks.map((_, i) => (
-                    <div key={`hb-${i}`} />
-                  ))}
                   {rows.map((r) => (
                     <Stat
                       key={`b-${r.e.key}`}
@@ -12011,9 +12007,6 @@ function NBackSessionApp() {
                       }
                     />
                   ))}
-                  {blanks.map((_, i) => (
-                    <div key={`bb-${i}`} />
-                  ))}
                   {rows.map((r) => (
                     <Stat
                       key={`a-${r.e.key}`}
@@ -12023,9 +12016,6 @@ function NBackSessionApp() {
                         r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
                       }
                     />
-                  ))}
-                  {blanks.map((_, i) => (
-                    <div key={`ab-${i}`} />
                   ))}
                 </div>
               );
