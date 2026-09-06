@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 162;
+const BUILD_VERSION = 163;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:41 PM";
+const BUILD_TIME = "2:44 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Graph sized to the viewport",
+  "Stats screen fits without scrolling",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12074,7 +12074,7 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
-          <div className="space-y-14">
+          <div className="space-y-5">
             <div>
               <button
                 onClick={() => setOverviewView("summary")}
@@ -12182,18 +12182,11 @@ function NBackSessionApp() {
               );
               return (
                 <div key={e.key} className="space-y-4">
-                  <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
-                    <span
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8" }}
-                    />
-                    {e.title}
-                  </h2>
                   {chartData.length > 0 ? (
                     <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6"
                       // Sized off the viewport so the whole Stats screen fits
                       // without scrolling, whatever the window height.
-                      style={{ height: "min(56vh, 26rem)", minHeight: "16rem" }}>
+                      style={{ height: "min(calc(100vh - 21rem), 30rem)", minHeight: "15rem" }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
