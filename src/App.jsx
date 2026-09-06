@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 156;
+const BUILD_VERSION = 157;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:38 PM";
+const BUILD_TIME = "1:49 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview column width no longer follows the exercise count",
+  "Overview columns are a fixed width",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11926,7 +11926,7 @@ function NBackSessionApp() {
             {/* Sized to its own content rather than the page: a full-width
                 strip made one short number look stranded, and it changed
                 width whenever the scrollbar came and went. */}
-            <div className="w-full" style={{ maxWidth: "20rem" }}>
+            <div className="w-full" style={{ maxWidth: "17rem" }}>
               <Stat
                 label={overviewSource === "home" ? "Total duration" : "Duration"}
                 value={formatDuration(
@@ -11937,17 +11937,16 @@ function NBackSessionApp() {
               />
             </div>
 
-            {/* One column per exercise instead of a stack, so a whole regime
-                fits on screen without scrolling. Headings and the two stat
-                rows are three bands of ONE grid rather than three separate
-                stacks, so a name that wraps onto two lines cannot push its
-                column's cards out of line with the others. */}
-            {(() => {
-              const cols = overviewSummaryExercises.length;
-              const rows = overviewSummaryExercises.map((e) => {
+            {/* Fixed-width columns, wrapping if they run out of room. A
+                fractional grid made every card change size with the number of
+                exercises, so switching regime appeared to resize the page. */}
+            <div className="flex flex-wrap gap-6 items-start">
+              {overviewSummaryExercises.map((e) => {
                 const stat = exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
                 const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
+                const bestLabel = isAccuracy ? "Best accuracy" : "Best score";
+                const avgLabel = isAccuracy ? "Avg accuracy" : "Avg score";
                 const bestValue = stat
                   ? e.key === "motion3d"
                     ? formatScoreValue(e, stat.bestAccuracy)
@@ -11960,65 +11959,38 @@ function NBackSessionApp() {
                         stat.bestAccuracy
                       )}`
                   : "\u2014";
-                return {
-                  e,
-                  isAccuracy,
-                  avgVal,
-                  stat,
-                  bestLabel: isAccuracy ? "Best accuracy" : "Best score",
-                  avgLabel: isAccuracy ? "Avg accuracy" : "Avg score",
-                  bestValue,
-                  avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
-                };
-              });
-              return (
-                <div
-                  className="grid gap-x-6 gap-y-4"
-                  style={{
-                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {rows.map(({ e }) => (
-                    <h2
-                      key={`h-${e.key}`}
-                      className={`font-semibold tracking-tight text-slate-100 flex items-center gap-3 self-end ${
-                        cols > 3 ? "text-2xl" : "text-3xl"
-                      }`}
-                    >
+                const avgValue = stat ? formatScoreValue(e, avgVal) : "\u2014";
+                return (
+                  <div
+                    key={e.key}
+                    className="space-y-4 shrink-0"
+                    style={{ width: "17rem", maxWidth: "100%" }}
+                  >
+                    <h2 className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9">
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{
                           backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
                         }}
                       />
-                      {e.title}
+                      <span className="truncate">{e.title}</span>
                     </h2>
-                  ))}
-                  {rows.map((r) => (
                     <Stat
-                      key={`b-${r.e.key}`}
-                      label={r.bestLabel}
-                      value={r.bestValue}
+                      label={bestLabel}
+                      value={bestValue}
                       color={
-                        r.stat && r.isAccuracy
-                          ? accuracyColor(r.stat.bestAccuracy)
-                          : undefined
+                        stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined
                       }
                     />
-                  ))}
-                  {rows.map((r) => (
                     <Stat
-                      key={`a-${r.e.key}`}
-                      label={r.avgLabel}
-                      value={r.avgValue}
-                      color={
-                        r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
-                      }
+                      label={avgLabel}
+                      value={avgValue}
+                      color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
                     />
-                  ))}
-                </div>
-              );
-            })()}
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="flex gap-6 pt-4">
               <button
