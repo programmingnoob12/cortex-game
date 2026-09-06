@@ -2376,15 +2376,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 174;
+const BUILD_VERSION = 175;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:10 PM";
+const BUILD_TIME = "5:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT records a session result",
-  "Typed answer stays on screen",
+  "CCT streak markers, clearer interval and clock",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13921,6 +13920,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const [tally, setTally] = useState({ correct: 0, wrong: 0 });
   const [startedAt, setStartedAt] = useState(null);
   const [msLeft, setMsLeft] = useState(null);
+  // The last few verdicts, newest last, purely for the row of markers.
+  const [marks, setMarks] = useState([]);
 
   const spokenRef = useRef(spoken);
   const entryRef = useRef(entry);
@@ -13951,10 +13952,12 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       correct: t.correct + (right ? 1 : 0),
       wrong: t.wrong + (right ? 0 : 1),
     }));
+    setMarks((m) => [...m, right].slice(-CCT_STREAK_TO_SPEED_UP));
     if (right) {
       streakRef.current += 1;
       if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
         streakRef.current = 0;
+        setMarks([]);
         setIntervalMs((v) => Math.max(CCT_MIN_MS, v - CCT_STEP_MS));
       }
     } else {
@@ -13970,6 +13973,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       answeredRef.current = true;
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
+      setMarks((m) => [...m, false].slice(-CCT_STREAK_TO_SPEED_UP));
       streakRef.current = 0;
     }
     // The last answer stays visible right up to the next number, so a typed
@@ -13991,6 +13995,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     setEntry("");
     setFlash(null);
     setTally({ correct: 0, wrong: 0 });
+    setMarks([]);
     streakRef.current = 0;
     answeredRef.current = true;
     setIntervalMs(CCT_START_MS);
@@ -14103,7 +14108,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             <span className="text-slate-200 font-medium">{CCT_MIN_MS} ms</span>
           </div>
           <p className="text-slate-400 text-base">
-            3 in a row = 100ms faster.
+            3 in a row = 100ms faster
           </p>
         </div>
 
@@ -14137,19 +14142,46 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between text-base text-slate-400 font-medium">
-        <span>{score(tally.correct, tally.wrong)}%</span>
-        <div className="flex items-center gap-4">
-          <span>{intervalMs} ms</span>
-          <span className="text-slate-300 tabular-nums">
-            {msLeft == null ? "" : formatClock(msLeft)}
-          </span>
+      {/* Interval and time left are the two numbers worth watching, so they
+          are set at a size that can be read without looking for them. */}
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            Interval
+          </div>
+          <div
+            className="text-3xl font-semibold tabular-nums leading-tight"
+            style={{ color: accent }}
+          >
+            {intervalMs}
+            <span className="text-base font-medium text-slate-400 ml-1.5">ms</span>
+          </div>
+        </div>
+
+        <div className="text-center">
+          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            Accuracy
+          </div>
+          <div className="text-xl font-semibold tabular-nums text-slate-300 leading-tight">
+            {score(tally.correct, tally.wrong)}%
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            Time left
+          </div>
+          <div className="text-3xl font-semibold tabular-nums text-slate-100 leading-tight">
+            {msLeft == null ? "\u2014" : formatClock(msLeft)}
+          </div>
         </div>
       </div>
 
       <div
         className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 space-y-6 text-center"
-        style={flashColor ? { boxShadow: `inset 0 0 0 2px ${flashColor}` } : undefined}
+        style={
+          flash === "wrong" ? { boxShadow: `inset 0 0 0 2px ${flashColor}` } : undefined
+        }
       >
         {/* The answer lands in a box of its own, so there is somewhere for it
             to appear whether it was typed or tapped. */}
@@ -14157,16 +14189,46 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           className="mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
           style={{
             height: "5.5rem",
-            borderColor: flashColor || `${accent}66`,
-            background: flashColor ? `${flashColor}1A` : "#0F1115",
+            borderColor: flash === "wrong" ? flashColor : `${accent}66`,
+            background: flash === "wrong" ? `${flashColor}1A` : "#0F1115",
           }}
         >
           <span
             className="text-6xl font-semibold tabular-nums"
-            style={{ color: flashColor || "#F7F8F8" }}
+            style={{ color: flash === "wrong" ? flashColor : "#F7F8F8" }}
           >
             {entry}
           </span>
+        </div>
+
+        {/* Three squares: how close this run is to the next speed-up, and
+            what the last few answers were. */}
+        <div className="flex items-center justify-center gap-2.5">
+          {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
+            const mark = marks[i];
+            return (
+              <span
+                key={i}
+                className="rounded-md border transition-colors"
+                style={{
+                  width: "1.6rem",
+                  height: "1.6rem",
+                  borderColor:
+                    mark === undefined
+                      ? "#2A2E37"
+                      : mark
+                      ? "#4CB782"
+                      : "#EB5757",
+                  background:
+                    mark === undefined
+                      ? "transparent"
+                      : mark
+                      ? "#4CB78233"
+                      : "#EB575733",
+                }}
+              />
+            );
+          })}
         </div>
 
       </div>
