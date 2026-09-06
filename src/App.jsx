@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 180;
+const BUILD_VERSION = 181;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "TBD";
+const BUILD_TIME = "10:06 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Reminder wording",
+  "CCT tutorial speaks the numbers",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4779,12 +4779,25 @@ function CctTutorialDemo() {
   const accent = EXERCISE_COLORS.cct;
   const seq = [5, 3, 3, 7, 2];
   const STEP_MS = 1600;
-  const [i, setI] = useState(0);
+  const [i, setI] = useState(-1);
+
+  // The tutorial is only reached by clicking, so the context can be resumed
+  // here. Without this the first numbers fall through to speech synthesis
+  // while the samples are still being fetched.
+  useEffect(() => {
+    unlockNumberAudio();
+  }, []);
+
+  // Same voice as the exercise, so the drill sounds like the real thing.
+  useEffect(() => {
+    if (i >= 0 && i < seq.length) speakNumber(seq[i]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i]);
 
   useEffect(() => {
     const t = setTimeout(
-      () => setI((v) => (v >= seq.length - 1 ? 0 : v + 1)),
-      i >= seq.length - 1 ? 5200 : STEP_MS
+      () => setI((v) => (v >= seq.length - 1 ? -1 : v + 1)),
+      i < 0 ? 1200 : i >= seq.length - 1 ? 5200 : STEP_MS
     );
     return () => clearTimeout(t);
   }, [i, seq.length]);
