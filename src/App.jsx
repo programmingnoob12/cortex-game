@@ -1086,6 +1086,53 @@ function playLetterSample(letter, onstart) {
   return true;
 }
 
+// Spoken numbers for CCT, same Web Audio path the letters use: a decoded
+// buffer starts on the next audio frame, where an <audio> element would add
+// tens of milliseconds of jitter to a task built on a fixed interval.
+const NUMBER_AUDIO_BASE = "/audio/numbers/";
+const CCT_MAX_NUMBER = 18;
+const numberAudioBuffers = new Map();
+
+async function preloadNumberAudio() {
+  const ctx = letterAudioContext();
+  if (!ctx) return;
+  await Promise.all(
+    Array.from({ length: CCT_MAX_NUMBER }, (_, i) => i + 1).map(async (n) => {
+      if (numberAudioBuffers.has(n)) return;
+      try {
+        const res = await fetch(`${NUMBER_AUDIO_BASE}${n}.mp3`);
+        if (!res.ok) return;
+        numberAudioBuffers.set(n, await ctx.decodeAudioData(await res.arrayBuffer()));
+      } catch {
+        // Missing or unplayable file: speech synthesis covers it below.
+      }
+    })
+  );
+}
+
+function unlockNumberAudio() {
+  const ctx = letterAudioContext();
+  if (ctx && ctx.state === "suspended") ctx.resume();
+  preloadNumberAudio();
+}
+
+function speakNumber(n) {
+  const buffer = numberAudioBuffers.get(n);
+  const ctx = letterAudioCtx;
+  if (buffer && ctx && ctx.state === "running") {
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(letterAudioGain);
+    source.start();
+    return;
+  }
+  if (!("speechSynthesis" in window)) return;
+  const u = new SpeechSynthesisUtterance(String(n));
+  u.rate = 1.05;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
+
 const GRID_SIZE = 9; // 3x3 grid, positions 0-8
 const POSITIONS = Array.from({ length: GRID_SIZE }, (_, i) => i);
 
@@ -1191,7 +1238,7 @@ const EXERCISE_COLORS = {
   iqnb: "#7537E2",      // purple
   rrt: "#E58B09",       // orange
   motion3d: "#008000",  // green
-  // TODO: pick a colour for CCT when the Anti-brainrot regime is built.
+  cct: "#D62246",       // crimson
 };
 
 // Each regime on the landing page borrows the colour of the exercise that
@@ -1201,6 +1248,7 @@ const REGIME_COLORS = {
   low: EXERCISE_COLORS.motion3d,
   medium: EXERCISE_COLORS.rrt,
   high: EXERCISE_COLORS.iqnb,
+  cct: EXERCISE_COLORS.cct,
 };
 
 // The cards need four values from one hex: a faint fill, a visible border,
@@ -1380,6 +1428,20 @@ const EXERCISE_LIBRARY = {
     description:
       "Relational Reasoning Training. Read a chain of premises about a set of items, then answer whether the final relationship holds. Each round is randomly a \"same as\"/\"opposite of\" round, a \"contains\"/\"is within\" round, a \"more than\"/\"less than\" round, or an \"on top of\"/\"is under\" round.",
   },
+  cct: {
+    key: "cct",
+    title: "CCT",
+    abbrev: "C",
+    accent: "indigo",
+    modalities: [],
+    maxN: 10,
+    defaultN: 1,
+    stimMs: 0,
+    comingSoon: false,
+    scoreType: "points",
+    description:
+      "Continuous Calculation Task. Numbers are spoken one after another; add each new number to the one before it and answer before the next arrives. Three right in a row and the gap between numbers shortens.",
+  },
   iqnb: {
     key: "iqnb",
     title: "QNB'",
@@ -1458,6 +1520,14 @@ const REGIMES = [
       { key: "iqnb", minutes: 20 },
       { key: "quad", minutes: 20 },
     ],
+  },
+  {
+    key: "cct",
+    title: "Anti-brainrot",
+    subtitle: "20 min",
+    summary: "CCT",
+    accent: "indigo",
+    steps: [{ key: "cct", minutes: 20 }],
   },
 ];
 
@@ -2297,15 +2367,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 166;
+const BUILD_VERSION = 167;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:49 PM";
+const BUILD_TIME = "4:01 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sheet columns hold their width",
-  "Total duration in days and hours",
+  "CCT first draft",
+  "Anti-brainrot regime unlocked",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9908,29 +9978,6 @@ function NBackSessionApp() {
                 </div>
               </div>
 
-              {/* Placeholder for the CCT regime, not built yet. Same locked
-                  treatment as Custom so it reads as coming soon rather than
-                  broken. */}
-              <div className="relative group">
-                <button
-                  disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-6 cursor-not-allowed"
-                >
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-                      <div className="text-2xl font-semibold text-slate-500 flex items-center gap-2">
-                        🔒 Anti-brainrot
-                      </div>
-                    </div>
-                    <div className="text-lg font-medium text-slate-600">—</div>
-                  </div>
-                  <div className="text-slate-600 text-base mt-1">CCT</div>
-                </button>
-                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
-                  Coming soon
-                </div>
-              </div>
             </div>
 
 
@@ -11867,6 +11914,7 @@ function NBackSessionApp() {
           screen === "setup" &&
           exercise.key !== "overview" &&
           exercise.key !== "motion3d" &&
+          exercise.key !== "cct" &&
           (exercise.key !== "rrt" || rrtStage === "setup") && (
           <div className={`text-center text-base uppercase tracking-wide font-semibold mb-6 ${ACCENT_STYLES[exercise.accent]?.text || "text-indigo-400"}`}>
             Exercise {exerciseIndex + 1} of {activeExercises.length - 1}
@@ -12538,6 +12586,14 @@ function NBackSessionApp() {
           />
         )}
 
+        {!switchNotice && exercise.key === "cct" && (
+          <CCTExercise
+            exercise={exercise}
+            onFinish={() => forceSwitchToNext(exerciseIndex)}
+            paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
+          />
+        )}
+
         {!switchNotice && exercise.key === "motion3d" && (
           <Motion3DExercise
             exercise={exercise}
@@ -12555,6 +12611,7 @@ function NBackSessionApp() {
           exercise.modalities.length === 0 &&
           exercise.key !== "overview" &&
           exercise.key !== "rrt" &&
+          exercise.key !== "cct" &&
           exercise.key !== "motion3d" && (
           <div className="space-y-14 text-center">
             <div>
@@ -13641,6 +13698,274 @@ const RRT_PROPOSITION_MIN_HEIGHT = 104;
 const RRT_DROP_AFTER_WRONG = 10;
 
 const RRT_FOOTER_MIN_HEIGHT = 116;
+
+// =======================================================================
+// CCT — Continuous Calculation Task
+// =======================================================================
+// Numbers 1-18 are spoken one after another at a fixed gap. From the second
+// number on, the answer is that number plus the one before it: 5, 3 -> 8,
+// then another 3 -> 6. Three correct in a row shortens the gap by 100ms,
+// down to a 500ms floor. First draft: no history or achievements wired up
+// yet, just the loop.
+const CCT_START_MS = 1500;
+const CCT_MIN_MS = 500;
+const CCT_STEP_MS = 100;
+const CCT_STREAK_TO_SPEED_UP = 3;
+
+function CCTExercise({ exercise, onFinish, paused }) {
+  const accent = EXERCISE_COLORS.cct;
+  const [stage, setStage] = useState("setup"); // setup | running
+  const [intervalMs, setIntervalMs] = useState(CCT_START_MS);
+  const [spoken, setSpoken] = useState([]); // every number this run, in order
+  const [entry, setEntry] = useState("");
+  const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
+  const [tally, setTally] = useState({ correct: 0, wrong: 0 });
+  const [streak, setStreak] = useState(0);
+  const [startedAt, setStartedAt] = useState(null);
+
+  const spokenRef = useRef(spoken);
+  const entryRef = useRef(entry);
+  const answeredRef = useRef(true); // the first number has no answer
+  const intervalRef = useRef(intervalMs);
+  const streakRef = useRef(0);
+  const timerRef = useRef(null);
+  const pausedRef = useRef(paused);
+
+  useEffect(() => { spokenRef.current = spoken; }, [spoken]);
+  useEffect(() => { entryRef.current = entry; }, [entry]);
+  useEffect(() => { intervalRef.current = intervalMs; }, [intervalMs]);
+  useEffect(() => { pausedRef.current = paused; }, [paused]);
+
+  const expected = (() => {
+    if (spoken.length < 2) return null;
+    return spoken[spoken.length - 2] + spoken[spoken.length - 1];
+  })();
+
+  const score = (correct, wrong) =>
+    correct + wrong === 0 ? 0 : Math.round((correct / (correct + wrong)) * 100);
+
+  const judge = (value) => {
+    const list = spokenRef.current;
+    if (list.length < 2) return;
+    const want = list[list.length - 2] + list[list.length - 1];
+    const right = Number(value) === want;
+    answeredRef.current = true;
+    setFlash(right ? "correct" : "wrong");
+    setTally((t) => ({
+      correct: t.correct + (right ? 1 : 0),
+      wrong: t.wrong + (right ? 0 : 1),
+    }));
+    if (right) {
+      streakRef.current += 1;
+      setStreak(streakRef.current);
+      if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
+        streakRef.current = 0;
+        setStreak(0);
+        setIntervalMs((v) => Math.max(CCT_MIN_MS, v - CCT_STEP_MS));
+      }
+    } else {
+      streakRef.current = 0;
+      setStreak(0);
+    }
+    setEntry("");
+  };
+
+  // One number, then the gap, then the next. The gap is read from a ref so a
+  // speed-up mid-run takes effect on the very next number.
+  const speakNext = useCallback(() => {
+    if (!answeredRef.current) {
+      // The gap ran out with nothing entered: that counts as a miss.
+      answeredRef.current = true;
+      setFlash("wrong");
+      setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
+      streakRef.current = 0;
+      setStreak(0);
+      setEntry("");
+    }
+    const n = 1 + Math.floor(Math.random() * CCT_MAX_NUMBER);
+    speakNumber(n);
+    setSpoken((prev) => {
+      const next = [...prev, n];
+      answeredRef.current = next.length < 2;
+      return next;
+    });
+    timerRef.current = setTimeout(speakNext, intervalRef.current);
+  }, []);
+
+  const begin = () => {
+    unlockNumberAudio();
+    setSpoken([]);
+    setEntry("");
+    setFlash(null);
+    setTally({ correct: 0, wrong: 0 });
+    setStreak(0);
+    streakRef.current = 0;
+    answeredRef.current = true;
+    setIntervalMs(CCT_START_MS);
+    intervalRef.current = CCT_START_MS;
+    setStartedAt(Date.now());
+    setStage("running");
+    timerRef.current = setTimeout(speakNext, 600);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  // Session budget, the same way the other timed exercises end themselves.
+  useEffect(() => {
+    if (stage !== "running" || !startedAt) return undefined;
+    const budget = exercise.sessionDurationMs || 20 * 60 * 1000;
+    const id = setTimeout(() => {
+      clearTimeout(timerRef.current);
+      setStage("setup");
+      onFinish?.();
+    }, budget);
+    return () => clearTimeout(id);
+  }, [stage, startedAt, exercise.sessionDurationMs, onFinish]);
+
+  useEffect(() => {
+    if (!flash) return undefined;
+    const id = setTimeout(() => setFlash(null), 320);
+    return () => clearTimeout(id);
+  }, [flash]);
+
+  const press = (digit) => {
+    if (stage !== "running" || spokenRef.current.length < 2) return;
+    const next = (entryRef.current + digit).slice(0, 2);
+    setEntry(next);
+    // Sums run from 2 to 36, so two digits is always a finished answer, and
+    // so is a leading digit that cannot start a two-digit sum.
+    if (next.length === 2 || Number(next) > 3) judge(next);
+  };
+
+  useEffect(() => {
+    if (stage !== "running") return undefined;
+    const onKey = (ev) => {
+      if (ev.key >= "0" && ev.key <= "9") press(ev.key);
+      else if (ev.key === "Enter" && entryRef.current) judge(entryRef.current);
+      else if (ev.key === "Backspace") setEntry((v) => v.slice(0, -1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
+  if (stage === "setup") {
+    return (
+      <div className="space-y-6 max-w-sm mx-auto">
+        <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+
+        <div
+          className="rounded-xl p-6 space-y-3 border"
+          style={{
+            borderColor: `${accent}55`,
+            background: `${accent}14`,
+          }}
+        >
+          <div className="text-lg text-slate-300">
+            Gap:{" "}
+            <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
+          </div>
+          <p className="text-slate-400 text-base">
+            Add each number to the one before it. 3 in a row = 100ms faster,
+            down to {CCT_MIN_MS}ms.
+          </p>
+        </div>
+
+        <button
+          onClick={begin}
+          style={{ "--ex": accent }}
+          className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        >
+          Start
+        </button>
+      </div>
+    );
+  }
+
+  const last = spoken[spoken.length - 1];
+  const prev = spoken[spoken.length - 2];
+  const flashColor =
+    flash === "correct" ? "#4CB782" : flash === "wrong" ? "#EB5757" : null;
+
+  return (
+    <div className="space-y-6 max-w-sm mx-auto">
+      <div className="flex items-center justify-between text-base text-slate-400 font-medium">
+        <span>{score(tally.correct, tally.wrong)}%</span>
+        <span>{intervalMs} ms</span>
+      </div>
+
+      <div
+        className="rounded-2xl border border-slate-700/60 bg-slate-900/70 p-6 space-y-6 text-center"
+        style={
+          flashColor
+            ? { boxShadow: `inset 0 0 0 2px ${flashColor}` }
+            : undefined
+        }
+      >
+        <div className="text-sm uppercase tracking-[0.18em] text-slate-500">
+          {spoken.length < 2 ? "Listen" : "Add the last two"}
+        </div>
+
+        <div className="flex items-center justify-center gap-4 text-slate-500 text-2xl font-medium">
+          <span>{prev ?? "\u2014"}</span>
+          <span>+</span>
+          <span style={{ color: accent }}>{last ?? "\u2014"}</span>
+        </div>
+
+        <div
+          className="text-6xl font-semibold tabular-nums h-16 flex items-center justify-center"
+          style={{ color: flashColor || "#F7F8F8" }}
+        >
+          {entry || (flash === "wrong" && expected != null ? expected : "")}
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
+            <button
+              key={d}
+              onClick={() => press(String(d))}
+              className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-2xl font-medium"
+            >
+              {d}
+            </button>
+          ))}
+          <button
+            onClick={() => setEntry("")}
+            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium text-slate-400"
+          >
+            Clear
+          </button>
+          <button
+            onClick={() => press("0")}
+            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-2xl font-medium"
+          >
+            0
+          </button>
+          <button
+            onClick={() => entry && judge(entry)}
+            style={{ "--ex": accent }}
+            className="deep-fill rounded-lg py-3 text-base font-medium"
+          >
+            Enter
+          </button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-sm text-slate-500">
+        <span>{streak}/{CCT_STREAK_TO_SPEED_UP} to speed up</span>
+        <button
+          onClick={() => {
+            clearTimeout(timerRef.current);
+            setStage("setup");
+          }}
+          className="text-slate-400 hover:text-slate-200 transition-colors font-medium"
+        >
+          Stop
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0 }) {
   const accent = ACCENT_STYLES[exercise.accent];
