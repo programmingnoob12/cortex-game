@@ -2113,6 +2113,7 @@ function longestStreakDays(exerciseHistory) {
 // One line for the session-complete screen: the pool that matches what
 // actually happened, or an unconditional line when nothing does. `forcedId`
 // shows one specific numbered line, for the test panel.
+const usedNudgeIds = new Set();
 function sessionNudge(state, forcedId) {
   const forced = forcedId ? MOTIVATION_BY_ID.get(forcedId) : null;
   const from = (cond) => MOTIVATION_LINES.filter((l) => l.cond === cond);
@@ -2135,7 +2136,19 @@ function sessionNudge(state, forcedId) {
   }
   if (pool.length === 0) pool = MOTIVATION_UNCONDITIONAL;
 
+  // Same no-repeat rule the hand-off screen uses: work through the pool
+  // before any line comes round again, so two sessions never read alike.
+  if (!forced) {
+    const fresh = pool.filter((l) => !usedNudgeIds.has(l.id));
+    if (fresh.length === 0) {
+      usedNudgeIds.clear();
+    } else {
+      pool = fresh;
+    }
+  }
+
   const line = pool[Math.floor(Math.random() * pool.length)];
+  if (line && !forced) usedNudgeIds.add(line.id);
   // `{n}` in a line fills in with the current streak length.
   return (line?.text || "Nice work.").replace("{n}", String(state?.streak ?? 0));
 }
@@ -2377,14 +2390,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 176;
+const BUILD_VERSION = 177;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:20 PM";
+const BUILD_TIME = "6:01 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT answer box is a real field",
+  "Error buzz on a wrong CCT answer",
+  "Session lines never repeat back to back",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2529,6 +2543,37 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
+// A deliberately unpleasant buzz for a wrong answer: two detuned saws
+// through a lowpass, short and flat. It is meant to be worth avoiding.
+function playError() {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.2, now + 0.008);
+    master.gain.setValueAtTime(0.2, now + 0.16);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 0.26);
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 1400;
+    lp.connect(master);
+    master.connect(ctx.destination);
+    [138, 146].forEach((hz) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(hz, now);
+      osc.frequency.linearRampToValueAtTime(hz * 0.82, now + 0.26);
+      osc.connect(lp);
+      osc.start(now);
+      osc.stop(now + 0.28);
+    });
+  } catch {
+    // Audio is a nicety here; a blocked context should not stop the round.
+  }
+}
+
 function playCountdownPip(last) {
   try {
     const ctx = uiAudioContext();
@@ -9144,9 +9189,11 @@ function NBackSessionApp() {
     comeback: hasComebackFromBrokenStreak(exerciseHistory),
     simulatedUnlockedIds,
   };
-  // The one line the session-complete screen shows. Recomputed on render,
-  // which is fine: it is a handful of comparisons over data already in hand.
-  const sessionNudgeLine = (() => {
+  // The one line the session-complete screen shows. Chosen once when the
+  // screen opens rather than on every render: the pick is random, so
+  // recomputing it mid-animation swapped the line out under the reader.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const sessionNudgeLine = useMemo(() => {
     const todayKey = new Date().toDateString();
     let hitPRToday = false;
     let nearBest = false;
@@ -9208,7 +9255,8 @@ function NBackSessionApp() {
       },
       nudgeIdOverride
     );
-  })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionCompleteAnim, nudgeIdOverride]);
 
   // The frame you've actually equipped (Club Penguin-style — pick one even if
   // several are unlocked), falling back to "none" if it's somehow no longer
@@ -9977,6 +10025,12 @@ function NBackSessionApp() {
         @keyframes gemGlowPulse {
           0%, 100% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 8px var(--glow-color)); }
           50% { filter: drop-shadow(0 4px 7px rgba(0,0,0,0.55)) drop-shadow(0 0 22px var(--glow-color)); }
+        }
+        /* The typed answer drops into the box and vanishes, so it reads as
+           handed in rather than left on screen. */
+        @keyframes cctDeposit {
+          0% { opacity: 1; transform: translateY(0) scale(1); }
+          100% { opacity: 0; transform: translateY(16px) scale(0.72); }
         }
         @keyframes switchIn {
           0% { opacity: 0; transform: translateY(14px); filter: blur(6px); }
@@ -13930,6 +13984,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const [msLeft, setMsLeft] = useState(null);
   // The last few verdicts, newest last, purely for the row of markers.
   const [marks, setMarks] = useState([]);
+  const [depositing, setDepositing] = useState(false);
 
   const spokenRef = useRef(spoken);
   const entryRef = useRef(entry);
@@ -13961,7 +14016,23 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       correct: t.correct + (right ? 1 : 0),
       wrong: t.wrong + (right ? 0 : 1),
     }));
-    setMarks((m) => [...m, right].slice(-CCT_STREAK_TO_SPEED_UP));
+    // A wrong answer wipes the row: the greens only mean anything as an
+    // unbroken run toward the next speed-up.
+    setMarks((m) =>
+      right
+        ? [...(m[m.length - 1] === false ? [] : m), true].slice(
+            -CCT_STREAK_TO_SPEED_UP
+          )
+        : [false]
+    );
+    if (!right) playError();
+    // The answer drops out of the box rather than sitting there: it has been
+    // handed in, so it should stop looking like something still being typed.
+    setDepositing(true);
+    setTimeout(() => {
+      setDepositing(false);
+      setEntry("");
+    }, 260);
     if (right) {
       streakRef.current += 1;
       if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
@@ -13982,7 +14053,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       answeredRef.current = true;
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
-      setMarks((m) => [...m, false].slice(-CCT_STREAK_TO_SPEED_UP));
+      setMarks([false]);
+      playError();
       streakRef.current = 0;
     }
     // The last answer stays visible right up to the next number, so a typed
@@ -14143,9 +14215,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     );
   }
 
-  const flashColor =
-    flash === "correct" ? "#4CB782" : flash === "wrong" ? "#EB5757" : null;
-
   return (
     <div className="space-y-5">
       {/* Interval and time left are the two numbers worth watching, so they
@@ -14185,9 +14254,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
       <div
         className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 space-y-6 text-center"
-        style={
-          flash === "wrong" ? { boxShadow: `inset 0 0 0 2px ${flashColor}` } : undefined
-        }
+
       >
         {/* The answer lands in a box of its own, so there is somewhere for it
             to appear whether it was typed or tapped. */}
@@ -14195,8 +14262,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           className="mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
           style={{
             height: "5.5rem",
-            borderColor: flash === "wrong" ? flashColor : `${accent}66`,
-            background: flash === "wrong" ? `${flashColor}1A` : "#0F1115",
+            borderColor: `${accent}66`,
+            background: "#0F1115",
           }}
         >
           <input
@@ -14207,7 +14274,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             autoComplete="off"
             aria-label="Your answer"
             className="w-full h-full bg-transparent border-0 outline-none text-center text-6xl font-semibold tabular-nums"
-            style={{ color: flash === "wrong" ? flashColor : "#F7F8F8" }}
+            style={{
+              color: "#F7F8F8",
+              animation: depositing ? "cctDeposit 0.26s ease-in forwards" : undefined,
+            }}
           />
         </div>
 
