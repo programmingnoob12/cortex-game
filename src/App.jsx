@@ -1165,6 +1165,14 @@ function formatLongDuration(ms) {
   return parts.join(" ");
 }
 
+// mm:ss for a running clock, distinct from formatDuration's "5 min 12 sec".
+function formatClock(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
 function formatHours(ms) {
   const hours = ms / 3600000;
   return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)}h`;
@@ -1524,10 +1532,10 @@ const REGIMES = [
   {
     key: "cct",
     title: "Anti-brainrot",
-    subtitle: "20 min",
+    subtitle: "15 min",
     summary: "CCT",
     accent: "indigo",
-    steps: [{ key: "cct", minutes: 20 }],
+    steps: [{ key: "cct", minutes: 15 }],
   },
 ];
 
@@ -2367,14 +2375,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 169;
+const BUILD_VERSION = 170;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:09 PM";
+const BUILD_TIME = "4:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT tutorial, countdown and single digits",
+  "CCT entry box, optional keypad and a session clock",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4714,7 +4722,7 @@ function CctTutorialDemo() {
   useEffect(() => {
     const t = setTimeout(
       () => setI((v) => (v >= seq.length - 1 ? 0 : v + 1)),
-      i >= seq.length - 1 ? 3000 : STEP_MS
+      i >= seq.length - 1 ? 5200 : STEP_MS
     );
     return () => clearTimeout(t);
   }, [i, seq.length]);
@@ -4749,7 +4757,7 @@ function CctTutorialDemo() {
 
       <div className="text-3xl font-semibold tabular-nums min-h-[2.5rem] flex items-center gap-3">
         {answer == null ? (
-          <span className="text-slate-500 text-lg">Listen</span>
+          <span>&nbsp;</span>
         ) : (
           <>
             <span style={{ color: PR_YELLOW }}>{seq[i - 1]}</span>
@@ -4771,13 +4779,11 @@ function CctTutorial({ onDone }) {
     <div className="space-y-5">
       <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6">
         <p className="text-slate-100 text-xl leading-relaxed text-center">
-          Numbers are spoken one at a time. Add the new one to the one before
-          it.
+          Numbers are spoken one at a time. Add the next number.
         </p>
         <CctTutorialDemo />
         <p className="text-slate-400 text-base leading-relaxed text-center">
-          Answer before the next number arrives. Three right in a row and they
-          come faster.
+          Answer before the next number arrives.
         </p>
       </div>
 
@@ -7372,6 +7378,7 @@ function NBackSessionApp() {
   // already underway. runTrial reads this ref instead of the static
   // EXERCISE_LIBRARY.iqnb.stimMs.
   const qnbPrimeRunSettingsRef = useRef(null);
+  const [cctStage, setCctStage] = useState("setup"); // mirrors CCTExercise's stage for the shared header
   const [rrtStage, setRrtStage] = useState("setup"); // mirrors RRTExercise's internal stage, so the shared header can hide "← Home" / "Exercise X of Y" once RRT is actually running
   const [motion3dStage, setMotion3dStage] = useState("setup"); // same idea, for Motion3DExercise
   useEffect(() => {
@@ -11999,6 +12006,7 @@ function NBackSessionApp() {
               {screen !== "running" &&
                 screen !== "results" &&
                 (exercise.key !== "rrt" || rrtStage === "setup") &&
+                (exercise.key !== "cct" || cctStage === "setup") &&
                 !(exercise.key === "iqnb" && sessionStartedRef.current.iqnb) &&
                 exercise.key !== "motion3d" && (
                 <button
@@ -12024,7 +12032,7 @@ function NBackSessionApp() {
           screen === "setup" &&
           exercise.key !== "overview" &&
           exercise.key !== "motion3d" &&
-          exercise.key !== "cct" &&
+          (exercise.key !== "cct" || cctStage === "setup") &&
           (exercise.key !== "rrt" || rrtStage === "setup") && (
           <div className={`text-center text-base uppercase tracking-wide font-semibold mb-6 ${ACCENT_STYLES[exercise.accent]?.text || "text-indigo-400"}`}>
             Exercise {exerciseIndex + 1} of {activeExercises.length - 1}
@@ -12699,6 +12707,7 @@ function NBackSessionApp() {
         {!switchNotice && exercise.key === "cct" && (
           <CCTExercise
             exercise={exercise}
+            onStageChange={setCctStage}
             onFinish={() => forceSwitchToNext(exerciseIndex)}
             paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
           />
@@ -13824,7 +13833,7 @@ const CCT_STREAK_TO_SPEED_UP = 3;
 // Single digits only, so the largest sum is 9 + 9.
 const CCT_MAX_SPOKEN = 9;
 
-function CCTExercise({ exercise, onFinish, paused }) {
+function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
   const accent = EXERCISE_COLORS.cct;
   const [stage, setStage] = useState("setup"); // setup | countdown | running
   const [count, setCount] = useState(3);
@@ -13834,6 +13843,8 @@ function CCTExercise({ exercise, onFinish, paused }) {
   const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
   const [tally, setTally] = useState({ correct: 0, wrong: 0 });
   const [startedAt, setStartedAt] = useState(null);
+  const [showKeypad, setShowKeypad] = useState(true);
+  const [msLeft, setMsLeft] = useState(null);
 
   const spokenRef = useRef(spoken);
   const entryRef = useRef(entry);
@@ -13845,6 +13856,7 @@ function CCTExercise({ exercise, onFinish, paused }) {
   useEffect(() => { spokenRef.current = spoken; }, [spoken]);
   useEffect(() => { entryRef.current = entry; }, [entry]);
   useEffect(() => { intervalRef.current = intervalMs; }, [intervalMs]);
+  useEffect(() => { onStageChange?.(stage); }, [stage, onStageChange]);
 
   const expected =
     spoken.length < 2 ? null : spoken[spoken.length - 2] + spoken[spoken.length - 1];
@@ -13928,7 +13940,7 @@ function CCTExercise({ exercise, onFinish, paused }) {
   // Session budget, the same way the other timed exercises end themselves.
   useEffect(() => {
     if (stage !== "running" || !startedAt) return undefined;
-    const budget = exercise.sessionDurationMs || 20 * 60 * 1000;
+    const budget = exercise.sessionDurationMs || 15 * 60 * 1000;
     const id = setTimeout(() => {
       clearTimeout(timerRef.current);
       setStage("setup");
@@ -13936,6 +13948,17 @@ function CCTExercise({ exercise, onFinish, paused }) {
     }, budget);
     return () => clearTimeout(id);
   }, [stage, startedAt, exercise.sessionDurationMs, onFinish]);
+
+  // Remaining time, ticked once a second rather than per frame: nothing here
+  // moves fast enough to need more.
+  useEffect(() => {
+    if (stage !== "running" || !startedAt) return undefined;
+    const budget = exercise.sessionDurationMs || 15 * 60 * 1000;
+    const tick = () => setMsLeft(Math.max(0, budget - (Date.now() - startedAt)));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [stage, startedAt, exercise.sessionDurationMs]);
 
   useEffect(() => {
     if (!flash) return undefined;
@@ -13981,10 +14004,18 @@ function CCTExercise({ exercise, onFinish, paused }) {
             Range: <span className="text-slate-200 font-medium">1 to 9</span>
           </div>
           <p className="text-slate-400 text-base">
-            Add each number to the one before it. 3 in a row = 100ms faster,
-            down to {CCT_MIN_MS}ms.
+            3 in a row = 100ms faster.
           </p>
         </div>
+
+        {/* Typing is faster than tapping once someone is used to it, so the
+            keypad is optional rather than assumed. */}
+        <button
+          onClick={() => setShowKeypad((v) => !v)}
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium text-slate-300"
+        >
+          {showKeypad ? "Hide keypad" : "Show keypad"}
+        </button>
 
         <button
           onClick={begin}
@@ -14020,7 +14051,12 @@ function CCTExercise({ exercise, onFinish, paused }) {
     <div className="space-y-5">
       <div className="flex items-center justify-between text-base text-slate-400 font-medium">
         <span>{score(tally.correct, tally.wrong)}%</span>
-        <span>{intervalMs} ms</span>
+        <div className="flex items-center gap-4">
+          <span>{intervalMs} ms</span>
+          <span className="text-slate-300 tabular-nums">
+            {msLeft == null ? "" : formatClock(msLeft)}
+          </span>
+        </div>
       </div>
 
       <div
@@ -14033,13 +14069,25 @@ function CCTExercise({ exercise, onFinish, paused }) {
           <span style={{ color: accent }}>{last ?? "\u2014"}</span>
         </div>
 
+        {/* The answer lands in a box of its own, so there is somewhere for it
+            to appear whether it was typed or tapped. */}
         <div
-          className="text-7xl font-semibold tabular-nums h-20 flex items-center justify-center"
-          style={{ color: flashColor || "#F7F8F8" }}
+          className="mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
+          style={{
+            height: "5.5rem",
+            borderColor: flashColor || `${accent}66`,
+            background: flashColor ? `${flashColor}1A` : "#0F1115",
+          }}
         >
-          {entry || (flash === "wrong" && expected != null ? expected : "")}
+          <span
+            className="text-6xl font-semibold tabular-nums"
+            style={{ color: flashColor || "#F7F8F8" }}
+          >
+            {entry || (flash === "wrong" && expected != null ? expected : "")}
+          </span>
         </div>
 
+        {showKeypad && (
         <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
             <button
@@ -14059,6 +14107,7 @@ function CCTExercise({ exercise, onFinish, paused }) {
           </button>
           <span />
         </div>
+        )}
       </div>
     </div>
   );
