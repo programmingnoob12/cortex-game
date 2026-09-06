@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 157;
+const BUILD_VERSION = 158;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:49 PM";
+const BUILD_TIME = "1:54 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview columns are a fixed width",
+  "Overview always uses a four-column track",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11926,7 +11926,12 @@ function NBackSessionApp() {
             {/* Sized to its own content rather than the page: a full-width
                 strip made one short number look stranded, and it changed
                 width whenever the scrollbar came and went. */}
-            <div className="w-full" style={{ maxWidth: "17rem" }}>
+            {/* Laid on the same four-column track as the exercises below, so
+                it lines up with the first of them at any regime. */}
+            <div
+              className="grid gap-6"
+              style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+            >
               <Stat
                 label={overviewSource === "home" ? "Total duration" : "Duration"}
                 value={formatDuration(
@@ -11937,16 +11942,17 @@ function NBackSessionApp() {
               />
             </div>
 
-            {/* Fixed-width columns, wrapping if they run out of room. A
-                fractional grid made every card change size with the number of
-                exercises, so switching regime appeared to resize the page. */}
-            <div className="flex flex-wrap gap-6 items-start">
-              {overviewSummaryExercises.map((e) => {
+            {/* Always four columns, whatever the regime holds: a track that
+                counted the exercises made every card change size when the
+                regime changed. Unused columns are simply left empty, and the
+                three bands are one grid so wrapped names cannot knock the
+                cards out of line. */}
+            {(() => {
+              const SLOTS = 4;
+              const rows = overviewSummaryExercises.slice(0, SLOTS).map((e) => {
                 const stat = exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
                 const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
-                const bestLabel = isAccuracy ? "Best accuracy" : "Best score";
-                const avgLabel = isAccuracy ? "Avg accuracy" : "Avg score";
                 const bestValue = stat
                   ? e.key === "motion3d"
                     ? formatScoreValue(e, stat.bestAccuracy)
@@ -11959,14 +11965,28 @@ function NBackSessionApp() {
                         stat.bestAccuracy
                       )}`
                   : "\u2014";
-                const avgValue = stat ? formatScoreValue(e, avgVal) : "\u2014";
-                return (
-                  <div
-                    key={e.key}
-                    className="space-y-4 shrink-0"
-                    style={{ width: "17rem", maxWidth: "100%" }}
-                  >
-                    <h2 className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9">
+                return {
+                  e,
+                  stat,
+                  isAccuracy,
+                  avgVal,
+                  bestLabel: isAccuracy ? "Best accuracy" : "Best score",
+                  avgLabel: isAccuracy ? "Avg accuracy" : "Avg score",
+                  bestValue,
+                  avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
+                };
+              });
+              const blanks = Array.from({ length: SLOTS - rows.length });
+              return (
+                <div
+                  className="grid gap-x-6 gap-y-4"
+                  style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
+                >
+                  {rows.map(({ e }) => (
+                    <h2
+                      key={`h-${e.key}`}
+                      className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9 self-end"
+                    >
                       <span
                         className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{
@@ -11975,22 +11995,41 @@ function NBackSessionApp() {
                       />
                       <span className="truncate">{e.title}</span>
                     </h2>
+                  ))}
+                  {blanks.map((_, i) => (
+                    <div key={`hb-${i}`} />
+                  ))}
+                  {rows.map((r) => (
                     <Stat
-                      label={bestLabel}
-                      value={bestValue}
+                      key={`b-${r.e.key}`}
+                      label={r.bestLabel}
+                      value={r.bestValue}
                       color={
-                        stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined
+                        r.stat && r.isAccuracy
+                          ? accuracyColor(r.stat.bestAccuracy)
+                          : undefined
                       }
                     />
+                  ))}
+                  {blanks.map((_, i) => (
+                    <div key={`bb-${i}`} />
+                  ))}
+                  {rows.map((r) => (
                     <Stat
-                      label={avgLabel}
-                      value={avgValue}
-                      color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
+                      key={`a-${r.e.key}`}
+                      label={r.avgLabel}
+                      value={r.avgValue}
+                      color={
+                        r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
+                      }
                     />
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                  {blanks.map((_, i) => (
+                    <div key={`ab-${i}`} />
+                  ))}
+                </div>
+              );
+            })()}
 
             <div className="flex gap-6 pt-4">
               <button
