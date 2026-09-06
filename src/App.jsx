@@ -2375,14 +2375,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 171;
+const BUILD_VERSION = 172;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:26 PM";
+const BUILD_TIME = "4:34 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT is typing only",
+  "CCT hides the numbers, countdown has pips",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2525,6 +2525,29 @@ let cheerBytes = null;
 // a stack of INHARMONIC partials ringing above it. Harmonic ratios (2x, 3x)
 // sound like a pitched instrument; the ratios below are the ones a struck
 // bar or bell actually produces, and they are what the ear hears as metal.
+// Countdown pips for CCT. `last` raises the pitch on the final one so the
+// start is heard rather than counted.
+function playCountdownPip(last) {
+  try {
+    const ctx = uiAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(last ? 0.16 : 0.1, now + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + (last ? 0.34 : 0.16));
+    gain.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(last ? 880 : 560, now);
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(now + (last ? 0.38 : 0.2));
+  } catch {
+    // Audio is a nicety here; a blocked context should not stop the round.
+  }
+}
+
 function playShine() {
   try {
     const ctx = uiAudioContext();
@@ -13925,6 +13948,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
   // 3, 2, 1, then the first number: a moment to settle before it starts.
   useEffect(() => {
     if (stage !== "countdown") return undefined;
+    if (count > 0) playCountdownPip(count === 1);
     if (count === 0) {
       setStage("running");
       setStartedAt(Date.now());
@@ -13998,10 +14022,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
           style={{ borderColor: `${accent}55`, background: `${accent}14` }}
         >
           <div className="text-lg text-slate-300">
-            Gap: <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
-          </div>
-          <div className="text-lg text-slate-400">
-            Range: <span className="text-slate-200 font-medium">1 to 9</span>
+            Interval:{" "}
+            <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
           </div>
           <p className="text-slate-400 text-base">
             3 in a row = 100ms faster.
@@ -14033,8 +14055,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
     );
   }
 
-  const last = spoken[spoken.length - 1];
-  const prev = spoken[spoken.length - 2];
   const flashColor =
     flash === "correct" ? "#4CB782" : flash === "wrong" ? "#EB5757" : null;
 
@@ -14054,12 +14074,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
         className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 space-y-6 text-center"
         style={flashColor ? { boxShadow: `inset 0 0 0 2px ${flashColor}` } : undefined}
       >
-        <div className="flex items-center justify-center gap-5 text-3xl font-medium text-slate-500">
-          <span>{prev ?? "\u2014"}</span>
-          <span className="text-2xl">+</span>
-          <span style={{ color: accent }}>{last ?? "\u2014"}</span>
-        </div>
-
         {/* The answer lands in a box of its own, so there is somewhere for it
             to appear whether it was typed or tapped. */}
         <div
@@ -14078,7 +14092,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
           </span>
         </div>
 
-        <div className="text-sm text-slate-500">Type the answer</div>
       </div>
 
       <button
