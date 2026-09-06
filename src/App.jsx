@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 155;
+const BUILD_VERSION = 156;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:21 PM";
+const BUILD_TIME = "1:38 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats scoped to the regime, with its own picker",
+  "Overview column width no longer follows the exercise count",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9734,6 +9734,10 @@ function NBackSessionApp() {
           isMotion3dApp
             ? undefined
             : {
+                // As a flex item this column could be widened by its own
+                // min-content size, which is what made the Overview grow a
+                // little with each extra exercise column.
+                minWidth: 0,
                 // The running screen carries a column of answer buttons on
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
@@ -10366,7 +10370,7 @@ function NBackSessionApp() {
                         setNudgeIdOverride(l.id);
                         setSessionCompleteAnim(true);
                         playLevelUp();
-                        setTimeout(() => setSessionCompleteAnim(false), 6200);
+                        setTimeout(() => setSessionCompleteAnim(false), 6100);
                       }}
                       className={`w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border text-slate-300 hover:border-slate-400 ${
                         l.cond
@@ -10384,7 +10388,7 @@ function NBackSessionApp() {
                       setNudgeIdOverride(null);
                       setSessionCompleteAnim(true);
                       playLevelUp();
-                      setTimeout(() => setSessionCompleteAnim(false), 6200);
+                      setTimeout(() => setSessionCompleteAnim(false), 6100);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -11922,7 +11926,7 @@ function NBackSessionApp() {
             {/* Sized to its own content rather than the page: a full-width
                 strip made one short number look stranded, and it changed
                 width whenever the scrollbar came and went. */}
-            <div className="w-full max-w-xs">
+            <div className="w-full" style={{ maxWidth: "20rem" }}>
               <Stat
                 label={overviewSource === "home" ? "Total duration" : "Duration"}
                 value={formatDuration(
@@ -12040,7 +12044,7 @@ function NBackSessionApp() {
                     setSessionCompleteAnim(false);
                     setHypnosisAfterSession(true);
                     setMainView("hypnosis");
-                  }, 6200);
+                  }, 6100);
                 }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
@@ -13324,7 +13328,7 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
-              animation: "sessionDoneWash 6.2s cubic-bezier(0.2,0.7,0.3,1) forwards",
+              animation: "sessionDoneWash 6.1s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
           <div className="relative flex items-center justify-center">
