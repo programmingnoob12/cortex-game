@@ -2340,6 +2340,7 @@ const MOTIVATION_LINES = [
   { id: 44, text: "KEEP CLIMBING." },
   { id: 45, text: "The goal is progress, not perfection." },
   { id: 46, text: "Feel like a God." },
+  { id: 47, text: "This training will make you mentally HARD. Be strong." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2376,14 +2377,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 175;
+const BUILD_VERSION = 176;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:16 PM";
+const BUILD_TIME = "5:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT streak markers, clearer interval and clock",
+  "CCT answer box is a real field",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10066,6 +10067,13 @@ function NBackSessionApp() {
                   quality to give a premium feel.
                 </div>
                 <div>
+                  Add TikTok hard songs and mix up when they're played.
+                </div>
+                <div>
+                  Add a nutrition section that tracks raw milk, raw eggs,
+                  sunlight, etc.
+                </div>
+                <div>
                   Consolidate and get this to take off and make bank before
                   competitors start to catch on and copy what I'm doing. I need
                   to already be flying and doing well, and potentially cashing
@@ -13929,6 +13937,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const intervalRef = useRef(intervalMs);
   const streakRef = useRef(0);
   const timerRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => { spokenRef.current = spoken; }, [spoken]);
   useEffect(() => { entryRef.current = entry; }, [entry]);
@@ -14070,22 +14079,19 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
   // Sums run from 2 to 18, so only a leading 1 can be part of a two-digit
   // answer; every other first digit is already the whole answer.
-  const press = (digit) => {
-    if (stage !== "running" || spokenRef.current.length < 2) return;
-    const next = (entryRef.current + digit).slice(0, 2);
-    setEntry(next);
-    if (next.length === 2 || next !== "1") judge(next);
+  const handleType = (raw) => {
+    if (stage !== "running") return;
+    if (spokenRef.current.length < 2 || answeredRef.current) return;
+    const digits = raw.replace(/\D/g, "").slice(0, 2);
+    setEntry(digits);
+    if (!digits) return;
+    if (digits.length === 2 || digits !== "1") judge(digits);
   };
 
+  // A real field, focused as the round begins, so it can be clicked or tapped
+  // and brings up a number pad on a phone.
   useEffect(() => {
-    if (stage !== "running") return undefined;
-    const onKey = (ev) => {
-      if (ev.key >= "0" && ev.key <= "9") press(ev.key);
-      else if (ev.key === "Backspace") setEntry((v) => v.slice(0, -1));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (stage === "running") inputRef.current?.focus();
   }, [stage]);
 
   if (stage === "setup") {
@@ -14193,12 +14199,16 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             background: flash === "wrong" ? `${flashColor}1A` : "#0F1115",
           }}
         >
-          <span
-            className="text-6xl font-semibold tabular-nums"
+          <input
+            ref={inputRef}
+            value={entry}
+            onChange={(ev) => handleType(ev.target.value)}
+            inputMode="numeric"
+            autoComplete="off"
+            aria-label="Your answer"
+            className="w-full h-full bg-transparent border-0 outline-none text-center text-6xl font-semibold tabular-nums"
             style={{ color: flash === "wrong" ? flashColor : "#F7F8F8" }}
-          >
-            {entry}
-          </span>
+          />
         </div>
 
         {/* Three squares: how close this run is to the next speed-up, and
@@ -14215,7 +14225,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
                   height: "1.6rem",
                   borderColor:
                     mark === undefined
-                      ? "#2A2E37"
+                      ? "#3A3E46"
                       : mark
                       ? "#4CB782"
                       : "#EB5757",
