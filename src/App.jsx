@@ -2280,14 +2280,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 150;
+const BUILD_VERSION = 151;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:03 PM";
+const BUILD_TIME = "12:58 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation audio v10",
+  "Overview lays out horizontally",
+  "Regime picker when opened from Home",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7269,6 +7270,10 @@ function NBackSessionApp() {
   // overviewSource was wrong: that value is stale when Motivation is opened
   // straight from Home without passing through the Overview screen.
   const [hypnosisAfterSession, setHypnosisAfterSession] = useState(false);
+  // Which regime's exercises the Overview summary lists. Defaults to the one
+  // being trained; the picker at the top of the page (Home entry only) lets
+  // them look at another regime's numbers without switching regime.
+  const [overviewRegimeKey, setOverviewRegimeKey] = useState(null);
   const [overviewSource, setOverviewSource] = useState("training"); // "training" | "home" — controls which time-trained stat the Session Overview screen shows
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
@@ -8831,8 +8836,13 @@ function NBackSessionApp() {
   // order they appear in that regime's step list (e.g. Dual N-Back is
   // exercise 1 of 4 in one regime but 3rd in another — the overview should
   // match whichever position it actually runs in).
+  const overviewRegime =
+    (overviewSource === "home" &&
+      overviewRegimeKey &&
+      REGIMES.find((r) => r.key === overviewRegimeKey)) ||
+    currentRegime;
   const overviewExercises = Array.from(
-    new Set(currentRegime.steps.map((s) => s.key))
+    new Set(overviewRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
 
   // Stats is not scoped to the current regime. Training history is stored per
@@ -11870,7 +11880,35 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div className="space-y-14">
+          <div className="space-y-8">
+            {/* Looking at the Overview from Home is browsing, so the regime
+                picker belongs there. Reaching it at the end of a session is a
+                report on what was just done, and switching regimes on it
+                would be nonsense. */}
+            {overviewSource === "home" && (
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm text-slate-500 uppercase tracking-wide font-semibold">
+                  Regime
+                </span>
+                {REGIMES.map((r) => {
+                  const on = r.key === overviewRegime.key;
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => setOverviewRegimeKey(r.key)}
+                      className={`rounded-lg border px-4 py-2 text-base transition-colors ${
+                        on
+                          ? "bg-slate-700 border-slate-700 text-slate-100"
+                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {r.title}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Overview
@@ -11886,6 +11924,14 @@ function NBackSessionApp() {
               )}
             />
 
+            {/* One column per exercise instead of a stack, so a whole regime
+                fits on screen without scrolling. */}
+            <div
+              className="grid gap-6 items-start"
+              style={{
+                gridTemplateColumns: `repeat(${overviewExercises.length}, minmax(0, 1fr))`,
+              }}
+            >
             {overviewExercises.map((e) => {
               const stat = exerciseStats[e.key];
               const isAccuracy = e.scoreType === "accuracy";
@@ -11903,32 +11949,31 @@ function NBackSessionApp() {
                       e,
                       stat.bestAccuracy
                     )}`
-                : "—";
-              const avgValue = stat ? formatScoreValue(e, avgVal) : "—";
+                : "\u2014";
+              const avgValue = stat ? formatScoreValue(e, avgVal) : "\u2014";
               return (
                 <div key={e.key} className="space-y-4">
                   <h2 className="text-3xl font-semibold tracking-tight text-slate-100 flex items-center gap-3">
                     <span
-                      className="w-2.5 h-2.5 rounded-full"
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
                       style={{ backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8" }}
                     />
                     {e.title}
                   </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <Stat
-                      label={bestLabel}
-                      value={bestValue}
-                      color={stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined}
-                    />
-                    <Stat
-                      label={avgLabel}
-                      value={avgValue}
-                      color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
-                    />
-                  </div>
+                  <Stat
+                    label={bestLabel}
+                    value={bestValue}
+                    color={stat && isAccuracy ? accuracyColor(stat.bestAccuracy) : undefined}
+                  />
+                  <Stat
+                    label={avgLabel}
+                    value={avgValue}
+                    color={stat && isAccuracy ? accuracyColor(avgVal) : undefined}
+                  />
                 </div>
               );
             })}
+            </div>
 
             <div className="flex gap-6 pt-4">
               <button
@@ -15137,7 +15182,7 @@ const HYPNOSIS_TRACK = {
   // of showing 0:00 and then jumping.
   seconds: 631,
   blurb:
-    "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost. Results are best in the morning and at night right before sleep.",
+    "A guided motivation audio. There's no need to do it every day. Use it when you want an extra boost. Results are best if you do it twice daily, once in the morning and at night.",
 };
 
 // Deliberately bare: a play button and a volume slider, nothing else. No
