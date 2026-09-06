@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 163;
+const BUILD_VERSION = 164;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:44 PM";
+const BUILD_TIME = "3:00 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats screen fits without scrolling",
+  "Graph panel carries its own exercise switch",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12124,33 +12124,6 @@ function NBackSessionApp() {
               </button>
             </div>
 
-            {statsDisplay === "chart" && overviewSummaryExercises.length > 1 && (
-              <div className="flex items-center gap-3 flex-wrap">
-                {overviewSummaryExercises.map((e) => {
-                  const on = e.key === statsChartExercise?.key;
-                  return (
-                    <button
-                      key={e.key}
-                      onClick={() => setStatsExerciseKey(e.key)}
-                      className={`rounded-lg border px-4 py-2 text-base transition-colors flex items-center gap-2.5 ${
-                        on
-                          ? "bg-slate-700 border-slate-700 text-slate-100"
-                          : "bg-slate-800 border-slate-700/60 text-slate-400 hover:text-slate-100"
-                      }`}
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
-                        }}
-                      />
-                      {e.title}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
             {/* The graph shows one exercise at a time so it gets the whole
                 width; the spreadsheet is a single table with a column pair
                 per exercise. */}
@@ -12181,12 +12154,53 @@ function NBackSessionApp() {
                 )
               );
               return (
-                <div key={e.key} className="space-y-4">
+                <div key={e.key}>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6"
-                      // Sized off the viewport so the whole Stats screen fits
-                      // without scrolling, whatever the window height.
-                      style={{ height: "min(calc(100vh - 21rem), 30rem)", minHeight: "15rem" }}>
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
+                      {/* Title on the left, exercise switch on the right, both
+                          inside the panel so the chart owns its own controls. */}
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: exColor }}
+                          />
+                          {e.title}
+                        </div>
+                        {overviewSummaryExercises.length > 1 && (
+                          <div
+                            className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
+                            role="group"
+                            aria-label="Choose an exercise"
+                          >
+                            {overviewSummaryExercises.map((opt) => {
+                              const on = opt.key === e.key;
+                              return (
+                                <button
+                                  key={opt.key}
+                                  onClick={() => setStatsExerciseKey(opt.key)}
+                                  aria-pressed={on}
+                                  className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                                    on
+                                      ? "bg-slate-700 text-slate-100"
+                                      : "text-slate-400 hover:text-slate-100"
+                                  }`}
+                                >
+                                  {opt.title}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div
+                        // Sized off the viewport so the whole Stats screen fits
+                        // without scrolling, whatever the window height.
+                        style={{
+                          height: "min(calc(100vh - 26rem), 26rem)",
+                          minHeight: "14rem",
+                        }}
+                      >
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
@@ -12299,9 +12313,7 @@ function NBackSessionApp() {
                           />
                         </AreaChart>
                       </ResponsiveContainer>
-                    </div>
-                  ) : null}
-                  {chartData.length > 0 ? (
+                      </div>
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-400">
                       <span className="flex items-center gap-2">
                         <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
@@ -12330,6 +12342,7 @@ function NBackSessionApp() {
                         </svg>
                         New personal record
                       </span>
+                    </div>
                     </div>
                   ) : null}
                   {chartData.length === 0 && (
