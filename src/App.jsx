@@ -2375,14 +2375,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 170;
+const BUILD_VERSION = 171;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:16 PM";
+const BUILD_TIME = "4:26 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT entry box, optional keypad and a session clock",
+  "CCT is typing only",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4782,9 +4782,6 @@ function CctTutorial({ onDone }) {
           Numbers are spoken one at a time. Add the next number.
         </p>
         <CctTutorialDemo />
-        <p className="text-slate-400 text-base leading-relaxed text-center">
-          Answer before the next number arrives.
-        </p>
       </div>
 
       <div className="flex items-center justify-end">
@@ -9991,6 +9988,10 @@ function NBackSessionApp() {
                   makes it look cool.
                 </div>
                 <div>
+                  Show up differently. Make all the little details higher
+                  quality to give a premium feel.
+                </div>
+                <div>
                   Consolidate and get this to take off and make bank before
                   competitors start to catch on and copy what I'm doing. I need
                   to already be flying and doing well, and potentially cashing
@@ -13843,7 +13844,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
   const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
   const [tally, setTally] = useState({ correct: 0, wrong: 0 });
   const [startedAt, setStartedAt] = useState(null);
-  const [showKeypad, setShowKeypad] = useState(true);
   const [msLeft, setMsLeft] = useState(null);
 
   const spokenRef = useRef(spoken);
@@ -14008,15 +14008,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
           </p>
         </div>
 
-        {/* Typing is faster than tapping once someone is used to it, so the
-            keypad is optional rather than assumed. */}
-        <button
-          onClick={() => setShowKeypad((v) => !v)}
-          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium text-slate-300"
-        >
-          {showKeypad ? "Hide keypad" : "Show keypad"}
-        </button>
-
         <button
           onClick={begin}
           style={{ "--ex": accent }}
@@ -14087,28 +14078,19 @@ function CCTExercise({ exercise, onFinish, onStageChange, paused }) {
           </span>
         </div>
 
-        {showKeypad && (
-        <div className="grid grid-cols-3 gap-3 max-w-xs mx-auto">
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => (
-            <button
-              key={d}
-              onClick={() => press(String(d))}
-              className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-2xl font-medium"
-            >
-              {d}
-            </button>
-          ))}
-          <span />
-          <button
-            onClick={() => press("0")}
-            className="no-sheen bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-2xl font-medium"
-          >
-            0
-          </button>
-          <span />
-        </div>
-        )}
+        <div className="text-sm text-slate-500">Type the answer</div>
       </div>
+
+      <button
+        onClick={() => {
+          clearTimeout(timerRef.current);
+          setStage("setup");
+          onFinish?.();
+        }}
+        className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-base"
+      >
+        🧪 Test: finish this session
+      </button>
     </div>
   );
 }
