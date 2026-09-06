@@ -2211,7 +2211,7 @@ const MOTIVATION_LINES = [
   { id: 8, text: "BECOME MENTALLY SUPERIOR." },
   { id: 9, text: "BECOME MENTALLY UNSTOPPABLE." },
   { id: 10, text: "Another day, another win." },
-  { id: 11, text: "Don't worry about being perfect. Just be consistent. The goal is progress, not perfection." },
+  { id: 11, text: "Don't worry about being perfect. Just be consistent." },
   { id: 12, text: "Your future self will thank you." },
   { id: 13, text: "You're getting smarter than the competition." },
   { id: 15, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
@@ -2244,6 +2244,7 @@ const MOTIVATION_LINES = [
   { id: 42, text: "The closest thing we have to a superpower is intellect." },
   { id: 43, text: "Dominate everyone." },
   { id: 44, text: "KEEP CLIMBING." },
+  { id: 45, text: "The goal is progress, not perfection." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2280,14 +2281,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 152;
+const BUILD_VERSION = 153;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:02 PM";
+const BUILD_TIME = "1:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview uses the full width and aligns its rows",
+  "Stats and spreadsheet go two across",
+  "Duration card sized to its content",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9741,9 +9743,7 @@ function NBackSessionApp() {
                 maxWidth:
                   mainView === "app" && screen === "running"
                     ? "100%"
-                    : mainView === "app" &&
-                      exercise.key === "overview" &&
-                      overviewView === "summary"
+                    : mainView === "app" && exercise.key === "overview"
                     ? // The summary lays its exercises out in columns, so it
                       // needs more than the reading width the other screens use.
                       "76rem"
@@ -11922,14 +11922,19 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            <Stat
-              label={overviewSource === "home" ? "Total duration" : "Duration"}
-              value={formatDuration(
-                overviewSource === "home"
-                  ? msTrainedTotal(exerciseHistory)
-                  : msTrainedToday(exerciseHistory)
-              )}
-            />
+            {/* Sized to its own content rather than the page: a full-width
+                strip made one short number look stranded, and it changed
+                width whenever the scrollbar came and went. */}
+            <div className="w-full max-w-xs">
+              <Stat
+                label={overviewSource === "home" ? "Total duration" : "Duration"}
+                value={formatDuration(
+                  overviewSource === "home"
+                    ? msTrainedTotal(exerciseHistory)
+                    : msTrainedToday(exerciseHistory)
+                )}
+              />
+            </div>
 
             {/* One column per exercise instead of a stack, so a whole regime
                 fits on screen without scrolling. Headings and the two stat
@@ -12072,6 +12077,10 @@ function NBackSessionApp() {
               </button>
             </div>
 
+            {/* Two across from large screens up: a chart needs real width, so
+                three would be unreadable, but stacking them one per screen
+                meant scrolling past every exercise to reach the last. */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-12 items-start">
             {statsDisplay === "chart"
               ? statsExercises.map((e) => {
               const history = exerciseHistory[e.key] || [];
@@ -12107,7 +12116,7 @@ function NBackSessionApp() {
                     {e.title}
                   </h2>
                   {chartData.length > 0 ? (
-                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-6 h-[22rem] sm:h-[30rem]">
+                    <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-2 sm:p-5 h-[20rem] sm:h-[24rem]">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={chartData}
@@ -12435,6 +12444,7 @@ function NBackSessionApp() {
                 </div>
               );
             })}
+            </div>
 
             <button
               onClick={seedFakeHistory}
