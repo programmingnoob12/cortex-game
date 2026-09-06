@@ -2281,15 +2281,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 153;
+const BUILD_VERSION = 154;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:07 PM";
+const BUILD_TIME = "1:16 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats and spreadsheet go two across",
-  "Duration card sized to its content",
+  "Regime picker no longer changes Home",
+  "Scrollbar gutter reserved",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8837,12 +8837,19 @@ function NBackSessionApp() {
   // order they appear in that regime's step list (e.g. Dual N-Back is
   // exercise 1 of 4 in one regime but 3rd in another — the overview should
   // match whichever position it actually runs in).
+  const overviewExercises = Array.from(
+    new Set(currentRegime.steps.map((s) => s.key))
+  ).map((key) => EXERCISE_LIBRARY[key]);
+
+  // Only the Overview summary follows the regime picker. Home's exercise
+  // cards and the Stats list stay on the regime actually being trained —
+  // sharing one list meant picking Quick on the Overview emptied Home.
   const overviewRegime =
     (overviewSource === "home" &&
       overviewRegimeKey &&
       REGIMES.find((r) => r.key === overviewRegimeKey)) ||
     currentRegime;
-  const overviewExercises = Array.from(
+  const overviewSummaryExercises = Array.from(
     new Set(overviewRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
 
@@ -9509,7 +9516,10 @@ function NBackSessionApp() {
   return (
     <div
       ref={scrollRootRef}
-      style={{ "--ex": themeColor }}
+      // scrollbarGutter keeps the space reserved whether or not a page is
+      // long enough to scroll, so switching regimes no longer nudges the
+      // whole layout sideways.
+      style={{ "--ex": themeColor, scrollbarGutter: "stable" }}
       className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
@@ -11942,8 +11952,8 @@ function NBackSessionApp() {
                 stacks, so a name that wraps onto two lines cannot push its
                 column's cards out of line with the others. */}
             {(() => {
-              const cols = overviewExercises.length;
-              const rows = overviewExercises.map((e) => {
+              const cols = overviewSummaryExercises.length;
+              const rows = overviewSummaryExercises.map((e) => {
                 const stat = exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
                 const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
