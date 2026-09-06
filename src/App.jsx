@@ -2282,14 +2282,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 159;
+const BUILD_VERSION = 160;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:03 PM";
+const BUILD_TIME = "2:09 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview fills the width again",
+  "Quick regime keeps a normal card width",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11974,11 +11974,15 @@ function NBackSessionApp() {
                   avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
                 };
               });
+              // Never fewer than three tracks: a single-exercise regime would
+              // otherwise stretch one card across the whole page.
+              const cols = Math.max(rows.length, 3);
+              const blanks = Array.from({ length: cols - rows.length });
               return (
                 <div
                   className="grid gap-x-6 gap-y-4"
                   style={{
-                    gridTemplateColumns: `repeat(${rows.length}, minmax(0, 1fr))`,
+                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
                   }}
                 >
                   {rows.map(({ e }) => (
@@ -11995,6 +11999,9 @@ function NBackSessionApp() {
                       <span className="truncate">{e.title}</span>
                     </h2>
                   ))}
+                  {blanks.map((_, i) => (
+                    <div key={`hb-${i}`} />
+                  ))}
                   {rows.map((r) => (
                     <Stat
                       key={`b-${r.e.key}`}
@@ -12006,6 +12013,9 @@ function NBackSessionApp() {
                           : undefined
                       }
                     />
+                  ))}
+                  {blanks.map((_, i) => (
+                    <div key={`bb-${i}`} />
                   ))}
                   {rows.map((r) => (
                     <Stat
