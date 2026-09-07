@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 197;
+const BUILD_VERSION = 198;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:25 AM";
+const BUILD_TIME = "10:27 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Home buttons back to full size",
+  "CCT promotes automatically at 95%",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14037,7 +14037,7 @@ const CCT_FLOOR_LIMIT = 100;
 const CCT_STEP_MS = 100;
 const CCT_STREAK_TO_SPEED_UP = 3;
 const CCT_STREAK_TO_SLOW_DOWN = 3;
-const CCT_PROMOTE_ACCURACY = 90;
+const CCT_PROMOTE_ACCURACY = 95;
 const CCT_FLOOR_KEY = "cortex.cctFloor.v1";
 
 function loadCctFloor() {
@@ -14060,7 +14060,7 @@ const CCT_MAX_SPOKEN = 9;
 
 function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }) {
   const accent = EXERCISE_COLORS.cct;
-  // setup | countdown | running | promote
+  // setup | countdown | running
   const [stage, setStage] = useState("setup");
   const [count, setCount] = useState(3);
   const [intervalMs, setIntervalMs] = useState(CCT_START_MS);
@@ -14078,8 +14078,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   // for right, red for wrong; three of either moves the interval.
   const [marks, setMarks] = useState([]);
   const [depositing, setDepositing] = useState(false);
-  // Set when a finished session cleared the promotion bar: {interval, accuracy}.
-  const [promoteFrom, setPromoteFrom] = useState(null);
   const floorRef = useRef(floorMs);
   useEffect(() => { floorRef.current = floorMs; }, [floorMs]);
 
@@ -14247,28 +14245,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       speedStep:
         Math.round((CCT_START_MS - finalInterval) / CCT_STEP_MS) + 1,
     });
-    // Clearing the bar earns the offer, it does not force it: dropping the
-    // floor is the person's call, so the session ends on a question rather
-    // than on a silent change they find out about next time.
+    // Holding CCT_PROMOTE_ACCURACY over a whole session earns the next step
+    // down, applied straight away and kept for every session after this one.
     if (accuracy >= CCT_PROMOTE_ACCURACY && floorRef.current > CCT_FLOOR_LIMIT) {
-      setPromoteFrom({ floor: floorRef.current, accuracy });
-      setStage("promote");
-      return;
-    }
-    setStage("setup");
-    onFinish?.();
-  };
-
-  // Answering the offer. Yes writes the lower floor for every session from
-  // here; either way the session is over and the regime moves on.
-  const answerPromote = (accept) => {
-    if (accept && promoteFrom) {
-      const next = Math.max(CCT_FLOOR_LIMIT, promoteFrom.floor - CCT_STEP_MS);
+      const next = Math.max(CCT_FLOOR_LIMIT, floorRef.current - CCT_STEP_MS);
       saveCctFloor(next);
       setFloorMs(next);
       floorRef.current = next;
     }
-    setPromoteFrom(null);
     setStage("setup");
     onFinish?.();
   };
@@ -14337,7 +14321,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             <span className="text-slate-200 font-medium">{floorMs} ms</span>
           </div>
           <p className="text-slate-400 text-base">
-            3 in a row = 100ms faster
+            3 in a row = 100ms faster. Hold {CCT_PROMOTE_ACCURACY}% over a
+            session and the minimum drops another 100ms.
           </p>
         </div>
 
@@ -14348,54 +14333,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         >
           Start
         </button>
-
-        <button
-          onClick={() => {
-            setPromoteFrom({ floor: floorMs, accuracy: 95 });
-            setStage("promote");
-          }}
-          className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-base"
-        >
-          🧪 Test: 95% promotion screen
-        </button>
-      </div>
-    );
-  }
-
-  if (stage === "promote" && promoteFrom) {
-    const next = Math.max(CCT_FLOOR_LIMIT, promoteFrom.floor - CCT_STEP_MS);
-    return (
-      <div className="space-y-8">
-        <div
-          className="rounded-2xl border p-8 space-y-4 text-center"
-          style={{ borderColor: `${accent}55`, background: `${accent}14` }}
-        >
-          <div className="text-sm uppercase tracking-[0.18em] text-slate-400">
-            {promoteFrom.accuracy}% at a {promoteFrom.floor} ms floor
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-100">
-            Proceed to {next} ms min. interval?
-          </h1>
-          <p className="text-slate-400 text-base">
-            You can stay where you are and keep building accuracy first.
-          </p>
-        </div>
-
-        <div className="flex gap-5">
-          <button
-            onClick={() => answerPromote(true)}
-            style={{ "--ex": accent }}
-            className="flex-1 deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
-          >
-            Yes
-          </button>
-          <button
-            onClick={() => answerPromote(false)}
-            className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 font-medium text-xl"
-          >
-            No
-          </button>
-        </div>
       </div>
     );
   }
