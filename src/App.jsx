@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 213;
+const BUILD_VERSION = 214;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:51 AM";
+const BUILD_TIME = "11:53 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Account footer no longer clipped",
+  "Both footers sit near the bottom edge",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10295,7 +10295,15 @@ function NBackSessionApp() {
       // gutter that stops the layout shifting lives on <html> in THEME_CSS.
       // Reserving one here as well just painted an empty strip of page
       // background down the right-hand edge, inside the app.
-      style={{ "--ex": themeColor }}
+      style={{
+        "--ex": themeColor,
+        // The two pages that end in the legal footer sit it close to the
+        // bottom edge rather than a full page-padding above it. Inline so it
+        // cannot lose to the p-5/sm:p-8/lg:p-12 utility.
+        ...(mainView === "account" || mainView === "membership"
+          ? { paddingBottom: "0.75rem" }
+          : null),
+      }}
       className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
         /* Home and Account are laid out to fit exactly one screen, so they
            are pinned to the viewport height instead of min-height: with
