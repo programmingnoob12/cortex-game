@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 205;
+const BUILD_VERSION = 206;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:55 AM";
+const BUILD_TIME = "11:07 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "More wisdom sources, membership footer",
+  "Quiz is its own screen, membership spacing",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4993,7 +4993,7 @@ const WISDOM_QUIZ = [
   },
 ];
 
-function WisdomQuiz() {
+function WisdomQuiz({ onBack }) {
   const [started, setStarted] = useState(false);
   const [index, setIndex] = useState(0);
   const [picked, setPicked] = useState(null);
@@ -5026,38 +5026,79 @@ function WisdomQuiz() {
     setStarted(false);
   };
 
+  // The framing is only useful before the first question. Once someone is
+  // answering, the page is the quiz and nothing else.
+  const backLink = (
+    <button
+      onClick={onBack}
+      className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium no-lift"
+    >
+      &lsaquo; Back
+    </button>
+  );
+
   if (!started) {
     return (
-      <button
-        onClick={() => setStarted(true)}
-        className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-      >
-        Start quiz
-      </button>
+      <div className="space-y-10" style={{ maxWidth: "42rem" }}>
+        <div>
+          {backLink}
+          <h1 className="text-4xl font-semibold tracking-tight mt-6">Wisdom</h1>
+          <div className="text-slate-500 text-base mt-2">
+            Proverbs, Job, Ecclesiastes, Marcus Aurelius, Confucius, Laozi,
+            Sun Tzu
+          </div>
+        </div>
+
+        <p className="text-slate-100 text-lg leading-relaxed">
+          A short quiz on the oldest practical wisdom we have.
+        </p>
+
+        <div
+          className="rounded-xl p-6 border"
+          style={{ borderColor: "#4CB9D833", background: "#4CB9D80D" }}
+        >
+          <p className="text-slate-300 text-base leading-relaxed">
+            Note: you don't have to believe in the bible to get value from
+            this quiz. There is practical wisdom anyone can use.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setStarted(true)}
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+        >
+          Start quiz
+        </button>
+      </div>
     );
   }
 
   if (done) {
     return (
-      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-5 text-center">
+      <div className="space-y-6" style={{ maxWidth: "42rem" }}>
+        {backLink}
+        <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-5 text-center">
         <div className="text-sm uppercase tracking-[0.18em] text-slate-500">
           Finished
         </div>
         <div className="text-4xl font-semibold tabular-nums text-slate-100">
           {correct} of {WISDOM_QUIZ.length}
         </div>
-        <button
-          onClick={restart}
-          className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 px-8 text-lg font-medium"
-        >
-          Again
-        </button>
+          <button
+            onClick={restart}
+            className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 px-8 text-lg font-medium"
+          >
+            Again
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7 space-y-5">
+    <div className="space-y-6" style={{ maxWidth: "42rem" }}>
+      {backLink}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7 space-y-5">
       <div className="flex items-baseline justify-between gap-4">
         <span className="text-sm uppercase tracking-[0.18em] text-slate-500">
           {index + 1} of {WISDOM_QUIZ.length}
@@ -5117,6 +5158,7 @@ function WisdomQuiz() {
           </button>
         </>
       )}
+      </div>
     </div>
   );
 }
@@ -10265,10 +10307,14 @@ function NBackSessionApp() {
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
-          : mainView === "account" || mainView === "membership"
+          : mainView === "account"
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
+          : mainView === "membership"
+          ? // Top-aligned: the footer follows the content, so centring the
+            // block would only push it away from what it belongs to.
+            "items-start justify-center p-5 sm:p-8 lg:p-12"
           : screen === "running"
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
@@ -10859,40 +10905,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "wisdom" && (
-          <div className="space-y-10" style={{ maxWidth: "42rem" }}>
-            <div>
-              <button
-                onClick={() => setMainView("home")}
-                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
-              >
-                &lsaquo; Back
-              </button>
-              <h1 className="text-4xl font-semibold tracking-tight">Wisdom</h1>
-              <div className="text-slate-500 text-base mt-2">
-                Proverbs, Job, Ecclesiastes, Marcus Aurelius, Confucius, Laozi,
-                Sun Tzu
-              </div>
-            </div>
-
-            <p className="text-slate-100 text-lg leading-relaxed">
-              A short quiz on the oldest practical wisdom we have.
-            </p>
-
-            <div
-              className="rounded-xl p-6 border"
-              style={{
-                borderColor: "#4CB9D833",
-                background: "#4CB9D80D",
-              }}
-            >
-              <p className="text-slate-300 text-base leading-relaxed">
-                Note: you don't have to believe in the bible to get value from
-                this quiz. There is practical wisdom anyone can use.
-              </p>
-            </div>
-
-            <WisdomQuiz />
-          </div>
+          <WisdomQuiz onBack={() => setMainView("home")} />
         )}
 
         {(mainView === "privacy" || mainView === "terms") && (
@@ -12148,10 +12161,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          /* Flex column with a spacer above the footer, so on a short page
-             the footer sits at the bottom of the screen the same way it does
-             on Account instead of floating in the middle. */
-          <div className="space-y-14 flex flex-col min-h-full">
+          <div className="space-y-14">
             {/* Same markup as the Account screen's back button so every
                 back control in the app looks and behaves identically. In a
                 flex column it has to be wrapped, or it stretches the full
@@ -12163,8 +12173,6 @@ function NBackSessionApp() {
               >
                 &lsaquo; Back
               </button>
-            </div>
-            <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Membership
               </h1>
@@ -12546,10 +12554,10 @@ function NBackSessionApp() {
               </>
             )}
 
-            <div className="grow" />
-
-            {/* Same legal and contact footer as Account. */}
-            <div className="!mt-8 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+            {/* Same legal and contact footer as Account. Sits straight
+                under the content: pinning it to the bottom of the screen
+                just opened a dead gap above it. */}
+            <div className="!mt-6 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
