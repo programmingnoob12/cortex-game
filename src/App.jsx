@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 198;
+const BUILD_VERSION = 199;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:27 AM";
+const BUILD_TIME = "10:28 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT promotes automatically at 95%",
+  "Diagnostics card removed",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11152,7 +11152,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "account" && (
-          <div className="space-y-14">
+          <div className="space-y-9">
             <div>
               <button
                 onClick={() => {
@@ -11712,59 +11712,6 @@ function NBackSessionApp() {
               >
                 Log out
               </button>
-            </div>
-
-            {/* Diagnostics — surfaces failed storage writes and thrown
-                errors that used to fail completely silently (see
-                logClientError/safeStorageSet/AppErrorBoundary near the top
-                of the file). Not hidden behind anything — a regression like
-                "RRT stopped saving" should be visible here instead of only
-                ever showing up as a user report. */}
-            <div className="bg-slate-900 border border-slate-700/70 rounded-lg p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-slate-400 text-base uppercase tracking-wide">
-                    Diagnostics
-                  </div>
-                  <div
-                    className={`text-lg mt-1 ${errorLog.length > 0 ? "text-amber-400" : "text-slate-200"}`}
-                  >
-                    {errorLog.length === 0
-                      ? "No errors logged"
-                      : `${errorLog.length} error${errorLog.length === 1 ? "" : "s"} logged`}
-                  </div>
-                </div>
-                {errorLog.length > 0 && (
-                  <button
-                    onClick={clearErrorLog}
-                    className="text-sm font-medium text-slate-400 hover:text-slate-200 transition-colors shrink-0"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              {errorLog.length > 0 && (
-                <div className="mt-5 space-y-3 max-h-56 overflow-y-auto">
-                  {[...errorLog].reverse().slice(0, 10).map((entry, i) => (
-                    <div
-                      key={`${entry.ts}-${i}`}
-                      className="text-xs border-t border-slate-800 pt-3 first:border-0 first:pt-0"
-                    >
-                      <div className="text-slate-500">
-                        {new Date(entry.ts).toLocaleString()}
-                      </div>
-                      <div className="text-amber-400 font-medium mt-0.5">
-                        {entry.context}
-                      </div>
-                      {entry.message && (
-                        <div className="text-slate-500 mt-0.5 break-words">
-                          {entry.message}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Legal and contact footer. Both policy links open real pages
