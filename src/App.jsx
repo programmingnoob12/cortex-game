@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 212;
+const BUILD_VERSION = 213;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:46 AM";
+const BUILD_TIME = "11:51 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Reverted the membership layout change",
+  "Account footer no longer clipped",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10301,7 +10301,12 @@ function NBackSessionApp() {
            are pinned to the viewport height instead of min-height: with
            min-h-screen the page could still be a few pixels taller than the
            window and offer a pointless little scroll. */
-        mainView === "home" || mainView === "account"
+        /* Home is short enough to pin to the viewport. Account is NOT: with
+           h-screen + overflow hidden its footer was pushed past the bottom
+           padding and clipped, which is why the gap under it never matched
+           Membership's. Measured in the browser: min-h-screen puts both
+           footers exactly one page-padding (48px) above the bottom. */
+        mainView === "home"
           ? "h-screen overflow-y-hidden"
           : "min-h-screen overflow-y-auto"
       } ${
@@ -11567,7 +11572,7 @@ function NBackSessionApp() {
           /* Flex column with a spacer above the footer, so the legal line
              sits at the bottom of the screen without the page becoming tall
              enough to scroll. */
-          <div className="space-y-9 flex flex-col h-full">
+          <div className="space-y-9 flex flex-col min-h-full">
             <div>
               <button
                 onClick={() => {
