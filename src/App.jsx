@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 188;
+const BUILD_VERSION = 189;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:07 PM";
+const BUILD_TIME = "7:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "PR glow fades early, bigger switch label",
+  "Dropped the duplicate scrollbar gutter",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9823,10 +9823,12 @@ function NBackSessionApp() {
   return (
     <div
       ref={scrollRootRef}
-      // scrollbarGutter keeps the space reserved whether or not a page is
-      // long enough to scroll, so switching regimes no longer nudges the
-      // whole layout sideways.
-      style={{ "--ex": themeColor, scrollbarGutter: "stable" }}
+      // No scrollbarGutter here. This element is min-h-screen, so it grows
+      // with its content and the document is what actually scrolls; the
+      // gutter that stops the layout shifting lives on <html> in THEME_CSS.
+      // Reserving one here as well just painted an empty strip of page
+      // background down the right-hand edge, inside the app.
+      style={{ "--ex": themeColor }}
       className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
