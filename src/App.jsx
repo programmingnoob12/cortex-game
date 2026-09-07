@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 196;
+const BUILD_VERSION = 197;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:22 AM";
+const BUILD_TIME = "10:25 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Wisdom back, CCT promotion test button",
+  "Home buttons back to full size",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10495,10 +10495,11 @@ function NBackSessionApp() {
         {mainView === "home" && (
           /* The Achievements and Leaderboard pills are fixed to the top
              corners. On a wide screen they sit clear of everything; on a
-             phone the content has to start below them. Spacing is kept tight
-             on purpose: the whole page, footer included, is meant to sit on
-             one screen with nothing to scroll to. */
-          <div className="space-y-7 pt-12 sm:pt-0">
+             phone the content has to start below them. The whole page, footer
+             included, is meant to sit on one screen with nothing to scroll
+             to, using the height that is there rather than shrinking the
+             controls. */
+          <div className="space-y-9 pt-12 sm:pt-0">
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -10549,7 +10550,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -10583,7 +10584,7 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card rounded-xl p-5 text-white text-left${
+                    className={`ex-card rounded-xl p-6 text-white text-left${
                       shineCard === e.key ? " ex-card-shine" : ""
                     }`}
                     style={{
@@ -10634,7 +10635,7 @@ function NBackSessionApp() {
               })}
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-5">
+            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6">
               <div className="text-xl font-semibold text-slate-100">
                 Next session
               </div>
@@ -10656,7 +10657,7 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
@@ -10674,7 +10675,7 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
-                className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {sessionInProgress
                   ? "Resume Training"
@@ -10685,32 +10686,27 @@ function NBackSessionApp() {
                   : "Start Training"}
               </button>
               </div>
-              {/* Three across rather than stacked: Wisdom belongs here, and
-                  a third full-width row is exactly what pushed the footer
-                  off the bottom of the screen. */}
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={goToOverview}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => {
-                    setHypnosisAfterSession(false);
-                    setMainView("hypnosis");
-                  }}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
-                >
-                  Motivation
-                </button>
-                <button
-                  onClick={() => setMainView("wisdom")}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
-                >
-                  Wisdom
-                </button>
-              </div>
+              <button
+                onClick={goToOverview}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => {
+                  setHypnosisAfterSession(false);
+                  setMainView("hypnosis");
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Motivation
+              </button>
+              <button
+                onClick={() => setMainView("wisdom")}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Wisdom
+              </button>
               {SHOW_TEST_TOOLS && (
               <button
                 onClick={resetNextSessionForTesting}
