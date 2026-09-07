@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 202;
+const BUILD_VERSION = 203;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:42 AM";
+const BUILD_TIME = "10:47 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT ranks and achievements",
+  "Proverbs quiz, goal-only progress, CCT 400ms ranks",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4786,6 +4786,194 @@ function Motion3DTutorialDemo() {
 
 // The CCT walkthrough. Numbers arrive one at a time; the last two light up
 // and their sum is spelled out, which is the whole rule.
+// A first pass at the Proverbs quiz. Eight questions, one on screen at a
+// time, each with the practical point spelled out under the answer so it is
+// worth reading even for someone who has never opened the book.
+const WISDOM_QUIZ = [
+  {
+    ref: "Proverbs 16:18",
+    question: "Pride goes before what?",
+    options: ["Destruction", "Wealth", "Silence", "Honour"],
+    answer: 0,
+    note: "The full line is \u201Cpride goes before destruction, a haughty spirit before a fall.\u201D Overconfidence is the thing that takes people out, not a lack of talent.",
+  },
+  {
+    ref: "Proverbs 15:1",
+    question: "A soft answer turns away what?",
+    options: ["Wrath", "Envy", "Fear", "Doubt"],
+    answer: 0,
+    note: "How you say it decides whether the argument escalates. The cheapest way to win a fight is to not start one.",
+  },
+  {
+    ref: "Proverbs 6:6",
+    question: "Which creature does Proverbs tell the sluggard to study?",
+    options: ["The ant", "The lion", "The eagle", "The ox"],
+    answer: 0,
+    note: "The ant has no boss and no deadline and still stores food in summer. Self-direction beats supervision.",
+  },
+  {
+    ref: "Proverbs 9:10",
+    question: "What does Proverbs call the beginning of wisdom?",
+    options: [
+      "The fear of the Lord",
+      "A long memory",
+      "Wealth",
+      "The counsel of friends",
+    ],
+    answer: 0,
+    note: "Wisdom starts with knowing you are not the highest authority in the room. Everything else is built on that.",
+  },
+  {
+    ref: "Proverbs 27:17",
+    question: "Iron sharpens iron, so one person sharpens what?",
+    options: ["Another", "A blade", "A field", "A house"],
+    answer: 0,
+    note: "You get sharper around people who push back. Company that never disagrees with you is company that never improves you.",
+  },
+  {
+    ref: "Proverbs 22:1",
+    question: "A good name is to be chosen over what?",
+    options: ["Great riches", "Long life", "Strength", "Fine food"],
+    answer: 0,
+    note: "Reputation compounds and cannot be bought back once spent. Money can.",
+  },
+  {
+    ref: "Proverbs 21:5",
+    question: "The plans of the diligent lead to what?",
+    options: ["Plenty", "Rest", "Praise", "Power"],
+    answer: 0,
+    note: "The verse pairs it with haste, which leads to poverty. Steady beats frantic.",
+  },
+  {
+    ref: "Proverbs 25:28",
+    question:
+      "A person without self-control is compared to what?",
+    options: [
+      "A city with broken walls",
+      "A ship with no sail",
+      "A tree without roots",
+      "A lamp with no oil",
+    ],
+    answer: 0,
+    note: "No walls means anything can walk in. Without self-control every impulse gets a vote.",
+  },
+];
+
+function WisdomQuiz() {
+  const [index, setIndex] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [done, setDone] = useState(false);
+
+  const q = WISDOM_QUIZ[index];
+  const isLast = index === WISDOM_QUIZ.length - 1;
+
+  const choose = (i) => {
+    if (picked !== null) return;
+    setPicked(i);
+    if (i === q.answer) setCorrect((c) => c + 1);
+  };
+
+  const next = () => {
+    if (isLast) {
+      setDone(true);
+      return;
+    }
+    setIndex((v) => v + 1);
+    setPicked(null);
+  };
+
+  const restart = () => {
+    setIndex(0);
+    setPicked(null);
+    setCorrect(0);
+    setDone(false);
+  };
+
+  if (done) {
+    return (
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-5 text-center">
+        <div className="text-sm uppercase tracking-[0.18em] text-slate-500">
+          Finished
+        </div>
+        <div className="text-4xl font-semibold tabular-nums text-slate-100">
+          {correct} of {WISDOM_QUIZ.length}
+        </div>
+        <button
+          onClick={restart}
+          className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 px-8 text-lg font-medium"
+        >
+          Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7 space-y-5">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="text-sm uppercase tracking-[0.18em] text-slate-500">
+          {index + 1} of {WISDOM_QUIZ.length}
+        </span>
+        {picked !== null && (
+          <span className="text-sm text-slate-500">{q.ref}</span>
+        )}
+      </div>
+
+      <div className="text-xl font-medium text-slate-100 leading-snug">
+        {q.question}
+      </div>
+
+      <div className="space-y-3">
+        {q.options.map((opt, i) => {
+          const revealed = picked !== null;
+          const isAnswer = i === q.answer;
+          const isPicked = i === picked;
+          // Once answered, the right one is always marked green and a wrong
+          // pick is marked red, so the correct answer is never left ambiguous.
+          const border = !revealed
+            ? "#23252A"
+            : isAnswer
+            ? "#4CB782"
+            : isPicked
+            ? "#EB5757"
+            : "#23252A";
+          const background = !revealed
+            ? "transparent"
+            : isAnswer
+            ? "rgba(76,183,130,0.10)"
+            : isPicked
+            ? "rgba(235,87,87,0.10)"
+            : "transparent";
+          return (
+            <button
+              key={opt}
+              onClick={() => choose(i)}
+              disabled={revealed}
+              className="w-full text-left rounded-lg border px-5 py-3 text-lg text-slate-100 transition-colors disabled:cursor-default"
+              style={{ borderColor: border, background }}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {picked !== null && (
+        <>
+          <p className="text-slate-400 text-base leading-relaxed">{q.note}</p>
+          <button
+            onClick={next}
+            className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-lg font-medium"
+          >
+            {isLast ? "Finish" : "Next"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 function CctTutorialDemo() {
   const accent = EXERCISE_COLORS.cct;
   const seq = [5, 3, 3, 7, 2];
@@ -6875,15 +7063,32 @@ const LEADERBOARD_DATA = {
 // field the level-achievement generators set, and otherwise falls back to the
 // id prefix, which is how the hand-written per-exercise ones (dualMaster,
 // qnbPrimeAdept, …) identify themselves.
-// CCT has no N level, so its rank comes from the best session accuracy it
-// has been held at. One threshold per gem tier, 1 to 10.
-const CCT_RANK_ACCURACY = [50, 60, 68, 74, 79, 84, 88, 91, 94, 97];
+// CCT has no N level, so its rank is the accuracy it has been held at AND
+// the interval it was held at. The first five ranks are climbed at the
+// default 500ms floor; 95% there is what opens 400ms, and the top five ranks
+// are the same climb again down there.
+const CCT_RANKS = [
+  { interval: 500, accuracy: 60 },
+  { interval: 500, accuracy: 70 },
+  { interval: 500, accuracy: 80 },
+  { interval: 500, accuracy: 88 },
+  { interval: 500, accuracy: 95 },
+  { interval: 400, accuracy: 60 },
+  { interval: 400, accuracy: 70 },
+  { interval: 400, accuracy: 80 },
+  { interval: 400, accuracy: 88 },
+  { interval: 400, accuracy: 95 },
+];
 
-function cctRankFor(accuracy) {
+// The ladder is climbed in order, so a 95% at 400ms without the 500ms rungs
+// behind it does not skip anyone ahead.
+function cctRankFor(bestByInterval) {
+  const best = bestByInterval || {};
   let rank = 0;
-  CCT_RANK_ACCURACY.forEach((need, i) => {
-    if ((accuracy || 0) >= need) rank = i + 1;
-  });
+  for (const step of CCT_RANKS) {
+    if ((best[step.interval] || 0) < step.accuracy) break;
+    rank += 1;
+  }
   return rank;
 }
 
@@ -7082,7 +7287,7 @@ function rrtLevelAchievement(level, overrides = {}) {
     description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
-    progress: (s) => `${Math.min(s.exerciseStats.rrt?.bestN || 0, level) + 1}p/${premiseCount}p`,
+    progress: () => `${premiseCount}p`,
     ...overrides,
   };
 }
@@ -7118,7 +7323,7 @@ function motion3dLevelAchievement(level, overrides = {}) {
     description: `Reach 3D MOT tier ${level} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
-    progress: (s) => `Tier ${Math.min(s.exerciseStats.motion3d?.bestN || 0, level)}/${level}`,
+    progress: () => `Tier ${level}`,
     ...overrides,
   };
 }
@@ -7136,8 +7341,8 @@ function motion3dLevelAchievements(overridesByLevel = {}) {
 // are on. Checked against bestAccuracy, the best single session ever, so a
 // rank once earned is kept.
 function cctRankAchievement(level, overrides = {}) {
-  const need = CCT_RANK_ACCURACY[level - 1];
-  const isMax = level === CCT_RANK_ACCURACY.length;
+  const step = CCT_RANKS[level - 1];
+  const isMax = level === CCT_RANKS.length;
   return {
     id: `cctRank${level}`,
     exercise: "cct",
@@ -7145,17 +7350,16 @@ function cctRankAchievement(level, overrides = {}) {
     icon: "🧮",
     tierColor: gemTierFor(level).color,
     title: `CCT ${gemTierFor(level).label}`,
-    description: `Finish a CCT session at ${need}% accuracy or better.`,
+    description: `Finish a CCT session at ${step.accuracy}% accuracy or better on a ${step.interval}ms interval.`,
     reward: isMax ? "New personal-best badge · max rank" : "New personal-best badge",
-    unlocked: (s) => (s.exerciseStats.cct?.bestAccuracy || 0) >= need,
-    progress: (s) =>
-      `${Math.min(Math.round(s.exerciseStats.cct?.bestAccuracy || 0), need)}%/${need}%`,
+    unlocked: (s) => cctRankFor(s.exerciseStats.cct?.bestByInterval) >= level,
+    progress: () => `${step.accuracy}% at ${step.interval}ms`,
     ...overrides,
   };
 }
 function cctRankAchievements(overridesByLevel = {}) {
   const out = [];
-  for (let level = 2; level <= CCT_RANK_ACCURACY.length; level++) {
+  for (let level = 2; level <= CCT_RANKS.length; level++) {
     out.push(cctRankAchievement(level, overridesByLevel[level] || {}));
   }
   return out;
@@ -7171,7 +7375,7 @@ const ACHIEVEMENTS_CATALOG = [
     description: "Complete your regime 7 days in a row without missing a day.",
     reward: "1 month free membership · Glow avatar border",
     unlocked: (s) => s.regimeStreak >= 7,
-    progress: (s) => `${Math.min(s.regimeStreak, 7)}/7 days`,
+    progress: () => `7 days`,
   },
   {
     id: "streak14",
@@ -7180,7 +7384,7 @@ const ACHIEVEMENTS_CATALOG = [
     title: "2 Weeks",
     description: "Train 14 days in a row.",
     unlocked: (s) => s.streak >= 14,
-    progress: (s) => `${Math.min(s.streak, 14)}/14 days`,
+    progress: () => `14 days`,
   },
   {
     id: "streak30",
@@ -7190,7 +7394,7 @@ const ACHIEVEMENTS_CATALOG = [
     description: "Train 30 days in a row.",
     reward: "Unlocks the Custom regime option",
     unlocked: (s) => s.streak >= 30,
-    progress: (s) => `${Math.min(s.streak, 30)}/30 days`,
+    progress: () => `30 days`,
   },
   {
     id: "streak90",
@@ -7199,7 +7403,7 @@ const ACHIEVEMENTS_CATALOG = [
     title: "3 Months",
     description: "Train 90 days in a row.",
     unlocked: (s) => s.streak >= 90,
-    progress: (s) => `${Math.min(s.streak, 90)}/90 days`,
+    progress: () => `90 days`,
   },
   {
     id: "streak180",
@@ -7209,7 +7413,7 @@ const ACHIEVEMENTS_CATALOG = [
     description: "Train 180 days in a row.",
     reward: "Animated aura around your avatar",
     unlocked: (s) => s.streak >= 180,
-    progress: (s) => `${Math.min(s.streak, 180)}/180 days`,
+    progress: () => `180 days`,
   },
   {
     id: "streak365",
@@ -7218,7 +7422,7 @@ const ACHIEVEMENTS_CATALOG = [
     title: "1 Year",
     description: "Train 365 days in a row.",
     unlocked: (s) => s.streak >= 365,
-    progress: (s) => `${Math.min(s.streak, 365)}/365 days`,
+    progress: () => `365 days`,
   },
   {
     id: "streak730",
@@ -7227,7 +7431,7 @@ const ACHIEVEMENTS_CATALOG = [
     title: "2 Years",
     description: "Train 730 days in a row.",
     unlocked: (s) => s.streak >= 730,
-    progress: (s) => `${Math.min(s.streak, 730)}/730 days`,
+    progress: () => `730 days`,
   },
   {
     id: "streak1095",
@@ -7236,7 +7440,7 @@ const ACHIEVEMENTS_CATALOG = [
     title: "3 Years",
     description: "Train 1095 days in a row.",
     unlocked: (s) => s.streak >= 1095,
-    progress: (s) => `${Math.min(s.streak, 1095)}/1095 days`,
+    progress: () => `1095 days`,
   },
 
   // Performance — per-exercise level ladders
@@ -7257,7 +7461,7 @@ const ACHIEVEMENTS_CATALOG = [
     [EXERCISE_LIBRARY.motion3d.maxN]: { id: "motion3dMaster" },
   }),
   ...cctRankAchievements({
-    [CCT_RANK_ACCURACY.length]: { id: "cctMaster" },
+    [CCT_RANKS.length]: { id: "cctMaster" },
   }),
 ];
 
@@ -8499,6 +8703,13 @@ function NBackSessionApp() {
       // so the best resets whenever the interval moves: an old 96% at
       // 1500ms says nothing about how they are doing at 600ms.
       const sameInterval = prevStat.intervalMs === intervalMs;
+      // Kept per interval and never reset, because a rank earned at 500ms
+      // still counts once the floor has moved on to 400ms.
+      const bestByInterval = { ...(prevStat.bestByInterval || {}) };
+      bestByInterval[intervalMs] = Math.max(
+        bestByInterval[intervalMs] || 0,
+        scoreValue
+      );
       const newStat = {
         ...prevStat,
         sessions: prevStat.sessions + 1,
@@ -8507,11 +8718,9 @@ function NBackSessionApp() {
         bestStreak: Math.max(prevStat.bestStreak || 0, bestStreak || 0),
         // CCT's rank is its accuracy, not how fast it got — bestN is what
         // draws the gem, so it carries the accuracy rank here.
-        bestN: Math.max(
-          prevStat.bestN,
-          cctRankFor(Math.max(prevStat.bestAccuracy, scoreValue))
-        ),
+        bestN: Math.max(prevStat.bestN, cctRankFor(bestByInterval)),
         lastAccuracy: scoreValue,
+        bestByInterval,
         intervalMs,
         bestAtInterval: sameInterval
           ? Math.max(prevStat.bestAtInterval || 0, scoreValue)
@@ -10532,9 +10741,7 @@ function NBackSessionApp() {
               </p>
             </div>
 
-            <div className="bg-slate-900 border border-dashed border-slate-700 rounded-xl p-8 text-center text-slate-500 text-base">
-              Quiz coming soon.
-            </div>
+            <WisdomQuiz />
           </div>
         )}
 
@@ -11200,7 +11407,7 @@ function NBackSessionApp() {
           /* Flex column with a spacer above the footer, so the legal line
              sits at the bottom of the screen without the page becoming tall
              enough to scroll. */
-          <div className="space-y-9 flex flex-col h-full">
+          <div className="space-y-9 flex flex-col h-full pb-6">
             <div>
               <button
                 onClick={() => {
@@ -11789,7 +11996,13 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          <div className="space-y-14">
+          /* Same shape as Account: a spacer above the footer so it sits at
+             the bottom of the screen on a short page, and simply follows the
+             content on a long one. */
+          <div
+            className="space-y-14 flex flex-col pb-6"
+            style={{ minHeight: "calc(100vh - 10rem)" }}
+          >
             {/* Same markup as the Account screen's back button so every
                 back control in the app looks and behaves identically. */}
             <button
@@ -12179,6 +12392,8 @@ function NBackSessionApp() {
                 )}
               </>
             )}
+
+            <div className="grow" />
 
             {/* Same legal and contact footer as Account. */}
             <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
