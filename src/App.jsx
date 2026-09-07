@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 187;
+const BUILD_VERSION = 188;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:50 PM";
+const BUILD_TIME = "7:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Error beep picked",
+  "PR glow fades early, bigger switch label",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5103,7 +5103,7 @@ function RrtTutorialAnimated({ onDone }) {
         spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        It should be like feeling where your door is in your room.
+        It should be like feeling where your door is in the room.
       </p>
     </div>,
   ];
@@ -9710,14 +9710,14 @@ function NBackSessionApp() {
     }
     setPrRevealed(false);
     setPrGlowOut(false);
-    const t = setTimeout(() => setPrRevealed(true), 4700);
-    // The song plays SONG_START..SONG_FADE_OUT_AT and then fades over
-    // SONG_FADE_OUT. The glow starts its own fade at the same moment and
-    // over the same span, so the light and the music leave together.
-    const g = setTimeout(
-      () => setPrGlowOut(true),
-      (SONG_FADE_OUT_AT - SONG_START) * 1000
-    );
+    const REVEAL_AT = 4700;
+    // The glow's own fade-in runs 2s (the transition set on the element).
+    const GLOW_IN = 2000;
+    const t = setTimeout(() => setPrRevealed(true), REVEAL_AT);
+    // The glow starts leaving the moment it has finished arriving, so it
+    // blooms once and dies away rather than sitting lit under the gem for
+    // the whole track.
+    const g = setTimeout(() => setPrGlowOut(true), REVEAL_AT + GLOW_IN);
     return () => {
       clearTimeout(t);
       clearTimeout(g);
@@ -12194,7 +12194,7 @@ function NBackSessionApp() {
              the middle after one exercise and near the top after another. */
           <div className="fixed inset-0 z-40 flex flex-col items-center justify-center text-center gap-8 px-6 bg-slate-950">
             <div
-              className="text-sm font-medium uppercase tracking-[0.2em] text-slate-500"
+              className="text-xl font-medium uppercase tracking-[0.2em] text-slate-500"
               style={{ animation: "switchIn 0.5s ease-out both" }}
             >
               Next exercise
