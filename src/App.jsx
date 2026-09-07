@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 214;
+const BUILD_VERSION = 215;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:53 AM";
+const BUILD_TIME = "11:58 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Both footers sit near the bottom edge",
+  "Achievement titles are level codes",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7387,13 +7387,9 @@ const ACHIEVEMENT_EXERCISE_NAMES = {
 function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
   const ex = EXERCISE_LIBRARY[exerciseKey];
   const levelTitle = ex.title.replace("N-Back", `${level}-Back`); // e.g. "Dual 5-Back"
-  // Spelled-out names, not the stripped or abbreviated ones. "Dual Adept"
-  // read as a typo and "QNB' Adept" means nothing to a new user, so the
-  // achievement list says which exercise the rank actually belongs to.
-  // Only achievement titles use these; the short labels stay everywhere
-  // space is tight, like the home cards and leaderboard.
-  const exerciseName = ACHIEVEMENT_EXERCISE_NAMES[exerciseKey] || ex.title;
-  const tierTitle = `${exerciseName} ${gemTierFor(level).label}`; // e.g. "Dual N-Back Adept"
+  // The short code the exercise itself uses, e.g. "D3B" / "Q3B", so the
+  // title says exactly which level was reached.
+  const tierTitle = `${ex.abbrev}${level}B`;
   const isMax = level === ex.maxN;
   return {
     id: `${exerciseKey}Level${level}`,
@@ -7439,7 +7435,7 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
     exercise: "iqnb",
     group: "Performance",
     icon: "🌀",
-    title: `QNB' ${gemTierFor(level).label}`,
+    title: `QNB' ${level}.00`,
     description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
@@ -7472,7 +7468,7 @@ function rrtLevelAchievement(level, overrides = {}) {
     exercise: "rrt",
     group: "Performance",
     icon: "🔗",
-    title: `RRT ${gemTierFor(level).label}`,
+    title: `RRT ${premiseCount}p`,
     description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
@@ -7508,7 +7504,7 @@ function motion3dLevelAchievement(level, overrides = {}) {
     exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
-    title: `3D MOT ${gemTierFor(level).label}`,
+    title: `3D MOT T${level}`,
     description: `Reach 3D MOT tier ${level} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
@@ -7538,7 +7534,7 @@ function cctRankAchievement(level, overrides = {}) {
     group: "Performance",
     icon: "🧮",
     tierColor: gemTierFor(level).color,
-    title: `CCT ${gemTierFor(level).label}`,
+    title: `CCT ${step.accuracy}% at ${step.interval}ms`,
     description: `Finish a CCT session at ${step.accuracy}% accuracy or better on a ${step.interval}ms interval.`,
     reward: isMax ? "New personal-best badge · max rank" : "New personal-best badge",
     unlocked: (s) => cctRankFor(s.exerciseStats.cct?.bestByInterval) >= level,
@@ -10301,7 +10297,7 @@ function NBackSessionApp() {
         // bottom edge rather than a full page-padding above it. Inline so it
         // cannot lose to the p-5/sm:p-8/lg:p-12 utility.
         ...(mainView === "account" || mainView === "membership"
-          ? { paddingBottom: "0.75rem" }
+          ? { paddingBottom: "1.25rem" }
           : null),
       }}
       className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
@@ -12509,7 +12505,10 @@ function NBackSessionApp() {
                   <button
                     onClick={() => setShowCancelForm(true)}
                     disabled={actionLoading}
-                    className="w-full bg-red-950/40 hover:bg-red-950/60 disabled:opacity-50 border border-red-900 text-red-400 transition-colors rounded-lg py-5 text-xl font-medium"
+                    /* bg-none opts out of the global white sheen on
+                       hover, which washed the red out to a dirty pink.
+                       Hover deepens the red and brightens the text instead. */
+                    className="w-full bg-none bg-red-950/40 hover:bg-red-900/50 disabled:opacity-50 border border-red-900 hover:border-red-700 text-red-400 hover:text-red-300 transition-colors rounded-lg py-5 text-xl font-medium"
                   >
                     Cancel membership
                   </button>
