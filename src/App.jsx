@@ -1116,6 +1116,11 @@ function unlockNumberAudio() {
   preloadNumberAudio();
 }
 
+// Returns how long the number takes to say, in ms. The caller schedules the
+// next number from the END of this one, so the interval it shows is real
+// silence between numbers rather than onset-to-onset spacing.
+const NUMBER_SPOKEN_FALLBACK_MS = 600;
+
 function speakNumber(n) {
   const buffer = numberAudioBuffers.get(n);
   const ctx = letterAudioCtx;
@@ -1124,13 +1129,14 @@ function speakNumber(n) {
     source.buffer = buffer;
     source.connect(letterAudioGain);
     source.start();
-    return;
+    return Math.round(buffer.duration * 1000);
   }
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) return NUMBER_SPOKEN_FALLBACK_MS;
   const u = new SpeechSynthesisUtterance(String(n));
   u.rate = 1.05;
   window.speechSynthesis.cancel();
   window.speechSynthesis.speak(u);
+  return NUMBER_SPOKEN_FALLBACK_MS;
 }
 
 const GRID_SIZE = 9; // 3x3 grid, positions 0-8
@@ -2393,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 192;
+const BUILD_VERSION = 193;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:46 PM";
+const BUILD_TIME = "9:48 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Reminder note",
+  "CCT interval is now real silence between numbers",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14090,8 +14096,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     }
   };
 
-  // One number, then the gap, then the next. The gap is read from a ref so a
-  // speed-up mid-run takes effect on the very next number.
+  // One number, then the interval, then the next. The interval is the silence
+  // AFTER the number finishes, not the spacing between the starts of two
+  // numbers: at 500ms onset-to-onset the recordings ran almost end to end,
+  // which is why it felt impossibly fast. Read from a ref so a speed change
+  // mid-run takes effect on the very next number.
   const speakNext = useCallback(() => {
     if (!answeredRef.current) {
       // The gap ran out with nothing entered: that counts as a miss.
@@ -14112,13 +14121,13 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     // digit is never wiped the instant it lands.
     setEntry("");
     const n = 1 + Math.floor(Math.random() * CCT_MAX_SPOKEN);
-    speakNumber(n);
+    const spokenMs = speakNumber(n);
     setSpoken((prev) => {
       const next = [...prev, n];
       answeredRef.current = next.length < 2;
       return next;
     });
-    timerRef.current = setTimeout(speakNext, intervalRef.current);
+    timerRef.current = setTimeout(speakNext, spokenMs + intervalRef.current);
   }, []);
 
   const begin = () => {
