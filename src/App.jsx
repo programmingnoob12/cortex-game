@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 185;
+const BUILD_VERSION = 186;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:10 PM";
+const BUILD_TIME = "3:13 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Smoke-alarm error chirp",
+  "Single error beep, overview left-aligned again",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2542,37 +2542,26 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A wrong answer gets a smoke-alarm chirp: two short pulses of one clean,
-// piercing tone around 3100Hz, which is where a real alarm sits and where
-// the ear is most sensitive. No detuning and no warble, just the pulse.
+// A wrong answer gets one short, loud, high beep. Single pulse: at the
+// fastest interval anything longer is still sounding when the next number
+// lands.
 function playError() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
-    const PULSE = 0.075;
-    const GAP = 0.05;
-
-    // Two pulses rather than the usual three: at the fastest interval a
-    // full alarm pattern would still be sounding when the next number lands.
-    [0, PULSE + GAP].forEach((offset) => {
-      const at = now + offset;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, at);
-      gain.gain.linearRampToValueAtTime(0.16, at + 0.002);
-      gain.gain.setValueAtTime(0.16, at + PULSE - 0.008);
-      gain.gain.exponentialRampToValueAtTime(0.0001, at + PULSE);
-      gain.connect(ctx.destination);
-
-      // Square, not sine: the odd harmonics are what make an alarm shrill
-      // rather than flute-like.
-      const osc = ctx.createOscillator();
-      osc.type = "square";
-      osc.frequency.setValueAtTime(3100, at);
-      osc.connect(gain);
-      osc.start(at);
-      osc.stop(at + PULSE + 0.01);
-    });
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(0.18, now + 0.002);
+    gain.gain.setValueAtTime(0.18, now + 0.1);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    gain.connect(ctx.destination);
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(3100, now);
+    osc.connect(gain);
+    osc.start(now);
+    osc.stop(now + 0.13);
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
   }
@@ -12277,11 +12266,11 @@ function NBackSessionApp() {
               });
               // Never fewer than three tracks: a single-exercise regime would
               // otherwise stretch one card across the whole page. Spare tracks
-              // are split either side so a short regime sits centred instead
-              // of hugging the left edge.
+              // all sit on the right, so cards stay left-aligned with the
+              // heading no matter how short the regime is.
               const cols = Math.max(rows.length, 3);
               const spare = cols - rows.length;
-              const lead = Math.floor(spare / 2);
+              const lead = 0;
               const tail = spare - lead;
               const leadBlanks = Array.from({ length: lead });
               const tailBlanks = Array.from({ length: tail });
