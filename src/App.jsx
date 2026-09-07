@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 207;
+const BUILD_VERSION = 208;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:13 AM";
+const BUILD_TIME = "11:22 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Membership footer matches Account",
+  "Membership footer sits under the content",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10307,7 +10307,7 @@ function NBackSessionApp() {
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
-          : mainView === "account" || mainView === "membership"
+          : mainView === "account"
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
@@ -12158,10 +12158,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          /* Exactly the Account treatment: stretched to the screen with a
-             spacer above the footer, so the footer lands in the same place
-             on both pages. */
-          <div className="space-y-14 flex flex-col min-h-full pb-1">
+          <div className="space-y-14">
             {/* Same markup as the Account screen's back button so every
                 back control in the app looks and behaves identically. In a
                 flex column it has to be wrapped, or it stretches the full
@@ -12554,9 +12551,9 @@ function NBackSessionApp() {
               </>
             )}
 
-            <div className="grow" />
-
-            {/* Same legal and contact footer as Account. */}
+            {/* Same legal and contact footer as Account, with the same
+                margin above it. No spacer: pushing it to the bottom of the
+                screen is what opened the gap under the Cancel block. */}
             <div className="!mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
