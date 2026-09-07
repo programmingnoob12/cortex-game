@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 182;
+const BUILD_VERSION = 183;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:08 PM";
+const BUILD_TIME = "10:04 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Harsher error beep",
+  "Reminder note",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10143,6 +10143,9 @@ function NBackSessionApp() {
                 <div>
                   Show up differently. Make all the little details higher
                   quality to give a premium feel.
+                </div>
+                <div>
+                  Add a studies link on the bottom with ToS, privacy etc.
                 </div>
                 <div>
                   Add TikTok hard songs and mix up when they're played.
