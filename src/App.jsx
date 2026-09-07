@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 200;
+const BUILD_VERSION = 201;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:30 AM";
+const BUILD_TIME = "10:34 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT floor reset, Home footer removed",
+  "Home cannot scroll, Account footer pinned",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -9846,7 +9846,15 @@ function NBackSessionApp() {
       // Reserving one here as well just painted an empty strip of page
       // background down the right-hand edge, inside the app.
       style={{ "--ex": themeColor }}
-      className={`relative min-h-screen w-full bg-slate-950 text-slate-100 flex overflow-y-auto overflow-x-hidden ${
+      className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
+        /* Home is laid out to fit exactly one screen, so it is pinned to the
+           viewport height instead of min-height: with min-h-screen the page
+           could still be a few pixels taller than the window and offer a
+           pointless little scroll. */
+        mainView === "home"
+          ? "h-screen overflow-y-hidden"
+          : "min-h-screen overflow-y-auto"
+      } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
           : screen === "running"
@@ -11133,7 +11141,13 @@ function NBackSessionApp() {
         )}
 
         {mainView === "account" && (
-          <div className="space-y-9">
+          /* Flex column with a spacer above the footer, so the legal line
+             sits at the bottom of the screen without the page becoming tall
+             enough to scroll. */
+          <div
+            className="space-y-9 flex flex-col"
+            style={{ minHeight: "calc(100vh - 7rem)" }}
+          >
             <div>
               <button
                 onClick={() => {
@@ -11694,6 +11708,8 @@ function NBackSessionApp() {
                 Log out
               </button>
             </div>
+
+            <div className="grow" />
 
             {/* Legal and contact footer. Both policy links open real pages
                 inside the app rather than leaving it. */}
@@ -14287,10 +14303,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             <span className="text-slate-200 font-medium">{floorMs} ms</span>
           </div>
           <p className="text-slate-400 text-base">
-            3 in a row = 100ms faster. Hold {CCT_PROMOTE_ACCURACY}% over a
-            session and the minimum drops another 100ms.{" "}
-            {CCT_SESSIONS_TO_DEMOTE} sessions under {CCT_DEMOTE_ACCURACY}% and
-            it goes back to {CCT_MIN_MS} ms.
+            3 in a row = 100ms faster
+          </p>
+          <p className="text-slate-400 text-base">
+            {CCT_PROMOTE_ACCURACY}% accuracy at {floorMs}ms ={" "}
+            {Math.max(CCT_FLOOR_LIMIT, floorMs - CCT_STEP_MS)}ms min. interval
           </p>
         </div>
 
