@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 183;
+const BUILD_VERSION = 184;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:04 AM";
+const BUILD_TIME = "2:25 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Reminder note",
+  "Blaring error buzz, white interval, centred overview",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2542,43 +2542,41 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A short, high buzz for a wrong answer. Two squares a few Hz apart beat
-// against each other, which the ear hears as roughness rather than a note,
-// plus a bright partial on top. Hard attack, no ramp in: it should sting.
+// A wrong answer gets a low blaring buzz, not a beep: a sawtooth around
+// 220Hz with a detuned twin under it, hard on and hard off. Low and buzzy
+// carries as an alarm; high and thin just sounds like a UI chirp.
 function playError() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
+
+    // A lowpass keeps the sawtooth from turning into a hiss while leaving
+    // the lower harmonics that make it sound like a horn.
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1500, now);
+    filter.Q.setValueAtTime(1.2, now);
+
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(0.2, now + 0.001);
-    gain.gain.setValueAtTime(0.2, now + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.135);
+    gain.gain.linearRampToValueAtTime(0.3, now + 0.002);
+    gain.gain.setValueAtTime(0.3, now + 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.185);
+    filter.connect(gain);
     gain.connect(ctx.destination);
 
-    // 1180 and 1217 sit ~37Hz apart, right in the band the ear reads as
-    // dissonant roughness instead of two pitches.
-    [1180, 1217].forEach((freq) => {
+    // 220 and 233 are ~13Hz apart, slow enough to hear as a wobble on top
+    // of the buzz rather than as two separate notes.
+    [220, 233].forEach((freq) => {
       const osc = ctx.createOscillator();
-      osc.type = "square";
+      osc.type = "sawtooth";
       osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.setValueAtTime(freq * 0.94, now + 0.1);
-      osc.connect(gain);
+      osc.frequency.setValueAtTime(freq * 0.9, now + 0.15);
+      osc.connect(filter);
       osc.start(now);
-      osc.stop(now + 0.15);
+      osc.stop(now + 0.2);
     });
-
-    const bite = ctx.createGain();
-    bite.gain.setValueAtTime(0.055, now);
-    bite.gain.exponentialRampToValueAtTime(0.0001, now + 0.09);
-    bite.connect(ctx.destination);
-    const top = ctx.createOscillator();
-    top.type = "square";
-    top.frequency.setValueAtTime(2630, now);
-    top.connect(bite);
-    top.start(now);
-    top.stop(now + 0.1);
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
   }
@@ -12249,29 +12247,6 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            {/* Sized to its own content rather than the page: a full-width
-                strip made one short number look stranded, and it changed
-                width whenever the scrollbar came and went. */}
-            {/* Laid on the same four-column track as the exercises below, so
-                it lines up with the first of them at any regime. */}
-            <div
-              className="grid gap-6"
-              style={{ gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}
-            >
-              <Stat
-                label={overviewSource === "home" ? "Total duration" : "Duration"}
-                value={
-                  overviewSource === "home"
-                    ? formatLongDuration(msTrainedTotal(exerciseHistory))
-                    : formatDuration(msTrainedToday(exerciseHistory))
-                }
-              />
-            </div>
-
-            {/* The exercises fill the width; the Duration card above keeps a
-                fixed quarter-width track so it never moves when the regime
-                changes. The three bands are one grid so a wrapped name cannot
-                knock the cards out of line with their neighbours. */}
             {(() => {
               const rows = overviewSummaryExercises.map((e) => {
                 const stat = exerciseStats[e.key];
@@ -12305,59 +12280,91 @@ function NBackSessionApp() {
                 };
               });
               // Never fewer than three tracks: a single-exercise regime would
-              // otherwise stretch one card across the whole page.
+              // otherwise stretch one card across the whole page. Spare tracks
+              // are split either side so a short regime sits centred instead
+              // of hugging the left edge.
               const cols = Math.max(rows.length, 3);
-              const blanks = Array.from({ length: cols - rows.length });
+              const spare = cols - rows.length;
+              const lead = Math.floor(spare / 2);
+              const tail = spare - lead;
+              const leadBlanks = Array.from({ length: lead });
+              const tailBlanks = Array.from({ length: tail });
+              const track = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
               return (
-                <div
-                  className="grid gap-x-6 gap-y-4"
-                  style={{
-                    gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {rows.map(({ e }) => (
-                    <h2
-                      key={`h-${e.key}`}
-                      className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9 self-end"
-                    >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{
-                          backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
-                        }}
+                <>
+                  {/* Laid on the same track as the exercises below, so it
+                      lines up with the first of them at any regime, centring
+                      with them when the regime is short. */}
+                  <div className="grid gap-6" style={track}>
+                    {leadBlanks.map((_, i) => (
+                      <div key={`db-${i}`} />
+                    ))}
+                    <Stat
+                      label={overviewSource === "home" ? "Total duration" : "Duration"}
+                      value={
+                        overviewSource === "home"
+                          ? formatLongDuration(msTrainedTotal(exerciseHistory))
+                          : formatDuration(msTrainedToday(exerciseHistory))
+                      }
+                    />
+                  </div>
+
+                  {/* The three bands are one grid so a wrapped name cannot
+                      knock the cards out of line with their neighbours. */}
+                  <div className="grid gap-x-6 gap-y-4" style={track}>
+                    {leadBlanks.map((_, i) => (
+                      <div key={`hl-${i}`} />
+                    ))}
+                    {rows.map(({ e }) => (
+                      <h2
+                        key={`h-${e.key}`}
+                        className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9 self-end"
+                      >
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
+                          }}
+                        />
+                        <span className="truncate">{e.title}</span>
+                      </h2>
+                    ))}
+                    {tailBlanks.map((_, i) => (
+                      <div key={`ht-${i}`} />
+                    ))}
+                    {leadBlanks.map((_, i) => (
+                      <div key={`bl-${i}`} />
+                    ))}
+                    {rows.map((r) => (
+                      <Stat
+                        key={`b-${r.e.key}`}
+                        label={r.bestLabel}
+                        value={r.bestValue}
+                        color={
+                          r.stat && r.isAccuracy
+                            ? accuracyColor(r.stat.bestAccuracy)
+                            : undefined
+                        }
                       />
-                      <span className="truncate">{e.title}</span>
-                    </h2>
-                  ))}
-                  {blanks.map((_, i) => (
-                    <div key={`hb-${i}`} />
-                  ))}
-                  {rows.map((r) => (
-                    <Stat
-                      key={`b-${r.e.key}`}
-                      label={r.bestLabel}
-                      value={r.bestValue}
-                      color={
-                        r.stat && r.isAccuracy
-                          ? accuracyColor(r.stat.bestAccuracy)
-                          : undefined
-                      }
-                    />
-                  ))}
-                  {blanks.map((_, i) => (
-                    <div key={`bb-${i}`} />
-                  ))}
-                  {rows.map((r) => (
-                    <Stat
-                      key={`a-${r.e.key}`}
-                      label={r.avgLabel}
-                      value={r.avgValue}
-                      color={
-                        r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
-                      }
-                    />
-                  ))}
-                </div>
+                    ))}
+                    {tailBlanks.map((_, i) => (
+                      <div key={`bt-${i}`} />
+                    ))}
+                    {leadBlanks.map((_, i) => (
+                      <div key={`al-${i}`} />
+                    ))}
+                    {rows.map((r) => (
+                      <Stat
+                        key={`a-${r.e.key}`}
+                        label={r.avgLabel}
+                        value={r.avgValue}
+                        color={
+                          r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                </>
               );
             })()}
 
@@ -14278,10 +14285,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
             Interval
           </div>
-          <div
-            className="text-3xl font-semibold tabular-nums leading-tight"
-            style={{ color: accent }}
-          >
+          <div className="text-3xl font-semibold tabular-nums leading-tight text-slate-100">
             {intervalMs}
             <span className="text-base font-medium text-slate-400 ml-1.5">ms</span>
           </div>
