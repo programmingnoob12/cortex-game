@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 194;
+const BUILD_VERSION = 195;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:10 AM";
+const BUILD_TIME = "10:16 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT interval is a level you choose to drop",
+  "CCT card score, Home fits one screen",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10495,8 +10495,10 @@ function NBackSessionApp() {
         {mainView === "home" && (
           /* The Achievements and Leaderboard pills are fixed to the top
              corners. On a wide screen they sit clear of everything; on a
-             phone the content has to start below them. */
-          <div className="space-y-14 pt-12 sm:pt-0">
+             phone the content has to start below them. Spacing is kept tight
+             on purpose: the whole page, footer included, is meant to sit on
+             one screen with nothing to scroll to. */
+          <div className="space-y-7 pt-12 sm:pt-0">
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -10526,6 +10528,7 @@ function NBackSessionApp() {
                     {achievementState.streak === 1 ? "Day" : "Days"}
                   </span>
                 </button>
+                {SHOW_TEST_TOOLS && (
                 <button
                   onClick={() => bumpTestStreak(regimeKey)}
                   title="Test: +1 day streak"
@@ -10533,6 +10536,7 @@ function NBackSessionApp() {
                 >
                   🧪 +1
                 </button>
+                )}
                 {SHOW_TEST_TOOLS && (
                 <button
                   onClick={resetTestStreak}
@@ -10545,7 +10549,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -10579,7 +10583,7 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card rounded-xl p-6 text-white text-left${
+                    className={`ex-card rounded-xl p-5 text-white text-left${
                       shineCard === e.key ? " ex-card-shine" : ""
                     }`}
                     style={{
@@ -10596,7 +10600,14 @@ function NBackSessionApp() {
                       <div>
                         <div className="text-xl font-semibold">{e.title}</div>
                         <div className="text-lg font-medium mt-2">
-                          {isAccuracy
+                          {/* CCT has no N level. Its score is the interval it
+                              is being trained at and the best accuracy held
+                              at that interval. */}
+                          {e.key === "cct"
+                            ? `${stat?.intervalMs ?? CCT_MIN_MS}ms \u00B7 ${
+                                stat?.bestAtInterval ?? 0
+                              }%`
+                            : isAccuracy
                             ? `${e.abbrev}${bestLevel}B`
                             : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
                         </div>
@@ -10623,7 +10634,7 @@ function NBackSessionApp() {
               })}
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7">
+            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-5">
               <div className="text-xl font-semibold text-slate-100">
                 Next session
               </div>
@@ -10645,7 +10656,7 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className="flex flex-col gap-5 pt-4">
+            <div className="flex flex-col gap-3">
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
@@ -10663,7 +10674,7 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
-                className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {sessionInProgress
                   ? "Resume Training"
@@ -10676,7 +10687,7 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={goToOverview}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-xl font-medium"
               >
                 Overview
               </button>
@@ -10685,15 +10696,9 @@ function NBackSessionApp() {
                   setHypnosisAfterSession(false);
                   setMainView("hypnosis");
                 }}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-xl font-medium"
               >
                 Motivation
-              </button>
-              <button
-                onClick={() => setMainView("wisdom")}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Wisdom
               </button>
               {SHOW_TEST_TOOLS && (
               <button
@@ -10704,7 +10709,10 @@ function NBackSessionApp() {
               </button>
               )}
               {/* One button per written line. Hover a number for the text;
-                  click it to run the session-complete screen with that line. */}
+                  click it to run the session-complete screen with that line.
+                  Behind the test flag: with fifty-odd buttons it was the
+                  single thing pushing Home off the bottom of the screen. */}
+              {SHOW_TEST_TOOLS && (
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Session complete screen (test) — {MOTIVATION_LINES.length} lines
@@ -10761,7 +10769,9 @@ function NBackSessionApp() {
                   Amber = has a condition. Grey = unconditional, also used between rounds.
                 </div>
               </div>
+              )}
 
+              {SHOW_TEST_TOOLS && (
               <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Skip to exercise (test): bypasses regime/Start Training entirely
@@ -10778,9 +10788,10 @@ function NBackSessionApp() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
 
-            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+            <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
@@ -14011,30 +14022,30 @@ const RRT_FOOTER_MIN_HEIGHT = 116;
 // down to a 500ms floor. First draft: no history or achievements wired up
 // yet, just the loop.
 const CCT_START_MS = 1500;
-const CCT_MIN_MS = 100;
+// The default floor. It is not fixed: clearing a session at
+// CCT_PROMOTE_ACCURACY offers to take the floor down another step, and the
+// choice is kept between sessions. CCT_FLOOR_LIMIT is the hard stop.
+const CCT_MIN_MS = 500;
+const CCT_FLOOR_LIMIT = 100;
 const CCT_STEP_MS = 100;
-// The interval no longer moves inside a session: it is the person's level,
-// held between sessions, and it only comes down when they choose to take it
-// down after clearing this accuracy over a whole session.
+const CCT_STREAK_TO_SPEED_UP = 3;
+const CCT_STREAK_TO_SLOW_DOWN = 3;
 const CCT_PROMOTE_ACCURACY = 90;
-// How many squares the feedback row shows. Pure feedback now: the run of
-// same-verdict answers, capped so the row is a fixed width.
-const CCT_MARK_SLOTS = 3;
-const CCT_INTERVAL_KEY = "cortex.cctInterval.v1";
+const CCT_FLOOR_KEY = "cortex.cctFloor.v1";
 
-function loadCctInterval() {
+function loadCctFloor() {
   try {
-    const raw = Number(localStorage.getItem(CCT_INTERVAL_KEY));
-    if (!raw) return CCT_START_MS;
-    return Math.min(CCT_START_MS, Math.max(CCT_MIN_MS, raw));
+    const raw = Number(localStorage.getItem(CCT_FLOOR_KEY));
+    if (!raw) return CCT_MIN_MS;
+    return Math.min(CCT_MIN_MS, Math.max(CCT_FLOOR_LIMIT, raw));
   } catch {
-    return CCT_START_MS;
+    return CCT_MIN_MS;
   }
 }
 
-function saveCctInterval(ms) {
+function saveCctFloor(ms) {
   try {
-    localStorage.setItem(CCT_INTERVAL_KEY, String(ms));
+    localStorage.setItem(CCT_FLOOR_KEY, String(ms));
   } catch { /* no storage */ }
 }
 // Single digits only, so the largest sum is 9 + 9.
@@ -14045,7 +14056,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   // setup | countdown | running | promote
   const [stage, setStage] = useState("setup");
   const [count, setCount] = useState(3);
-  const [intervalMs, setIntervalMs] = useState(loadCctInterval);
+  const [intervalMs, setIntervalMs] = useState(CCT_START_MS);
+  // The floor this session runs against, read once so it cannot move
+  // mid-round.
+  const [floorMs, setFloorMs] = useState(loadCctFloor);
   const [spoken, setSpoken] = useState([]);
   const [entry, setEntry] = useState("");
   const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
@@ -14059,6 +14073,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   const [depositing, setDepositing] = useState(false);
   // Set when a finished session cleared the promotion bar: {interval, accuracy}.
   const [promoteFrom, setPromoteFrom] = useState(null);
+  const floorRef = useRef(floorMs);
+  useEffect(() => { floorRef.current = floorMs; }, [floorMs]);
 
   const spokenRef = useRef(spoken);
   const entryRef = useRef(entry);
@@ -14095,7 +14111,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     // The row only ever shows one unbroken run, so a verdict that breaks the
     // run starts a new row in its own colour.
     setMarks((m) =>
-      m[m.length - 1] === right ? [...m, right].slice(-CCT_MARK_SLOTS) : [right]
+      m[m.length - 1] === right ? [...m, right].slice(-CCT_STREAK_TO_SPEED_UP) : [right]
     );
     if (!right) playError();
     // The answer drops out of the box rather than sitting there: it has been
@@ -14111,9 +14127,21 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       if (streakRef.current > bestStreakRef.current) {
         bestStreakRef.current = streakRef.current;
       }
+      if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
+        streakRef.current = 0;
+        setMarks([]);
+        setIntervalMs((v) => Math.max(floorRef.current, v - CCT_STEP_MS));
+      }
     } else {
       streakRef.current = 0;
       wrongStreakRef.current += 1;
+      // Three wrong in a row eases the interval back out, the mirror of the
+      // speed-up, so a run that has got away from someone comes back.
+      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
+        wrongStreakRef.current = 0;
+        setMarks([]);
+        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+      }
     }
   };
 
@@ -14129,11 +14157,16 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
       setMarks((m) =>
-        m[m.length - 1] === false ? [...m, false].slice(-CCT_MARK_SLOTS) : [false]
+        m[m.length - 1] === false ? [...m, false].slice(-CCT_STREAK_TO_SLOW_DOWN) : [false]
       );
       playError();
       streakRef.current = 0;
       wrongStreakRef.current += 1;
+      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
+        wrongStreakRef.current = 0;
+        setMarks([]);
+        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+      }
     }
     // The last answer stays visible right up to the next number, so a typed
     // digit is never wiped the instant it lands.
@@ -14159,11 +14192,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     wrongStreakRef.current = 0;
     bestStreakRef.current = 0;
     answeredRef.current = true;
-    // The interval is the level, so a new session starts where the last one
-    // left off rather than back at 1500ms.
-    const level = loadCctInterval();
-    setIntervalMs(level);
-    intervalRef.current = level;
+    setIntervalMs(CCT_START_MS);
+    intervalRef.current = CCT_START_MS;
+    const floor = loadCctFloor();
+    setFloorMs(floor);
+    floorRef.current = floor;
     setCount(3);
     setStage("countdown");
   };
@@ -14199,16 +14232,19 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       wrong,
       bestStreak: blank ? 9 : bestStreakRef.current,
       durationMs,
-      intervalMs: finalInterval,
+      // The score is the floor they were training against plus how well they
+      // held it, not wherever the adaptive interval happened to sit when the
+      // clock ran out.
+      intervalMs: floorRef.current,
       // 1500ms is step 1, every 100ms faster is one step up.
       speedStep:
         Math.round((CCT_START_MS - finalInterval) / CCT_STEP_MS) + 1,
     });
     // Clearing the bar earns the offer, it does not force it: dropping the
-    // interval is the person's call, so the session ends on a question
-    // rather than on a silent change they find out about next time.
-    if (accuracy >= CCT_PROMOTE_ACCURACY && finalInterval > CCT_MIN_MS) {
-      setPromoteFrom({ interval: finalInterval, accuracy });
+    // floor is the person's call, so the session ends on a question rather
+    // than on a silent change they find out about next time.
+    if (accuracy >= CCT_PROMOTE_ACCURACY && floorRef.current > CCT_FLOOR_LIMIT) {
+      setPromoteFrom({ floor: floorRef.current, accuracy });
       setStage("promote");
       return;
     }
@@ -14216,14 +14252,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     onFinish?.();
   };
 
-  // Answering the offer. Yes writes the faster interval as the new level;
-  // either way the session is over and the regime moves on.
+  // Answering the offer. Yes writes the lower floor for every session from
+  // here; either way the session is over and the regime moves on.
   const answerPromote = (accept) => {
     if (accept && promoteFrom) {
-      const next = Math.max(CCT_MIN_MS, promoteFrom.interval - CCT_STEP_MS);
-      saveCctInterval(next);
-      setIntervalMs(next);
-      intervalRef.current = next;
+      const next = Math.max(CCT_FLOOR_LIMIT, promoteFrom.floor - CCT_STEP_MS);
+      saveCctFloor(next);
+      setFloorMs(next);
+      floorRef.current = next;
     }
     setPromoteFrom(null);
     setStage("setup");
@@ -14287,11 +14323,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         >
           <div className="text-lg text-slate-300">
             Interval:{" "}
-            <span className="text-slate-100 font-medium">{intervalMs} ms</span>
+            <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
+          </div>
+          <div className="text-lg text-slate-400">
+            Minimum:{" "}
+            <span className="text-slate-200 font-medium">{floorMs} ms</span>
           </div>
           <p className="text-slate-400 text-base">
-            Hold {CCT_PROMOTE_ACCURACY}% over a session and you can take it
-            down to {Math.max(CCT_MIN_MS, intervalMs - CCT_STEP_MS)} ms.
+            3 in a row = 100ms faster
           </p>
         </div>
 
@@ -14307,7 +14346,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   }
 
   if (stage === "promote" && promoteFrom) {
-    const next = Math.max(CCT_MIN_MS, promoteFrom.interval - CCT_STEP_MS);
+    const next = Math.max(CCT_FLOOR_LIMIT, promoteFrom.floor - CCT_STEP_MS);
     return (
       <div className="space-y-8">
         <div
@@ -14315,10 +14354,10 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           style={{ borderColor: `${accent}55`, background: `${accent}14` }}
         >
           <div className="text-sm uppercase tracking-[0.18em] text-slate-400">
-            {promoteFrom.accuracy}% at {promoteFrom.interval} ms
+            {promoteFrom.accuracy}% at a {promoteFrom.floor} ms floor
           </div>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-100">
-            Proceed to {next} ms interval?
+            Proceed to {next} ms min. interval?
           </h1>
           <p className="text-slate-400 text-base">
             You can stay where you are and keep building accuracy first.
@@ -14424,7 +14463,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         {/* Three squares: how close this run is to the next speed-up, and
             what the last few answers were. */}
         <div className="flex items-center justify-center gap-2.5">
-          {Array.from({ length: CCT_MARK_SLOTS }).map((_, i) => {
+          {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
             const mark = marks[i];
             return (
               <span
