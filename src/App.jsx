@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 195;
+const BUILD_VERSION = 196;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:16 AM";
+const BUILD_TIME = "10:22 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT card score, Home fits one screen",
+  "Wisdom back, CCT promotion test button",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10685,21 +10685,32 @@ function NBackSessionApp() {
                   : "Start Training"}
               </button>
               </div>
-              <button
-                onClick={goToOverview}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-xl font-medium"
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => {
-                  setHypnosisAfterSession(false);
-                  setMainView("hypnosis");
-                }}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-xl font-medium"
-              >
-                Motivation
-              </button>
+              {/* Three across rather than stacked: Wisdom belongs here, and
+                  a third full-width row is exactly what pushed the footer
+                  off the bottom of the screen. */}
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={goToOverview}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => {
+                    setHypnosisAfterSession(false);
+                    setMainView("hypnosis");
+                  }}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
+                >
+                  Motivation
+                </button>
+                <button
+                  onClick={() => setMainView("wisdom")}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-4 text-lg font-medium"
+                >
+                  Wisdom
+                </button>
+              </div>
               {SHOW_TEST_TOOLS && (
               <button
                 onClick={resetNextSessionForTesting}
@@ -14340,6 +14351,16 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
         >
           Start
+        </button>
+
+        <button
+          onClick={() => {
+            setPromoteFrom({ floor: floorMs, accuracy: 95 });
+            setStage("promote");
+          }}
+          className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-base"
+        >
+          🧪 Test: 95% promotion screen
         </button>
       </div>
     );
