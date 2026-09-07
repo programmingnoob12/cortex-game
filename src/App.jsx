@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 199;
+const BUILD_VERSION = 200;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:28 AM";
+const BUILD_TIME = "10:30 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Diagnostics card removed",
+  "CCT floor reset, Home footer removed",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10798,25 +10798,6 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
-              <span>© {new Date().getFullYear()} Cortex</span>
-              <span>
-                Contact:{" "}
-                <span className="underline underline-offset-2">hello@cortex.app</span>
-              </span>
-              <button
-                onClick={() => setMainView("privacy")}
-                className="hover:text-slate-400 transition-colors"
-              >
-                Privacy Policy
-              </button>
-              <button
-                onClick={() => setMainView("terms")}
-                className="hover:text-slate-400 transition-colors"
-              >
-                Terms of Service
-              </button>
-            </div>
           </div>
         )}
 
@@ -13985,7 +13966,27 @@ const CCT_STEP_MS = 100;
 const CCT_STREAK_TO_SPEED_UP = 3;
 const CCT_STREAK_TO_SLOW_DOWN = 3;
 const CCT_PROMOTE_ACCURACY = 95;
+// Three sessions in a row under this and the floor snaps back to the 500ms
+// default. It is a single reset, not a staircase: nothing ever pushes the
+// floor above CCT_MIN_MS, so 500ms never becomes 600ms.
+const CCT_DEMOTE_ACCURACY = 80;
+const CCT_SESSIONS_TO_DEMOTE = 3;
 const CCT_FLOOR_KEY = "cortex.cctFloor.v1";
+const CCT_LOW_RUN_KEY = "cortex.cctLowRun.v1";
+
+function loadCctLowRun() {
+  try {
+    return Number(localStorage.getItem(CCT_LOW_RUN_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function saveCctLowRun(n) {
+  try {
+    localStorage.setItem(CCT_LOW_RUN_KEY, String(n));
+  } catch { /* no storage */ }
+}
 
 function loadCctFloor() {
   try {
@@ -14199,6 +14200,24 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       saveCctFloor(next);
       setFloorMs(next);
       floorRef.current = next;
+      saveCctLowRun(0);
+    } else if (accuracy < CCT_DEMOTE_ACCURACY) {
+      // A run of poor sessions sends the floor back to 500ms in one move.
+      // Someone already at 500ms just keeps their run counting; the floor
+      // is never eased out past the default.
+      const run = loadCctLowRun() + 1;
+      if (run >= CCT_SESSIONS_TO_DEMOTE) {
+        saveCctLowRun(0);
+        if (floorRef.current < CCT_MIN_MS) {
+          saveCctFloor(CCT_MIN_MS);
+          setFloorMs(CCT_MIN_MS);
+          floorRef.current = CCT_MIN_MS;
+        }
+      } else {
+        saveCctLowRun(run);
+      }
+    } else {
+      saveCctLowRun(0);
     }
     setStage("setup");
     onFinish?.();
@@ -14269,7 +14288,9 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           </div>
           <p className="text-slate-400 text-base">
             3 in a row = 100ms faster. Hold {CCT_PROMOTE_ACCURACY}% over a
-            session and the minimum drops another 100ms.
+            session and the minimum drops another 100ms.{" "}
+            {CCT_SESSIONS_TO_DEMOTE} sessions under {CCT_DEMOTE_ACCURACY}% and
+            it goes back to {CCT_MIN_MS} ms.
           </p>
         </div>
 
