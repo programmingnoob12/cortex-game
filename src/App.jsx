@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 186;
+const BUILD_VERSION = 187;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:13 PM";
+const BUILD_TIME = "3:50 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Single error beep, overview left-aligned again",
+  "Error beep picked",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2542,26 +2542,27 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A wrong answer gets one short, loud, high beep. Single pulse: at the
-// fastest interval anything longer is still sounding when the next number
-// lands.
+// A wrong answer gets one loud, piercing beep: square, 3400Hz, 145ms, held
+// flat and faded over the last 15ms. Picked by ear from a bench of
+// candidates; it cuts through without ringing on into the next number.
 function playError() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
+    const DUR = 0.145;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.linearRampToValueAtTime(0.18, now + 0.002);
-    gain.gain.setValueAtTime(0.18, now + 0.1);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    gain.gain.setValueAtTime(0.18, now + DUR - 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + DUR);
     gain.connect(ctx.destination);
     const osc = ctx.createOscillator();
     osc.type = "square";
-    osc.frequency.setValueAtTime(3100, now);
+    osc.frequency.setValueAtTime(3400, now);
     osc.connect(gain);
     osc.start(now);
-    osc.stop(now + 0.13);
+    osc.stop(now + DUR + 0.02);
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
   }
