@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 201;
+const BUILD_VERSION = 202;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:34 AM";
+const BUILD_TIME = "10:42 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Home cannot scroll, Account footer pinned",
+  "CCT ranks and achievements",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6875,12 +6875,25 @@ const LEADERBOARD_DATA = {
 // field the level-achievement generators set, and otherwise falls back to the
 // id prefix, which is how the hand-written per-exercise ones (dualMaster,
 // qnbPrimeAdept, …) identify themselves.
+// CCT has no N level, so its rank comes from the best session accuracy it
+// has been held at. One threshold per gem tier, 1 to 10.
+const CCT_RANK_ACCURACY = [50, 60, 68, 74, 79, 84, 88, 91, 94, 97];
+
+function cctRankFor(accuracy) {
+  let rank = 0;
+  CCT_RANK_ACCURACY.forEach((need, i) => {
+    if ((accuracy || 0) >= need) rank = i + 1;
+  });
+  return rank;
+}
+
 const ACHIEVEMENT_ID_PREFIXES = {
   dual: "dual",
   quad: "quad",
   rrt: "rrt",
   iqnb: "qnbPrime",
   motion3d: "motion3d",
+  cct: "cct",
 };
 function exerciseKeyFor(a) {
   if (a.exercise) return a.exercise;
@@ -6974,6 +6987,7 @@ const ACHIEVEMENT_EXERCISE_NAMES = {
   iqnb: "Quad N-Back Prime",
   rrt: "Relational Reasoning Training",
   motion3d: "3D MOT",
+  cct: "Continuous Calculation",
 };
 
 function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
@@ -7117,6 +7131,36 @@ function motion3dLevelAchievements(overridesByLevel = {}) {
   return out;
 }
 
+// CCT's ladder is accuracy, not a level: the interval already moves itself,
+// so what marks someone out is how cleanly they hold whatever interval they
+// are on. Checked against bestAccuracy, the best single session ever, so a
+// rank once earned is kept.
+function cctRankAchievement(level, overrides = {}) {
+  const need = CCT_RANK_ACCURACY[level - 1];
+  const isMax = level === CCT_RANK_ACCURACY.length;
+  return {
+    id: `cctRank${level}`,
+    exercise: "cct",
+    group: "Performance",
+    icon: "🧮",
+    tierColor: gemTierFor(level).color,
+    title: `CCT ${gemTierFor(level).label}`,
+    description: `Finish a CCT session at ${need}% accuracy or better.`,
+    reward: isMax ? "New personal-best badge · max rank" : "New personal-best badge",
+    unlocked: (s) => (s.exerciseStats.cct?.bestAccuracy || 0) >= need,
+    progress: (s) =>
+      `${Math.min(Math.round(s.exerciseStats.cct?.bestAccuracy || 0), need)}%/${need}%`,
+    ...overrides,
+  };
+}
+function cctRankAchievements(overridesByLevel = {}) {
+  const out = [];
+  for (let level = 2; level <= CCT_RANK_ACCURACY.length; level++) {
+    out.push(cctRankAchievement(level, overridesByLevel[level] || {}));
+  }
+  return out;
+}
+
 const ACHIEVEMENTS_CATALOG = [
   // Consistency — major milestones only
   {
@@ -7211,6 +7255,9 @@ const ACHIEVEMENTS_CATALOG = [
   ...rrtLevelAchievements(),
   ...motion3dLevelAchievements({
     [EXERCISE_LIBRARY.motion3d.maxN]: { id: "motion3dMaster" },
+  }),
+  ...cctRankAchievements({
+    [CCT_RANK_ACCURACY.length]: { id: "cctMaster" },
   }),
 ];
 
@@ -8458,7 +8505,12 @@ function NBackSessionApp() {
         totalAccuracy: prevStat.totalAccuracy + scoreValue,
         bestAccuracy: Math.max(prevStat.bestAccuracy, scoreValue),
         bestStreak: Math.max(prevStat.bestStreak || 0, bestStreak || 0),
-        bestN: Math.max(prevStat.bestN, speedStep),
+        // CCT's rank is its accuracy, not how fast it got — bestN is what
+        // draws the gem, so it carries the accuracy rank here.
+        bestN: Math.max(
+          prevStat.bestN,
+          cctRankFor(Math.max(prevStat.bestAccuracy, scoreValue))
+        ),
         lastAccuracy: scoreValue,
         intervalMs,
         bestAtInterval: sameInterval
@@ -9847,16 +9899,20 @@ function NBackSessionApp() {
       // background down the right-hand edge, inside the app.
       style={{ "--ex": themeColor }}
       className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
-        /* Home is laid out to fit exactly one screen, so it is pinned to the
-           viewport height instead of min-height: with min-h-screen the page
-           could still be a few pixels taller than the window and offer a
-           pointless little scroll. */
-        mainView === "home"
+        /* Home and Account are laid out to fit exactly one screen, so they
+           are pinned to the viewport height instead of min-height: with
+           min-h-screen the page could still be a few pixels taller than the
+           window and offer a pointless little scroll. */
+        mainView === "home" || mainView === "account"
           ? "h-screen overflow-y-hidden"
           : "min-h-screen overflow-y-auto"
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
+          : mainView === "account"
+          ? // Stretched, so the column is the full height of the screen and
+            // the footer can sit on the bottom edge of it.
+            "items-stretch justify-center p-5 sm:p-8 lg:p-12"
           : screen === "running"
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
@@ -11144,10 +11200,7 @@ function NBackSessionApp() {
           /* Flex column with a spacer above the footer, so the legal line
              sits at the bottom of the screen without the page becoming tall
              enough to scroll. */
-          <div
-            className="space-y-9 flex flex-col"
-            style={{ minHeight: "calc(100vh - 7rem)" }}
-          >
+          <div className="space-y-9 flex flex-col h-full">
             <div>
               <button
                 onClick={() => {
@@ -12127,6 +12180,26 @@ function NBackSessionApp() {
               </>
             )}
 
+            {/* Same legal and contact footer as Account. */}
+            <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+              <span>© {new Date().getFullYear()} Cortex</span>
+              <span>
+                Contact:{" "}
+                <span className="underline underline-offset-2">hello@cortex.app</span>
+              </span>
+              <button
+                onClick={() => setMainView("privacy")}
+                className="hover:text-slate-400 transition-colors"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => setMainView("terms")}
+                className="hover:text-slate-400 transition-colors"
+              >
+                Terms of Service
+              </button>
+            </div>
           </div>
         )}
 
