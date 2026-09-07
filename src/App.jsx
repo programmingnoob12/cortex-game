@@ -2390,14 +2390,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 184;
+const BUILD_VERSION = 185;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:25 PM";
+const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Blaring error buzz, white interval, centred overview",
+  "Smoke-alarm error chirp",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -2542,40 +2542,36 @@ let cheerBytes = null;
 // bar or bell actually produces, and they are what the ear hears as metal.
 // Countdown pips for CCT. `last` raises the pitch on the final one so the
 // start is heard rather than counted.
-// A wrong answer gets a low blaring buzz, not a beep: a sawtooth around
-// 220Hz with a detuned twin under it, hard on and hard off. Low and buzzy
-// carries as an alarm; high and thin just sounds like a UI chirp.
+// A wrong answer gets a smoke-alarm chirp: two short pulses of one clean,
+// piercing tone around 3100Hz, which is where a real alarm sits and where
+// the ear is most sensitive. No detuning and no warble, just the pulse.
 function playError() {
   try {
     const ctx = uiAudioContext();
     if (!ctx) return;
     const now = ctx.currentTime;
+    const PULSE = 0.075;
+    const GAP = 0.05;
 
-    // A lowpass keeps the sawtooth from turning into a hiss while leaving
-    // the lower harmonics that make it sound like a horn.
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(1500, now);
-    filter.Q.setValueAtTime(1.2, now);
+    // Two pulses rather than the usual three: at the fastest interval a
+    // full alarm pattern would still be sounding when the next number lands.
+    [0, PULSE + GAP].forEach((offset) => {
+      const at = now + offset;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.linearRampToValueAtTime(0.16, at + 0.002);
+      gain.gain.setValueAtTime(0.16, at + PULSE - 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + PULSE);
+      gain.connect(ctx.destination);
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(0.3, now + 0.002);
-    gain.gain.setValueAtTime(0.3, now + 0.15);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.185);
-    filter.connect(gain);
-    gain.connect(ctx.destination);
-
-    // 220 and 233 are ~13Hz apart, slow enough to hear as a wobble on top
-    // of the buzz rather than as two separate notes.
-    [220, 233].forEach((freq) => {
+      // Square, not sine: the odd harmonics are what make an alarm shrill
+      // rather than flute-like.
       const osc = ctx.createOscillator();
-      osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.setValueAtTime(freq * 0.9, now + 0.15);
-      osc.connect(filter);
-      osc.start(now);
-      osc.stop(now + 0.2);
+      osc.type = "square";
+      osc.frequency.setValueAtTime(3100, at);
+      osc.connect(gain);
+      osc.start(at);
+      osc.stop(at + PULSE + 0.01);
     });
   } catch {
     // Audio is a nicety here; a blocked context should not stop the round.
