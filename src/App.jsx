@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 210;
+const BUILD_VERSION = 211;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:31 AM";
+const BUILD_TIME = "11:44 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "No dead viewport under the membership footer",
+  "One code path for both footer pages",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10301,23 +10301,22 @@ function NBackSessionApp() {
            are pinned to the viewport height instead of min-height: with
            min-h-screen the page could still be a few pixels taller than the
            window and offer a pointless little scroll. */
-        mainView === "home" || mainView === "account"
+        mainView === "home"
           ? "h-screen overflow-y-hidden"
-          : mainView === "membership"
-          ? // No min-height: with one, a page shorter than the window left
-            // dead viewport under the footer. html/body already paint the
-            // page colour, so the background still fills the screen.
-            "overflow-y-auto"
+          : mainView === "account" || mainView === "membership"
+          ? // The two pages that carry the legal footer are pinned to the
+            // viewport height so the footer lands on the bottom edge of the
+            // screen, and they scroll if their content is taller than that.
+            // Both go through this one branch so they cannot drift apart.
+            "h-screen overflow-y-auto"
           : "min-h-screen overflow-y-auto"
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
-          : mainView === "account"
+          : mainView === "account" || mainView === "membership"
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
-          : mainView === "membership"
-          ? "items-start justify-center p-5 sm:p-8 lg:p-12"
 
           : screen === "running"
           // The running screen is the one view that has to fit a square grid
@@ -12165,7 +12164,7 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          <div className="space-y-14">
+          <div className="space-y-14 flex flex-col min-h-full">
             {/* Same markup as the Account screen's back button so every
                 back control in the app looks and behaves identically. In a
                 flex column it has to be wrapped, or it stretches the full
@@ -12558,9 +12557,9 @@ function NBackSessionApp() {
               </>
             )}
 
-            {/* Same legal and contact footer as Account, with the same
-                margin above it. No spacer: pushing it to the bottom of the
-                screen is what opened the gap under the Cancel block. */}
+            <div className="grow" />
+
+            {/* Same legal and contact footer as Account. */}
             <div className="!mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
