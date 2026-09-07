@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 193;
+const BUILD_VERSION = 194;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:48 PM";
+const BUILD_TIME = "10:10 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT interval is now real silence between numbers",
+  "CCT interval is a level you choose to drop",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8438,7 +8438,7 @@ function NBackSessionApp() {
   // score (a number that rises as someone gets better, which the charts
   // need), and the speed step reached as the level behind the gem.
   const recordCctSessionEnd = useCallback(
-    ({ correct, wrong, bestStreak, durationMs, speedStep }) => {
+    ({ correct, wrong, bestStreak, durationMs, speedStep, intervalMs }) => {
       const answered = correct + wrong;
       const scoreValue = answered === 0 ? 0 : Math.round((correct / answered) * 100);
       const prevStat = exerciseStatsRef.current.cct || {
@@ -8448,6 +8448,10 @@ function NBackSessionApp() {
         bestN: 0,
         bestStreak: 0,
       };
+      // CCT's score is the pair "interval, best accuracy at that interval",
+      // so the best resets whenever the interval moves: an old 96% at
+      // 1500ms says nothing about how they are doing at 600ms.
+      const sameInterval = prevStat.intervalMs === intervalMs;
       const newStat = {
         ...prevStat,
         sessions: prevStat.sessions + 1,
@@ -8456,6 +8460,10 @@ function NBackSessionApp() {
         bestStreak: Math.max(prevStat.bestStreak || 0, bestStreak || 0),
         bestN: Math.max(prevStat.bestN, speedStep),
         lastAccuracy: scoreValue,
+        intervalMs,
+        bestAtInterval: sameInterval
+          ? Math.max(prevStat.bestAtInterval || 0, scoreValue)
+          : scoreValue,
       };
       if (window.storage) {
         safeStorageSet("stats-cct", JSON.stringify(newStat), false);
@@ -12258,9 +12266,9 @@ function NBackSessionApp() {
                     : e.key === "iqnb"
                     ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
                     : e.key === "cct"
-                    ? `${formatScoreValue(e, stat.bestAccuracy)} \u00B7 ${
-                        stat.bestStreak ?? 0
-                      } in a row`
+                    ? `${stat.intervalMs ?? CCT_START_MS}ms \u00B7 ${
+                        stat.bestAtInterval ?? 0
+                      }%`
                     : e.key === "rrt"
                     ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
                     : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} \u00B7 ${formatScoreValue(
@@ -14003,18 +14011,41 @@ const RRT_FOOTER_MIN_HEIGHT = 116;
 // down to a 500ms floor. First draft: no history or achievements wired up
 // yet, just the loop.
 const CCT_START_MS = 1500;
-const CCT_MIN_MS = 500;
+const CCT_MIN_MS = 100;
 const CCT_STEP_MS = 100;
-const CCT_STREAK_TO_SPEED_UP = 3;
-const CCT_STREAK_TO_SLOW_DOWN = 3;
+// The interval no longer moves inside a session: it is the person's level,
+// held between sessions, and it only comes down when they choose to take it
+// down after clearing this accuracy over a whole session.
+const CCT_PROMOTE_ACCURACY = 90;
+// How many squares the feedback row shows. Pure feedback now: the run of
+// same-verdict answers, capped so the row is a fixed width.
+const CCT_MARK_SLOTS = 3;
+const CCT_INTERVAL_KEY = "cortex.cctInterval.v1";
+
+function loadCctInterval() {
+  try {
+    const raw = Number(localStorage.getItem(CCT_INTERVAL_KEY));
+    if (!raw) return CCT_START_MS;
+    return Math.min(CCT_START_MS, Math.max(CCT_MIN_MS, raw));
+  } catch {
+    return CCT_START_MS;
+  }
+}
+
+function saveCctInterval(ms) {
+  try {
+    localStorage.setItem(CCT_INTERVAL_KEY, String(ms));
+  } catch { /* no storage */ }
+}
 // Single digits only, so the largest sum is 9 + 9.
 const CCT_MAX_SPOKEN = 9;
 
 function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }) {
   const accent = EXERCISE_COLORS.cct;
-  const [stage, setStage] = useState("setup"); // setup | countdown | running
+  // setup | countdown | running | promote
+  const [stage, setStage] = useState("setup");
   const [count, setCount] = useState(3);
-  const [intervalMs, setIntervalMs] = useState(CCT_START_MS);
+  const [intervalMs, setIntervalMs] = useState(loadCctInterval);
   const [spoken, setSpoken] = useState([]);
   const [entry, setEntry] = useState("");
   const [flash, setFlash] = useState(null); // "correct" | "wrong" | null
@@ -14026,6 +14057,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   // for right, red for wrong; three of either moves the interval.
   const [marks, setMarks] = useState([]);
   const [depositing, setDepositing] = useState(false);
+  // Set when a finished session cleared the promotion bar: {interval, accuracy}.
+  const [promoteFrom, setPromoteFrom] = useState(null);
 
   const spokenRef = useRef(spoken);
   const entryRef = useRef(entry);
@@ -14062,7 +14095,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     // The row only ever shows one unbroken run, so a verdict that breaks the
     // run starts a new row in its own colour.
     setMarks((m) =>
-      m[m.length - 1] === right ? [...m, right].slice(-3) : [right]
+      m[m.length - 1] === right ? [...m, right].slice(-CCT_MARK_SLOTS) : [right]
     );
     if (!right) playError();
     // The answer drops out of the box rather than sitting there: it has been
@@ -14078,21 +14111,9 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       if (streakRef.current > bestStreakRef.current) {
         bestStreakRef.current = streakRef.current;
       }
-      if (streakRef.current >= CCT_STREAK_TO_SPEED_UP) {
-        streakRef.current = 0;
-        setMarks([]);
-        setIntervalMs((v) => Math.max(CCT_MIN_MS, v - CCT_STEP_MS));
-      }
     } else {
       streakRef.current = 0;
       wrongStreakRef.current += 1;
-      // Three wrong in a row eases the interval back out, the mirror of the
-      // speed-up, so a run that has got away from someone comes back.
-      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
-        wrongStreakRef.current = 0;
-        setMarks([]);
-        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
-      }
     }
   };
 
@@ -14107,15 +14128,12 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       answeredRef.current = true;
       setFlash("wrong");
       setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
-      setMarks((m) => (m[m.length - 1] === false ? [...m, false].slice(-3) : [false]));
+      setMarks((m) =>
+        m[m.length - 1] === false ? [...m, false].slice(-CCT_MARK_SLOTS) : [false]
+      );
       playError();
       streakRef.current = 0;
       wrongStreakRef.current += 1;
-      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
-        wrongStreakRef.current = 0;
-        setMarks([]);
-        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
-      }
     }
     // The last answer stays visible right up to the next number, so a typed
     // digit is never wiped the instant it lands.
@@ -14141,8 +14159,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     wrongStreakRef.current = 0;
     bestStreakRef.current = 0;
     answeredRef.current = true;
-    setIntervalMs(CCT_START_MS);
-    intervalRef.current = CCT_START_MS;
+    // The interval is the level, so a new session starts where the last one
+    // left off rather than back at 1500ms.
+    const level = loadCctInterval();
+    setIntervalMs(level);
+    intervalRef.current = level;
     setCount(3);
     setStage("countdown");
   };
@@ -14172,16 +14193,39 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     const correct = blank ? 26 : tally.correct;
     const wrong = blank ? 4 : tally.wrong;
     const finalInterval = blank ? 1200 : intervalMs;
+    const accuracy = score(correct, wrong);
     onSessionEnd?.({
       correct,
       wrong,
       bestStreak: blank ? 9 : bestStreakRef.current,
       durationMs,
       intervalMs: finalInterval,
-      // 1500ms is step 1, every 100ms faster is one step up, 500ms is step 11.
+      // 1500ms is step 1, every 100ms faster is one step up.
       speedStep:
         Math.round((CCT_START_MS - finalInterval) / CCT_STEP_MS) + 1,
     });
+    // Clearing the bar earns the offer, it does not force it: dropping the
+    // interval is the person's call, so the session ends on a question
+    // rather than on a silent change they find out about next time.
+    if (accuracy >= CCT_PROMOTE_ACCURACY && finalInterval > CCT_MIN_MS) {
+      setPromoteFrom({ interval: finalInterval, accuracy });
+      setStage("promote");
+      return;
+    }
+    setStage("setup");
+    onFinish?.();
+  };
+
+  // Answering the offer. Yes writes the faster interval as the new level;
+  // either way the session is over and the regime moves on.
+  const answerPromote = (accept) => {
+    if (accept && promoteFrom) {
+      const next = Math.max(CCT_MIN_MS, promoteFrom.interval - CCT_STEP_MS);
+      saveCctInterval(next);
+      setIntervalMs(next);
+      intervalRef.current = next;
+    }
+    setPromoteFrom(null);
     setStage("setup");
     onFinish?.();
   };
@@ -14243,14 +14287,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         >
           <div className="text-lg text-slate-300">
             Interval:{" "}
-            <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
-          </div>
-          <div className="text-lg text-slate-400">
-            Minimum:{" "}
-            <span className="text-slate-200 font-medium">{CCT_MIN_MS} ms</span>
+            <span className="text-slate-100 font-medium">{intervalMs} ms</span>
           </div>
           <p className="text-slate-400 text-base">
-            3 in a row = 100ms faster
+            Hold {CCT_PROMOTE_ACCURACY}% over a session and you can take it
+            down to {Math.max(CCT_MIN_MS, intervalMs - CCT_STEP_MS)} ms.
           </p>
         </div>
 
@@ -14261,6 +14302,44 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         >
           Start
         </button>
+      </div>
+    );
+  }
+
+  if (stage === "promote" && promoteFrom) {
+    const next = Math.max(CCT_MIN_MS, promoteFrom.interval - CCT_STEP_MS);
+    return (
+      <div className="space-y-8">
+        <div
+          className="rounded-2xl border p-8 space-y-4 text-center"
+          style={{ borderColor: `${accent}55`, background: `${accent}14` }}
+        >
+          <div className="text-sm uppercase tracking-[0.18em] text-slate-400">
+            {promoteFrom.accuracy}% at {promoteFrom.interval} ms
+          </div>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-100">
+            Proceed to {next} ms interval?
+          </h1>
+          <p className="text-slate-400 text-base">
+            You can stay where you are and keep building accuracy first.
+          </p>
+        </div>
+
+        <div className="flex gap-5">
+          <button
+            onClick={() => answerPromote(true)}
+            style={{ "--ex": accent }}
+            className="flex-1 deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
+          >
+            Yes
+          </button>
+          <button
+            onClick={() => answerPromote(false)}
+            className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 font-medium text-xl"
+          >
+            No
+          </button>
+        </div>
       </div>
     );
   }
@@ -14345,7 +14424,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         {/* Three squares: how close this run is to the next speed-up, and
             what the last few answers were. */}
         <div className="flex items-center justify-center gap-2.5">
-          {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
+          {Array.from({ length: CCT_MARK_SLOTS }).map((_, i) => {
             const mark = marks[i];
             return (
               <span
