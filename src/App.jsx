@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 209;
+const BUILD_VERSION = 210;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:27 AM";
+const BUILD_TIME = "11:31 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Same footer offset on both pages",
+  "No dead viewport under the membership footer",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10303,6 +10303,11 @@ function NBackSessionApp() {
            window and offer a pointless little scroll. */
         mainView === "home" || mainView === "account"
           ? "h-screen overflow-y-hidden"
+          : mainView === "membership"
+          ? // No min-height: with one, a page shorter than the window left
+            // dead viewport under the footer. html/body already paint the
+            // page colour, so the background still fills the screen.
+            "overflow-y-auto"
           : "min-h-screen overflow-y-auto"
       } ${
         isMotion3dApp
@@ -10311,6 +10316,8 @@ function NBackSessionApp() {
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
+          : mainView === "membership"
+          ? "items-start justify-center p-5 sm:p-8 lg:p-12"
 
           : screen === "running"
           // The running screen is the one view that has to fit a square grid
