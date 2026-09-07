@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 208;
+const BUILD_VERSION = 209;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:22 AM";
+const BUILD_TIME = "11:27 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Membership footer sits under the content",
+  "Same footer offset on both pages",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11567,7 +11567,7 @@ function NBackSessionApp() {
           /* Flex column with a spacer above the footer, so the legal line
              sits at the bottom of the screen without the page becoming tall
              enough to scroll. */
-          <div className="space-y-9 flex flex-col h-full pb-1">
+          <div className="space-y-9 flex flex-col h-full">
             <div>
               <button
                 onClick={() => {
