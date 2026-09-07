@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 206;
+const BUILD_VERSION = 207;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:07 AM";
+const BUILD_TIME = "11:13 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Quiz is its own screen, membership spacing",
+  "Membership footer matches Account",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10307,14 +10307,11 @@ function NBackSessionApp() {
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
-          : mainView === "account"
+          : mainView === "account" || mainView === "membership"
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
-          : mainView === "membership"
-          ? // Top-aligned: the footer follows the content, so centring the
-            // block would only push it away from what it belongs to.
-            "items-start justify-center p-5 sm:p-8 lg:p-12"
+
           : screen === "running"
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
@@ -12146,13 +12143,13 @@ function NBackSessionApp() {
               </span>
               <button
                 onClick={() => setMainView("privacy")}
-                className="hover:text-slate-400 transition-colors"
+                className="no-lift hover:underline underline-offset-2"
               >
                 Privacy Policy
               </button>
               <button
                 onClick={() => setMainView("terms")}
-                className="hover:text-slate-400 transition-colors"
+                className="no-lift hover:underline underline-offset-2"
               >
                 Terms of Service
               </button>
@@ -12161,7 +12158,10 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          <div className="space-y-14">
+          /* Exactly the Account treatment: stretched to the screen with a
+             spacer above the footer, so the footer lands in the same place
+             on both pages. */
+          <div className="space-y-14 flex flex-col min-h-full pb-1">
             {/* Same markup as the Account screen's back button so every
                 back control in the app looks and behaves identically. In a
                 flex column it has to be wrapped, or it stretches the full
@@ -12554,10 +12554,10 @@ function NBackSessionApp() {
               </>
             )}
 
-            {/* Same legal and contact footer as Account. Sits straight
-                under the content: pinning it to the bottom of the screen
-                just opened a dead gap above it. */}
-            <div className="!mt-6 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+            <div className="grow" />
+
+            {/* Same legal and contact footer as Account. */}
+            <div className="!mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
@@ -12565,13 +12565,13 @@ function NBackSessionApp() {
               </span>
               <button
                 onClick={() => setMainView("privacy")}
-                className="hover:text-slate-400 transition-colors"
+                className="no-lift hover:underline underline-offset-2"
               >
                 Privacy Policy
               </button>
               <button
                 onClick={() => setMainView("terms")}
-                className="hover:text-slate-400 transition-colors"
+                className="no-lift hover:underline underline-offset-2"
               >
                 Terms of Service
               </button>
