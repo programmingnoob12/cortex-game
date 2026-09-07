@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 204;
+const BUILD_VERSION = 205;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:52 AM";
+const BUILD_TIME = "10:55 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tighter footers, quiz start button",
+  "More wisdom sources, membership footer",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4856,6 +4856,140 @@ const WISDOM_QUIZ = [
     ],
     answer: 0,
     note: "No walls means anything can walk in. Without self-control every impulse gets a vote.",
+  },
+  {
+    ref: "Job 1:21",
+    question:
+      "Having lost everything in a day, what does Job say about what he came into the world with?",
+    options: [
+      "Naked I came, and naked I will go",
+      "I came with nothing and earned it all",
+      "What I built, I keep",
+      "My children are my only wealth",
+    ],
+    answer: 0,
+    note: "Nothing you hold was ever really yours to keep. That is either terrifying or freeing, depending on how tightly you grip it.",
+  },
+  {
+    ref: "Ecclesiastes 1:9",
+    question: "What does Ecclesiastes say there is nothing new of?",
+    options: [
+      "Under the sun",
+      "In the desert",
+      "Among the wise",
+      "Beyond the sea",
+    ],
+    answer: 0,
+    note: "Your situation has happened before, to someone, who wrote it down. Almost nothing you face is genuinely unprecedented.",
+  },
+  {
+    ref: "Ecclesiastes 4:9",
+    question: "Two are better than one because of what?",
+    options: [
+      "They have a good return for their labour",
+      "They travel further",
+      "They fear less",
+      "They eat better",
+    ],
+    answer: 0,
+    note: "The next verse is the reason: if one falls down, the other can pull him up. Working alone means nobody catches you.",
+  },
+  {
+    ref: "Marcus Aurelius, Meditations",
+    question:
+      "Marcus writes that you have power over your mind, not over what?",
+    options: [
+      "Outside events",
+      "Your own body",
+      "The past",
+      "Other people's words",
+    ],
+    answer: 0,
+    note: "Realise this and you find strength. The only reliable lever you have is the one attached to your own attention.",
+  },
+  {
+    ref: "Marcus Aurelius, Meditations",
+    question:
+      "Marcus says the impediment to action does what to action?",
+    options: [
+      "Advances it",
+      "Ends it",
+      "Delays it",
+      "Reveals it as pointless",
+    ],
+    answer: 0,
+    note: "\u201CThe obstacle becomes the way.\u201D What blocks the path becomes the path, because working through it is the training.",
+  },
+  {
+    ref: "Confucius, Analects",
+    question:
+      "Confucius says that when you walk with two others, what is true?",
+    options: [
+      "One of them can be your teacher",
+      "One of them will betray you",
+      "You should walk in the middle",
+      "You must speak last",
+    ],
+    answer: 0,
+    note: "Take what is good in them and copy it; see what is bad and correct it in yourself. Everyone you meet is material.",
+  },
+  {
+    ref: "Confucius, Analects",
+    question:
+      "What does Confucius call the real mistake when you have made one?",
+    options: [
+      "Not correcting it",
+      "Admitting it too late",
+      "Telling no one",
+      "Making it twice",
+    ],
+    answer: 0,
+    note: "The error itself is normal. Leaving it standing is the actual fault.",
+  },
+  {
+    ref: "Laozi, Tao Te Ching",
+    question: "A journey of a thousand miles begins with what?",
+    options: [
+      "A single step",
+      "A clear map",
+      "A strong horse",
+      "A worthy reason",
+    ],
+    answer: 0,
+    note: "The scale of the goal is not what you act on. The next step is.",
+  },
+  {
+    ref: "Laozi, Tao Te Ching",
+    question:
+      "Laozi says knowing others is intelligence. What is knowing yourself?",
+    options: ["True wisdom", "A burden", "Rare luck", "The start of fear"],
+    answer: 0,
+    note: "He pairs it again straight after: mastering others is strength, mastering yourself is true power.",
+  },
+  {
+    ref: "Sun Tzu, The Art of War",
+    question:
+      "Know the enemy and know yourself, and you need not fear what?",
+    options: [
+      "The result of a hundred battles",
+      "A longer war",
+      "A larger army",
+      "Bad ground",
+    ],
+    answer: 0,
+    note: "Half the work of any contest is done before it starts, in honest assessment of both sides.",
+  },
+  {
+    ref: "Sun Tzu, The Art of War",
+    question: "Sun Tzu calls what the supreme art of war?",
+    options: [
+      "Subduing the enemy without fighting",
+      "Striking first",
+      "Holding the high ground",
+      "Outnumbering the enemy",
+    ],
+    answer: 0,
+    note: "Winning the fight is second best. Arranging things so the fight never has to happen is first.",
   },
 ];
 
@@ -10131,7 +10265,7 @@ function NBackSessionApp() {
       } ${
         isMotion3dApp
           ? "items-stretch justify-center p-2"
-          : mainView === "account"
+          : mainView === "account" || mainView === "membership"
           ? // Stretched, so the column is the full height of the screen and
             // the footer can sit on the bottom edge of it.
             "items-stretch justify-center p-5 sm:p-8 lg:p-12"
@@ -10734,11 +10868,14 @@ function NBackSessionApp() {
                 &lsaquo; Back
               </button>
               <h1 className="text-4xl font-semibold tracking-tight">Wisdom</h1>
-              <div className="text-slate-500 text-base mt-2">Book of Proverbs</div>
+              <div className="text-slate-500 text-base mt-2">
+                Proverbs, Job, Ecclesiastes, Marcus Aurelius, Confucius, Laozi,
+                Sun Tzu
+              </div>
             </div>
 
             <p className="text-slate-100 text-lg leading-relaxed">
-              A short quiz on the Book of Proverbs.
+              A short quiz on the oldest practical wisdom we have.
             </p>
 
             <div
@@ -10749,8 +10886,8 @@ function NBackSessionApp() {
               }}
             >
               <p className="text-slate-300 text-base leading-relaxed">
-                Note: you don't have to believe in the entire bible to get value
-                from this quiz. There is practical wisdom anyone can use.
+                Note: you don't have to believe in the bible to get value from
+                this quiz. There is practical wisdom anyone can use.
               </p>
             </div>
 
@@ -12011,15 +12148,22 @@ function NBackSessionApp() {
         )}
 
         {mainView === "membership" && (
-          <div className="space-y-14">
+          /* Flex column with a spacer above the footer, so on a short page
+             the footer sits at the bottom of the screen the same way it does
+             on Account instead of floating in the middle. */
+          <div className="space-y-14 flex flex-col min-h-full">
             {/* Same markup as the Account screen's back button so every
-                back control in the app looks and behaves identically. */}
-            <button
-              onClick={() => setMainView("account")}
-              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
-            >
-              &lsaquo; Back
-            </button>
+                back control in the app looks and behaves identically. In a
+                flex column it has to be wrapped, or it stretches the full
+                width and centres its own label. */}
+            <div>
+              <button
+                onClick={() => setMainView("account")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+              >
+                &lsaquo; Back
+              </button>
+            </div>
             <div>
               <h1 className="text-4xl font-semibold tracking-tight">
                 Membership
@@ -12401,6 +12545,8 @@ function NBackSessionApp() {
                 )}
               </>
             )}
+
+            <div className="grow" />
 
             {/* Same legal and contact footer as Account. */}
             <div className="!mt-8 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
