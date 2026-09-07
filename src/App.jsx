@@ -2354,6 +2354,7 @@ const MOTIVATION_LINES = [
   { id: 45, text: "The goal is progress, not perfection." },
   { id: 46, text: "Feel like a God." },
   { id: 47, text: "This training will make you mentally HARD. Be strong." },
+  { id: 48, text: "Sometimes just get the session done even if the score is bad. That's progress." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2390,14 +2391,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 189;
+const BUILD_VERSION = 190;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:10 PM";
+const BUILD_TIME = "7:21 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Dropped the duplicate scrollbar gutter",
+  "New motivation line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
