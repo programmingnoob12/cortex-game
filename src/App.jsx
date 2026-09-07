@@ -2323,7 +2323,9 @@ const MOTIVATION_LINES = [
   { id: 13, text: "You're getting smarter than the competition." },
   { id: 15, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
   { id: 16, text: "Keep going. Your future self will thank you." },
-  { id: 17, text: "Be proud of how smart you have become. The best don't stop improving. Become better than your old self." },
+  { id: 17, text: "Be proud of how smart you have become." },
+  { id: 49, text: "The best don't stop improving." },
+  { id: 50, text: "Become better than your old self." },
   { id: 18, text: "Enjoy being mentally superior to everyone." },
   { id: 19, text: "Other people won't be able to keep up with you." },
   { id: 20, text: "You showed up today. That's a win." },
@@ -2391,14 +2393,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 190;
+const BUILD_VERSION = 191;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:21 PM";
+const BUILD_TIME = "7:24 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "New motivation line",
+  "Split the three-in-one line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
