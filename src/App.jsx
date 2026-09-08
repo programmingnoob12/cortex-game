@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 227;
+const BUILD_VERSION = 228;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One header row, rows fill the panel",
+  "All button on Home",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8061,6 +8061,8 @@ function NBackSessionApp() {
   // them look at another regime's numbers without switching regime.
   const [overviewRegimeKey, setOverviewRegimeKey] = useState(null);
   const [overviewSource, setOverviewSource] = useState("training"); // "training" | "home" — controls which time-trained stat the Session Overview screen shows
+  // "regime" (the exercises being trained) or "all" (everything with history).
+  const [overviewScope, setOverviewScope] = useState("regime");
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
@@ -9721,9 +9723,18 @@ function NBackSessionApp() {
       overviewRegimeKey &&
       REGIMES.find((r) => r.key === overviewRegimeKey)) ||
     currentRegime;
-  const overviewSummaryExercises = Array.from(
-    new Set(overviewRegime.steps.map((s) => s.key))
-  ).map((key) => EXERCISE_LIBRARY[key]);
+  // "All" widens the Overview past the regime: every exercise that has any
+  // history at all, in library order, so scores from a regime someone is no
+  // longer running are still reachable. History is stored per exercise, so
+  // nothing extra had to be kept for this.
+  const overviewSummaryExercises =
+    overviewScope === "all"
+      ? Object.values(EXERCISE_LIBRARY).filter(
+          (e) => e.key !== "overview" && (exerciseHistory[e.key] || []).length > 0
+        )
+      : Array.from(new Set(overviewRegime.steps.map((s) => s.key))).map(
+          (key) => EXERCISE_LIBRARY[key]
+        );
 
   const statsChartExercise =
     overviewSummaryExercises.find((e) => e.key === statsExerciseKey) ||
@@ -9989,11 +10000,12 @@ function NBackSessionApp() {
     return remaining;
   }
 
-  const goToOverview = () => {
+  const goToOverview = (scope = "regime") => {
     const overviewIndex = activeExercises.findIndex((e) => e.key === "overview");
     setExerciseIndex(overviewIndex);
     setOverviewView("summary");
     setOverviewSource("home");
+    setOverviewScope(scope);
     setMainView("app");
   };
 
@@ -11225,21 +11237,32 @@ function NBackSessionApp() {
                   : "Start Training"}
               </button>
               </div>
-              <button
-                onClick={goToOverview}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Overview
-              </button>
-              <button
-                onClick={() => {
-                  setHypnosisAfterSession(false);
-                  setMainView("hypnosis");
-                }}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Motivation
-              </button>
+              {/* Three across: a fourth full-width row did not fit on one
+                  screen at the Deep regime, and these are all secondary to
+                  Start Training anyway. */}
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => goToOverview("regime")}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => goToOverview("all")}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => {
+                    setHypnosisAfterSession(false);
+                    setMainView("hypnosis");
+                  }}
+                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
+                >
+                  Motivation
+                </button>
+              </div>
             </div>
 
           </div>
@@ -13293,7 +13316,7 @@ function NBackSessionApp() {
                     className="ml-1.5 text-[0.6rem] font-semibold align-middle"
                     style={{ visibility: isRecord ? "visible" : "hidden" }}
                   >
-                    PR
+                    New PR!
                   </span>
                 </td>
               );
