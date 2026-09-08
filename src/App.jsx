@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 221;
+const BUILD_VERSION = 222;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Removed a duplicate motivation line",
+  "Stats page fits the screen",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10385,7 +10385,8 @@ function NBackSessionApp() {
            padding and clipped, which is why the gap under it never matched
            Membership's. Measured in the browser: min-h-screen puts both
            footers exactly one page-padding (48px) above the bottom. */
-        mainView === "home"
+        mainView === "home" ||
+        (mainView === "app" && exercise.key === "overview" && overviewView === "graph")
           ? "h-screen overflow-y-hidden"
           : "min-h-screen overflow-y-auto"
       } ${
@@ -11217,12 +11218,6 @@ function NBackSessionApp() {
               >
                 Motivation
               </button>
-              <button
-                onClick={() => setMainView("wisdom")}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Wisdom
-              </button>
             </div>
 
           </div>
@@ -11260,6 +11255,12 @@ function NBackSessionApp() {
                   🧪 Reset streak
                 </button>
               </div>
+              <button
+                onClick={seedFakeHistory}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Fill 90 days of fake history
+              </button>
                             <button
                 onClick={resetNextSessionForTesting}
                 className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
@@ -13235,10 +13236,7 @@ function NBackSessionApp() {
               );
 
               return (
-                <div
-                  className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
-                  style={{ minHeight: "min(calc(100vh - 15rem), 36rem)" }}
-                >
+                <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
                       <span
@@ -13384,13 +13382,6 @@ function NBackSessionApp() {
               );
             })()            }
             </div>
-
-            <button
-              onClick={seedFakeHistory}
-              className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-            >
-              🧪 Test: fill 90 days of fake history
-            </button>
 
           </div>
         )}
