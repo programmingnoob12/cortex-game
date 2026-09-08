@@ -2404,14 +2404,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 219;
+const BUILD_VERSION = 220;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Dropped speed from the 3D MOT text",
+  "Achievement bars and unlock dates",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4998,6 +4998,26 @@ const WISDOM_QUIZ = [
   },
 ];
 
+// The filled bar on an achievement category row. Green regardless of the
+// exercise accent: it reads as "how much of this is done", the same job the
+// bar does in any progress overview, and a per-exercise hue would make the
+// rows look like six different meters.
+function AchievementProgressBar({ done, total }) {
+  const frac = total > 0 ? Math.min(1, done / total) : 0;
+  return (
+    <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
+      <div
+        className="h-full rounded-full"
+        style={{
+          width: `${frac * 100}%`,
+          background: "linear-gradient(to right, #3E9E6C, #4CB782)",
+          transition: "width 0.3s ease-out",
+        }}
+      />
+    </div>
+  );
+}
+
 function WisdomQuiz({ onBack }) {
   const [started, setStarted] = useState(false);
   const [index, setIndex] = useState(0);
@@ -7286,6 +7306,34 @@ function cctRankFor(bestByInterval) {
   return rank;
 }
 
+// When each achievement was first seen unlocked. Achievements are computed
+// from stats rather than stored, so the date has to be stamped the first time
+// one reads as unlocked and then kept.
+const ACHIEVEMENT_DATES_KEY = "cortex.achievementDates.v1";
+
+function loadAchievementDates() {
+  try {
+    return JSON.parse(localStorage.getItem(ACHIEVEMENT_DATES_KEY) || "{}") || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveAchievementDates(map) {
+  try {
+    localStorage.setItem(ACHIEVEMENT_DATES_KEY, JSON.stringify(map));
+  } catch { /* no storage */ }
+}
+
+function formatAchievementDate(ts) {
+  if (!ts) return null;
+  return new Date(ts).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  });
+}
+
 const ACHIEVEMENT_ID_PREFIXES = {
   dual: "dual",
   quad: "quad",
@@ -8524,6 +8572,23 @@ function NBackSessionApp() {
   // in immediately once the level-up celebration closes, rather than
   // depending on exactly when React happens to run the passive effect
   // relative to that click.
+  // Stamps a date on anything newly unlocked and returns the updated map.
+  const stampAchievementDates = useCallback((idSet) => {
+    setAchievementDates((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      idSet.forEach((id) => {
+        if (!next[id]) {
+          next[id] = Date.now();
+          changed = true;
+        }
+      });
+      if (!changed) return prev;
+      saveAchievementDates(next);
+      return next;
+    });
+  }, []);
+
   const checkForNewAchievements = useCallback((statsOverride) => {
     // Accepts an explicit statsOverride so a caller that just computed a
     // brand-new exerciseStats object itself (e.g. recordSessionResult, right
@@ -8546,6 +8611,7 @@ function NBackSessionApp() {
     const nowUnlocked = new Set(
       ACHIEVEMENTS_CATALOG.filter((a) => a.unlocked(state)).map((a) => a.id)
     );
+    stampAchievementDates(nowUnlocked);
     if (unlockedAchievementIdsRef.current === null) {
       // First measurement post-hydration — this is the baseline, not a "win".
       unlockedAchievementIdsRef.current = nowUnlocked;
@@ -8563,7 +8629,7 @@ function NBackSessionApp() {
       });
     }
     unlockedAchievementIdsRef.current = nowUnlocked;
-  }, [exerciseStats, exerciseHistory, regimeCompletionDates, streakBrokenAt]);
+  }, [exerciseStats, exerciseHistory, regimeCompletionDates, streakBrokenAt, stampAchievementDates]);
 
   useEffect(() => {
     if (!hasHydrated) return;
@@ -10170,6 +10236,7 @@ function NBackSessionApp() {
   // Which Home card is mid-shine. One at a time; cleared when its sweep
   // finishes so the same card can be pressed again straight away.
   const [shineCard, setShineCard] = useState(null);
+  const [achievementDates, setAchievementDates] = useState(loadAchievementDates);
   const [prRevealed, setPrRevealed] = useState(false);
   const [prGlowOut, setPrGlowOut] = useState(false);
   // Every exercise's record gets the full reveal, not just Quad's. A record
@@ -10772,25 +10839,31 @@ function NBackSessionApp() {
                   <button
                     onClick={() => toggleAchievementSection(groupId)}
                     aria-expanded={groupOpen}
-                    className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
+                    className="w-full text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
                   >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                      />
+                      <h2 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
+                        {topSection.label}
+                      </h2>
+                      <span className="text-sm text-slate-400 tabular-nums">
+                        {groupUnlocked}/{groupItems.length}
+                      </span>
+                      <span
+                        className="text-slate-400 text-sm transition-transform"
+                        style={{ transform: groupOpen ? "rotate(90deg)" : "none" }}
+                        aria-hidden="true"
+                      >
+                        ▶
+                      </span>
+                    </div>
+                    <AchievementProgressBar
+                      done={groupUnlocked}
+                      total={groupItems.length}
                     />
-                    <h2 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
-                      {topSection.label}
-                    </h2>
-                    <span className="text-sm text-slate-400 tabular-nums">
-                      {groupUnlocked}/{groupItems.length}
-                    </span>
-                    <span
-                      className="text-slate-400 text-sm transition-transform"
-                      style={{ transform: groupOpen ? "rotate(90deg)" : "none" }}
-                      aria-hidden="true"
-                    >
-                      ▶
-                    </span>
                   </button>
                   {groupOpen && (
                   <div
@@ -10814,25 +10887,31 @@ function NBackSessionApp() {
                     <button
                       onClick={() => toggleAchievementSection(sectionId)}
                       aria-expanded={isOpen}
-                      className="w-full flex items-center gap-2.5 text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
+                      className="w-full text-left bg-slate-900 border border-slate-700/60 hover:border-slate-500 transition-colors rounded-lg px-5 py-4"
                     >
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: EXERCISE_COLORS[group] || "#4CB9D8" }}
+                        />
+                        <h3 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
+                          {section.label}
+                        </h3>
+                        <span className="text-sm text-slate-400 tabular-nums">
+                          {unlockedCount}/{section.items.length}
+                        </span>
+                        <span
+                          className="text-slate-400 text-sm transition-transform"
+                          style={{ transform: isOpen ? "rotate(90deg)" : "none" }}
+                          aria-hidden="true"
+                        >
+                          ▶
+                        </span>
+                      </div>
+                      <AchievementProgressBar
+                        done={unlockedCount}
+                        total={section.items.length}
                       />
-                      <h3 className="flex-1 text-2xl font-semibold tracking-tight text-slate-100">
-                        {section.label}
-                      </h3>
-                      <span className="text-sm text-slate-400 tabular-nums">
-                        {unlockedCount}/{section.items.length}
-                      </span>
-                      <span
-                        className="text-slate-400 text-sm transition-transform"
-                        style={{ transform: isOpen ? "rotate(90deg)" : "none" }}
-                        aria-hidden="true"
-                      >
-                        ▶
-                      </span>
                     </button>
                   )}
                   {isOpen && (
@@ -10842,12 +10921,8 @@ function NBackSessionApp() {
                   >
                     {section.items.map((a) => {
                       const isUnlocked = isAchievementUnlocked(a, achievementState);
-                      const progressText =
-                        !isUnlocked && a.progress ? a.progress(achievementState) : null;
-                      const progressMatch =
-                        progressText && progressText.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
-                      const progressFrac = progressMatch
-                        ? Math.min(1, Number(progressMatch[1]) / Number(progressMatch[2]))
+                      const achievedOn = isUnlocked
+                        ? formatAchievementDate(achievementDates[a.id])
                         : null;
                       return (
                         <div
@@ -10883,26 +10958,19 @@ function NBackSessionApp() {
                                 </div>
                               )}
                             </div>
-                            <div className="shrink-0 text-right">
-                              {isUnlocked ? (
-                                <span className={`text-base font-semibold ${groupAccent.text}`}>
+                            {isUnlocked && (
+                              <div className="shrink-0 text-right">
+                                <div className={`text-base font-semibold ${groupAccent.text}`}>
                                   ✓ Achieved
-                                </span>
-                              ) : (
-                                <span className="text-base text-slate-400 tabular-nums">
-                                  {progressText || "Locked"}
-                                </span>
-                              )}
-                            </div>
+                                </div>
+                                {achievedOn && (
+                                  <div className="text-sm text-slate-500 tabular-nums mt-0.5">
+                                    {achievedOn}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
-                          {progressFrac !== null && (
-                            <div className="mt-4 h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full bg-gradient-to-r ${groupAccent.grad}`}
-                                style={{ width: `${progressFrac * 100}%` }}
-                              />
-                            </div>
-                          )}
                         </div>
                       );
                     })}
