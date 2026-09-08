@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 226;
+const BUILD_VERSION = 227;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:55 PM";
+const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sheet headers use the short names",
+  "One header row, rows fill the panel",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3212,6 +3212,9 @@ function formatScoreCell(exercise, row) {
 function formatLevelValue(exercise, value) {
   if (value == null || Number.isNaN(value)) return "\u2014";
   if (exercise.key === "cct") return `${Math.round(value)}%`;
+  // 3D MOT's number is a speed, and the column is already labelled 3D MOT,
+  // so the abbreviation in front of it was pure noise.
+  if (exercise.key === "motion3d") return value.toFixed(2);
   switch (exercise.scoreType) {
     case "points":
       return formatScoreValue(exercise, value);
@@ -9891,7 +9894,6 @@ function NBackSessionApp() {
   // Spreadsheet paging — one page number per exercise, 20 rows a page.
   const [historyPage, setHistoryPage] = useState({});
   const HISTORY_PAGE_SIZE = 7;
-  const SHEET_ROW_H = 44;
 
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
@@ -13313,7 +13315,9 @@ function NBackSessionApp() {
                         switching exercise or view resized every cell. */}
                     <table
                       className="w-full text-xs sm:text-sm whitespace-nowrap"
-                      style={{ tableLayout: "fixed" }}
+                      // Full height so the seven rows share the panel evenly
+                      // instead of stacking at the top and leaving a gap.
+                      style={{ tableLayout: "fixed", height: "100%" }}
                     >
                       <colgroup>
                         <col style={{ width: "6%" }} />
@@ -13327,35 +13331,31 @@ function NBackSessionApp() {
                         ))}
                       </colgroup>
                       <thead>
-                        <tr className="text-left text-slate-100">
-                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
-                            Day
-                          </th>
-                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
-                            Date
-                          </th>
-                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
-                            Time
-                          </th>
-                          {exs.map((ex) => (
-                            <th
-                              key={ex.key}
-                              colSpan={2}
-                              className="px-2 sm:px-3 pt-2 pb-1 font-medium text-center"
-                              style={{ color: EXERCISE_COLORS[ex.key] || "#4CB9D8" }}
-                            >
-                              {SHEET_HEADER_LABELS[ex.key] || ex.title}
-                            </th>
-                          ))}
-                        </tr>
+                        {/* One row, so every heading sits on the same
+                            baseline. The exercise name rides in front of its
+                            own Best column in the exercise's colour. */}
                         <tr
-                          className="border-b border-slate-700/70 text-left text-slate-400"
-                          style={{ height: 30 }}
+                          className="border-b border-slate-700/70 text-left text-slate-100"
+                          style={{ height: 38 }}
                         >
+                          <th className="px-2 sm:px-3 py-2 font-medium">Day</th>
+                          <th className="px-2 sm:px-3 py-2 font-medium">Date</th>
+                          <th className="px-2 sm:px-3 py-2 font-medium">Time</th>
                           {exs.map((ex) => (
                             <Fragment key={ex.key}>
-                              <th className="px-2 sm:px-3 pb-2 font-medium">Best</th>
-                              <th className="px-2 sm:px-3 pb-2 font-medium">Avg</th>
+                              <th className="px-2 sm:px-3 py-2 font-medium">
+                                <span
+                                  style={{
+                                    color: EXERCISE_COLORS[ex.key] || "#4CB9D8",
+                                  }}
+                                >
+                                  {SHEET_HEADER_LABELS[ex.key] || ex.title}
+                                </span>{" "}
+                                <span className="text-slate-400">Best</span>
+                              </th>
+                              <th className="px-2 sm:px-3 py-2 font-medium text-slate-400">
+                                Avg
+                              </th>
                             </Fragment>
                           ))}
                         </tr>
@@ -13380,7 +13380,6 @@ function NBackSessionApp() {
                               key={dateKey}
                               className="border-b border-slate-800/70 last:border-0"
                               style={{
-                                height: SHEET_ROW_H,
                                 backgroundColor: future
                                   ? "transparent"
                                   : trained
