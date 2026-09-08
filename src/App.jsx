@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 235;
+const BUILD_VERSION = 236;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sheet cells share one baseline",
+  "CCT shows streak instead of average",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3226,7 +3226,7 @@ function formatSheetBest(exercise, row) {
   if (row == null || row.level == null) return "\u2014";
   switch (exercise.key) {
     case "cct":
-      return `${Math.round(row.level)}% \u00B7 ${row.streak ?? 0}`;
+      return `${Math.round(row.level)}%`;
     case "rrt":
       return `${formatScoreValue(exercise, row.level)} ${row.streak ?? 0}/20`;
     case "motion3d":
@@ -13484,7 +13484,7 @@ function NBackSessionApp() {
                                 <span className="text-slate-400">Best</span>
                               </th>
                               <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium text-slate-400">
-                                Avg
+                                {ex.key === "cct" ? "Streak" : "Avg"}
                               </th>
                             </Fragment>
                           ))}
@@ -13552,11 +13552,22 @@ function NBackSessionApp() {
                                         formatSheetBest(ex, row),
                                         `${ex.key}-best`
                                       ),
-                                      cell(
-                                        !!row?.isAvgPR,
-                                        formatSheetAvg(ex, row?.dayAvg),
-                                        `${ex.key}-avg`
-                                      ),
+                                      // CCT has no average worth reading:
+                                      // what matters alongside accuracy is
+                                      // the longest run of right answers.
+                                      ex.key === "cct"
+                                        ? cell(
+                                            false,
+                                            row && row.level != null
+                                              ? String(row.streak ?? 0)
+                                              : "\u2014",
+                                            `${ex.key}-streak`
+                                          )
+                                        : cell(
+                                            !!row?.isAvgPR,
+                                            formatSheetAvg(ex, row?.dayAvg),
+                                            `${ex.key}-avg`
+                                          ),
                                     ]
                                   : cell(
                                       !!row?.isPR,
