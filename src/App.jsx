@@ -2369,6 +2369,10 @@ const MOTIVATION_LINES = [
   { id: 47, text: "Feel like a God." },
   { id: 48, text: "This training will make you mentally HARD. Be strong." },
   { id: 49, text: "Sometimes just get the session done even if the score is bad. That's progress." },
+  {
+    id: 50,
+    text: "The most important thing is to keep your streak going. Don't worry about scores for now. They'll come later.",
+  },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2405,14 +2409,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 238;
+const BUILD_VERSION = 239;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Fake data stays inside real ranges",
+  "All is graph only, CCT drops its average",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13078,20 +13082,25 @@ function NBackSessionApp() {
                   })}
                 </div>
               </div>
-              <button
-                onClick={() =>
-                  setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
-                }
-                className="shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
-              >
-                {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
-              </button>
+              {/* The sheet is a per-regime read: with every exercise on it
+                  at once the columns stop being legible, so All is graph
+                  only. */}
+              {overviewScope === "regime" && (
+                <button
+                  onClick={() =>
+                    setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
+                  }
+                  className="shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                >
+                  {statsDisplay === "chart" ? "Spreadsheet" : "Graph"}
+                </button>
+              )}
             </div>
 
             {/* Both views show one exercise at a time, chosen from the switch
                 inside the panel. */}
             <div>
-            {statsDisplay === "chart"
+            {statsDisplay === "chart" || overviewScope === "all"
               ? (statsChartExercise ? [statsChartExercise] : []).map((e) => {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
@@ -13268,17 +13277,22 @@ function NBackSessionApp() {
                             dot={(props) => renderPRDot(props, exColor)}
                             activeDot={{ r: 5 }}
                           />
-                          <Area
-                            type="monotone"
-                            dataKey="avg"
-                            name="avg"
-                            stroke={avgColor}
-                            strokeWidth={2}
-                            strokeDasharray="5 4"
-                            fill="none"
-                            dot={false}
-                            activeDot={{ r: 4 }}
-                          />
+                          {/* CCT's number is an accuracy for the session, so
+                              a running average of it says nothing the line
+                              itself does not. */}
+                          {e.key !== "cct" && (
+                            <Area
+                              type="monotone"
+                              dataKey="avg"
+                              name="avg"
+                              stroke={avgColor}
+                              strokeWidth={2}
+                              strokeDasharray="5 4"
+                              fill="none"
+                              dot={false}
+                              activeDot={{ r: 4 }}
+                            />
+                          )}
                         </AreaChart>
                       </ResponsiveContainer>
                       </div>
@@ -13289,20 +13303,22 @@ function NBackSessionApp() {
                         </svg>
                         Best score
                       </span>
-                      <span className="flex items-center gap-2">
-                        <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
-                          <line
-                            x1="0"
-                            y1="5"
-                            x2="22"
-                            y2="5"
-                            stroke={avgColor}
-                            strokeWidth="2"
-                            strokeDasharray="5 4"
-                          />
-                        </svg>
-                        Avg score
-                      </span>
+                      {e.key !== "cct" && (
+                        <span className="flex items-center gap-2">
+                          <svg width="22" height="10" viewBox="0 0 22 10" aria-hidden="true">
+                            <line
+                              x1="0"
+                              y1="5"
+                              x2="22"
+                              y2="5"
+                              stroke={avgColor}
+                              strokeWidth="2"
+                              strokeDasharray="5 4"
+                            />
+                          </svg>
+                          Avg score
+                        </span>
+                      )}
                       <span className="flex items-center gap-2">
                         <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
                           <circle cx="7" cy="7" r="6" fill="none" stroke={PR_YELLOW} strokeWidth="1.5" />
