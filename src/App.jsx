@@ -2277,7 +2277,9 @@ function formatScoreValue(exercise, value) {
   switch (exercise.scoreType) {
     case "points": {
       const points = Math.floor(value);
-      const seconds = Math.round((value - points) * 100);
+      // The decimals are a round length in seconds, so they can never read
+      // above 59 no matter what arithmetic produced the number.
+      const seconds = Math.min(59, Math.round((value - points) * 100));
       return `${points}p ${seconds}s`;
     }
     case "decimal":
@@ -2403,14 +2405,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 237;
+const BUILD_VERSION = 238;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "All view column order",
+  "Fake data stays inside real ranges",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3244,7 +3246,11 @@ function formatSheetAvg(exercise, value) {
     case "cct":
       return `${Math.round(value)}%`;
     case "rrt":
-      return formatScoreValue(exercise, value);
+      // RRT packs premises and round length into one number, so the mean of
+      // two sessions is not itself a score (7.30 and 8.20 average to 7.75,
+      // which read as "7p 75s" — a round length that does not exist). Only
+      // the premise count survives averaging.
+      return `${Math.floor(value)}p`;
     case "motion3d":
     case "iqnb":
       return value.toFixed(2);
@@ -9981,7 +9987,12 @@ function NBackSessionApp() {
             1,
             Math.min(ex.maxN, Math.round(2 + progress * 5 + (Math.random() - 0.5) * 2))
           );
-          const seconds = 10 + Math.floor(Math.random() * 40); // 10-49s
+          // A round is only ever 30s, 25s or 20s (see ROUND_MS), and it
+          // shortens as the level climbs — anything else is not a score
+          // the exercise can produce.
+          const lengths = [30, 25, 20];
+          const seconds =
+            lengths[Math.min(2, Math.floor(progress * 3 + Math.random() * 0.6))];
           return points + seconds / 100;
         }
         if (key === "iqnb") {
@@ -9992,8 +10003,14 @@ function NBackSessionApp() {
         if (key === "motion3d") {
           // 3D MOT is a ball speed, and a low one — it was reading as a
           // level number before, which is why it looked far too high.
-          const spd = 0.6 + progress * 1.5 + (Math.random() - 0.5) * 0.35;
-          return Math.round(Math.max(0.2, spd) * 100) / 100;
+          // The staircase runs MOT_MIN_SPEED..MOT_MAX_SPEED (0.15-1.0), so
+          // anything above 1.00 is a number the exercise cannot reach.
+          const spd = 0.2 + progress * 0.7 + (Math.random() - 0.5) * 0.12;
+          return (
+            Math.round(
+              Math.min(MOT_MAX_SPEED, Math.max(MOT_MIN_SPEED, spd)) * 100
+            ) / 100
+          );
         }
         // N-back exercises score a hit rate.
         return Math.max(
