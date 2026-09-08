@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 229;
+const BUILD_VERSION = 230;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Regime / All switch on Stats",
+  "All sheet fits without sideways scroll",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3206,6 +3206,41 @@ function formatScoreCell(exercise, row) {
     return `${formatScoreValue(exercise, row.level)} ${row.streak ?? 0}/20`;
   }
   return formatLevelValue(exercise, row.level);
+}
+
+// The sheet's own value forms. Every column is already headed with the
+// exercise's name, so the abbreviation in front of each value was width
+// spent saying what the header says — and with six exercises on screen
+// there is none to spare.
+function formatSheetBest(exercise, row) {
+  if (row == null || row.level == null) return "\u2014";
+  switch (exercise.key) {
+    case "cct":
+      return `${Math.round(row.level)}% \u00B7 ${row.streak ?? 0}`;
+    case "rrt":
+      return `${formatScoreValue(exercise, row.level)} ${row.streak ?? 0}/20`;
+    case "motion3d":
+      return row.level.toFixed(2);
+    case "iqnb":
+      return row.level.toFixed(2);
+    default:
+      return `${Math.round(row.level)}B`;
+  }
+}
+
+function formatSheetAvg(exercise, value) {
+  if (value == null || Number.isNaN(value)) return "\u2014";
+  switch (exercise.key) {
+    case "cct":
+      return `${Math.round(value)}%`;
+    case "rrt":
+      return formatScoreValue(exercise, value);
+    case "motion3d":
+    case "iqnb":
+      return value.toFixed(2);
+    default:
+      return `${Math.round(value)}B`;
+  }
 }
 
 // Full form, used in tooltips and the table.
@@ -13316,10 +13351,12 @@ function NBackSessionApp() {
 
               // The tag is always in the markup and only hidden, so a record
               // row is exactly as wide as every other row.
+              // "New PR!" sits on its own line under the value rather than
+              // beside it, so a record cell is never wider than a plain one.
               const cell = (isRecord, content, key) => (
                 <td
                   key={key}
-                  className="px-2 sm:px-3 py-2 font-medium"
+                  className="px-2 sm:px-3 py-1.5 font-medium align-middle"
                   style={
                     isRecord
                       ? {
@@ -13330,20 +13367,22 @@ function NBackSessionApp() {
                       : { color: "#F7F8F8" }
                   }
                 >
-                  {content}
-                  <span
-                    className="ml-1.5 text-[0.6rem] font-semibold align-middle"
+                  <div className="leading-tight">{content}</div>
+                  <div
+                    className="text-[0.6rem] font-semibold leading-tight"
                     style={{ visibility: isRecord ? "visible" : "hidden" }}
                   >
                     New PR!
-                  </span>
+                  </div>
                 </td>
               );
 
-              // Day/Date/Time take a fixed slice; the exercise pairs split
-              // the rest evenly, so four exercises fill the panel instead of
-              // crowding into a third of it.
-              const fixed = 26;
+              // Day/Date/Time take a fixed slice and the exercises split the
+              // rest. Past four exercises the Best/Avg pair no longer fits in
+              // the width available, so All drops to Best alone rather than
+              // spilling into a horizontal scrollbar.
+              const showAvg = exs.length <= 4;
+              const fixed = exs.length > 4 ? 22 : 26;
               const per = (100 - fixed) / exs.length;
 
               return (
@@ -13351,26 +13390,30 @@ function NBackSessionApp() {
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
                   style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
                 >
-                  <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-auto">
+                  <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-y-auto overflow-x-hidden">
                     {/* Fixed layout with declared widths: an auto table
                         re-measures its columns from the values in view, so
                         switching exercise or view resized every cell. */}
                     <table
-                      className="w-full text-xs sm:text-sm whitespace-nowrap"
+                      className="w-full text-xs sm:text-sm"
                       // Full height so the seven rows share the panel evenly
                       // instead of stacking at the top and leaving a gap.
                       style={{ tableLayout: "fixed", height: "100%" }}
                     >
                       <colgroup>
-                        <col style={{ width: "6%" }} />
-                        <col style={{ width: "10%" }} />
-                        <col style={{ width: "10%" }} />
-                        {exs.map((ex) => (
-                          <Fragment key={ex.key}>
-                            <col style={{ width: `${per * 0.55}%` }} />
-                            <col style={{ width: `${per * 0.45}%` }} />
-                          </Fragment>
-                        ))}
+                        <col style={{ width: `${fixed * 0.23}%` }} />
+                        <col style={{ width: `${fixed * 0.385}%` }} />
+                        <col style={{ width: `${fixed * 0.385}%` }} />
+                        {exs.map((ex) =>
+                          showAvg ? (
+                            <Fragment key={ex.key}>
+                              <col style={{ width: `${per * 0.55}%` }} />
+                              <col style={{ width: `${per * 0.45}%` }} />
+                            </Fragment>
+                          ) : (
+                            <col key={ex.key} style={{ width: `${per}%` }} />
+                          )
+                        )}
                       </colgroup>
                       <thead>
                         {/* One row, so every heading sits on the same
@@ -13392,12 +13435,16 @@ function NBackSessionApp() {
                                   }}
                                 >
                                   {SHEET_HEADER_LABELS[ex.key] || ex.title}
-                                </span>{" "}
-                                <span className="text-slate-400">Best</span>
+                                </span>
+                                {showAvg && (
+                                  <span className="text-slate-400"> Best</span>
+                                )}
                               </th>
-                              <th className="px-2 sm:px-3 py-2 font-medium text-slate-400">
-                                Avg
-                              </th>
+                              {showAvg && (
+                                <th className="px-2 sm:px-3 py-2 font-medium text-slate-400">
+                                  Avg
+                                </th>
+                              )}
                             </Fragment>
                           ))}
                         </tr>
@@ -13438,18 +13485,26 @@ function NBackSessionApp() {
                               <td className="px-2 sm:px-3 py-2 text-slate-100">
                                 {totalMs ? formatDuration(totalMs) : "\u2014"}
                               </td>
-                              {rows.map(({ ex, row }) => [
-                                cell(
-                                  !!row?.isPR,
-                                  row ? formatScoreCell(ex, row) : "\u2014",
-                                  `${ex.key}-best`
-                                ),
-                                cell(
-                                  !!row?.isAvgPR,
-                                  row ? formatLevelValue(ex, row.dayAvg) : "\u2014",
-                                  `${ex.key}-avg`
-                                ),
-                              ])}
+                              {rows.map(({ ex, row }) =>
+                                showAvg
+                                  ? [
+                                      cell(
+                                        !!row?.isPR,
+                                        formatSheetBest(ex, row),
+                                        `${ex.key}-best`
+                                      ),
+                                      cell(
+                                        !!row?.isAvgPR,
+                                        formatSheetAvg(ex, row?.dayAvg),
+                                        `${ex.key}-avg`
+                                      ),
+                                    ]
+                                  : cell(
+                                      !!row?.isPR,
+                                      formatSheetBest(ex, row),
+                                      `${ex.key}-best`
+                                    )
+                              )}
                             </tr>
                           );
                         })}
