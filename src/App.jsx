@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 231;
+const BUILD_VERSION = 232;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Equal sheet rows, Best and Avg everywhere",
+  "Exercise name sits above Best and Avg",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13429,35 +13429,44 @@ function NBackSessionApp() {
                         )}
                       </colgroup>
                       <thead>
-                        {/* One row, so every heading sits on the same
-                            baseline. The exercise name rides in front of its
-                            own Best column in the exercise's colour. */}
-                        <tr
-                          className="border-b border-slate-700/70 text-left text-slate-100"
-                          style={{ height: 38 }}
-                        >
-                          <th className="px-2 sm:px-3 py-2 font-medium">Day</th>
-                          <th className="px-2 sm:px-3 py-2 font-medium">Date</th>
-                          <th className="px-2 sm:px-3 py-2 font-medium">Time</th>
+                        {/* Two rows: the exercise name over its own pair of
+                            columns, then the column names. Day/Date/Time live
+                            on the SECOND row alongside Best/Avg rather than
+                            spanning both, which is what threw the baselines
+                            out before. */}
+                        <tr className="text-center">
+                          <th />
+                          <th />
+                          <th />
+                          {exs.map((ex) => (
+                            <th
+                              key={ex.key}
+                              colSpan={2}
+                              className="px-2 sm:px-3 pt-2 pb-0.5 font-semibold"
+                              style={{ color: EXERCISE_COLORS[ex.key] || "#4CB9D8" }}
+                            >
+                              {SHEET_HEADER_LABELS[ex.key] || ex.title}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr className="border-b border-slate-700/70 text-left">
+                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                            Day
+                          </th>
+                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                            Date
+                          </th>
+                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                            Time
+                          </th>
                           {exs.map((ex) => (
                             <Fragment key={ex.key}>
-                              <th className="px-2 sm:px-3 py-2 font-medium">
-                                <span
-                                  style={{
-                                    color: EXERCISE_COLORS[ex.key] || "#4CB9D8",
-                                  }}
-                                >
-                                  {SHEET_HEADER_LABELS[ex.key] || ex.title}
-                                </span>
-                                {showAvg && (
-                                  <span className="text-slate-400"> Best</span>
-                                )}
+                              <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-400">
+                                Best
                               </th>
-                              {showAvg && (
-                                <th className="px-2 sm:px-3 py-2 font-medium text-slate-400">
-                                  Avg
-                                </th>
-                              )}
+                              <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-400">
+                                Avg
+                              </th>
                             </Fragment>
                           ))}
                         </tr>
@@ -13484,8 +13493,9 @@ function NBackSessionApp() {
                               style={{
                                 // The same share of the panel for every day,
                                 // so no single row can grow taller than the
-                                // rest.
-                                height: `${100 / 7}%`,
+                                // rest. Seven of these leaves the remainder
+                                // for the two-line header.
+                                height: "11.5%",
                                 backgroundColor: future
                                   ? "transparent"
                                   : trained
