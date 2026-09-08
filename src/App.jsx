@@ -2399,14 +2399,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 215;
+const BUILD_VERSION = 216;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "11:58 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Achievement titles are level codes",
+  "Level codes on the right, 3D MOT speeds",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7404,6 +7404,7 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
     description: `Reach ${levelTitle} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats[exerciseKey]?.bestN || 0) >= level,
+    progress: () => tierTitle,
     ...overrides,
   };
 }
@@ -7439,6 +7440,7 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
     description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
+    progress: () => `QNB' ${level}.00`,
     ...overrides,
   };
 }
@@ -7472,7 +7474,7 @@ function rrtLevelAchievement(level, overrides = {}) {
     description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
-    progress: () => `${premiseCount}p`,
+    progress: () => `RRT ${premiseCount}p`,
     ...overrides,
   };
 }
@@ -7496,6 +7498,8 @@ function rrtLevelAchievements(overridesByLevel = {}) {
 // long perfect streak), every tier up to and including bestN still shows
 // unlocked — same "checked against final state, not the individual event"
 // behavior the other three exercises' level achievements already rely on.
+const MOT_TIER_STEP = 0.1;
+
 function motion3dLevelAchievement(level, overrides = {}) {
   const ex = EXERCISE_LIBRARY.motion3d;
   const isMax = level === ex.maxN;
@@ -7504,11 +7508,11 @@ function motion3dLevelAchievement(level, overrides = {}) {
     exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
-    title: `3D MOT T${level}`,
-    description: `Reach 3D MOT tier ${level} for the first time.`,
+    title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)}`,
+    description: `Reach 3D MOT speed ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
-    progress: () => `Tier ${level}`,
+    progress: () => `${(level * MOT_TIER_STEP).toFixed(2)} speed`,
     ...overrides,
   };
 }
@@ -10297,7 +10301,7 @@ function NBackSessionApp() {
         // bottom edge rather than a full page-padding above it. Inline so it
         // cannot lose to the p-5/sm:p-8/lg:p-12 utility.
         ...(mainView === "account" || mainView === "membership"
-          ? { paddingBottom: "1.25rem" }
+          ? { paddingBottom: "1.125rem" }
           : null),
       }}
       className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
@@ -16372,8 +16376,9 @@ function motDisplaySpeedToVelocity(displaySpeed) {
 // 1.0, tiers can't be whole-number crossings of `speed` anymore (that
 // never would have fired), so tiers are steps of this size instead. At
 // 0.10, the full MOT_MIN_SPEED-MOT_MAX_SPEED range (0.15-1.0) spans
-// exactly the 10 gem tiers (GEM_TIERS 1-10) evenly.
-const MOT_TIER_STEP = 0.1;
+// exactly the 10 gem tiers (GEM_TIERS 1-10) evenly. Declared up with the
+// achievements because ACHIEVEMENTS_CATALOG is built at module load and
+// prints the speed each 3D MOT tier corresponds to.
 // Bump this whenever MOT_MIN_SPEED/MOT_MAX_SPEED/MOT_TIER_STEP change in a
 // way that shifts what tier a given speed maps to. A persisted bestN from
 // before the bump was computed against a different scale — reading it
