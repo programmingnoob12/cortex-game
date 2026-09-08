@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 228;
+const BUILD_VERSION = 229;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "All button on Home",
+  "Regime / All switch on Stats",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10000,12 +10000,11 @@ function NBackSessionApp() {
     return remaining;
   }
 
-  const goToOverview = (scope = "regime") => {
+  const goToOverview = () => {
     const overviewIndex = activeExercises.findIndex((e) => e.key === "overview");
     setExerciseIndex(overviewIndex);
     setOverviewView("summary");
     setOverviewSource("home");
-    setOverviewScope(scope);
     setMainView("app");
   };
 
@@ -11237,32 +11236,21 @@ function NBackSessionApp() {
                   : "Start Training"}
               </button>
               </div>
-              {/* Three across: a fourth full-width row did not fit on one
-                  screen at the Deep regime, and these are all secondary to
-                  Start Training anyway. */}
-              <div className="grid grid-cols-3 gap-3">
-                <button
-                  onClick={() => goToOverview("regime")}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
-                >
-                  Overview
-                </button>
-                <button
-                  onClick={() => goToOverview("all")}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
-                >
-                  All
-                </button>
-                <button
-                  onClick={() => {
-                    setHypnosisAfterSession(false);
-                    setMainView("hypnosis");
-                  }}
-                  className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-lg font-medium"
-                >
-                  Motivation
-                </button>
-              </div>
+              <button
+                onClick={goToOverview}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Overview
+              </button>
+              <button
+                onClick={() => {
+                  setHypnosisAfterSession(false);
+                  setMainView("hypnosis");
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+              >
+                Motivation
+              </button>
             </div>
 
           </div>
@@ -12987,9 +12975,40 @@ function NBackSessionApp() {
               ‹ Back
             </button>
             <div className="flex items-center justify-between gap-4">
-              <h1 className="text-4xl font-semibold tracking-tight">
-                Stats
-              </h1>
+              <div className="flex items-center gap-4">
+                <h1 className="text-4xl font-semibold tracking-tight">
+                  Stats
+                </h1>
+                {/* Regime is what is being trained; All is every exercise
+                    that has any history, so scores from a regime someone has
+                    moved off are still reachable. */}
+                <div
+                  className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
+                  role="group"
+                  aria-label="Which exercises to show"
+                >
+                  {[
+                    { key: "regime", label: "Regime" },
+                    { key: "all", label: "All" },
+                  ].map((opt) => {
+                    const on = overviewScope === opt.key;
+                    return (
+                      <button
+                        key={opt.key}
+                        onClick={() => setOverviewScope(opt.key)}
+                        aria-pressed={on}
+                        className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                          on
+                            ? "bg-slate-700 text-slate-100"
+                            : "text-slate-400 hover:text-slate-100"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <button
                 onClick={() =>
                   setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
