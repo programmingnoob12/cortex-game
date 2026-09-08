@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 234;
+const BUILD_VERSION = 235;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Bigger stats panel and text",
+  "Sheet cells share one baseline",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13409,7 +13409,7 @@ function NBackSessionApp() {
                         switching exercise or view resized every cell. */}
                     <table
                       className={`w-full whitespace-nowrap ${
-                        dense ? "text-xs" : "text-sm sm:text-base"
+                        dense ? "text-xs" : "text-xs sm:text-sm"
                       }`}
                       // Full height so the seven rows share the panel evenly
                       // instead of stacking at the top and leaving a gap.
@@ -13522,15 +13522,28 @@ function NBackSessionApp() {
                                   : "rgba(151,20,38,0.14)",
                               }}
                             >
-                              <td className="px-2 sm:px-3 py-2 text-slate-100">
-                                {day.toLocaleDateString(undefined, { weekday: "short" })}
-                              </td>
-                              <td className="px-2 sm:px-3 py-2 text-slate-100">
-                                {day.toLocaleDateString()}
-                              </td>
-                              <td className="px-2 sm:px-3 py-2 text-slate-100">
-                                {formatSheetDuration(totalMs)}
-                              </td>
+                              {[
+                                day.toLocaleDateString(undefined, { weekday: "short" }),
+                                day.toLocaleDateString(),
+                                formatSheetDuration(totalMs),
+                              ].map((text, i) => (
+                                <td
+                                  key={`fixed-${i}`}
+                                  className="px-2 sm:px-3 py-1.5 text-slate-100 align-middle overflow-hidden"
+                                >
+                                  {/* Same two-line box as a score cell: with
+                                      one line here and two there, each cell
+                                      centred its own content and the values
+                                      sat above the dates. */}
+                                  <div className="leading-tight">{text}</div>
+                                  <div
+                                    className="text-[0.6rem] font-semibold leading-tight"
+                                    style={{ visibility: "hidden" }}
+                                  >
+                                    New PR!
+                                  </div>
+                                </td>
+                              ))}
                               {rows.map(({ ex, row }) =>
                                 showAvg
                                   ? [
