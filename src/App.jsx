@@ -2327,47 +2327,47 @@ const MOTIVATION_LINES = [
   { id: 11, text: "Don't worry about being perfect. Just be consistent." },
   { id: 12, text: "Your future self will thank you." },
   { id: 13, text: "You're getting smarter than the competition." },
-  { id: 15, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
-  { id: 16, text: "Keep going. Your future self will thank you." },
-  { id: 17, text: "Be proud of how smart you have become." },
-  { id: 49, text: "The best don't stop improving." },
-  { id: 50, text: "Become better than your old self." },
+  { id: 14, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
+  { id: 15, text: "Keep going. Your future self will thank you." },
+  { id: 16, text: "Be proud of how smart you have become." },
+  { id: 17, text: "The best don't stop improving." },
+  { id: 18, text: "Become better than your old self." },
   {
-    id: 51,
+    id: 19,
     text: "Having a hard session today? That's okay. Just get it done. Don't worry about the scores.",
     cond: "worse",
   },
-  { id: 18, text: "Enjoy being mentally superior to everyone." },
-  { id: 19, text: "Other people won't be able to keep up with you." },
-  { id: 20, text: "You showed up today. That's a win." },
-  { id: 21, text: "Today was a little harder. You still got it done anyway. Good job.", cond: "worse" },
-  { id: 22, text: "Another personal best. You're on fire!", cond: "pr" },
-  { id: 23, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
-  { id: 24, text: "Progress is messy sometimes." },
-  { id: 25, text: "It was a hard session but you got it done.", cond: "worse" },
-  { id: 26, text: "You're getting stronger with every session." },
-  { id: 27, text: "Show up even when you aren't feeling it. That's how winners are made." },
-  { id: 28, text: "You're becoming wiser and smarter every session. Keep it up." },
-  { id: 29, text: "New personal record! Nice work.", cond: "pr" },
-  { id: 30, text: "{n} day streak. Keep it going.", cond: "streak" },
-  { id: 31, text: "Some days are hard. Just focus on being consistent.", cond: "worse" },
-  { id: 32, text: "Other people aren't willing to do what you do. That's why you have an edge." },
-  { id: 33, text: "Most people never train this. That's why you have an edge." },
-  { id: 34, text: "Your edge is built on days like this." },
-  { id: 35, text: "You're building the thing everyone else calls talent." },
-  { id: 36, text: "What used to be impossible is now your average. That's how far you've come.", cond: "avgPR" },
-  { id: 37, text: "Celebrate this. Then go higher.", cond: "pr" },
-  { id: 38, text: "Faster decisions. Better reactions." },
-  { id: 39, text: "Become better than your old self." },
-  { id: 40, text: "You're on your way to becoming mentally unstoppable." },
-  { id: 41, text: "Your opponents aren't ready." },
-  { id: 42, text: "The closest thing we have to a superpower is intellect." },
-  { id: 43, text: "Dominate everyone." },
-  { id: 44, text: "KEEP CLIMBING." },
-  { id: 45, text: "The goal is progress, not perfection." },
-  { id: 46, text: "Feel like a God." },
-  { id: 47, text: "This training will make you mentally HARD. Be strong." },
-  { id: 48, text: "Sometimes just get the session done even if the score is bad. That's progress." },
+  { id: 20, text: "Enjoy being mentally superior to everyone." },
+  { id: 21, text: "Other people won't be able to keep up with you." },
+  { id: 22, text: "You showed up today. That's a win." },
+  { id: 23, text: "Today was a little harder. You still got it done anyway. Good job.", cond: "worse" },
+  { id: 24, text: "Another personal best. You're on fire!", cond: "pr" },
+  { id: 25, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
+  { id: 26, text: "Progress is messy sometimes." },
+  { id: 27, text: "It was a hard session but you got it done.", cond: "worse" },
+  { id: 28, text: "You're getting stronger with every session." },
+  { id: 29, text: "Show up even when you aren't feeling it. That's how winners are made." },
+  { id: 30, text: "You're becoming wiser and smarter every session. Keep it up." },
+  { id: 31, text: "New personal record! Nice work.", cond: "pr" },
+  { id: 32, text: "{n} day streak. Keep it going.", cond: "streak" },
+  { id: 33, text: "Some days are hard. Just focus on being consistent.", cond: "worse" },
+  { id: 34, text: "Other people aren't willing to do what you do. That's why you have an edge." },
+  { id: 35, text: "Most people never train this. That's why you have an edge." },
+  { id: 36, text: "Your edge is built on days like this." },
+  { id: 37, text: "You're building the thing everyone else calls talent." },
+  { id: 38, text: "What used to be impossible is now your average. That's how far you've come.", cond: "avgPR" },
+  { id: 39, text: "Celebrate this. Then go higher.", cond: "pr" },
+  { id: 40, text: "Faster decisions. Better reactions." },
+  { id: 41, text: "Become better than your old self." },
+  { id: 42, text: "You're on your way to becoming mentally unstoppable." },
+  { id: 43, text: "Your opponents aren't ready." },
+  { id: 44, text: "The closest thing we have to a superpower is intellect." },
+  { id: 45, text: "Dominate everyone." },
+  { id: 46, text: "KEEP CLIMBING." },
+  { id: 47, text: "The goal is progress, not perfection." },
+  { id: 48, text: "Feel like a God." },
+  { id: 49, text: "This training will make you mentally HARD. Be strong." },
+  { id: 50, text: "Sometimes just get the session done even if the score is bad. That's progress." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2404,14 +2404,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 217;
+const BUILD_VERSION = 218;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:15 PM";
+const BUILD_TIME = "12:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Testing station page",
+  "Motivation line ids renumbered",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
