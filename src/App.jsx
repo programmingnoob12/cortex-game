@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 224;
+const BUILD_VERSION = 225;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:50 PM";
+const BUILD_TIME = "2:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT stats read as accuracy, Home fits Deep",
+  "One spreadsheet for the whole regime",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13197,32 +13197,73 @@ function NBackSessionApp() {
               );
             })
               : (() => {
-              // One exercise at a time, chosen with the same switch the graph
-              // uses, so the two views behave identically.
-              const e = statsChartExercise;
-              if (!e) return null;
-              const rows = markDayRecords(
-                buildExerciseDailyRows(exerciseHistory[e.key], e)
-                  .slice()
-                  .reverse()
-                  .map((r) => ({ ...r, level: sessionLevel(e, r) }))
-              ).reverse();
-              const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
-              const pageCount = Math.max(
-                1,
-                Math.ceil(rows.length / HISTORY_PAGE_SIZE)
+              // One sheet for the whole regime: Day / Date / Time once, then
+              // Best and Avg per exercise. Weeks run Monday to Sunday with
+              // Monday at the top, and the most recent week is page 1.
+              const exs = overviewSummaryExercises;
+              if (exs.length === 0) return null;
+
+              // Per exercise, its marked daily rows keyed by day.
+              const byExercise = exs.map((ex) => {
+                const asc = markDayRecords(
+                  buildExerciseDailyRows(exerciseHistory[ex.key], ex)
+                    .slice()
+                    .reverse()
+                    .map((r) => ({ ...r, level: sessionLevel(ex, r) }))
+                );
+                const map = new Map(asc.map((r) => [r.dateKey, r]));
+                return { ex, map, any: asc.some((r) => !r.missed) };
+              });
+
+              const allTs = byExercise.flatMap(({ map }) =>
+                [...map.values()].filter((r) => !r.missed).map((r) => r.ts)
               );
-              const page = Math.min(historyPage[e.key] || 0, pageCount - 1);
-              const pageRows = rows.slice(
-                page * HISTORY_PAGE_SIZE,
-                page * HISTORY_PAGE_SIZE + HISTORY_PAGE_SIZE
-              );
+              if (allTs.length === 0) {
+                return (
+                  <div
+                    className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 flex flex-col"
+                    style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
+                  >
+                    <div className="flex-1 rounded-lg border border-slate-700/60 flex items-center justify-center text-slate-500 text-base">
+                      No completed sessions yet.
+                    </div>
+                  </div>
+                );
+              }
+
+              // Whole weeks only, so every page is one Monday-to-Sunday block.
+              const mondayOf = (d) => {
+                const x = new Date(d);
+                x.setHours(0, 0, 0, 0);
+                // getDay(): 0 = Sunday, so Sunday belongs to the week before.
+                x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+                return x;
+              };
+              const cursor = mondayOf(new Date(Math.min(...allTs)));
+              const lastMonday = mondayOf(new Date());
+              const weeks = [];
+              while (cursor <= lastMonday) {
+                const week = [];
+                for (let i = 0; i < 7; i++) {
+                  const day = new Date(cursor);
+                  day.setDate(day.getDate() + i);
+                  week.push(day);
+                }
+                weeks.push(week);
+                cursor.setDate(cursor.getDate() + 7);
+              }
+              weeks.reverse(); // newest week first
+
+              const pageCount = Math.max(1, weeks.length);
+              const page = Math.min(historyPage.sheet || 0, pageCount - 1);
+              const week = weeks[page];
 
               // The tag is always in the markup and only hidden, so a record
               // row is exactly as wide as every other row.
-              const cell = (isRecord, content) => (
+              const cell = (isRecord, content, key) => (
                 <td
-                  className="px-2.5 sm:px-4 py-2.5 font-medium"
+                  key={key}
+                  className="px-2 sm:px-3 py-2 font-medium"
                   style={
                     isRecord
                       ? {
@@ -13235,163 +13276,178 @@ function NBackSessionApp() {
                 >
                   {content}
                   <span
-                    className="ml-2 text-[0.65rem] font-semibold align-middle"
+                    className="ml-1.5 text-[0.6rem] font-semibold align-middle"
                     style={{ visibility: isRecord ? "visible" : "hidden" }}
                   >
-                    New PR!
+                    PR
                   </span>
                 </td>
               );
 
+              // Day/Date/Time take a fixed slice; the exercise pairs split
+              // the rest evenly, so four exercises fill the panel instead of
+              // crowding into a third of it.
+              const fixed = 26;
+              const per = (100 - fixed) / exs.length;
+
               return (
-                /* Same fixed height as the graph panel, and a flex column
-                   inside it: the table area takes the slack and the pager
-                   sits on the bottom, so the panel neither resizes when the
-                   view is switched nor leaves a hole under a short table. */
                 <div
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
                   style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
                 >
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: exColor }}
-                      />
-                      {e.title}
-                    </div>
-                    {overviewSummaryExercises.length > 1 && (
-                      <div
-                        className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
-                        role="group"
-                        aria-label="Choose an exercise"
-                      >
-                        {overviewSummaryExercises.map((opt) => {
-                          const on = opt.key === e.key;
-                          return (
-                            <button
-                              key={opt.key}
-                              onClick={() => setStatsExerciseKey(opt.key)}
-                              aria-pressed={on}
-                              className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
-                                on
-                                  ? "bg-slate-700 text-slate-100"
-                                  : "text-slate-400 hover:text-slate-100"
-                              }`}
-                            >
-                              {opt.title}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                  <div className="flex items-center gap-4 flex-wrap text-lg font-semibold text-slate-100">
+                    {exs.map((ex) => (
+                      <span key={ex.key} className="flex items-center gap-2">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full shrink-0"
+                          style={{
+                            backgroundColor: EXERCISE_COLORS[ex.key] || "#4CB9D8",
+                          }}
+                        />
+                        {ex.title}
+                      </span>
+                    ))}
                   </div>
 
-                  {rows.length === 0 ? (
-                    <div className="flex-1 rounded-lg border border-slate-700/60 p-8 text-center text-slate-500 text-base">
-                      No completed sessions yet.
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-auto">
-                        {/* Fixed layout with declared widths: an auto table
-                            re-measures its columns from the values in view, so
-                            switching exercise or view resized every cell. */}
-                        <table
-                          className="w-full text-xs sm:text-sm whitespace-nowrap"
-                          style={{ tableLayout: "fixed" }}
-                        >
-                          <colgroup>
-                            <col style={{ width: "12%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "20%" }} />
-                            <col style={{ width: "24%" }} />
-                            <col style={{ width: "24%" }} />
-                          </colgroup>
-                          <thead>
-                            <tr
-                              className="border-b border-slate-700/70 text-left text-slate-100"
-                              style={{ height: SHEET_ROW_H }}
+                  <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-auto">
+                    {/* Fixed layout with declared widths: an auto table
+                        re-measures its columns from the values in view, so
+                        switching exercise or view resized every cell. */}
+                    <table
+                      className="w-full text-xs sm:text-sm whitespace-nowrap"
+                      style={{ tableLayout: "fixed" }}
+                    >
+                      <colgroup>
+                        <col style={{ width: "6%" }} />
+                        <col style={{ width: "10%" }} />
+                        <col style={{ width: "10%" }} />
+                        {exs.map((ex) => (
+                          <Fragment key={ex.key}>
+                            <col style={{ width: `${per * 0.55}%` }} />
+                            <col style={{ width: `${per * 0.45}%` }} />
+                          </Fragment>
+                        ))}
+                      </colgroup>
+                      <thead>
+                        <tr className="text-left text-slate-100">
+                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
+                            Day
+                          </th>
+                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
+                            Date
+                          </th>
+                          <th className="px-2 sm:px-3 pt-2 font-medium" rowSpan={2}>
+                            Time
+                          </th>
+                          {exs.map((ex) => (
+                            <th
+                              key={ex.key}
+                              colSpan={2}
+                              className="px-2 sm:px-3 pt-2 pb-1 font-medium text-center"
+                              style={{ color: EXERCISE_COLORS[ex.key] || "#4CB9D8" }}
                             >
-                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Day</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Date</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Time</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Best score</th>
-                              <th className="px-2.5 sm:px-4 py-2.5 font-medium">Avg</th>
+                              {ex.abbrev}
+                            </th>
+                          ))}
+                        </tr>
+                        <tr
+                          className="border-b border-slate-700/70 text-left text-slate-400"
+                          style={{ height: 30 }}
+                        >
+                          {exs.map((ex) => (
+                            <Fragment key={ex.key}>
+                              <th className="px-2 sm:px-3 pb-2 font-medium">Best</th>
+                              <th className="px-2 sm:px-3 pb-2 font-medium">Avg</th>
+                            </Fragment>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {week.map((day) => {
+                          const dateKey = day.toDateString();
+                          const rows = byExercise.map(({ ex, map }) => ({
+                            ex,
+                            row: map.get(dateKey) || null,
+                          }));
+                          const trained = rows.some(
+                            (r) => r.row && !r.row.missed && r.row.level != null
+                          );
+                          const future = day > new Date();
+                          const totalMs = rows.reduce(
+                            (sum, r) => sum + (r.row?.durationMs || 0),
+                            0
+                          );
+                          return (
+                            <tr
+                              key={dateKey}
+                              className="border-b border-slate-800/70 last:border-0"
+                              style={{
+                                height: SHEET_ROW_H,
+                                backgroundColor: future
+                                  ? "transparent"
+                                  : trained
+                                  ? "rgba(30,152,43,0.12)"
+                                  : "rgba(151,20,38,0.14)",
+                              }}
+                            >
+                              <td className="px-2 sm:px-3 py-2 text-slate-100">
+                                {day.toLocaleDateString(undefined, { weekday: "short" })}
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 text-slate-100">
+                                {day.toLocaleDateString()}
+                              </td>
+                              <td className="px-2 sm:px-3 py-2 text-slate-100">
+                                {totalMs ? formatDuration(totalMs) : "\u2014"}
+                              </td>
+                              {rows.map(({ ex, row }) => [
+                                cell(
+                                  !!row?.isPR,
+                                  row ? formatScoreCell(ex, row) : "\u2014",
+                                  `${ex.key}-best`
+                                ),
+                                cell(
+                                  !!row?.isAvgPR,
+                                  row ? formatLevelValue(ex, row.dayAvg) : "\u2014",
+                                  `${ex.key}-avg`
+                                ),
+                              ])}
                             </tr>
-                          </thead>
-                          <tbody>
-                            {pageRows.map((row) => {
-                              const d = new Date(row.ts);
-                              return (
-                                <tr
-                                  key={row.dateKey}
-                                  className="border-b border-slate-800/70 last:border-0"
-                                  style={{
-                                    height: SHEET_ROW_H,
-                                    backgroundColor:
-                                      row.level == null
-                                        ? "rgba(151,20,38,0.14)"
-                                        : "rgba(30,152,43,0.12)",
-                                  }}
-                                >
-                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                    {d.toLocaleDateString(undefined, {
-                                      weekday: "short",
-                                    })}
-                                  </td>
-                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                    {d.toLocaleDateString()}
-                                  </td>
-                                  <td className="px-2.5 sm:px-4 py-2.5 text-slate-100">
-                                    {row.durationMs
-                                      ? formatDuration(row.durationMs)
-                                      : "\u2014"}
-                                  </td>
-                                  {cell(!!row.isPR, formatScoreCell(e, row))}
-                                  {cell(
-                                    !!row.isAvgPR,
-                                    formatLevelValue(e, row.dayAvg)
-                                  )}
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
 
-                      {pageCount > 1 && (
-                        <div className="flex items-center justify-between gap-4">
-                          <button
-                            onClick={() =>
-                              setHistoryPage((prev) => ({
-                                ...prev,
-                                [e.key]: Math.max(0, page - 1),
-                              }))
-                            }
-                            disabled={page === 0}
-                            className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
-                          >
-                            Back
-                          </button>
-                          <span className="text-sm text-slate-500">
-                            Page {page + 1} of {pageCount}
-                          </span>
-                          <button
-                            onClick={() =>
-                              setHistoryPage((prev) => ({
-                                ...prev,
-                                [e.key]: Math.min(pageCount - 1, page + 1),
-                              }))
-                            }
-                            disabled={page >= pageCount - 1}
-                            className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
-                          >
-                            Next
-                          </button>
-                        </div>
-                      )}
-                    </>
+                  {pageCount > 1 && (
+                    <div className="flex items-center justify-between gap-4">
+                      <button
+                        onClick={() =>
+                          setHistoryPage((prev) => ({
+                            ...prev,
+                            sheet: Math.min(pageCount - 1, page + 1),
+                          }))
+                        }
+                        disabled={page >= pageCount - 1}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                      >
+                        Earlier
+                      </button>
+                      <span className="text-sm text-slate-500">
+                        Week {pageCount - page} of {pageCount}
+                      </span>
+                      <button
+                        onClick={() =>
+                          setHistoryPage((prev) => ({
+                            ...prev,
+                            sheet: Math.max(0, page - 1),
+                          }))
+                        }
+                        disabled={page === 0}
+                        className="bg-slate-800 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors rounded-lg py-2 px-5 text-base font-medium"
+                      >
+                        Later
+                      </button>
+                    </div>
                   )}
                 </div>
               );
