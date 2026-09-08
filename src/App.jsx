@@ -2404,14 +2404,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 218;
+const BUILD_VERSION = 219;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "12:18 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Motivation line ids renumbered",
+  "Dropped speed from the 3D MOT text",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7514,7 +7514,7 @@ function motion3dLevelAchievement(level, overrides = {}) {
     group: "Performance",
     icon: "👁️",
     title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)}`,
-    description: `Reach 3D MOT speed ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
+    description: `Reach 3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
     progress: () => `${(level * MOT_TIER_STEP).toFixed(2)}`,
