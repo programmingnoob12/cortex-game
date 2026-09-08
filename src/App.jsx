@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 232;
+const BUILD_VERSION = 233;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Exercise name sits above Best and Avg",
+  "Two-line header only in the All view",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13429,42 +13429,59 @@ function NBackSessionApp() {
                         )}
                       </colgroup>
                       <thead>
-                        {/* Two rows: the exercise name over its own pair of
-                            columns, then the column names. Day/Date/Time live
-                            on the SECOND row alongside Best/Avg rather than
-                            spanning both, which is what threw the baselines
-                            out before. */}
-                        <tr className="text-center">
-                          <th />
-                          <th />
-                          <th />
-                          {exs.map((ex) => (
-                            <th
-                              key={ex.key}
-                              colSpan={2}
-                              className="px-2 sm:px-3 pt-2 pb-0.5 font-semibold"
-                              style={{ color: EXERCISE_COLORS[ex.key] || "#4CB9D8" }}
-                            >
-                              {SHEET_HEADER_LABELS[ex.key] || ex.title}
-                            </th>
-                          ))}
-                        </tr>
-                        <tr className="border-b border-slate-700/70 text-left">
-                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                        {/* Four exercises or fewer: one row, name in front of
+                            its own Best column — the regime view. Five or
+                            more: the name moves onto a line of its own,
+                            directly over its Best column, because there is
+                            no room for it beside the word. */}
+                        {dense && (
+                          <tr className="text-left">
+                            <th />
+                            <th />
+                            <th />
+                            {exs.map((ex) => (
+                              <Fragment key={ex.key}>
+                                <th
+                                  className="px-2 sm:px-3 pt-2 pb-0.5 font-semibold"
+                                  style={{
+                                    color: EXERCISE_COLORS[ex.key] || "#4CB9D8",
+                                  }}
+                                >
+                                  {SHEET_HEADER_LABELS[ex.key] || ex.title}
+                                </th>
+                                <th />
+                              </Fragment>
+                            ))}
+                          </tr>
+                        )}
+                        <tr
+                          className="border-b border-slate-700/70 text-left"
+                          style={dense ? undefined : { height: 38 }}
+                        >
+                          <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium text-slate-100">
                             Day
                           </th>
-                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                          <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium text-slate-100">
                             Date
                           </th>
-                          <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-100">
+                          <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium text-slate-100">
                             Time
                           </th>
                           {exs.map((ex) => (
                             <Fragment key={ex.key}>
-                              <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-400">
-                                Best
+                              <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium">
+                                {!dense && (
+                                  <span
+                                    style={{
+                                      color: EXERCISE_COLORS[ex.key] || "#4CB9D8",
+                                    }}
+                                  >
+                                    {SHEET_HEADER_LABELS[ex.key] || ex.title}{" "}
+                                  </span>
+                                )}
+                                <span className="text-slate-400">Best</span>
                               </th>
-                              <th className="px-2 sm:px-3 pb-1.5 font-medium text-slate-400">
+                              <th className="px-2 sm:px-3 pb-1.5 pt-1.5 font-medium text-slate-400">
                                 Avg
                               </th>
                             </Fragment>
@@ -13493,9 +13510,9 @@ function NBackSessionApp() {
                               style={{
                                 // The same share of the panel for every day,
                                 // so no single row can grow taller than the
-                                // rest. Seven of these leaves the remainder
-                                // for the two-line header.
-                                height: "11.5%",
+                                // rest. Slightly shorter in the dense view,
+                                // where the header takes a second line.
+                                height: dense ? "11.5%" : `${100 / 7}%`,
                                 backgroundColor: future
                                   ? "transparent"
                                   : trained
