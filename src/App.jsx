@@ -2358,16 +2358,15 @@ const MOTIVATION_LINES = [
   { id: 38, text: "What used to be impossible is now your average. That's how far you've come.", cond: "avgPR" },
   { id: 39, text: "Celebrate this. Then go higher.", cond: "pr" },
   { id: 40, text: "Faster decisions. Better reactions." },
-  { id: 41, text: "Become better than your old self." },
-  { id: 42, text: "You're on your way to becoming mentally unstoppable." },
-  { id: 43, text: "Your opponents aren't ready." },
-  { id: 44, text: "The closest thing we have to a superpower is intellect." },
-  { id: 45, text: "Dominate everyone." },
-  { id: 46, text: "KEEP CLIMBING." },
-  { id: 47, text: "The goal is progress, not perfection." },
-  { id: 48, text: "Feel like a God." },
-  { id: 49, text: "This training will make you mentally HARD. Be strong." },
-  { id: 50, text: "Sometimes just get the session done even if the score is bad. That's progress." },
+  { id: 41, text: "You're on your way to becoming mentally unstoppable." },
+  { id: 42, text: "Your opponents aren't ready." },
+  { id: 43, text: "The closest thing we have to a superpower is intellect." },
+  { id: 44, text: "Dominate everyone." },
+  { id: 45, text: "KEEP CLIMBING." },
+  { id: 46, text: "The goal is progress, not perfection." },
+  { id: 47, text: "Feel like a God." },
+  { id: 48, text: "This training will make you mentally HARD. Be strong." },
+  { id: 49, text: "Sometimes just get the session done even if the score is bad. That's progress." },
 ];
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2404,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 220;
+const BUILD_VERSION = 221;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:18 PM";
+const BUILD_TIME = "12:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Achievement bars and unlock dates",
+  "Removed a duplicate motivation line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
