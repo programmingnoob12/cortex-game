@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 225;
+const BUILD_VERSION = 226;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "2:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One spreadsheet for the whole regime",
+  "Sheet headers use the short names",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5009,6 +5009,18 @@ const WISDOM_QUIZ = [
 // exercise accent: it reads as "how much of this is done", the same job the
 // bar does in any progress overview, and a per-exercise hue would make the
 // rows look like six different meters.
+// Column headers in the history sheet. Short enough to fit a narrow column
+// but still readable as the exercise's name, rather than the single-letter
+// abbreviations used where space is really tight.
+const SHEET_HEADER_LABELS = {
+  dual: "DNB",
+  quad: "QNB",
+  iqnb: "QNB'",
+  rrt: "RRT",
+  motion3d: "3D MOT",
+  cct: "CCT",
+};
+
 function AchievementProgressBar({ done, total }) {
   const frac = total > 0 ? Math.min(1, done / total) : 0;
   return (
@@ -13295,20 +13307,6 @@ function NBackSessionApp() {
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
                   style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
                 >
-                  <div className="flex items-center gap-4 flex-wrap text-lg font-semibold text-slate-100">
-                    {exs.map((ex) => (
-                      <span key={ex.key} className="flex items-center gap-2">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: EXERCISE_COLORS[ex.key] || "#4CB9D8",
-                          }}
-                        />
-                        {ex.title}
-                      </span>
-                    ))}
-                  </div>
-
                   <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-auto">
                     {/* Fixed layout with declared widths: an auto table
                         re-measures its columns from the values in view, so
@@ -13346,7 +13344,7 @@ function NBackSessionApp() {
                               className="px-2 sm:px-3 pt-2 pb-1 font-medium text-center"
                               style={{ color: EXERCISE_COLORS[ex.key] || "#4CB9D8" }}
                             >
-                              {ex.abbrev}
+                              {SHEET_HEADER_LABELS[ex.key] || ex.title}
                             </th>
                           ))}
                         </tr>
