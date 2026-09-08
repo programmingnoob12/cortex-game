@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 222;
+const BUILD_VERSION = 223;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:30 PM";
+const BUILD_TIME = "1:50 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats page fits the screen",
+  "Stats panel is one fixed height",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12990,7 +12990,7 @@ function NBackSessionApp() {
                       className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
                       // Both views declare the same height, so moving between
                       // Graph and Spreadsheet does not resize the page.
-                      style={{ minHeight: "min(calc(100vh - 15rem), 36rem)" }}
+                      style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
                     >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
@@ -13236,7 +13236,14 @@ function NBackSessionApp() {
               );
 
               return (
-                <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4">
+                /* Same fixed height as the graph panel, and a flex column
+                   inside it: the table area takes the slack and the pager
+                   sits on the bottom, so the panel neither resizes when the
+                   view is switched nor leaves a hole under a short table. */
+                <div
+                  className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
+                  style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
+                >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
                       <span
@@ -13273,12 +13280,12 @@ function NBackSessionApp() {
                   </div>
 
                   {rows.length === 0 ? (
-                    <div className="rounded-lg border border-slate-700/60 p-8 text-center text-slate-500 text-base">
+                    <div className="flex-1 rounded-lg border border-slate-700/60 p-8 text-center text-slate-500 text-base">
                       No completed sessions yet.
                     </div>
                   ) : (
                     <>
-                      <div className="rounded-lg border border-slate-700/60 overflow-x-auto">
+                      <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-auto">
                         {/* Fixed layout with declared widths: an auto table
                             re-measures its columns from the values in view, so
                             switching exercise or view resized every cell. */}
