@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 233;
+const BUILD_VERSION = 234;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Two-line header only in the All view",
+  "Bigger stats panel and text",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -13012,7 +13012,9 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
-          <div className="space-y-5">
+          /* Tight at the top: the panel is the page, so the heading and the
+             Back link give up their spacing to it. */
+          <div className="space-y-3">
             <button
               onClick={() => setOverviewView("summary")}
               className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium self-start"
@@ -13021,7 +13023,7 @@ function NBackSessionApp() {
             </button>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <h1 className="text-4xl font-semibold tracking-tight">
+                <h1 className="text-3xl font-semibold tracking-tight">
                   Stats
                 </h1>
                 {/* Regime is what is being trained; All is every exercise
@@ -13099,7 +13101,7 @@ function NBackSessionApp() {
                       className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
                       // Both views declare the same height, so moving between
                       // Graph and Spreadsheet does not resize the page.
-                      style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
+                      style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
                     >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
@@ -13141,7 +13143,7 @@ function NBackSessionApp() {
                         // Sized off the viewport so the whole Stats screen fits
                         // without scrolling, whatever the window height.
                         style={{
-                          height: "min(calc(100vh - 26rem), 26rem)",
+                          height: "min(calc(100vh - 22rem), 36rem)",
                           minHeight: "14rem",
                         }}
                       >
@@ -13323,7 +13325,7 @@ function NBackSessionApp() {
                 return (
                   <div
                     className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 flex flex-col"
-                    style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
+                    style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
                   >
                     <div className="flex-1 rounded-lg border border-slate-700/60 flex items-center justify-center text-slate-500 text-base">
                       No completed sessions yet.
@@ -13399,7 +13401,7 @@ function NBackSessionApp() {
               return (
                 <div
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
-                  style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
+                  style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
                 >
                   <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-hidden">
                     {/* Fixed layout with declared widths: an auto table
@@ -13407,7 +13409,7 @@ function NBackSessionApp() {
                         switching exercise or view resized every cell. */}
                     <table
                       className={`w-full whitespace-nowrap ${
-                        dense ? "text-[0.7rem]" : "text-xs sm:text-sm"
+                        dense ? "text-xs" : "text-sm sm:text-base"
                       }`}
                       // Full height so the seven rows share the panel evenly
                       // instead of stacking at the top and leaving a gap.
