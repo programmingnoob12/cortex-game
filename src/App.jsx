@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 236;
+const BUILD_VERSION = 237;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT shows streak instead of average",
+  "All view column order",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5060,6 +5060,11 @@ const WISDOM_QUIZ = [
 // Column headers in the history sheet. Short enough to fit a narrow column
 // but still readable as the exercise's name, rather than the single-letter
 // abbreviations used where space is really tight.
+// Column order in the All view. The three n-backs sit together and in
+// difficulty order, so the sheet reads as families rather than as whatever
+// order the library happens to declare.
+const ALL_SCOPE_ORDER = ["dual", "iqnb", "quad", "rrt", "cct", "motion3d"];
+
 const SHEET_HEADER_LABELS = {
   dual: "DNB",
   quad: "QNB",
@@ -9774,8 +9779,8 @@ function NBackSessionApp() {
   // nothing extra had to be kept for this.
   const overviewSummaryExercises =
     overviewScope === "all"
-      ? Object.values(EXERCISE_LIBRARY).filter(
-          (e) => e.key !== "overview" && (exerciseHistory[e.key] || []).length > 0
+      ? ALL_SCOPE_ORDER.map((key) => EXERCISE_LIBRARY[key]).filter(
+          (e) => e && (exerciseHistory[e.key] || []).length > 0
         )
       : Array.from(new Set(overviewRegime.steps.map((s) => s.key))).map(
           (key) => EXERCISE_LIBRARY[key]
