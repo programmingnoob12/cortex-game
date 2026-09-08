@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 230;
+const BUILD_VERSION = 231;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "All sheet fits without sideways scroll",
+  "Equal sheet rows, Best and Avg everywhere",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3212,6 +3212,16 @@ function formatScoreCell(exercise, row) {
 // exercise's name, so the abbreviation in front of each value was width
 // spent saying what the header says — and with six exercises on screen
 // there is none to spare.
+// A day's training time, short enough for a narrow column: "48m", "2h 04m".
+// formatDuration's "158 min 0 sec" wrapped onto a second line, which made
+// that one row taller than every other row in the week.
+function formatSheetDuration(ms) {
+  if (!ms) return "\u2014";
+  const mins = Math.round(ms / 60000);
+  if (mins < 60) return `${mins}m`;
+  return `${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
+}
+
 function formatSheetBest(exercise, row) {
   if (row == null || row.level == null) return "\u2014";
   switch (exercise.key) {
@@ -13356,7 +13366,7 @@ function NBackSessionApp() {
               const cell = (isRecord, content, key) => (
                 <td
                   key={key}
-                  className="px-2 sm:px-3 py-1.5 font-medium align-middle"
+                  className="px-2 sm:px-3 py-1.5 font-medium align-middle overflow-hidden"
                   style={
                     isRecord
                       ? {
@@ -13378,11 +13388,12 @@ function NBackSessionApp() {
               );
 
               // Day/Date/Time take a fixed slice and the exercises split the
-              // rest. Past four exercises the Best/Avg pair no longer fits in
-              // the width available, so All drops to Best alone rather than
-              // spilling into a horizontal scrollbar.
-              const showAvg = exs.length <= 4;
-              const fixed = exs.length > 4 ? 22 : 26;
+              // rest. Every exercise keeps its Best and Avg pair; the type
+              // scale steps down once there are more than four of them so the
+              // values still fit on one line.
+              const showAvg = true;
+              const dense = exs.length > 4;
+              const fixed = dense ? 20 : 26;
               const per = (100 - fixed) / exs.length;
 
               return (
@@ -13390,12 +13401,14 @@ function NBackSessionApp() {
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
                   style={{ height: "min(calc(100vh - 15rem), 36rem)" }}
                 >
-                  <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-y-auto overflow-x-hidden">
+                  <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-hidden">
                     {/* Fixed layout with declared widths: an auto table
                         re-measures its columns from the values in view, so
                         switching exercise or view resized every cell. */}
                     <table
-                      className="w-full text-xs sm:text-sm"
+                      className={`w-full whitespace-nowrap ${
+                        dense ? "text-[0.7rem]" : "text-xs sm:text-sm"
+                      }`}
                       // Full height so the seven rows share the panel evenly
                       // instead of stacking at the top and leaving a gap.
                       style={{ tableLayout: "fixed", height: "100%" }}
@@ -13469,6 +13482,10 @@ function NBackSessionApp() {
                               key={dateKey}
                               className="border-b border-slate-800/70 last:border-0"
                               style={{
+                                // The same share of the panel for every day,
+                                // so no single row can grow taller than the
+                                // rest.
+                                height: `${100 / 7}%`,
                                 backgroundColor: future
                                   ? "transparent"
                                   : trained
@@ -13483,7 +13500,7 @@ function NBackSessionApp() {
                                 {day.toLocaleDateString()}
                               </td>
                               <td className="px-2 sm:px-3 py-2 text-slate-100">
-                                {totalMs ? formatDuration(totalMs) : "\u2014"}
+                                {formatSheetDuration(totalMs)}
                               </td>
                               {rows.map(({ ex, row }) =>
                                 showAvg
