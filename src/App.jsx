@@ -2332,6 +2332,11 @@ const MOTIVATION_LINES = [
   { id: 17, text: "Be proud of how smart you have become." },
   { id: 49, text: "The best don't stop improving." },
   { id: 50, text: "Become better than your old self." },
+  {
+    id: 51,
+    text: "Having a hard session today? That's okay. Just get it done. Don't worry about the scores.",
+    cond: "worse",
+  },
   { id: 18, text: "Enjoy being mentally superior to everyone." },
   { id: 19, text: "Other people won't be able to keep up with you." },
   { id: 20, text: "You showed up today. That's a win." },
@@ -2399,14 +2404,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 216;
+const BUILD_VERSION = 217;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:58 AM";
+const BUILD_TIME = "12:15 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Level codes on the right, 3D MOT speeds",
+  "Testing station page",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7512,7 +7517,7 @@ function motion3dLevelAchievement(level, overrides = {}) {
     description: `Reach 3D MOT speed ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
-    progress: () => `${(level * MOT_TIER_STEP).toFixed(2)} speed`,
+    progress: () => `${(level * MOT_TIER_STEP).toFixed(2)}`,
     ...overrides,
   };
 }
@@ -11151,20 +11156,52 @@ function NBackSessionApp() {
               >
                 Wisdom
               </button>
-              {SHOW_TEST_TOOLS && (
+            </div>
+
+          </div>
+        )}
+
+        {mainView === "testing" && (
+          <div className="space-y-8">
+            <div>
               <button
+                onClick={() => setMainView("home")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+              >
+                &lsaquo; Back
+              </button>
+              <h1 className="text-4xl font-semibold tracking-tight">
+                Testing station
+              </h1>
+              <div className="text-slate-500 text-base mt-2">
+                Every screen and animation, on demand.
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <div className="flex gap-3">
+                <button
+                  onClick={() => bumpTestStreak(regimeKey)}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 +1 day streak
+                </button>
+                <button
+                  onClick={resetTestStreak}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Reset streak
+                </button>
+              </div>
+                            <button
                 onClick={resetNextSessionForTesting}
                 className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
                 🧪 Reset next session (test)
               </button>
-              )}
               {/* One button per written line. Hover a number for the text;
-                  click it to run the session-complete screen with that line.
-                  Behind the test flag: with fifty-odd buttons it was the
-                  single thing pushing Home off the bottom of the screen. */}
-              {SHOW_TEST_TOOLS && (
-              <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
+                  click it to run the session-complete screen with that line. */}
+                            <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Session complete screen (test) — {MOTIVATION_LINES.length} lines
                 </div>
@@ -11220,10 +11257,8 @@ function NBackSessionApp() {
                   Amber = has a condition. Grey = unconditional, also used between rounds.
                 </div>
               </div>
-              )}
 
-              {SHOW_TEST_TOOLS && (
-              <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
+                            <div className="border border-dashed border-slate-700 rounded-lg p-4 space-y-3">
                 <div className="text-sm text-slate-500">
                   🧪 Skip to exercise (test): bypasses regime/Start Training entirely
                 </div>
@@ -11239,9 +11274,7 @@ function NBackSessionApp() {
                   ))}
                 </div>
               </div>
-              )}
             </div>
-
           </div>
         )}
 
@@ -14248,6 +14281,16 @@ function NBackSessionApp() {
           className="fixed top-2 right-2 md:top-6 md:right-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30"
         >
           🧪 Skip to next exercise
+        </button>
+      )}
+
+      {mainView === "home" && (
+        <button
+          onClick={() => setMainView("testing")}
+          /* Top left, opposite Achievements. */
+          className="fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+        >
+          🧪 Testing station
         </button>
       )}
 
