@@ -2403,14 +2403,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 223;
+const BUILD_VERSION = 224;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "1:50 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats panel is one fixed height",
+  "CCT stats read as accuracy, Home fits Deep",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -3174,6 +3174,8 @@ function playLevelUp() {
 // seconds packed into one float.
 function sessionLevel(exercise, entry) {
   if (!entry || entry.accuracy == null) return null;
+  // CCT has no level: what is worth plotting is the accuracy itself.
+  if (exercise.key === "cct") return entry.accuracy;
   return exercise.scoreType === "accuracy" ? entry.n ?? null : entry.accuracy;
 }
 
@@ -3181,6 +3183,7 @@ function sessionLevel(exercise, entry) {
 // the side of a chart.
 function formatLevelTick(exercise, value) {
   if (value == null || Number.isNaN(value)) return "";
+  if (exercise.key === "cct") return `${Math.round(value)}%`;
   switch (exercise.scoreType) {
     case "points":
       return `${Math.floor(value)}p`;
@@ -3194,7 +3197,11 @@ function formatLevelTick(exercise, value) {
 // RRT's day score reads the same way it does everywhere else in the app:
 // premises solved, round length, then the run of correct answers out of 20.
 function formatScoreCell(exercise, row) {
-  if (row.level == null) return "—";
+  if (row.level == null) return "\u2014";
+  // CCT: how cleanly the session went, and the longest run inside it.
+  if (exercise.key === "cct") {
+    return `${Math.round(row.level)}% \u00B7 ${row.streak ?? 0} in a row`;
+  }
   if (exercise.scoreType === "points") {
     return `${formatScoreValue(exercise, row.level)} ${row.streak ?? 0}/20`;
   }
@@ -3203,7 +3210,8 @@ function formatScoreCell(exercise, row) {
 
 // Full form, used in tooltips and the table.
 function formatLevelValue(exercise, value) {
-  if (value == null || Number.isNaN(value)) return "—";
+  if (value == null || Number.isNaN(value)) return "\u2014";
+  if (exercise.key === "cct") return `${Math.round(value)}%`;
   switch (exercise.scoreType) {
     case "points":
       return formatScoreValue(exercise, value);
@@ -11016,7 +11024,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className="space-y-9 pt-12 sm:pt-0">
+          <div className="space-y-6 pt-12 sm:pt-0">
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -11067,7 +11075,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -11101,7 +11109,7 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card rounded-xl p-6 text-white text-left${
+                    className={`ex-card rounded-xl p-5 text-white text-left${
                       shineCard === e.key ? " ex-card-shine" : ""
                     }`}
                     style={{
@@ -11152,7 +11160,7 @@ function NBackSessionApp() {
               })}
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6">
+            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4">
               <div className="text-xl font-semibold text-slate-100">
                 Next session
               </div>
@@ -11174,7 +11182,7 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
