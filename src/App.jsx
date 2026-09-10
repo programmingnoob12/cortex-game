@@ -2436,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 242;
+const BUILD_VERSION = 243;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "5:49 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Free tier: Anti-brainrot only without a membership",
+  "Free month banner on Home, log out above the footer",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8155,6 +8155,9 @@ function NBackSessionApp() {
 
   // Paying account or free. `simulateFree` is the Testing station's way to
   // see the free experience without cancelling anything.
+  // Dismissed for this visit only: it is a nudge, not a task list.
+  const [freeMonthNoticeDismissed, setFreeMonthNoticeDismissed] = useState(false);
+
   const paidAccount = useContext(MembershipContext);
   const [simulateFree, setSimulateFree] = useState(false);
   const isMember = paidAccount && !simulateFree;
@@ -9881,6 +9884,9 @@ function NBackSessionApp() {
     comeback: hasComebackFromBrokenStreak(exerciseHistory),
     simulatedUnlockedIds,
   };
+
+  const freeMonthDays = Math.min(7, achievementState.regimeStreak || 0);
+  const freeMonthEarned = freeMonthDays >= 7;
   // The one line the session-complete screen shows. Chosen once when the
   // screen opens rather than on every render: the pick is random, so
   // recomputing it mid-animation swapped the line out under the reader.
@@ -11016,50 +11022,6 @@ function NBackSessionApp() {
               </p>
             </div>
 
-            {/* The free month is the one reward with real money behind it,
-                so it gets said out loud rather than sitting as a line of
-                small print on one badge among sixty. */}
-            {(() => {
-              const done = Math.min(7, achievementState.regimeStreak || 0);
-              const earned = done >= 7;
-              return (
-                <div
-                  className="rounded-xl border p-5 flex items-center gap-4"
-                  style={{
-                    borderColor: earned ? "#1E982B" : "rgba(30,152,43,0.4)",
-                    background: earned
-                      ? "rgba(30,152,43,0.14)"
-                      : "rgba(30,152,43,0.07)",
-                  }}
-                >
-                  <span className="text-3xl shrink-0">🎁</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-lg font-semibold text-slate-100">
-                      {earned
-                        ? "Free month earned"
-                        : "Complete your regime 7 days in a row for a free month"}
-                    </div>
-                    <div className="text-base text-slate-400 mt-0.5">
-                      {earned
-                        ? "Applied to your membership."
-                        : `${done} of 7 days. Miss a day and it starts again.`}
-                    </div>
-                    <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${(done / 7) * 100}%`,
-                          background:
-                            "linear-gradient(to right, #177A22, #1E982B)",
-                          transition: "width 0.3s ease-out",
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
             {achievementExerciseSections().map((topSection) => {
               const group = topSection.key;
               const groupAccent = ACCENT_STYLES.indigo;
@@ -11199,7 +11161,7 @@ function NBackSessionApp() {
                                   ✓ Achieved
                                 </div>
                                 {achievedOn && (
-                                  <div className="text-sm text-slate-500 tabular-nums mt-0.5">
+                                  <div className="text-base text-slate-400 tabular-nums mt-0.5">
                                     {achievedOn}
                                   </div>
                                 )}
@@ -12470,7 +12432,11 @@ function NBackSessionApp() {
               </span>
             </button>
 
-            <div>
+            <div className="grow" />
+
+            {/* Last thing on the page, hard right, immediately above the
+                footer rule: nothing anyone is looking for on the way in. */}
+            <div className="flex justify-end">
               <button
                 onClick={() => {
                   try {
@@ -12486,8 +12452,6 @@ function NBackSessionApp() {
                 Log out
               </button>
             </div>
-
-            <div className="grow" />
 
             {/* Legal and contact footer. Both policy links open real pages
                 inside the app rather than leaving it. Pulled tight against
@@ -14763,6 +14727,58 @@ function NBackSessionApp() {
         >
           🧪 Skip to next exercise
         </button>
+      )}
+
+      {/* Floats over Home rather than sitting in it: Home is laid out to fit
+          one screen exactly, and a row in the flow would push the footer
+          off. Solid card with a green rail, not the tinted-panel treatment
+          the rest of the app uses for inline notes. */}
+      {mainView === "home" && !freeMonthNoticeDismissed && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(30rem,calc(100vw-2rem))]">
+          <div
+            className="flex items-center gap-4 rounded-xl pl-0 pr-4 py-3 overflow-hidden"
+            style={{
+              background: "#1B1D20",
+              border: "1px solid #2C2F34",
+              boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
+            }}
+          >
+            <span
+              className="self-stretch shrink-0"
+              style={{ width: 4, background: "#1E982B" }}
+            />
+            <span className="text-2xl shrink-0">🎁</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-base font-semibold text-slate-100">
+                {freeMonthEarned
+                  ? "Free month earned"
+                  : `${freeMonthDays} of 7 days to a free month`}
+              </div>
+              <div className="text-sm text-slate-400 mt-0.5">
+                {freeMonthEarned
+                  ? "Applied to your membership."
+                  : "Complete your regime 7 days in a row."}
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(freeMonthDays / 7) * 100}%`,
+                    background: "linear-gradient(to right, #177A22, #1E982B)",
+                    transition: "width 0.3s ease-out",
+                  }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setFreeMonthNoticeDismissed(true)}
+              aria-label="Dismiss"
+              className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
 
       {mainView === "home" && (
