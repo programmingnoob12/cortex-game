@@ -732,7 +732,11 @@ function AuthGate({ children }) {
   // regime. Only a membership that exists and has gone wrong (paused, card
   // declined, ended) still gets held at this screen, because each of those
   // needs its own way back in.
-  const LOCKING_STATUSES = ["paused", "past_due", "inactive"];
+  // Every status the users table can hold that means "had a membership, it
+  // is not working". "expired" is what the Vercel webhook writes on
+  // subscription.deleted and "inactive" is what the edge function writes;
+  // both have to lock, or a lapsed member silently becomes a free one.
+  const LOCKING_STATUSES = ["paused", "past_due", "inactive", "expired"];
   if (!membershipOk && LOCKING_STATUSES.includes(membershipStatus)) {
     // Each locked-out state gets its own explanation and its own way out.
     // A paused member especially must be able to come back from here —
@@ -2436,14 +2440,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 247;
+const BUILD_VERSION = 248;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:12 PM";
+const BUILD_TIME = "7:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Get membership button on the regime page",
+  "Expired memberships lock, not fall to free",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
