@@ -534,6 +534,7 @@ function AuthGate({ children }) {
   // Only the sign-up page shows this box. Signing in from the sign-in
   // screen is always remembered, which is what it did before the box existed.
   const [remember, setRemember] = useState(true);
+  const [rememberFocus, setRememberFocus] = useState(false);
   const [linkSent, setLinkSent] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -698,7 +699,15 @@ function AuthGate({ children }) {
     // goes to the store the box asked for.
     setRememberMe(remember);
     try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        // Without this, Supabase sends them to its configured Site URL,
+        // which is how a confirmation link ends up at a Vercel login wall
+        // instead of the app. Sending them to the origin they signed up on
+        // also keeps localhost working in development.
+        options: { emailRedirectTo: window.location.origin },
+      });
       if (error) {
         const taken = /already|registered|exists/i.test(error.message);
         setEmailTaken(taken);
@@ -927,12 +936,7 @@ function AuthGate({ children }) {
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5">
-            <div className="text-center space-y-2">
-              <h1 className="text-2xl font-semibold">Create your account</h1>
-              <p className="text-slate-400 text-base">
-                Anti-brainrot is free. No card needed.
-              </p>
-            </div>
+            <h1 className="text-2xl font-semibold text-center">Create your account</h1>
             {linkSent ? (
               <p className="text-slate-300 text-center text-base">
                 Check <span className="font-medium">{email}</span> to confirm your
@@ -946,7 +950,7 @@ function AuthGate({ children }) {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
+                  placeholder="Enter email"
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
                 />
                 <input
@@ -959,17 +963,53 @@ function AuthGate({ children }) {
                   placeholder="Choose a password"
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
                 />
-                {/* The whole row is the hit target — a 16px checkbox on a
-                    phone is not one. Size and colour are inline because the
-                    build does not reliably emit either utility. */}
+                {/* The native checkbox is the one control on this page that
+                    cannot be styled to match the app, so it is visually
+                    hidden and a box drawn from the app's own palette sits in
+                    its place. The input stays in the tree, so keyboard and
+                    form semantics are unchanged. The whole row is the hit
+                    target — an 18px box on a phone is not one. Sizes are
+                    inline because the build does not reliably emit them. */}
                 <label className="flex items-center gap-3 cursor-pointer select-none py-1">
                   <input
                     type="checkbox"
                     checked={remember}
                     onChange={(e) => setRemember(e.target.checked)}
-                    style={{ width: 18, height: 18, accentColor: "#6366F1", flexShrink: 0 }}
+                    className="sr-only"
+                    onFocus={() => setRememberFocus(true)}
+                    onBlur={() => setRememberFocus(false)}
                   />
-                  <span className="text-slate-300 text-sm">Remember me</span>
+                  <span
+                    className="flex items-center justify-center rounded-md border transition-colors"
+                    style={{
+                      width: 20,
+                      height: 20,
+                      flexShrink: 0,
+                      backgroundColor: remember ? "#6366F1" : "#101112",
+                      borderColor: rememberFocus ? "#818CF8" : remember ? "#6366F1" : "#23252A",
+                      boxShadow: rememberFocus ? "0 0 0 3px rgba(99,102,241,0.35)" : "none",
+                    }}
+                  >
+                    {remember && (
+                      <svg
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth={2.4}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ width: 12, height: 12 }}
+                      >
+                        <path d="M3 8.5 6.2 11.5 13 4.5" />
+                      </svg>
+                    )}
+                  </span>
+                  <span
+                    className="text-sm transition-colors"
+                    style={{ color: remember ? "#F7F8F8" : "#9BA1A6" }}
+                  >
+                    Remember me
+                  </span>
                 </label>
                 <button
                   type="submit"
@@ -2774,15 +2814,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 258;
+const BUILD_VERSION = 259;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:55 AM";
+const BUILD_TIME = "11:20 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sign-up is only /signup — no link from the sign-in screen",
-  "Remember me decides if the session survives the browser closing",
+  "Sign-up page tidied, checkbox restyled",
+  "Confirmation links come back to the app, not a Vercel login",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
