@@ -2436,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 243;
+const BUILD_VERSION = 244;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:49 PM";
+const BUILD_TIME = "6:04 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Free month banner on Home, log out above the footer",
+  "Banner on the right, log out closer in",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12456,8 +12456,9 @@ function NBackSessionApp() {
             {/* Legal and contact footer. Both policy links open real pages
                 inside the app rather than leaving it. Pulled tight against
                 the rule: a footer should read as a thin line at the bottom,
-                not another section. */}
-            <div className="!mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+                not another section, and tighter again here because Log out
+                sits directly above it. */}
+            <div className="!mt-2 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
@@ -14734,7 +14735,7 @@ function NBackSessionApp() {
           off. Solid card with a green rail, not the tinted-panel treatment
           the rest of the app uses for inline notes. */}
       {mainView === "home" && !freeMonthNoticeDismissed && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[min(30rem,calc(100vw-2rem))]">
+        <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 w-[min(22rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-4 rounded-xl pl-0 pr-4 py-3 overflow-hidden"
             style={{
