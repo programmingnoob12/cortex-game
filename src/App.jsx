@@ -460,6 +460,41 @@ function loadSessionSnapshot() {
   }
 }
 
+// Coming back from checkout. Two pieces of this browser's state are now
+// wrong and are read before any network answer arrives: the cached
+// membership verdict, which still says "free", and the session snapshot,
+// which still points at whichever regime they were on before they paid.
+// Both are cleared here, at module load, so nothing downstream ever sees
+// them. The flag is kept for the app below, which uses it to land them on
+// the regime picker, and the parameter is taken out of the address so a
+// refresh is an ordinary load.
+let CAME_FROM_CHECKOUT = false;
+
+function clearStaleBillingState() {
+  try {
+    Object.keys(localStorage)
+      .filter(
+        (k) => k.startsWith(MEMBERSHIP_CACHE_PREFIX) || k === "cortex.billingState"
+      )
+      .forEach((k) => localStorage.removeItem(k));
+    localStorage.removeItem(SESSION_SNAPSHOT_KEY);
+  } catch {
+    // Nothing cached means nothing stale.
+  }
+}
+
+if (typeof window !== "undefined") {
+  try {
+    if (new URLSearchParams(window.location.search).has("upgraded")) {
+      CAME_FROM_CHECKOUT = true;
+      clearStaleBillingState();
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  } catch {
+    // Without a readable URL this is just a normal load.
+  }
+}
+
 function saveSessionSnapshot(snap) {
   try {
     if (!snap) {
@@ -2814,15 +2849,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 259;
+const BUILD_VERSION = 260;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:20 AM";
+const BUILD_TIME = "12:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sign-up page tidied, checkbox restyled",
-  "Confirmation links come back to the app, not a Vercel login",
+  "Checkout returns straight to the regime picker, unlocked",
+  "Contact line on the last RRT tutorial page",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5994,7 +6029,7 @@ function RrtTutorialAnimated({ onDone }) {
       </div>
     </div>,
 
-    <div className={`${card} space-y-4`} key="s5">
+    <div className={`${card} space-y-6`} key="s5">
       <p className="text-slate-100 text-lg leading-relaxed">
         Feel where each item is. Don't imagine the items moving around on your
         screen.
@@ -6006,6 +6041,21 @@ function RrtTutorialAnimated({ onDone }) {
       <p className="text-slate-100 text-lg leading-relaxed">
         It should be like feeling where your door is in the room.
       </p>
+      {/* The tutorial is the point where someone either gets spatializing or
+          quietly gives up on it, so this is the one place worth offering a
+          reply. */}
+      <div className="pt-5 border-t border-slate-700/70">
+        <p className="text-slate-400 text-base leading-relaxed">
+          Still have questions? Email{" "}
+          <a
+            href={`mailto:${LEGAL_CONTACT}`}
+            className="underline underline-offset-2"
+            style={{ color: accent }}
+          >
+            {LEGAL_CONTACT}
+          </a>
+        </p>
+      </div>
     </div>,
   ];
 
@@ -10452,6 +10502,18 @@ function NBackSessionApp() {
   // of pretending nothing was underway. It does not navigate on its own:
   // being dropped straight into an exercise on a reload would be worse than
   // the bug.
+  // Straight to the regime picker, with everything now unlocked. Waits for
+  // hydration, or the stored regimeKey lands a moment later and drops them
+  // into the regime they had before they paid.
+  const upgradeLandingRef = useRef(false);
+  useEffect(() => {
+    if (!CAME_FROM_CHECKOUT || !hasHydrated || upgradeLandingRef.current) return;
+    upgradeLandingRef.current = true;
+    saveSessionSnapshot(null);
+    setRegimeKey(null);
+    setMainView("regime");
+  }, [hasHydrated]);
+
   const snapshotRestoredRef = useRef(false);
   useEffect(() => {
     if (!hasHydrated || snapshotRestoredRef.current) return;
