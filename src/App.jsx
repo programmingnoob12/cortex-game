@@ -2877,15 +2877,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 276;
+const BUILD_VERSION = 277;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:55 PM";
+const BUILD_TIME = "10:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "History lists premises in the order they were shown",
-  "No unglowed strip down the right edge",
+  "RRT waits for you before moving on, and has a Home button",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14926,6 +14925,10 @@ function NBackSessionApp() {
           <RRTExercise
             exercise={exercise}
             onFinish={() => forceSwitchToNext(exerciseIndex)}
+            onHome={() => {
+              logPartialSession("rrt");
+              setMainView("home");
+            }}
             onStageChange={setRrtStage}
             onLevelUp={recordRrtLevelUp}
             onSessionEnd={recordRrtSessionEnd}
@@ -16716,7 +16719,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   );
 }
 
-function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0 }) {
+function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0 }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
@@ -16824,6 +16827,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // reviewing the current session, can be wired up further later.
   const [roundHistory, setRoundHistory] = useState([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  // Set when the session's time is up. RRT used to call onFinish here and
+  // move straight on, which took the round history away at the exact moment
+  // it is most worth reading. Nothing advances now until they say so.
+  const [sessionDone, setSessionDone] = useState(false);
   // The item a person tapped inside a history entry — shows an enlarged
   // tile so they can see clearly which color/pattern or letter tag it was,
   // without having to squint at the small inline chip.
@@ -16964,7 +16971,8 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             streakReached: correctStreakRef.current,
           });
         }
-        onFinish?.();
+        // Progress is banked above; advancing is theirs to choose.
+        setSessionDone(true);
       }, 800);
       return;
     }
@@ -17188,9 +17196,21 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   };
   const showBackHint = !hideBackHint && !flash;
 
+  // Same control the n-back results screen has: leave mid-session and the
+  // session is still there to come back to.
+  const homeLink = onHome ? (
+    <button
+      onClick={onHome}
+      className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium"
+    >
+      &lsaquo; Home
+    </button>
+  ) : null;
+
   if (stage === "setup") {
     return (
       <div className="space-y-6">
+        {homeLink}
         <div>
           <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
         </div>
@@ -17221,89 +17241,11 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   // Shared header for both "premises" and "question" — one continuous clock,
   // armed by the checkbox, plus the running duration readout.
-  const timerHeader = (
+  // The history panel and the enlarged-item popup. Split out of
+  // timerHeader so the end-of-session screen can show them too — they are
+  // fixed overlays, so where they sit in the tree does not matter.
+  const rrtPanels = (
     <>
-      {downNotice && (
-        <div className="text-sm rounded-lg px-4 py-2 border text-amber-400 bg-amber-950/40 border-amber-800">
-          Eased back to {premiseCount}p / {ROUND_MS / 1000}s after a few misses in a row.
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-base text-slate-400 font-medium">
-          <span>{correctStreak}/20 in a row</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="text-base text-slate-400 font-medium">
-            {formatDuration(elapsedMs)}
-          </div>
-          <button
-            onClick={() => {
-              setTimerRunning(false);
-              setHistoryOpen(true);
-            }}
-            className="no-lift text-sm text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2 transition-colors"
-          >
-            History
-          </button>
-        </div>
-      </div>
-      <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
-        <div
-          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-teal-300"
-          style={{ width: `${(msLeft / ROUND_MS) * 100}%` }}
-        />
-      </div>
-      <div className="flex items-center justify-between">
-        <div className="italic font-bold tracking-wide text-slate-300 text-lg">TIMER</div>
-        <div className="flex items-center gap-2">
-          <div className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 text-base font-medium">
-            {secondsLeft} sec
-          </div>
-          <button
-            onClick={() => {
-              if (timerRunning) {
-                setTimerRunning(false); // just pause — keep the current puzzle
-              } else {
-                // Arming the timer always starts on a completely fresh
-                // puzzle, discarding whatever's on screen right now — closes
-                // the "pause, read the premises untimed, then check the box
-                // and answer instantly" loophole. Nothing seen while paused
-                // survives into the timed round. The replacement is the same
-                // category, so the checkbox cannot be used to skip past a
-                // puzzle type they would rather not get.
-                beginRound(true, { puzzleType: puzzle?.puzzleType });
-              }
-            }}
-            disabled={msLeft === 0 || !!flash}
-            role="checkbox"
-            aria-checked={timerRunning}
-            title={timerRunning ? "Pause the timer" : "Start the timer on a fresh set"}
-            className={`no-lift w-5 h-5 rounded flex items-center justify-center border-2 transition-colors disabled:opacity-40 ${
-              timerRunning
-                ? `${accent.border} ${accent.bg}`
-                : "border-slate-500 bg-slate-900 hover:border-slate-300"
-            }`}
-          >
-            {timerRunning && (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className={accent.text}
-              >
-                <path d="M20 6 9 17l-5-5" />
-              </svg>
-            )}
-          </button>
-        </div>
-      </div>
-
       {historyOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/80 flex items-start justify-center overflow-y-auto p-4"
@@ -17689,7 +17631,93 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             </button>
           </div>
         </div>
+      )}    </>
+  );
+
+  const timerHeader = (
+    <>
+      {downNotice && (
+        <div className="text-sm rounded-lg px-4 py-2 border text-amber-400 bg-amber-950/40 border-amber-800">
+          Eased back to {premiseCount}p / {ROUND_MS / 1000}s after a few misses in a row.
+        </div>
       )}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-base text-slate-400 font-medium">
+          <span>{correctStreak}/20 in a row</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="text-base text-slate-400 font-medium">
+            {formatDuration(elapsedMs)}
+          </div>
+          <button
+            onClick={() => {
+              setTimerRunning(false);
+              setHistoryOpen(true);
+            }}
+            className="no-lift text-sm text-slate-400 hover:text-slate-200 underline decoration-dotted underline-offset-2 transition-colors"
+          >
+            History
+          </button>
+        </div>
+      </div>
+      <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-teal-300"
+          style={{ width: `${(msLeft / ROUND_MS) * 100}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="italic font-bold tracking-wide text-slate-300 text-lg">TIMER</div>
+        <div className="flex items-center gap-2">
+          <div className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-100 text-base font-medium">
+            {secondsLeft} sec
+          </div>
+          <button
+            onClick={() => {
+              if (timerRunning) {
+                setTimerRunning(false); // just pause — keep the current puzzle
+              } else {
+                // Arming the timer always starts on a completely fresh
+                // puzzle, discarding whatever's on screen right now — closes
+                // the "pause, read the premises untimed, then check the box
+                // and answer instantly" loophole. Nothing seen while paused
+                // survives into the timed round. The replacement is the same
+                // category, so the checkbox cannot be used to skip past a
+                // puzzle type they would rather not get.
+                beginRound(true, { puzzleType: puzzle?.puzzleType });
+              }
+            }}
+            disabled={msLeft === 0 || !!flash}
+            role="checkbox"
+            aria-checked={timerRunning}
+            title={timerRunning ? "Pause the timer" : "Start the timer on a fresh set"}
+            className={`no-lift w-5 h-5 rounded flex items-center justify-center border-2 transition-colors disabled:opacity-40 ${
+              timerRunning
+                ? `${accent.border} ${accent.bg}`
+                : "border-slate-500 bg-slate-900 hover:border-slate-300"
+            }`}
+          >
+            {timerRunning && (
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={accent.text}
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </button>
+        </div>
+      </div>
+
+
     </>
   );
 
@@ -17931,12 +17959,60 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
     </div>
   );
 
+  // Time is up. The tally, the way into the history, and the two ways out.
+  if (sessionDone) {
+    const answered = tally.correct + tally.wrong + tally.missed;
+    const accuracy = answered > 0 ? Math.round((tally.correct / answered) * 100) : 0;
+    return (
+      <div className="max-w-sm mx-auto space-y-6">
+        {rrtPanels}
+        {homeLink}
+        <div>
+          <h1 className="text-4xl font-semibold tracking-tight">Session complete</h1>
+          <div className="text-slate-400 text-lg mt-2">
+            {exercise.title} · {Math.round(elapsedMs / 60000)} min
+          </div>
+        </div>
+
+        <div className={`${accent.bg} border ${accent.border} rounded-xl p-6 space-y-3`}>
+          <div className="text-lg text-slate-300">
+            Rounds: <span className="text-slate-100 font-medium">{answered}</span>
+          </div>
+          <div className="text-lg text-slate-300">
+            Accuracy: <span className="text-slate-100 font-medium">{accuracy}%</span>
+          </div>
+          <div className="text-lg text-slate-400">
+            Level: <span className="text-slate-200 font-medium">
+              {premiseCount}p / {ROUND_MS / 1000} sec
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium"
+        >
+          Review history
+        </button>
+
+        <button
+          onClick={onFinish}
+          style={{ "--ex": EXERCISE_COLORS.rrt }}
+          className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        >
+          Continue
+        </button>
+      </div>
+    );
+  }
+
   if (stage === "premises") {
     const premise = puzzle.premises[puzzle.premiseOrder[premiseIndex]];
     const isFirst = premiseIndex === 0;
     const isLast = premiseIndex === puzzle.premises.length - 1;
     return (
       <div className="relative max-w-sm mx-auto">
+        {rrtPanels}
         {flashOverlay}
         {timerHint}
         {historyHint}
@@ -18045,6 +18121,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   const { conclusion } = puzzle;
   return (
     <div className="relative max-w-sm mx-auto">
+      {rrtPanels}
       {flashOverlay}
       {timerHint}
       {historyHint}
