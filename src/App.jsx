@@ -340,6 +340,38 @@ function makeSupabaseStorage(userId) {
 // The one regime a free account can train. Everything else is behind the
 // membership, and a free account is what someone has before they have paid
 // rather than a locked-out state.
+// A session in flight is held in refs, so a refresh used to lose it: someone
+// forty minutes into Deep who reloaded came back to Home with no way in. This
+// keeps just enough to put them back where they were. It is deliberately
+// short-lived — a session is resumable for a few hours on the same day, not
+// tomorrow.
+const SESSION_SNAPSHOT_KEY = "cortex.sessionSnapshot.v1";
+const SESSION_SNAPSHOT_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+
+function loadSessionSnapshot() {
+  try {
+    const raw = localStorage.getItem(SESSION_SNAPSHOT_KEY);
+    if (!raw) return null;
+    const snap = JSON.parse(raw);
+    if (!snap || !snap.savedAt) return null;
+    if (Date.now() - snap.savedAt > SESSION_SNAPSHOT_MAX_AGE_MS) return null;
+    if (snap.day !== new Date().toDateString()) return null;
+    return snap;
+  } catch {
+    return null;
+  }
+}
+
+function saveSessionSnapshot(snap) {
+  try {
+    if (!snap) {
+      localStorage.removeItem(SESSION_SNAPSHOT_KEY);
+      return;
+    }
+    localStorage.setItem(SESSION_SNAPSHOT_KEY, JSON.stringify(snap));
+  } catch { /* no storage */ }
+}
+
 const FREE_REGIME_KEY = "cct";
 
 // True for a paying account, false for a free one. AuthGate is the only
@@ -2440,14 +2472,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 250;
+const BUILD_VERSION = 251;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "BTIME";
+const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT streak on Overview, scope switch, spacing",
+  "A refresh no longer loses the session",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10021,6 +10053,59 @@ function NBackSessionApp() {
     sessionOpenedRef.current &&
     exercise.key !== "overview";
 
+  // Kept up to date as the session moves through its exercises, and cleared
+  // the moment it ends. Written from an effect rather than at each call site
+  // so there is one place it can go stale.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!regimeKey) return;
+    if (sessionInProgress || sessionParked) {
+      saveSessionSnapshot({
+        day: new Date().toDateString(),
+        savedAt: Date.now(),
+        regimeKey,
+        exerciseIndex,
+        started: { ...sessionStartedRef.current },
+        timerStart: { ...sessionTimerStartRef.current },
+      });
+    } else if (exercise.key === "overview") {
+      // Reaching the Overview is the end of the session.
+      saveSessionSnapshot(null);
+    }
+  }, [
+    hasHydrated,
+    regimeKey,
+    exerciseIndex,
+    exercise.key,
+    sessionInProgress,
+    sessionParked,
+    mainView,
+  ]);
+
+  // Restored once, after hydration, so Home offers "Resume Training" instead
+  // of pretending nothing was underway. It does not navigate on its own:
+  // being dropped straight into an exercise on a reload would be worse than
+  // the bug.
+  const snapshotRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated || snapshotRestoredRef.current) return;
+    snapshotRestoredRef.current = true;
+    const snap = loadSessionSnapshot();
+    if (!snap || !snap.regimeKey) return;
+    if (snap.regimeKey !== regimeKey) {
+      // They changed regime since; the old position means nothing.
+      saveSessionSnapshot(null);
+      return;
+    }
+    sessionStartedRef.current = { ...(snap.started || {}) };
+    sessionTimerStartRef.current = { ...(snap.timerStart || {}) };
+    sessionOpenedRef.current = true;
+    if (typeof snap.exerciseIndex === "number") {
+      setExerciseIndex(snap.exerciseIndex);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated, regimeKey]);
+
   // Drops straight back into whichever exercise they left, at the screen
   // and elapsed time they left it on — nothing about the session is reset.
   const continueSession = () => setMainView("app");
@@ -10152,6 +10237,7 @@ function NBackSessionApp() {
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
     sessionOpenedRef.current = false;
+    saveSessionSnapshot(null);
     const today = new Date().toDateString();
     setRegimeCompletionDatesState((prev) => {
       const next = prev.filter((d) => d !== today);
@@ -10250,6 +10336,7 @@ function NBackSessionApp() {
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
     sessionOpenedRef.current = false;
+    saveSessionSnapshot(null);
     setRegimeKey(key);
     setActiveExercises(built);
     setExerciseIndex(0);
