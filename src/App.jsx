@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, Fragment, Component } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, useContext, createContext, Fragment, Component } from "react";
 import * as THREE from "three";
 import {
   AreaChart,
@@ -337,6 +337,15 @@ function makeSupabaseStorage(userId) {
 
 // Per-user cache of the last membership answer, so a returning member is
 // not held at a loading screen while the same question is asked again.
+// The one regime a free account can train. Everything else is behind the
+// membership, and a free account is what someone has before they have paid
+// rather than a locked-out state.
+const FREE_REGIME_KEY = "cct";
+
+// True for a paying account, false for a free one. AuthGate is the only
+// thing that sets it; every gate in the app reads it from here.
+const MembershipContext = createContext(true);
+
 const MEMBERSHIP_CACHE_PREFIX = "cortex.membershipOk.";
 
 function AuthGate({ children }) {
@@ -447,7 +456,9 @@ function AuthGate({ children }) {
   }, [session]);
 
   useEffect(() => {
-    if (session?.user && membershipOk) {
+    // Storage is attached for free accounts too: their CCT history has to
+    // persist, and it is the same per-user store either way.
+    if (session?.user) {
       window.storage = makeSupabaseStorage(session.user.id);
       // One-time "set a password" nudge — a plain localStorage flag keyed
       // by user id is enough here (it just controls whether a dismissible
@@ -716,7 +727,13 @@ function AuthGate({ children }) {
     return <div className="min-h-screen bg-slate-950" />;
   }
 
-  if (!membershipOk) {
+  // Someone with no membership at all is a FREE account, not a locked-out
+  // one: they get into the app and the app confines them to the free
+  // regime. Only a membership that exists and has gone wrong (paused, card
+  // declined, ended) still gets held at this screen, because each of those
+  // needs its own way back in.
+  const LOCKING_STATUSES = ["paused", "past_due", "inactive"];
+  if (!membershipOk && LOCKING_STATUSES.includes(membershipStatus)) {
     // Each locked-out state gets its own explanation and its own way out.
     // A paused member especially must be able to come back from here —
     // otherwise taking a break is a trap, since the Membership screen sits
@@ -882,7 +899,11 @@ function AuthGate({ children }) {
     );
   }
 
-  return children;
+  return (
+    <MembershipContext.Provider value={!!membershipOk}>
+      {children}
+    </MembershipContext.Provider>
+  );
 }
 
 // ---------------------------------------------------------------------
@@ -2415,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 241;
+const BUILD_VERSION = 242;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:46 PM";
+const BUILD_TIME = "5:49 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Free month banner, brighter green, reward text off",
+  "Free tier: Anti-brainrot only without a membership",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8131,6 +8152,30 @@ function NBackSessionApp() {
   const [overviewSource, setOverviewSource] = useState("training"); // "training" | "home" — controls which time-trained stat the Session Overview screen shows
   // "regime" (the exercises being trained) or "all" (everything with history).
   const [overviewScope, setOverviewScope] = useState("regime");
+
+  // Paying account or free. `simulateFree` is the Testing station's way to
+  // see the free experience without cancelling anything.
+  const paidAccount = useContext(MembershipContext);
+  const [simulateFree, setSimulateFree] = useState(false);
+  const isMember = paidAccount && !simulateFree;
+
+  // The public checkout, carrying the signed-in address so the payment
+  // lands on the account they are already using rather than creating a
+  // second one under whatever they type.
+  const goToCheckout = useCallback(async () => {
+    let email = "";
+    try {
+      const {
+        data: { session: authSession },
+      } = await supabase.auth.getSession();
+      email = authSession?.user?.email || "";
+    } catch {
+      // No session to read from; checkout will just ask for the address.
+    }
+    window.location.href = email
+      ? `${CHECKOUT_URL}?email=${encodeURIComponent(email)}`
+      : CHECKOUT_URL;
+  }, []);
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
@@ -10270,7 +10315,23 @@ function NBackSessionApp() {
     }
   };
 
+  // A membership that lapses leaves a paid regime selected. Rather than
+  // letting them keep training it for free, send them back to the picker,
+  // where everything but Anti-brainrot now reads as locked.
+  useEffect(() => {
+    if (isMember) return;
+    if (regimeKey && regimeKey !== FREE_REGIME_KEY) {
+      setRegimeKey(null);
+      setMainView("regime");
+    }
+  }, [isMember, regimeKey]);
+
   const chooseRegime = (key) => {
+    // Everything but the free regime is behind the membership.
+    if (!isMember && key !== FREE_REGIME_KEY) {
+      goToCheckout();
+      return;
+    }
     // Switching to a different regime abandons whatever daily streak is
     // currently live — warn whenever the person has one (> 0 days), using
     // the same streak the 🔥 badge on Home shows, so what's warned about
@@ -10852,13 +10913,16 @@ function NBackSessionApp() {
                 Choose your regime
               </h1>
               <p className="text-slate-400 text-base mt-3">
-                You'll ease into it gradually, starting with a few minutes each session.
+                {isMember
+                  ? "You'll ease into it gradually, starting with a few minutes each session."
+                  : "Anti-brainrot is free. The rest come with a membership."}
               </p>
             </div>
 
             <div className="flex flex-col gap-6">
               {REGIMES.map((r) => {
                 const rc = REGIME_COLORS[r.key] || "#4CB9D8";
+                const locked = !isMember && r.key !== FREE_REGIME_KEY;
                 return (
                   <button
                     key={r.key}
@@ -10871,20 +10935,35 @@ function NBackSessionApp() {
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
                     style={{ "--ex": rc }}
-                    className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
+                    /* A locked regime keeps its own colour but sits dimmed:
+                       it is something to buy, not something broken, so it
+                       still looks like the thing it starts. */
+                    className={`w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30${
+                      locked ? " opacity-45" : ""
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <div className="text-2xl font-semibold">{r.title}</div>
+                        <div className="text-2xl font-semibold">
+                          {locked ? "🔒 " : ""}
+                          {r.title}
+                        </div>
                         {r.key === "medium" && (
                           <span className="italic text-sm font-semibold">
                             Recommended
                           </span>
                         )}
+                        {!isMember && r.key === FREE_REGIME_KEY && (
+                          <span className="italic text-sm font-semibold">
+                            Free
+                          </span>
+                        )}
                       </div>
                       <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-base font-medium mt-1">{r.summary}</div>
+                    <div className="text-base font-medium mt-1">
+                      {locked ? "Membership required" : r.summary}
+                    </div>
                   </button>
                 );
               })}
@@ -11416,6 +11495,13 @@ function NBackSessionApp() {
                 className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
                 🧪 Fill 90 days of fake history
+              </button>
+              <button
+                onClick={() => setSimulateFree((v) => !v)}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Account: {simulateFree ? "free (simulated)" : isMember ? "member" : "free"}
+                {paidAccount ? " — tap to swap" : ""}
               </button>
                             <button
                 onClick={resetNextSessionForTesting}
@@ -12372,13 +12458,15 @@ function NBackSessionApp() {
             </div>
 
 
+            {/* A free account has no subscription to manage, so this row is
+                the way in to buying one rather than a settings page. */}
             <button
-              onClick={() => setMainView("membership")}
+              onClick={() => (isMember ? setMainView("membership") : goToCheckout())}
               className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Membership</span>
               <span className="text-slate-500 text-base font-normal capitalize">
-                {membershipPlan} ›
+                {isMember ? `${membershipPlan} ›` : "Free · Upgrade ›"}
               </span>
             </button>
 
