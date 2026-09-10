@@ -263,7 +263,105 @@ if (typeof document !== "undefined" && !document.getElementById("app-theme-overr
 const SUPABASE_URL = "https://sdvfacmhljkwojvmtflr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_oeUIhMq6Wg9ElS6gCzbIZw_djTvdsLm";
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ---------------------------------------------------------------------
+// WHERE THE SESSION LIVES — "remember me"
+// ---------------------------------------------------------------------
+// Ticked (the default) keeps the session in localStorage, so it survives
+// closing the browser. Unticked keeps it in sessionStorage, so the session
+// ends with the tab. Supabase reads and writes the session through this
+// adapter on every call, so the flag is re-read each time rather than
+// baked in when the client is created at module load.
+const REMEMBER_KEY = "cortex.rememberMe";
+
+function rememberMe() {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+// Called immediately before a sign-in or sign-up, so the session Supabase
+// is about to write lands in the right store.
+function setRememberMe(on) {
+  try {
+    localStorage.setItem(REMEMBER_KEY, on ? "1" : "0");
+  } catch {
+    // A browser refusing storage just gets the default.
+  }
+}
+
+const sessionStore = {
+  getItem(key) {
+    // Read both stores regardless of the flag: a session written under the
+    // other setting is still theirs, and discarding it would sign them out
+    // for no reason the moment the box changes.
+    try {
+      const fromLocal = localStorage.getItem(key);
+      if (fromLocal !== null) return fromLocal;
+    } catch {
+      // Fall through to sessionStorage.
+    }
+    try {
+      return sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  setItem(key, value) {
+    // Written to one store and cleared from the other, so the two can never
+    // hold two different sessions for the same browser.
+    try {
+      if (rememberMe()) {
+        try {
+          sessionStorage.removeItem(key);
+        } catch {}
+        localStorage.setItem(key, value);
+      } else {
+        try {
+          localStorage.removeItem(key);
+        } catch {}
+        sessionStorage.setItem(key, value);
+      }
+    } catch {
+      // Nothing to do: without storage the session lasts this page load.
+    }
+  },
+  removeItem(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch {}
+    try {
+      sessionStorage.removeItem(key);
+    } catch {}
+  },
+};
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    storage: sessionStore,
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
+
+// The free front door. There are exactly two ways in: this page, which
+// creates a free account, and checkout, which provisions a paid one and
+// mails a link. The path is rewritten to index.html in vercel.json; the
+// ?signup query is the fallback for any host that does not rewrite.
+const SIGNUP_PATH = "/signup";
+
+function onSignupPath() {
+  try {
+    if (window.location.pathname.replace(/\/+$/, "").toLowerCase() === SIGNUP_PATH) {
+      return true;
+    }
+    return new URLSearchParams(window.location.search).has("signup");
+  } catch {
+    return false;
+  }
+}
 
 // ---------------------------------------------------------------------
 // SUPABASE-BACKED STORAGE ADAPTER
@@ -433,6 +531,9 @@ function AuthGate({ children }) {
   const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  // Only the sign-up page shows this box. Signing in from the sign-in
+  // screen is always remembered, which is what it did before the box existed.
+  const [remember, setRemember] = useState(true);
   const [linkSent, setLinkSent] = useState(false);
   const [sendingLink, setSendingLink] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -440,6 +541,9 @@ function AuthGate({ children }) {
   // a returning member goes straight into the app instead of waiting on a
   // round trip; the real check still runs underneath and corrects it.
   const [creatingAccount, setCreatingAccount] = useState(false);
+  // Set when sign-up fails because the address is already taken — the only
+  // case where the sign-up page offers a way over to the sign-in screen.
+  const [emailTaken, setEmailTaken] = useState(false);
   const [membershipOk, setMembershipOk] = useState(null);
   // The raw value behind membershipOk — "paused", "past_due", "inactive" —
   // so a locked-out person is told which one applies and offered the action
@@ -448,23 +552,15 @@ function AuthGate({ children }) {
   const membershipOkRef = useRef(null);
   const [recoverBusy, setRecoverBusy] = useState(false);
   const [recoverError, setRecoverError] = useState("");
-  // 'magic' | 'password' | 'forgot' | 'forgotSent' | 'recovery' — which
-  // form the signed-out screen shows. 'recovery' is a special case:
+  // 'magic' | 'password' | 'signup' | 'forgot' | 'forgotSent' | 'recovery' —
+  // which form the signed-out screen shows. 'signup' is not reachable from
+  // any button: it is what /signup renders, and that URL is the only way to
+  // it. 'recovery' is a special case:
   // Supabase puts the user into an authenticated-but-recovering session
   // when they click a password-reset email link, detected below via
   // onAuthStateChange's PASSWORD_RECOVERY event, and they must set a new
   // password before anything else proceeds.
-  // /signup (or ?signup) is its own page, not a state hidden behind a link on
-  // the sign-in screen, so it can be linked to from anywhere.
-  const startOnSignup = (() => {
-    try {
-      if (window.location.pathname.replace(/\/+$/, "") === "/signup") return true;
-      return new URLSearchParams(window.location.search).has("signup");
-    } catch {
-      return false;
-    }
-  })();
-  const [mode, setMode] = useState(startOnSignup ? "signup" : "magic");
+  const [mode, setMode] = useState(() => (onSignupPath() ? "signup" : "magic"));
   const [newPassword, setNewPassword] = useState("");
   const [passwordPrompt, setPasswordPrompt] = useState(null); // null = not decided yet, true = show it, false = skip
 
@@ -568,6 +664,9 @@ function AuthGate({ children }) {
     if (sendingLink) return;
     setAuthError("");
     setSendingLink(true);
+    // No box on this screen: signing in here is always remembered, as it
+    // was before "remember me" existed.
+    setRememberMe(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email,
@@ -593,18 +692,39 @@ function AuthGate({ children }) {
     e.preventDefault();
     if (creatingAccount) return;
     setAuthError("");
+    setEmailTaken(false);
     setCreatingAccount(true);
+    // Set before the call, so the session Supabase writes on the way back
+    // goes to the store the box asked for.
+    setRememberMe(remember);
     try {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) {
-        setAuthError(
-          /already/i.test(error.message)
-            ? "That email already has an account. Sign in instead."
-            : error.message
-        );
+        const taken = /already|registered|exists/i.test(error.message);
+        setEmailTaken(taken);
+        setAuthError(taken ? "That email already has an account." : error.message);
         return;
       }
-      if (!data.session) setLinkSent(true);
+      // They just chose a password, so the "set a password?" nudge would be
+      // asking for something they have already done. Mark it seen.
+      if (data.user?.id) {
+        try {
+          localStorage.setItem(`password_prompt_seen_${data.user.id}`, "1");
+        } catch {
+          // The prompt reappearing is a nuisance, not a failure.
+        }
+      }
+      if (!data.session) {
+        setLinkSent(true);
+        return;
+      }
+      // Straight into the app. Drop /signup from the address bar so a
+      // refresh does not put a signed-in person back on the sign-up form.
+      try {
+        window.history.replaceState({}, "", "/");
+      } catch {
+        // Cosmetic only.
+      }
     } catch (err) {
       setAuthError(err?.message || "Could not create your account.");
     } finally {
@@ -615,6 +735,7 @@ function AuthGate({ children }) {
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
     setAuthError("");
+    setRememberMe(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setAuthError(error.message);
   };
@@ -797,12 +918,17 @@ function AuthGate({ children }) {
       );
     }
 
+    // ------------------------------------------------------------------
+    // /signup — the free front door
+    // ------------------------------------------------------------------
+    // Email, password, remember me. Nothing else: no plan picker, no card,
+    // no marketing. Somebody who arrives here has already decided.
     if (mode === "signup") {
       return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5">
             <div className="text-center space-y-2">
-              <h1 className="text-2xl font-semibold">Start free</h1>
+              <h1 className="text-2xl font-semibold">Create your account</h1>
               <p className="text-slate-400 text-base">
                 Anti-brainrot is free. No card needed.
               </p>
@@ -813,51 +939,73 @@ function AuthGate({ children }) {
                 account.
               </p>
             ) : (
-              <>
-                <form onSubmit={handleCreateAccount} className="space-y-3">
+              <form onSubmit={handleCreateAccount} className="space-y-3">
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                />
+                <input
+                  type="password"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Choose a password"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                />
+                {/* The whole row is the hit target — a 16px checkbox on a
+                    phone is not one. Size and colour are inline because the
+                    build does not reliably emit either utility. */}
+                <label className="flex items-center gap-3 cursor-pointer select-none py-1">
                   <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: "#6366F1", flexShrink: 0 }}
                   />
-                  <input
-                    type="password"
-                    required
-                    minLength={6}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Choose a password"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
-                  />
-                  <button
-                    type="submit"
-                    disabled={creatingAccount}
-                    className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 transition-colors rounded-lg py-3 text-base font-medium"
-                  >
-                    {creatingAccount ? "Creating\u2026" : "Create free account"}
-                  </button>
-                  {authError && <p className="text-red-400 text-sm">{authError}</p>}
-                </form>
+                  <span className="text-slate-300 text-sm">Remember me</span>
+                </label>
                 <button
-                  onClick={() => {
-                    setAuthError("");
-                    setMode("magic");
-                    // Drop /signup from the address, or a refresh lands back
-                    // on the page they just left.
-                    try {
-                      window.history.replaceState({}, "", "/");
-                    } catch {
-                      /* history unavailable, the link still works */
-                    }
-                  }}
-                  className="w-full text-center text-slate-400 text-sm hover:underline"
+                  type="submit"
+                  disabled={creatingAccount}
+                  className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 transition-colors rounded-lg py-3 text-base font-medium"
                 >
-                  Already have an account? Sign in
+                  {creatingAccount ? "Creating\u2026" : "Create account"}
                 </button>
-              </>
+                {authError && (
+                  <p className="text-red-400 text-sm">
+                    {authError}
+                    {emailTaken && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthError("");
+                            setEmailTaken(false);
+                            setPassword("");
+                            setMode("password");
+                            try {
+                              window.history.replaceState({}, "", "/");
+                            } catch {
+                              // Cosmetic only.
+                            }
+                          }}
+                          className="text-indigo-400 underline"
+                        >
+                          Sign in instead
+                        </button>
+                      </>
+                    )}
+                  </p>
+                )}
+              </form>
             )}
           </div>
         </div>
@@ -899,24 +1047,6 @@ function AuthGate({ children }) {
               >
                 Have a password? Sign in with it instead
               </button>
-              {/* The free tier has no front door without this: someone with
-                  no account had nothing to click. */}
-              <div className="pt-2 border-t border-slate-800 text-center">
-                <button
-                  onClick={() => {
-                    setAuthError("");
-                    setMode("signup");
-                    try {
-                      window.history.replaceState({}, "", "/signup");
-                    } catch {
-                      /* history unavailable, the page still renders */
-                    }
-                  }}
-                  className="text-slate-300 text-sm hover:underline"
-                >
-                  New here? Start free
-                </button>
-              </div>
             </>
           )}
         </div>
@@ -2644,14 +2774,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 257;
+const BUILD_VERSION = 258;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:35 PM";
+const BUILD_TIME = "10:55 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Account creation is its own page",
+  "Sign-up is only /signup — no link from the sign-in screen",
+  "Remember me decides if the session survives the browser closing",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
