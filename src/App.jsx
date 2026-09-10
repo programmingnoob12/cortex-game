@@ -2877,15 +2877,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 273;
+const BUILD_VERSION = 274;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:40 PM";
+const BUILD_TIME = "8:25 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Occasional hints on Home",
-  "Tighter bottom on the RRT card",
+  "No item appears more than 3 times in an RRT round",
+  "Round type shown on the history round line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4340,6 +4340,39 @@ function rrtSpaceDirectionFor(dx, dy) {
   return hit ? hit.name : null;
 }
 
+// The most times one item may appear across a round's premises.
+//
+// Without a cap, each new item attached to any earlier item with equal
+// probability — so item 0 was a candidate at every step and the last item
+// almost never was. That is preferential attachment, and it grows a star:
+// with 7 premises the most-repeated item averaged 3.5 appearances, was 4 or
+// more in 46% of rounds and 6 in about 1 in 110. An item that touches most of
+// the others is a hub the whole chain can be tracked through, which is the
+// opposite of holding disparate groups and integrating them, and no amount of
+// scrambling the viewing order fixes it — scramble reorders premises, it does
+// not change the shape of the graph underneath.
+//
+// Choosing uniformly among the earlier items that are still under this cap
+// keeps real branching (so the 2D map still spreads out) while making a hub
+// impossible: the ceiling is 3, and a round of 7 premises spreads 14 endpoints
+// over 8 items.
+const RRT_MAX_ITEM_APPEARANCES = 3;
+
+// Which earlier item the new one attaches to. `degrees` is how many premises
+// each item is already in; it is read, not written, so the caller stays in
+// charge of recording the edge.
+function pickRrtParentIndex(i, degrees, branchingEnabled) {
+  if (!branchingEnabled) return i - 1;
+  const eligible = [];
+  for (let k = 0; k < i; k += 1) {
+    if ((degrees[k] || 0) < RRT_MAX_ITEM_APPEARANCES) eligible.push(k);
+  }
+  // Everything earlier is already at the cap — only reachable at premise
+  // counts too small for it to matter. Fall back rather than fail.
+  if (eligible.length === 0) return i - 1;
+  return eligible[Math.floor(Math.random() * eligible.length)];
+}
+
 function generateRrtSpace2dPuzzle(premiseCount, branchingEnabled = true) {
   const itemCount = premiseCount + 1;
   const items = buildRrtItems(itemCount);
@@ -4354,7 +4387,11 @@ function generateRrtSpace2dPuzzle(premiseCount, branchingEnabled = true) {
     // out into a real shape. Branching off: always the previous item, giving
     // one walkable path — which is what scrambleFactor 0 relies on to
     // guarantee each premise shares an item with the next.
-    const parentIdx = branchingEnabled ? Math.floor(Math.random() * i) : i - 1;
+    const parentIdx = pickRrtParentIndex(
+      i,
+      adjacency.map((a) => a.length),
+      branchingEnabled
+    );
     const parent = positions[parentIdx];
 
     // Try random bearings until one lands on an empty cell. Two items in the
@@ -4448,7 +4485,11 @@ function generateRrtDistinctionPuzzle(premiseCount, branchingEnabled = true) {
   const premises = [];
   const adjacency = Array.from({ length: itemCount }, () => []); // undirected — for graph-distance below
   for (let i = 1; i < items.length; i++) {
-    const parentIdx = branchingEnabled ? Math.floor(Math.random() * i) : i - 1;
+    const parentIdx = pickRrtParentIndex(
+      i,
+      adjacency.map((a) => a.length),
+      branchingEnabled
+    );
     const relation = RRT_RELATIONS[Math.floor(Math.random() * RRT_RELATIONS.length)];
     parity.push(relation === "same as" ? parity[parentIdx] : 1 - parity[parentIdx]);
     premises.push({
@@ -17242,6 +17283,12 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                     <div className="flex items-center justify-between">
                       <span className="text-slate-300 text-sm font-semibold uppercase" style={{ letterSpacing: "0.14em" }}>
                         Round {roundHistory.length - i}
+                        {/* Which kind of round it was, read straight off the
+                            round line rather than hunted for at the bottom of
+                            the card. */}
+                        <span className="text-slate-500 ml-3 normal-case font-medium" style={{ letterSpacing: "0.02em" }}>
+                          {RRT_PUZZLE_TYPE_LABEL[entry.puzzleType] || "Distinction"}
+                        </span>
                       </span>
                       <span
                         className="text-sm font-bold uppercase rounded-full px-3 py-1"
@@ -17318,9 +17365,10 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       </span>
                     </div>
                     <div className="flex items-center justify-between pt-1">
-                      <span className="text-slate-400 text-base font-medium">
-                        {RRT_PUZZLE_TYPE_LABEL[entry.puzzleType] || "Distinction"}
-                      </span>
+                      {/* The type moved up to the round line; this side of
+                          the row stays so the controls opposite keep their
+                          place. */}
+                      <span />
                       <div className="flex items-center gap-2">
                       {!hideHistoryHint && i === 0 && (
                         <>
