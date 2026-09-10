@@ -2855,14 +2855,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 269;
+const BUILD_VERSION = 270;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:45 PM";
+const BUILD_TIME = "6:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "CCT is Cognitive Control Training",
+  "Earned free-month card stays dismissed",
+  "Show tutorials clears per-exercise dismissals",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8791,6 +8792,13 @@ function NBackSessionApp() {
   // see the free experience without cancelling anything.
   // Dismissed for this visit only: it is a nudge, not a task list.
   const [freeMonthNoticeDismissed, setFreeMonthNoticeDismissed] = useState(false);
+  // Dismissing the card while it is still a progress bar only hides it for
+  // this visit — it is the thing telling them the reward exists. Dismissing
+  // it once it reads "you earned a free month" retires it permanently: that
+  // one has been read and the reward is already applied. Kept in user_kv
+  // rather than localStorage, because the month is granted once per account,
+  // so the card should not reappear on their other devices either.
+  const [freeMonthNoticeRetired, setFreeMonthNoticeRetiredState] = useState(false);
 
   const paidAccount = useContext(MembershipContext);
   const [simulateFree, setSimulateFree] = useState(false);
@@ -9266,6 +9274,14 @@ function NBackSessionApp() {
         }
       } catch (err) {
         // no saved per-exercise tutorial dismissals yet
+      }
+      try {
+        const res = await window.storage.get("free-month-notice-retired", false);
+        if (res && res.value) {
+          setFreeMonthNoticeRetiredState(JSON.parse(res.value));
+        }
+      } catch (err) {
+        // never dismissed the earned card
       }
       try {
         const res = await window.storage.get("selected-frame", false);
@@ -9957,6 +9973,24 @@ function NBackSessionApp() {
     setHideTutorialsState(val);
     if (window.storage) {
       safeStorageSet("hide-tutorials", JSON.stringify(val), false);
+    }
+  }, []);
+
+  const retireFreeMonthNotice = useCallback(() => {
+    setFreeMonthNoticeRetiredState(true);
+    if (window.storage) {
+      safeStorageSet("free-month-notice-retired", JSON.stringify(true), false);
+    }
+  }, []);
+
+  // "Show tutorials" going back on has to clear the per-exercise "don't show
+  // this again" ticks as well as the global switch. Without this, an exercise
+  // whose own tutorial had been ticked off stayed hidden while every other
+  // one came back — which read as the switch not working.
+  const clearTutorialDismissals = useCallback(() => {
+    setDismissedTutorialsState({});
+    if (window.storage) {
+      safeStorageSet("dismissed-tutorials", JSON.stringify({}), false);
     }
   }, []);
 
@@ -13294,6 +13328,7 @@ function NBackSessionApp() {
                   // Switching tutorials back on brings the in-exercise
                   // pointers with them: they are the same kind of help.
                   if (turningOn) {
+                    clearTutorialDismissals();
                     try {
                       RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
                       localStorage.removeItem(RRT_ANSWERED_KEY);
@@ -15769,7 +15804,7 @@ function NBackSessionApp() {
           one screen exactly, and a row in the flow would push the footer
           off. Solid card with a green rail, not the tinted-panel treatment
           the rest of the app uses for inline notes. */}
-      {mainView === "home" && !freeMonthNoticeDismissed && (
+      {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
         <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 w-[min(28rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
@@ -15807,7 +15842,10 @@ function NBackSessionApp() {
               </div>
             </div>
             <button
-              onClick={() => setFreeMonthNoticeDismissed(true)}
+              onClick={() => {
+                setFreeMonthNoticeDismissed(true);
+                if (freeMonthEarned) retireFreeMonthNotice();
+              }}
               aria-label="Dismiss"
               className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors leading-none px-2 py-1"
               style={{ fontSize: "1.75rem" }}
