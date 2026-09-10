@@ -2472,14 +2472,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 252;
+const BUILD_VERSION = 253;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Pause is one month only",
+  "Card form opens without a wait",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8261,6 +8261,9 @@ function NBackSessionApp() {
   const [cancelFeedback, setCancelFeedback] = useState("");
   const [cancelComment, setCancelComment] = useState("");
   const [setupClientSecret, setSetupClientSecret] = useState(null);
+  // A SetupIntent client secret fetched ahead of the click, so opening the
+  // card form costs no round trip.
+  const prefetchedSetupRef = useRef(null);
   const [setupLoading, setSetupLoading] = useState(false);
   const [setupError, setSetupError] = useState("");
   const [cardUpdateSaved, setCardUpdateSaved] = useState(false);
@@ -8317,6 +8320,19 @@ function NBackSessionApp() {
         if (!cancelled) {
           applyBillingState(data);
           billingLoadedRef.current = true;
+          // The card form needs a SetupIntent, and asking Stripe for one at
+          // click time is the whole of that "Loading…" wait. Fetch it now,
+          // while they are still reading the page, so the button opens the
+          // form immediately.
+          if (mainView === "membership" && !prefetchedSetupRef.current) {
+            callBillingApi("setup-intent")
+              .then((d) => {
+                if (!cancelled) prefetchedSetupRef.current = d.clientSecret;
+              })
+              .catch(() => {
+                // Nothing to show: the button falls back to fetching on click.
+              });
+          }
         }
       })
       .catch((err) => {
@@ -8494,8 +8510,15 @@ function NBackSessionApp() {
 
   const handleStartCardUpdate = async () => {
     setSetupError("");
-    setSetupLoading(true);
     setCardUpdateSaved(false);
+    // Prefetched while the page loaded: open the form on the same frame as
+    // the click, with no request in between.
+    if (prefetchedSetupRef.current) {
+      setSetupClientSecret(prefetchedSetupRef.current);
+      prefetchedSetupRef.current = null;
+      return;
+    }
+    setSetupLoading(true);
     try {
       const data = await callBillingApi("setup-intent");
       setSetupClientSecret(data.clientSecret);
