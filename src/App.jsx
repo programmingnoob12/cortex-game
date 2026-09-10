@@ -2436,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 244;
+const BUILD_VERSION = 245;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:04 PM";
+const BUILD_TIME = "6:08 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Banner on the right, log out closer in",
+  "Bigger banner, no Motivation on free",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11406,15 +11406,18 @@ function NBackSessionApp() {
               >
                 Overview
               </button>
-              <button
-                onClick={() => {
-                  setHypnosisAfterSession(false);
-                  setMainView("hypnosis");
-                }}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
-              >
-                Motivation
-              </button>
+              {/* Part of the membership, not the free tier. */}
+              {isMember && (
+                <button
+                  onClick={() => {
+                    setHypnosisAfterSession(false);
+                    setMainView("hypnosis");
+                  }}
+                  className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                >
+                  Motivation
+                </button>
+              )}
             </div>
 
           </div>
@@ -12457,8 +12460,13 @@ function NBackSessionApp() {
                 inside the app rather than leaving it. Pulled tight against
                 the rule: a footer should read as a thin line at the bottom,
                 not another section, and tighter again here because Log out
-                sits directly above it. */}
-            <div className="!mt-2 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100">
+                sits directly above it. The margin is inline because the
+                page's own space-y sets one on every child and a utility
+                class was not reliably winning against it. */}
+            <div
+              className="pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-100"
+              style={{ marginTop: "0.35rem" }}
+            >
               <span>© {new Date().getFullYear()} Cortex</span>
               <span>
                 Contact:{" "}
@@ -14735,9 +14743,9 @@ function NBackSessionApp() {
           off. Solid card with a green rail, not the tinted-panel treatment
           the rest of the app uses for inline notes. */}
       {mainView === "home" && !freeMonthNoticeDismissed && (
-        <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 w-[min(22rem,calc(100vw-2rem))]">
+        <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 w-[min(28rem,calc(100vw-2rem))]">
           <div
-            className="flex items-center gap-4 rounded-xl pl-0 pr-4 py-3 overflow-hidden"
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
               background: "#1B1D20",
               border: "1px solid #2C2F34",
@@ -14746,21 +14754,21 @@ function NBackSessionApp() {
           >
             <span
               className="self-stretch shrink-0"
-              style={{ width: 4, background: "#1E982B" }}
+              style={{ width: 5, background: "#1E982B" }}
             />
-            <span className="text-2xl shrink-0">🎁</span>
+            <span className="text-3xl shrink-0">🎁</span>
             <div className="flex-1 min-w-0">
-              <div className="text-base font-semibold text-slate-100">
+              <div className="text-lg font-semibold text-slate-100 leading-snug">
                 {freeMonthEarned
-                  ? "Free month earned"
-                  : `${freeMonthDays} of 7 days to a free month`}
+                  ? "You earned a free month of membership"
+                  : "Get a free month of membership"}
               </div>
-              <div className="text-sm text-slate-400 mt-0.5">
+              <div className="text-base text-slate-400 mt-1">
                 {freeMonthEarned
-                  ? "Applied to your membership."
-                  : "Complete your regime 7 days in a row."}
+                  ? "It is applied to your membership."
+                  : `Complete your regime 7 days in a row. ${freeMonthDays} of 7 done.`}
               </div>
-              <div className="mt-2 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+              <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
                 <div
                   className="h-full rounded-full"
                   style={{
@@ -14774,7 +14782,8 @@ function NBackSessionApp() {
             <button
               onClick={() => setFreeMonthNoticeDismissed(true)}
               aria-label="Dismiss"
-              className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors text-lg leading-none"
+              className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors leading-none px-2 py-1"
+              style={{ fontSize: "1.75rem" }}
             >
               ×
             </button>
