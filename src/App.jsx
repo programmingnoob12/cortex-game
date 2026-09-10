@@ -2440,14 +2440,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 249;
+const BUILD_VERSION = 250;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:07 PM";
+const BUILD_TIME = "BTIME";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Free regime page order and copy",
+  "CCT streak on Overview, scope switch, spacing",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11918,7 +11918,7 @@ function NBackSessionApp() {
           /* Flex column with a spacer above the footer, so the legal line
              sits at the bottom of the screen without the page becoming tall
              enough to scroll. */
-          <div className="space-y-9 flex flex-col min-h-full">
+          <div className="space-y-8 flex flex-col min-h-full">
             <div>
               <button
                 onClick={() => {
@@ -12401,7 +12401,7 @@ function NBackSessionApp() {
                 on every child and a utility would not win against it. */}
             <button
               onClick={() => setMainView("regime")}
-              style={{ marginTop: "4rem" }}
+              style={{ marginTop: "2rem" }}
               className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
@@ -12475,7 +12475,7 @@ function NBackSessionApp() {
             {/* marginBottom inline: the page's space-y puts 36px UNDER every
                 child in this build, which is the whole gap between the
                 button and the footer rule. Measured in the browser. */}
-            <div className="flex justify-end" style={{ marginBottom: "0.6rem" }}>
+            <div className="flex justify-end" style={{ marginBottom: "0.85rem" }}>
               <button
                 onClick={() => {
                   try {
@@ -13025,10 +13025,39 @@ function NBackSessionApp() {
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
           <div className="space-y-8">
-            <div>
+            <div className="flex items-center gap-4 flex-wrap">
               <h1 className="text-4xl font-semibold tracking-tight">
                 Overview
               </h1>
+              {/* Same switch as Stats, driving the same scope: Regime is
+                  what is being trained, All is every exercise with any
+                  history. */}
+              <div
+                className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
+                role="group"
+                aria-label="Which exercises to show"
+              >
+                {[
+                  { key: "regime", label: "Regime" },
+                  { key: "all", label: "All" },
+                ].map((opt) => {
+                  const on = overviewScope === opt.key;
+                  return (
+                    <button
+                      key={opt.key}
+                      onClick={() => setOverviewScope(opt.key)}
+                      aria-pressed={on}
+                      className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
+                        on
+                          ? "bg-slate-700 text-slate-100"
+                          : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {(() => {
@@ -13058,9 +13087,23 @@ function NBackSessionApp() {
                   isAccuracy,
                   avgVal,
                   bestLabel: isAccuracy ? "Best accuracy" : "Best score",
-                  avgLabel: isAccuracy ? "Avg accuracy" : "Avg score",
+                  // CCT has no meaningful average: the run of right answers
+                  // is the second number worth reading.
+                  avgLabel:
+                    e.key === "cct"
+                      ? "Best streak"
+                      : isAccuracy
+                      ? "Avg accuracy"
+                      : "Avg score",
                   bestValue,
-                  avgValue: stat ? formatScoreValue(e, avgVal) : "\u2014",
+                  avgValue:
+                    e.key === "cct"
+                      ? stat
+                        ? `${stat.bestStreak ?? 0} in a row`
+                        : "\u2014"
+                      : stat
+                      ? formatScoreValue(e, avgVal)
+                      : "\u2014",
                 };
               });
               // Never fewer than three tracks: a single-exercise regime would
@@ -13382,7 +13425,10 @@ function NBackSessionApp() {
                             }}
                           />
                           <YAxis
-                            domain={["auto", "auto"]}
+                            // Recharts pads the top of an "auto" domain, which
+                            // put a 105% tick on a scale that cannot exceed
+                            // 100.
+                            domain={e.key === "cct" ? [0, 100] : ["auto", "auto"]}
                             stroke="#6E7178"
                             width={56}
                             tick={{ fill: "#6E7178", fontSize: 12 }}
@@ -14802,7 +14848,7 @@ function NBackSessionApp() {
               <div className="text-base text-slate-400 mt-1">
                 {freeMonthEarned
                   ? "It is applied to your membership."
-                  : `Complete your regime 7 days in a row. ${freeMonthDays} of 7 done.`}
+                  : "Complete your regime 7 days in a row."}
               </div>
               <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
                 <div
