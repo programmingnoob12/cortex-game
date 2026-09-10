@@ -2436,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 245;
+const BUILD_VERSION = 246;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:08 PM";
+const BUILD_TIME = "6:12 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Bigger banner, no Motivation on free",
+  "Log out sits on the footer",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12439,7 +12439,10 @@ function NBackSessionApp() {
 
             {/* Last thing on the page, hard right, immediately above the
                 footer rule: nothing anyone is looking for on the way in. */}
-            <div className="flex justify-end">
+            {/* marginBottom inline: the page's space-y puts 36px UNDER every
+                child in this build, which is the whole gap between the
+                button and the footer rule. Measured in the browser. */}
+            <div className="flex justify-end" style={{ marginBottom: 0 }}>
               <button
                 onClick={() => {
                   try {
