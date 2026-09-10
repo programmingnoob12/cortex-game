@@ -2307,6 +2307,9 @@ const SHOW_LEADERBOARD = false;
 const SHOW_PROFILE_CUSTOMIZATION = false;
 // Test-only controls that should not ship.
 const SHOW_TEST_TOOLS = false;
+// The history spreadsheet, parked. Everything that builds it is still here;
+// flip this back on to bring it back.
+const SHOW_SPREADSHEET = false;
 // Profile pieces that only make sense once other people can see them.
 const SHOW_BIO = false;
 const SHOW_BADGES = false;
@@ -2409,14 +2412,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 239;
+const BUILD_VERSION = 240;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "All is graph only, CCT drops its average",
+  "Spreadsheet parked, streak and sessions on Overview",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12942,6 +12945,16 @@ function NBackSessionApp() {
                           : formatDuration(msTrainedToday(exerciseHistory))
                       }
                     />
+                    <Stat
+                      label="Streak"
+                      value={`${achievementState.streak} ${
+                        achievementState.streak === 1 ? "day" : "days"
+                      }`}
+                    />
+                    <Stat
+                      label="Sessions"
+                      value={String(achievementState.totalSessions)}
+                    />
                   </div>
 
                   {/* The three bands are one grid so a wrapped name cannot
@@ -13085,7 +13098,7 @@ function NBackSessionApp() {
               {/* The sheet is a per-regime read: with every exercise on it
                   at once the columns stop being legible, so All is graph
                   only. */}
-              {overviewScope === "regime" && (
+              {SHOW_SPREADSHEET && overviewScope === "regime" && (
                 <button
                   onClick={() =>
                     setStatsDisplay((v) => (v === "chart" ? "spreadsheet" : "chart"))
@@ -13100,7 +13113,7 @@ function NBackSessionApp() {
             {/* Both views show one exercise at a time, chosen from the switch
                 inside the panel. */}
             <div>
-            {statsDisplay === "chart" || overviewScope === "all"
+            {!SHOW_SPREADSHEET || statsDisplay === "chart" || overviewScope === "all"
               ? (statsChartExercise ? [statsChartExercise] : []).map((e) => {
               const history = exerciseHistory[e.key] || [];
               const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
