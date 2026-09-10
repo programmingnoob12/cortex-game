@@ -2440,14 +2440,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 248;
+const BUILD_VERSION = 249;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:07 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Expired memberships lock, not fall to free",
+  "Free regime page order and copy",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10923,33 +10923,40 @@ function NBackSessionApp() {
                 Choose your regime
               </h1>
               <p className="text-slate-400 text-base mt-3">
-                {isMember
-                  ? "You'll ease into it gradually, starting with a few minutes each session."
-                  : "Anti-brainrot is free. The rest come with a membership."}
+                You'll start with just a few minutes a day.
               </p>
             </div>
 
             <div className="flex flex-col gap-6">
-              {/* The one thing on this page a free account is meant to do.
-                  Sits above the regimes rather than under them, because
-                  every locked card below it points here anyway. */}
-              {!isMember && (
-                <button
-                  onClick={goToCheckout}
-                  style={{ "--ex": "#1E982B" }}
-                  className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
-                >
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="text-2xl font-semibold">Get membership</div>
-                    <div className="text-lg font-medium">Unlock all regimes ›</div>
-                  </div>
-                  <div className="text-base font-medium mt-1">
-                    Quick, Balanced and Deep, plus Motivation.
-                  </div>
-                </button>
-              )}
-
-              {REGIMES.map((r) => {
+              {/* On a free account the one regime they can actually train
+                  leads, the offer sits directly under it, and the locked
+                  ones follow. */}
+              {(isMember
+                ? REGIMES
+                : [
+                    ...REGIMES.filter((r) => r.key === FREE_REGIME_KEY),
+                    "upgrade",
+                    ...REGIMES.filter((r) => r.key !== FREE_REGIME_KEY),
+                  ]
+              ).map((r) => {
+                if (r === "upgrade") {
+                  return (
+                    <button
+                      key="upgrade"
+                      onClick={goToCheckout}
+                      style={{ "--ex": "#1E982B" }}
+                      className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
+                    >
+                      <div className="flex items-center justify-between gap-6">
+                        <div className="text-2xl font-semibold">Get membership</div>
+                        <div className="text-lg font-medium">Unlock all regimes ›</div>
+                      </div>
+                      <div className="text-base font-medium mt-1">
+                        Plus the motivation module.
+                      </div>
+                    </button>
+                  );
+                }
                 const rc = REGIME_COLORS[r.key] || "#4CB9D8";
                 const locked = !isMember && r.key !== FREE_REGIME_KEY;
                 return (
@@ -12390,8 +12397,11 @@ function NBackSessionApp() {
             </button>
             )}
 
+            {/* Inline, because the page's own space-y already sets a margin
+                on every child and a utility would not win against it. */}
             <button
               onClick={() => setMainView("regime")}
+              style={{ marginTop: "4rem" }}
               className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
@@ -12454,7 +12464,7 @@ function NBackSessionApp() {
             >
               <span>Membership</span>
               <span className="text-slate-500 text-base font-normal capitalize">
-                {isMember ? `${membershipPlan} ›` : "Free · Upgrade ›"}
+                {isMember ? `${membershipPlan} ›` : "Get membership ›"}
               </span>
             </button>
 
@@ -12465,7 +12475,7 @@ function NBackSessionApp() {
             {/* marginBottom inline: the page's space-y puts 36px UNDER every
                 child in this build, which is the whole gap between the
                 button and the footer rule. Measured in the browser. */}
-            <div className="flex justify-end" style={{ marginBottom: 0 }}>
+            <div className="flex justify-end" style={{ marginBottom: "0.6rem" }}>
               <button
                 onClick={() => {
                   try {
