@@ -2877,15 +2877,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 274;
+const BUILD_VERSION = 275;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:25 PM";
+const BUILD_TIME = "9:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "No item appears more than 3 times in an RRT round",
-  "Round type shown on the history round line",
+  "One strong colour per RRT tile, clear of every other tile's",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4240,6 +4239,10 @@ function buildRrtItems(itemCount) {
     [hueQueue[i], hueQueue[j]] = [hueQueue[j], hueQueue[i]];
   }
 
+  // Handed to every tile so its supporting regions can stay clear of all of
+  // them, not just its own.
+  const roundIdentityHues = hueQueue.map((q) => q.hue);
+
   return types.map((type) => {
     if (type !== "letters") {
       const identity = hueQueue.pop() || { hue: Math.random() * 360, light: 50 };
@@ -4253,6 +4256,7 @@ function buildRrtItems(itemCount) {
         colorName: name,
         patternSeed: `${name}-${Math.random().toString(36).slice(2)}`,
         wide: type === "wide",
+        avoidHues: roundIdentityHues,
         label: `the ${name} tile`,
       };
     }
@@ -4966,7 +4970,15 @@ function rrtPolygonArea(poly) {
 // region takes `identityColor` and the rest are dealt from `accents`. QNB'
 // uses this because its fill colour IS the stimulus — a freely generated
 // palette would destroy the thing the person is being asked to remember.
-function rrtTileRegions(seedStr, width = 100, hueBase = null, identityLight = null, fixedFill = null) {
+// `avoidHues` is every identity hue in the round, including this tile's own.
+// Supporting regions are kept clear of all of them: a tile's own identity
+// colour was already protected, but nothing stopped one tile's supporting
+// region landing on ANOTHER tile's identity hue — and with three or four
+// swatches drawing a dozen regions from the same wheel, that happened
+// constantly. Every tile then showed two or three of the same handful of
+// colours in a different arrangement, which is why they stopped being
+// telling apart at a glance.
+function rrtTileRegions(seedStr, width = 100, hueBase = null, identityLight = null, fixedFill = null, avoidHues = null) {
   const rand = mulberry32(hashStringToSeed(seedStr));
   let regions = [
     [
@@ -5060,16 +5072,44 @@ function rrtTileRegions(seedStr, width = 100, hueBase = null, identityLight = nu
   const hues = new Array(regions.length).fill(null);
   if (hueBase != null) {
     hues[order[0].i] = hueBase;
-    // Everything else lands in the 270 degrees that aren't within 45 of the
-    // identity hue, so a supporting region can never be mistaken for it.
+    const avoid = [hueBase, ...(avoidHues || [])];
+    const circDist = (x, y) => {
+      const d = Math.abs((((x - y) % 360) + 360) % 360);
+      return d > 180 ? 360 - d : d;
+    };
+    const clearance = (h) => Math.min(...avoid.map((a) => circDist(h, a)));
     for (let k = 1; k < order.length; k++) {
-      hues[order[k].i] = Math.round((hueBase + 45 + rand() * 270) % 360);
+      // Sample and keep the best rather than picking once: with several
+      // identity hues to stay clear of there is no closed-form range left to
+      // pick from, and settling for the furthest of two dozen tries is both
+      // simpler and never fails to produce a colour.
+      let best = null;
+      let bestClear = -1;
+      for (let t = 0; t < 24; t += 1) {
+        const cand = Math.round(rand() * 360) % 360;
+        const c = clearance(cand);
+        if (c > bestClear) {
+          bestClear = c;
+          best = cand;
+        }
+        if (c >= 34) break;
+      }
+      hues[order[k].i] = best;
     }
     // The identity region is pinned to a mid, saturated colour rather than
     // left to the band lottery. Near-black hides the hue entirely and pastel
     // washes it out — two pastels 50 degrees apart both just read as "pale
     // mint", which is exactly the collision this is meant to prevent.
     bands[order[0].i] = 1;
+    // And it is the ONLY region allowed to be a saturated mid. A supporting
+    // region at that band is a second colour of equal weight, so the eye has
+    // no way to tell which of the two is the tile's identity — every tile
+    // then reads as "a couple of bright colours" and they all look alike.
+    // Pushed to near-black or pastel instead, alternating so each tile keeps
+    // both a dark and a pale area to read the identity colour against.
+    for (let k = 1; k < order.length; k++) {
+      if (bands[order[k].i] === 1) bands[order[k].i] = k % 2 === 1 ? 0 : 2;
+    }
   }
 
   if (fixedFill) {
@@ -5107,10 +5147,12 @@ function RrtItemTile({ item, size = 40 }) {
             item.patternSeed || item.colorName || item.hex,
             item.wide ? 160 : 100,
             item.hue ?? null,
-            item.identityLight ?? null
+            item.identityLight ?? null,
+            null,
+            item.avoidHues ?? null
           )
         : null,
-    [item.type, item.patternSeed, item.colorName, item.hex, item.wide]
+    [item.type, item.patternSeed, item.colorName, item.hex, item.wide, item.avoidHues]
   );
   if (item.type === "voronoi") {
     const voronoiSize = size * 0.86;
