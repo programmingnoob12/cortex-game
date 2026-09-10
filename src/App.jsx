@@ -2855,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 267;
+const BUILD_VERSION = 268;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:45 PM";
+const BUILD_TIME = "5:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Old achievements no longer re-celebrate on load",
+  "Every tutorial opens with what the exercise is for",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5086,6 +5086,109 @@ function rrtHasRealPointer() {
 }
 
 // ---------------------------------------------------------------------
+// WHAT EACH EXERCISE IS FOR
+// ---------------------------------------------------------------------
+// The opening page of every tutorial. The first thing anyone sees should be
+// why they are about to spend ten minutes on this, not which button to press
+// — the mechanics land better once the point is known. Full names here, not
+// the abbreviations the rest of the UI uses, because this is the one place
+// they are introduced.
+const EXERCISE_INTROS = {
+  rrt: {
+    name: "Relational Reasoning Training",
+    lead: "This is the most beneficial exercise here if what you want is a higher IQ.",
+    blurb:
+      "You read a chain of relationships between items, build a spatial model of them in your head, then answer a question the premises never state directly. That answer is only available to someone who held the whole structure at once.",
+    trains: ["Fluid reasoning", "Spatialization", "Integration", "Recall", "Speed"],
+  },
+  dual: {
+    name: "Dual N-Back",
+    blurb:
+      "A position and a spoken letter arrive together each trial, and you say whether either matches what came N steps earlier. You are never recalling the sequence — you hold two streams live and let the old ones fall away.",
+    trains: ["Working memory", "Updating", "Divided attention"],
+  },
+  quad: {
+    name: "Quad N-Back",
+    blurb:
+      "Dual N-Back with two more independent streams, colour and shape. Four things updating at once, each judged on its own — which is where the difficulty stops being about memory and becomes about keeping the streams from bleeding into each other.",
+    trains: ["Working memory", "Updating", "Interference control"],
+  },
+  iqnb: {
+    name: "Quad N-Back Prime",
+    blurb:
+      "Quad N-Back with the shape stream rendered as a textured blob rather than a clean shape, so it cannot be named and has to be held as it looks. Difficulty moves in hundredths of a level instead of whole steps.",
+    trains: ["Working memory", "Non-verbal encoding", "Updating"],
+  },
+  motion3d: {
+    name: "3D Multiple Object Tracking",
+    blurb:
+      "Ten balls drift through a rotating volume and five of them are yours. Everything turns the same colour and moves, and you hold all five with your eyes fixed on the centre — peripheral vision doing the work rather than darting between them.",
+    trains: [
+      "Sustained attention",
+      "Object tracking",
+      "Processing speed",
+      "Peripheral awareness",
+    ],
+  },
+  cct: {
+    name: "Continuous Calculation Task",
+    blurb:
+      "Numbers are spoken one after another and you answer the running sum of the last two before the next arrives. Three right in a row and the gap shortens. It is relentless on purpose: the target is attention that does not drift, which is the exact opposite of what scrolling trains.",
+    trains: [
+      "Attention control",
+      "Processing speed",
+      "Mental arithmetic",
+      "Resistance to distraction",
+    ],
+  },
+};
+
+// Rendered inside the tutorial card, so it inherits the card's padding from
+// whichever tutorial is showing it.
+function ExerciseIntro({ exerciseKey, accent }) {
+  const intro = EXERCISE_INTROS[exerciseKey];
+  if (!intro) return null;
+  return (
+    <div className="space-y-5">
+      <div>
+        <div
+          className="text-2xl font-semibold tracking-tight"
+          style={{ color: accent }}
+        >
+          {intro.name}
+        </div>
+      </div>
+      {intro.lead && (
+        <p className="text-slate-100 text-lg leading-relaxed font-medium">
+          {intro.lead}
+        </p>
+      )}
+      <p className="text-slate-300 text-lg leading-relaxed">{intro.blurb}</p>
+      <div className="pt-1">
+        <div className="text-slate-500 text-sm uppercase tracking-wide font-semibold">
+          What it trains
+        </div>
+        <div className="flex flex-wrap gap-2 mt-3">
+          {intro.trains.map((t) => (
+            <span
+              key={t}
+              className="rounded-full px-3 py-1.5 text-sm"
+              style={{
+                border: `1px solid ${accent}55`,
+                background: `${accent}14`,
+                color: "#F7F8F8",
+              }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
 // RRT TUTORIAL
 // ---------------------------------------------------------------------
 // A walk-through rather than a wall of text. The point it has to land is
@@ -5792,23 +5895,51 @@ function CctTutorialDemo() {
 
 function CctTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.cct;
+  const [step, setStep] = useState(0);
 
   return (
     <div className="space-y-5">
-      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6">
-        <p className="text-slate-100 text-xl leading-relaxed text-center">
-          Numbers are spoken one at a time. Add the next number.
-        </p>
-        <CctTutorialDemo />
+      <div className="flex items-center gap-2">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
       </div>
 
-      <div className="flex items-center justify-end">
+      <div
+        key={step}
+        className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6"
+        style={{ animation: "switchIn 0.5s ease-out both" }}
+      >
+        {step === 0 ? (
+          <ExerciseIntro exerciseKey="cct" accent={accent} />
+        ) : (
+          <>
+            <p className="text-slate-100 text-xl leading-relaxed text-center">
+              Numbers are spoken one at a time. Add the next number.
+            </p>
+            <CctTutorialDemo />
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
         <button
-          onClick={onDone}
+          onClick={() => setStep(0)}
+          disabled={step === 0}
+          className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
+        >
+          Back
+        </button>
+        <button
+          onClick={() => (step === 0 ? setStep(1) : onDone())}
           style={{ "--ex": accent }}
           className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
-          I Get It
+          {step === 0 ? "Next" : "I Get It"}
         </button>
       </div>
     </div>
@@ -5817,23 +5948,53 @@ function CctTutorial({ onDone }) {
 
 function Motion3DTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.motion3d;
+  // Two pages: what it is for, then the demo. The demo only mounts on the
+  // second, which also means its audio context is resumed by a real click.
+  const [step, setStep] = useState(0);
 
   return (
     <div className="space-y-8">
-      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6">
-        <p className="text-slate-100 text-xl leading-relaxed text-center">
-          Follow the balls.
-        </p>
-        <Motion3DTutorialDemo />
+      <div className="flex items-center gap-2">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="h-1 flex-1 rounded-full transition-colors"
+            style={{ background: i <= step ? accent : "#1E293B" }}
+          />
+        ))}
       </div>
 
-      <div className="flex items-center justify-end">
+      <div
+        key={step}
+        className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6"
+        style={{ animation: "switchIn 0.5s ease-out both" }}
+      >
+        {step === 0 ? (
+          <ExerciseIntro exerciseKey="motion3d" accent={accent} />
+        ) : (
+          <>
+            <p className="text-slate-100 text-xl leading-relaxed text-center">
+              Follow the balls.
+            </p>
+            <Motion3DTutorialDemo />
+          </>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
         <button
-          onClick={onDone}
+          onClick={() => setStep(0)}
+          disabled={step === 0}
+          className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
+        >
+          Back
+        </button>
+        <button
+          onClick={() => (step === 0 ? setStep(1) : onDone())}
           style={{ "--ex": accent }}
           className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
-          I Get It
+          {step === 0 ? "Next" : "I Get It"}
         </button>
       </div>
     </div>
@@ -5921,6 +6082,8 @@ function RrtTutorialAnimated({ onDone }) {
   // moment after its premise appears, so the map is seen being built rather
   // than arriving finished.
   const STEPS = [
+    // Step 0 is the intro page — nothing on the map yet.
+    { revealAt: [[], []], highlight: [] },
     { revealAt: [[], []], highlight: [] },
     { revealAt: [[], []], highlight: [] },
     { revealAt: [[0], [0, 1]], highlight: [] },
@@ -5966,6 +6129,10 @@ function RrtTutorialAnimated({ onDone }) {
   );
 
   const bodies = [
+    <div className={`${card}`} key="intro">
+      <ExerciseIntro exerciseKey="rrt" accent={accent} />
+    </div>,
+
     <div className={`${card} space-y-4`} key="s0">
       <p className="text-slate-200 text-xl leading-relaxed">
         Close your eyes and feel where different objects are in your room.
@@ -6046,6 +6213,20 @@ function RrtTutorialAnimated({ onDone }) {
       <p className="text-slate-100 text-lg leading-relaxed">
         It should be like feeling where your door is in the room.
       </p>
+      {/* The one habit that stops the exercise working. Looking back while
+          the model is still being built means never building one. */}
+      <div
+        className="rounded-lg px-4 py-3"
+        style={{
+          background: `${accent}14`,
+          border: `1px solid ${accent}55`,
+        }}
+      >
+        <p className="text-slate-100 text-lg leading-relaxed">
+          Don't look back until you've made the model and are just looking back
+          to double check items.
+        </p>
+      </div>
       {/* The tutorial is the point where someone either gets spatializing or
           quietly gives up on it, so this is the one place worth offering a
           reply. */}
@@ -6367,6 +6548,14 @@ function NBackTutorial({ exercise, onDone, level }) {
   );
 
   const steps = [];
+
+  steps.push({
+    body: (
+      <div className={`${card}`}>
+        <ExerciseIntro exerciseKey={exercise.key} accent={accent} />
+      </div>
+    ),
+  });
 
   steps.push({
     body: (
