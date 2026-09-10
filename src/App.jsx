@@ -2855,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 265;
+const BUILD_VERSION = 266;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:30 PM";
+const BUILD_TIME = "4:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Streak seeder no longer fires every other streak achievement",
+  "Dead Vercel webhook removed \u2014 back under Hobby's 12 function limit",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
