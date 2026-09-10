@@ -556,6 +556,28 @@ const NOTE_GROUPS = [
 
 const FREE_REGIME_KEY = "cct";
 
+// Occasional asides on Home. Never labelled on screen — a heading would make
+// them read as a feature to be got through rather than something someone
+// said to you in passing.
+const HOME_HINTS = [
+  "You don't have to do the session in one sitting. Some days just get it done even if it's broken up into small pieces whatever it takes to keep the streak going.",
+];
+
+// Which hint today gets, or null for a day with none. Derived from the date
+// so it is the same all day and across devices, rather than re-rolling on
+// every render or every reload. Roughly one day in three carries one, so it
+// stays an aside instead of becoming furniture.
+function hintForToday(dateString) {
+  if (HOME_HINTS.length === 0) return null;
+  let h = 0;
+  for (let i = 0; i < dateString.length; i += 1) {
+    h = (h * 31 + dateString.charCodeAt(i)) | 0;
+  }
+  h = Math.abs(h);
+  if (h % 3 !== 0) return null;
+  return HOME_HINTS[h % HOME_HINTS.length];
+}
+
 // Days of unbroken daily training that earn one free month. Claimable once
 // per member, ever — the claim is recorded on the Stripe subscription by
 // api/billing/streak-reward.js, which is the only durable record of it.
@@ -2855,14 +2877,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 272;
+const BUILD_VERSION = 273;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:00 PM";
+const BUILD_TIME = "7:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT intro page wording",
+  "Occasional hints on Home",
+  "Tighter bottom on the RRT card",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8793,6 +8816,10 @@ function NBackSessionApp() {
   // see the free experience without cancelling anything.
   // Dismissed for this visit only: it is a nudge, not a task list.
   const [freeMonthNoticeDismissed, setFreeMonthNoticeDismissed] = useState(false);
+  // Today's hint, dismissed for this visit only. `forced` is the Testing
+  // station's way to see one on a day that did not draw one.
+  const [hintDismissed, setHintDismissed] = useState(false);
+  const [hintForced, setHintForced] = useState(false);
   // Dismissing the card while it is still a progress bar only hides it for
   // this visit — it is the thing telling them the reward exists. Dismissing
   // it once it reads "you earned a free month" retires it permanently: that
@@ -10565,6 +10592,7 @@ function NBackSessionApp() {
   // one exercise) — this is what "Tomorrow" on the Next-session card means,
   // and what disables the Start button below.
   const trainedToday = regimeCompletionDates.includes(new Date().toDateString());
+  const todaysHint = hintForToday(new Date().toDateString());
 
   const liveStreakDays = currentStreakDays(exerciseHistory, streakBrokenAt);
   // What the free-month card and the achievement both count: days the FULL
@@ -12374,6 +12402,16 @@ function NBackSessionApp() {
                   tutorial sets that exercise's own flag AND turns the global
                   one off, so clearing only one of them leaves that exercise
                   silently skipped while every other tutorial returns. */}
+              <button
+                onClick={() => {
+                  setHintDismissed(false);
+                  setHintForced(true);
+                  setMainView("home");
+                }}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Show a hint on Home
+              </button>
               <button
                 onClick={() => {
                   clearTutorialDismissals();
@@ -15876,6 +15914,38 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {/* Bottom left, the one corner Home leaves free — Notes and Testing
+          are top left, Achievements top right, Account bottom right. */}
+      {mainView === "home" && !hintDismissed && (hintForced || todaysHint) && (
+        <div className="fixed bottom-6 left-6 z-40 w-[min(24rem,calc(100vw-3rem))]">
+          <div
+            className="flex items-start gap-4 rounded-xl pl-0 pr-3 py-4 overflow-hidden"
+            style={{
+              background: "#1B1D20",
+              border: "1px solid #2C2F34",
+              boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
+            }}
+          >
+            <span
+              className="self-stretch shrink-0"
+              style={{ width: 5, background: "#C8892A" }}
+            />
+            <span className="text-2xl shrink-0 leading-none pt-0.5">💡</span>
+            <p className="flex-1 min-w-0 text-base text-slate-300 leading-relaxed">
+              {todaysHint || HOME_HINTS[0]}
+            </p>
+            <button
+              onClick={() => setHintDismissed(true)}
+              aria-label="Dismiss"
+              className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors leading-none px-1"
+              style={{ fontSize: "1.5rem" }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {mainView === "home" && (
         <button
           onClick={() => setMainView("notes")}
@@ -16069,7 +16139,7 @@ const RRT_PROPOSITION_MIN_HEIGHT = 104;
 
 const RRT_DROP_AFTER_WRONG = 10;
 
-const RRT_FOOTER_MIN_HEIGHT = 116;
+const RRT_FOOTER_MIN_HEIGHT = 92;
 
 // =======================================================================
 // CCT — Cognitive Control Training
@@ -17583,7 +17653,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
 
   const backHint = showBackHint ? (
     <>
-      <div className="hidden lg:block absolute right-full bottom-[7.8rem] mr-3 w-56">
+      <div className="hidden lg:block absolute right-full bottom-[6.3rem] mr-3 w-56">
         <svg
           width="40"
           height="22"
