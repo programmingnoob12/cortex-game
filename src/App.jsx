@@ -2855,15 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 264;
+const BUILD_VERSION = 265;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:55 PM";
+const BUILD_TIME = "3:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Free month counts completed regimes, not any training",
-  "Testing station can reach and replay the reward",
+  "Streak seeder no longer fires every other streak achievement",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10917,31 +10916,25 @@ function NBackSessionApp() {
   // fills and the claim fires on the next render.
   const seedSevenDayStreak = () => {
     const dates = [];
-    const history = [];
     for (let i = STREAK_REWARD_DAYS - 1; i >= 0; i -= 1) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      d.setHours(12, 0, 0, 0);
       dates.push(d.toDateString());
-      history.push({ ts: d.getTime(), accuracy: 0, n: 0, durationMs: 0 });
     }
-    if (streakBrokenAt) {
-      setStreakBrokenAtState(null);
+    // Only the regime-completion list. The first version of this also
+    // seeded exercise history and cleared streakBrokenAt, which un-severed
+    // whatever daily streak was already sitting in the history — with 90
+    // days of fake history in there, every long-streak achievement fired at
+    // once. The reward counts completed regimes and nothing else, so this is
+    // the only list it needs to touch.
+    setRegimeCompletionDatesState((prev) => {
+      // Merged rather than replaced: wiping the list would take away real
+      // completed days, and the achievement unlock dates are stamped off it.
+      const next = Array.from(new Set([...(prev || []), ...dates]));
       if (window.storage) {
-        safeStorageSet("streak-broken-at", JSON.stringify(null), false);
+        safeStorageSet("regime-completion-dates", JSON.stringify(next), false);
       }
-    }
-    setRegimeCompletionDatesState(dates);
-    if (window.storage) {
-      safeStorageSet("regime-completion-dates", JSON.stringify(dates), false);
-    }
-    setExerciseHistory((prev) => {
-      if (window.storage) {
-        window.storage
-          .set("history-_streakTest", JSON.stringify(history), false)
-          .catch(() => {});
-      }
-      return { ...prev, _streakTest: history };
+      return next;
     });
     setFreeMonthNoticeDismissed(false);
     // Lets the claim run again in a session where it already ran once.
