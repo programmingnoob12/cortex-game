@@ -2310,6 +2310,9 @@ const SHOW_TEST_TOOLS = false;
 // The history spreadsheet, parked. Everything that builds it is still here;
 // flip this back on to bring it back.
 const SHOW_SPREADSHEET = false;
+// The "Unlocks: <badge>" line under every achievement. Parked: most of the
+// rewards are cosmetic and not wired to anything yet.
+const SHOW_ACHIEVEMENT_REWARDS = false;
 // Profile pieces that only make sense once other people can see them.
 const SHOW_BIO = false;
 const SHOW_BADGES = false;
@@ -2412,14 +2415,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 240;
+const BUILD_VERSION = 241;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:10 PM";
+const BUILD_TIME = "5:46 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Spreadsheet parked, streak and sessions on Overview",
+  "Free month banner, brighter green, reward text off",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5095,7 +5098,9 @@ function AchievementProgressBar({ done, total }) {
         className="h-full rounded-full"
         style={{
           width: `${frac * 100}%`,
-          background: "linear-gradient(to right, #3E9E6C, #4CB782)",
+          // The same green the trained days use in the history sheet,
+          // rather than the muted emerald.
+          background: "linear-gradient(to right, #177A22, #1E982B)",
           transition: "width 0.3s ease-out",
         }}
       />
@@ -10932,6 +10937,50 @@ function NBackSessionApp() {
               </p>
             </div>
 
+            {/* The free month is the one reward with real money behind it,
+                so it gets said out loud rather than sitting as a line of
+                small print on one badge among sixty. */}
+            {(() => {
+              const done = Math.min(7, achievementState.regimeStreak || 0);
+              const earned = done >= 7;
+              return (
+                <div
+                  className="rounded-xl border p-5 flex items-center gap-4"
+                  style={{
+                    borderColor: earned ? "#1E982B" : "rgba(30,152,43,0.4)",
+                    background: earned
+                      ? "rgba(30,152,43,0.14)"
+                      : "rgba(30,152,43,0.07)",
+                  }}
+                >
+                  <span className="text-3xl shrink-0">🎁</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-lg font-semibold text-slate-100">
+                      {earned
+                        ? "Free month earned"
+                        : "Complete your regime 7 days in a row for a free month"}
+                    </div>
+                    <div className="text-base text-slate-400 mt-0.5">
+                      {earned
+                        ? "Applied to your membership."
+                        : `${done} of 7 days. Miss a day and it starts again.`}
+                    </div>
+                    <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(done / 7) * 100}%`,
+                          background:
+                            "linear-gradient(to right, #177A22, #1E982B)",
+                          transition: "width 0.3s ease-out",
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {achievementExerciseSections().map((topSection) => {
               const group = topSection.key;
               const groupAccent = ACCENT_STYLES.indigo;
@@ -11059,7 +11108,7 @@ function NBackSessionApp() {
                               <div className="text-base text-slate-400 mt-1.5 leading-relaxed">
                                 {a.description}
                               </div>
-                              {a.reward && (
+                              {SHOW_ACHIEVEMENT_REWARDS && a.reward && (
                                 <div className={`text-base mt-1.5 ${groupAccent.text}`}>
                                   Unlocks: {a.reward}
                                 </div>
@@ -14313,7 +14362,7 @@ function NBackSessionApp() {
                   className="text-3xl font-semibold tracking-tight"
                 />
                 <div className="text-slate-400 text-base">{current.description}</div>
-                {current.reward && (
+                {SHOW_ACHIEVEMENT_REWARDS && current.reward && (
                   <div className={`italic text-sm mt-1 ${groupAccent.text}`}>
                     Unlocks: {current.reward}
                   </div>
@@ -14366,7 +14415,7 @@ function NBackSessionApp() {
                   className="text-2xl font-semibold tracking-tight"
                 />
                 <div className="text-slate-400 text-base">{a.description}</div>
-                {a.reward && (
+                {SHOW_ACHIEVEMENT_REWARDS && a.reward && (
                   <div className={`italic text-sm mt-1 ${groupAccent.text}`}>
                     Unlocks: {a.reward}
                   </div>
