@@ -2472,14 +2472,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 251;
+const BUILD_VERSION = 252;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "A refresh no longer loses the session",
+  "Pause is one month only",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12918,8 +12918,10 @@ function NBackSessionApp() {
                   ) : billingState.plan === "annual" ? null : (
                     <div className="space-y-3">
                       <div className="text-slate-400 text-base">Pause billing for</div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {[1, 2, 3].map((m) => (
+                      {/* One month only for now. The endpoint still accepts
+                          2 and 3, so bringing them back is adding them here. */}
+                      <div className="grid grid-cols-1 gap-3">
+                        {[1].map((m) => (
                           <button
                             key={m}
                             onClick={() => handlePause(m)}
