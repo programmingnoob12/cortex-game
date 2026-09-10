@@ -556,6 +556,12 @@ const NOTE_GROUPS = [
 
 const FREE_REGIME_KEY = "cct";
 
+// Days of unbroken daily training that earn one free month. Claimable once
+// per member, ever — the claim is recorded on the Stripe subscription by
+// api/billing/streak-reward.js, which is the only durable record of it.
+const STREAK_REWARD_DAYS = 7;
+const STREAK_REWARD_CLAIM_KEY = "streak-reward-claimed";
+
 // True for a paying account, false for a free one. AuthGate is the only
 // thing that sets it; every gate in the app reads it from here.
 const MembershipContext = createContext(true);
@@ -2849,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 261;
+const BUILD_VERSION = 263;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:35 PM";
+const BUILD_TIME = "2:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Achievements are member-only",
+  "7 day streak earns one free month, once ever",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8524,6 +8530,8 @@ function NBackSessionApp() {
       return next;
     }); // achievement ids force-unlocked via the per-badge 🧪 Simulate button, independent of real progress
   const [badgeDetail, setBadgeDetail] = useState(null); // { achievement, state } | null — clicked badge shown in an in-page detail modal
+  // { freeUntil } while the free-month celebration is on screen, else null.
+  const [streakReward, setStreakReward] = useState(null);
   const [streakCardOpen, setStreakCardOpen] = useState(false); // home screen's 🔥 streak badge — opens a small popup with the week view
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
@@ -10322,9 +10330,57 @@ function NBackSessionApp() {
   // and what disables the Start button below.
   const trainedToday = regimeCompletionDates.includes(new Date().toDateString());
 
+  const liveStreakDays = currentStreakDays(exerciseHistory, streakBrokenAt);
+
+  // The free month. Fires the one time the streak first reaches seven days,
+  // and only for a paying member — a free account has no subscription to
+  // extend. The request is idempotent server-side, so the worst a repeat can
+  // do is get told it was already granted.
+  const streakRewardRef = useRef(false);
+  useEffect(() => {
+    if (!hasHydrated || !isMember || streakRewardRef.current) return;
+    if (liveStreakDays < STREAK_REWARD_DAYS) return;
+    streakRewardRef.current = true;
+    (async () => {
+      try {
+        const claimed = await window.storage?.get(STREAK_REWARD_CLAIM_KEY, false);
+        if (claimed?.value) return;
+        const {
+          data: { session: authSession },
+        } = await supabase.auth.getSession();
+        const res = await fetch("/api/billing/streak-reward", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${authSession?.access_token}`,
+          },
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          // Nothing is shown. A celebration that announced a free month the
+          // billing side had not actually given would be worse than silence,
+          // and the next reload tries again.
+          streakRewardRef.current = false;
+          return;
+        }
+        await window.storage?.set(
+          STREAK_REWARD_CLAIM_KEY,
+          JSON.stringify({ at: Date.now() }),
+          false
+        );
+        // Granted on another device already — record it, say nothing.
+        if (data.alreadyGranted) return;
+        setStreakReward({ freeUntil: data.freeUntil || null });
+      } catch {
+        streakRewardRef.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated, isMember, liveStreakDays]);
+
   // Feeds the Achievements screen.
   const achievementState = {
-    streak: currentStreakDays(exerciseHistory, streakBrokenAt),
+    streak: liveStreakDays,
     regimeStreak: currentRegimeStreakDays(regimeCompletionDates),
     exerciseStats,
     totalSessions: Object.values(exerciseStats).reduce(
@@ -13843,8 +13899,11 @@ function NBackSessionApp() {
                     >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
-                      <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100">
+                      <div
+                        className="flex items-center justify-between gap-3"
+                        style={{ minHeight: "2.75rem" }}
+                      >
+                        <div className="flex items-center gap-2.5 text-lg font-semibold text-slate-100 min-w-0 truncate">
                           <span
                             className="w-2.5 h-2.5 rounded-full shrink-0"
                             style={{ backgroundColor: exColor }}
@@ -13853,7 +13912,7 @@ function NBackSessionApp() {
                         </div>
                         {overviewSummaryExercises.length > 1 && (
                           <div
-                            className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
+                            className="inline-flex shrink-0 max-w-full overflow-x-auto rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
                             role="group"
                             aria-label="Choose an exercise"
                           >
@@ -14942,7 +15001,85 @@ function NBackSessionApp() {
         </div>
       )}
 
-      {isMember && !unlockInfo && achievementCelebrationQueue.length > 0 && (() => {
+      {/* One free month, earned. Sits above the achievement celebration in
+          the file but is mutually exclusive with it in practice: this only
+          ever fires on the day the seventh consecutive session lands. */}
+      {streakReward && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm p-8">
+          <div
+            className="pointer-events-none absolute inset-0 overflow-hidden"
+            aria-hidden="true"
+          >
+            {Array.from({ length: 30 }).map((_, i) => {
+              const left = (i * 37 + 7) % 100;
+              const delay = (i % 10) * 0.2;
+              const duration = 2.3 + (i % 5) * 0.4;
+              return (
+                <div
+                  key={`f${i}`}
+                  className="absolute text-2xl"
+                  style={{
+                    left: `${left}%`,
+                    top: "-40px",
+                    animation: `confettiFall ${duration}s ease-in ${delay}s infinite`,
+                  }}
+                >
+                  {["🔥", "✨", "🎉"][i % 3]}
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            className="relative flex flex-col items-center text-center gap-8 max-w-md px-6"
+            style={{ animation: "celebrationPop 0.6s cubic-bezier(0.34,1.56,0.64,1)" }}
+          >
+            <div className="text-base uppercase tracking-wide font-semibold text-amber-300">
+              {STREAK_REWARD_DAYS} day streak
+            </div>
+
+            <div
+              className="rounded-full flex items-center justify-center shadow-2xl shadow-black/50"
+              style={{
+                width: 128,
+                height: 128,
+                fontSize: 60,
+                background: "linear-gradient(135deg, #F59E0B, #EF4444)",
+              }}
+            >
+              🔥
+            </div>
+
+            <div className="space-y-3">
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Your next month is free
+              </h2>
+              <p className="text-slate-300 text-lg leading-relaxed">
+                Seven days without a gap. Your next payment is skipped — billing
+                picks up as normal after that.
+              </p>
+              {streakReward.freeUntil && (
+                <p className="text-slate-400 text-base">
+                  Next charge:{" "}
+                  {new Date(streakReward.freeUntil * 1000).toLocaleDateString(
+                    undefined,
+                    { day: "numeric", month: "long", year: "numeric" }
+                  )}
+                </p>
+              )}
+            </div>
+
+            <button
+              onClick={() => setStreakReward(null)}
+              className="w-full max-w-xs bg-indigo-500 hover:bg-indigo-400 transition-colors rounded-lg py-3 text-base font-medium"
+            >
+              Keep training
+            </button>
+          </div>
+        </div>
+      )}
+
+      {isMember && !streakReward && !unlockInfo && achievementCelebrationQueue.length > 0 && (() => {
         const current = achievementCelebrationQueue[0];
         const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[current.group]];
         return (
@@ -17015,14 +17152,16 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
   // so it drops underneath instead.
   const timerHint = showTimerHint ? (
     <>
-      <div className="hidden lg:block absolute left-full top-[6.4rem] ml-3 w-60">
+      <div className="hidden lg:block absolute left-full top-[7.5rem] ml-3 w-60">
         <svg
           width="58"
           height="22"
           viewBox="0 0 58 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ left: -44, top: 6 }}
+          /* Shifted up by exactly the 1.1rem the box moved down, so the arrow
+             stays where it was and still lands on the checkbox. */
+          style={{ left: -44, top: -12 }}
           aria-hidden="true"
         >
           <path
