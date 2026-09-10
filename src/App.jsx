@@ -2855,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 266;
+const BUILD_VERSION = 267;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:05 PM";
+const BUILD_TIME = "4:45 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Dead Vercel webhook removed \u2014 back under Hobby's 12 function limit",
+  "Old achievements no longer re-celebrate on load",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7864,6 +7864,15 @@ function loadAchievementDates() {
   }
 }
 
+// Ids that already carried an unlock date when the page loaded. Everything in
+// here was earned on an earlier visit, so it can never be a "win" in this
+// session. The in-memory baseline below was not enough on its own: stats,
+// history and regime-completion dates arrive from Supabase a moment apart, so
+// the baseline could be taken before the history landed — at which point
+// every long-standing achievement looked brand new and the celebrations all
+// fired at once, on whichever screen happened to be open.
+const PREVIOUSLY_UNLOCKED_IDS = new Set(Object.keys(loadAchievementDates()));
+
 function saveAchievementDates(map) {
   try {
     localStorage.setItem(ACHIEVEMENT_DATES_KEY, JSON.stringify(map));
@@ -9218,7 +9227,10 @@ function NBackSessionApp() {
     }
     const prevUnlocked = unlockedAchievementIdsRef.current;
     const newlyUnlocked = ACHIEVEMENTS_CATALOG.filter(
-      (a) => nowUnlocked.has(a.id) && !prevUnlocked.has(a.id)
+      (a) =>
+        nowUnlocked.has(a.id) &&
+        !prevUnlocked.has(a.id) &&
+        !PREVIOUSLY_UNLOCKED_IDS.has(a.id)
     );
     if (newlyUnlocked.length > 0) {
       setAchievementCelebrationQueue((q) => {
@@ -12110,6 +12122,23 @@ function NBackSessionApp() {
                 >
                   🧪 Free month celebration
                 </button>
+                <button
+                  onClick={() => {
+                    // Wipes the unlock stamps for this browser, which is also
+                    // what decides whether an achievement can be celebrated
+                    // again. Nothing about training history is touched.
+                    setAchievementDates({});
+                    saveAchievementDates({});
+                    PREVIOUSLY_UNLOCKED_IDS.clear();
+                    unlockedAchievementIdsRef.current = null;
+                    setAchievementCelebrationQueue([]);
+                  }}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Clear achievement unlocks
+                </button>
+              </div>
+              <div className="flex gap-3">
                 <button
                   onClick={clearStreakRewardClaim}
                   className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
@@ -17339,7 +17368,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
             color: "#F7F8F8",
           }}
         >
-          <div>Can't press back until you've constructed the spatial model.</div>
+          <div>Can't look back until you've constructed the spatial model.</div>
           <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
             <input
               type="checkbox"
@@ -17359,7 +17388,7 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           color: "#F7F8F8",
         }}
       >
-        <div>Can't press back until you've constructed the spatial model.</div>
+        <div>Can't look back until you've constructed the spatial model.</div>
         <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
           <input
             type="checkbox"
