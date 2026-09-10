@@ -2472,14 +2472,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 253;
+const BUILD_VERSION = 254;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Card form opens without a wait",
+  "One honest line on the plan card",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12705,39 +12705,51 @@ function NBackSessionApp() {
                       </span>
                     )}
                   </div>
-                  {/* These used to be one if/else chain, so a scheduled plan
-                      change hid the pause line entirely. They can all be true
-                      at once, so each renders on its own and only "Renews"
-                      is suppressed when something more specific applies. */}
-                  {billingState.pausedUntil && (
-                    <div className="text-amber-400 text-base">
-                      Paused until{" "}
-                      {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
-                    </div>
-                  )}
-                  {billingState.cancelAtPeriodEnd && (
-                    <div className="text-red-400 text-base">
-                      Cancels on{" "}
-                      {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
-                    </div>
-                  )}
-                  {!billingState.cancelAtPeriodEnd &&
-                    billingState.scheduledPlan &&
-                    billingState.scheduledPlanAt && (
-                    <div className="text-amber-400 text-base">
-                      Annual until{" "}
-                      {new Date(billingState.scheduledPlanAt * 1000).toLocaleDateString()}, then
-                      switches to monthly
-                      </div>
-                    )}
-                  {!billingState.pausedUntil &&
-                    !billingState.cancelAtPeriodEnd &&
-                    !billingState.scheduledPlan && (
+                  {/* One line, not a stack of them. Rendering each condition
+                      independently produced contradictions like "Paused until
+                      October" directly above "Annual until 2027", which is
+                      two different answers to the same question.
+
+                      A pause only means anything if it outlasts the period
+                      already paid for: pausing collection on an annual plan
+                      with a year left on it defers nothing, so saying
+                      "Paused" there was simply untrue. */}
+                  {(() => {
+                    const periodEnd = billingState.currentPeriodEnd;
+                    const pauseDefersAPayment =
+                      billingState.pausedUntil &&
+                      (!periodEnd || billingState.pausedUntil > periodEnd);
+
+                    if (billingState.cancelAtPeriodEnd) {
+                      return (
+                        <div className="text-red-400 text-base">
+                          Cancels on {new Date(periodEnd * 1000).toLocaleDateString()}
+                        </div>
+                      );
+                    }
+                    if (pauseDefersAPayment) {
+                      return (
+                        <div className="text-amber-400 text-base">
+                          Billing paused until{" "}
+                          {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}
+                        </div>
+                      );
+                    }
+                    if (billingState.scheduledPlan && billingState.scheduledPlanAt) {
+                      return (
+                        <div className="text-amber-400 text-base">
+                          Annual until{" "}
+                          {new Date(billingState.scheduledPlanAt * 1000).toLocaleDateString()},
+                          then switches to monthly
+                        </div>
+                      );
+                    }
+                    return (
                       <div className="text-slate-400 text-base">
-                        Renews{" "}
-                        {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}
+                        Renews {new Date(periodEnd * 1000).toLocaleDateString()}
                       </div>
-                    )}
+                    );
+                  })()}
                 </div>
 
                 {billingState.openInvoiceId && (
