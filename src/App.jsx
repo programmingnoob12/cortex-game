@@ -2855,14 +2855,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 263;
+const BUILD_VERSION = 264;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:10 PM";
+const BUILD_TIME = "2:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "7 day streak earns one free month, once ever",
+  "Free month counts completed regimes, not any training",
+  "Testing station can reach and replay the reward",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10331,6 +10332,10 @@ function NBackSessionApp() {
   const trainedToday = regimeCompletionDates.includes(new Date().toDateString());
 
   const liveStreakDays = currentStreakDays(exerciseHistory, streakBrokenAt);
+  // What the free-month card and the achievement both count: days the FULL
+  // regime was completed, which live in their own list rather than in
+  // exercise history.
+  const liveRegimeStreakDays = currentRegimeStreakDays(regimeCompletionDates);
 
   // The free month. Fires the one time the streak first reaches seven days,
   // and only for a paying member — a free account has no subscription to
@@ -10339,7 +10344,7 @@ function NBackSessionApp() {
   const streakRewardRef = useRef(false);
   useEffect(() => {
     if (!hasHydrated || !isMember || streakRewardRef.current) return;
-    if (liveStreakDays < STREAK_REWARD_DAYS) return;
+    if (liveRegimeStreakDays < STREAK_REWARD_DAYS) return;
     streakRewardRef.current = true;
     (async () => {
       try {
@@ -10376,7 +10381,7 @@ function NBackSessionApp() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasHydrated, isMember, liveStreakDays]);
+  }, [hasHydrated, isMember, liveRegimeStreakDays]);
 
   // Feeds the Achievements screen.
   const achievementState = {
@@ -10890,8 +10895,67 @@ function NBackSessionApp() {
       }
       return { ...prev, _streakTest: newHistory };
     });
+    // The free-month card and the regimeStreak7 achievement count completed
+    // regime days, which are kept in their own list. Without this the test
+    // button moved the daily streak and nothing else.
+    setRegimeCompletionDatesState((prev) => {
+      const stamp = backDate.toDateString();
+      if (prev.includes(stamp)) return prev;
+      const next = [...prev, stamp];
+      if (window.storage) {
+        safeStorageSet("regime-completion-dates", JSON.stringify(next), false);
+      }
+      return next;
+    });
     if (regimeKey !== key) {
       setRegimeKey(key);
+    }
+  };
+
+  // Straight to the reward threshold: seven consecutive completed regime days
+  // ending today, written to both places a streak is counted, so the card
+  // fills and the claim fires on the next render.
+  const seedSevenDayStreak = () => {
+    const dates = [];
+    const history = [];
+    for (let i = STREAK_REWARD_DAYS - 1; i >= 0; i -= 1) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      d.setHours(12, 0, 0, 0);
+      dates.push(d.toDateString());
+      history.push({ ts: d.getTime(), accuracy: 0, n: 0, durationMs: 0 });
+    }
+    if (streakBrokenAt) {
+      setStreakBrokenAtState(null);
+      if (window.storage) {
+        safeStorageSet("streak-broken-at", JSON.stringify(null), false);
+      }
+    }
+    setRegimeCompletionDatesState(dates);
+    if (window.storage) {
+      safeStorageSet("regime-completion-dates", JSON.stringify(dates), false);
+    }
+    setExerciseHistory((prev) => {
+      if (window.storage) {
+        window.storage
+          .set("history-_streakTest", JSON.stringify(history), false)
+          .catch(() => {});
+      }
+      return { ...prev, _streakTest: history };
+    });
+    setFreeMonthNoticeDismissed(false);
+    // Lets the claim run again in a session where it already ran once.
+    streakRewardRef.current = false;
+  };
+
+  // Clears the "already claimed" flag this browser keeps, so the real grant
+  // can be exercised more than once against Stripe test mode. The durable
+  // record is the subscription's own metadata, which this cannot touch — a
+  // second run there answers "already granted" and changes no billing.
+  const clearStreakRewardClaim = () => {
+    streakRewardRef.current = false;
+    if (window.storage) {
+      window.storage.delete?.(STREAK_REWARD_CLAIM_KEY, false)?.catch?.(() => {});
     }
   };
 
@@ -12030,6 +12094,34 @@ function NBackSessionApp() {
                   className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
                 >
                   🧪 Reset streak
+                </button>
+              </div>
+              {/* The free month, in three pieces: reach the threshold for
+                  real (which calls Stripe), see the celebration on its own,
+                  and clear this browser's claim flag so the grant can be
+                  exercised again in test mode. */}
+              <button
+                onClick={seedSevenDayStreak}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Jump to {STREAK_REWARD_DAYS} day streak (claims the free month)
+              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() =>
+                    setStreakReward({
+                      freeUntil: Math.floor(Date.now() / 1000) + 30 * 86400,
+                    })
+                  }
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Free month celebration
+                </button>
+                <button
+                  onClick={clearStreakRewardClaim}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Clear free month claim
                 </button>
               </div>
               <button
