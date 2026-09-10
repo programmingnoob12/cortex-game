@@ -85,6 +85,20 @@ export async function buildStateResponse(customerId, subscriptionId) {
       }
     : null;
 
+  // A scheduled change that has already happened is not a schedule. It has
+  // happened once the live price is the scheduled one, or once its date has
+  // passed.
+  const scheduledPlanAt = subscription.metadata?.scheduled_plan_at
+    ? Number(subscription.metadata.scheduled_plan_at)
+    : null;
+  const rawScheduledPlan = subscription.metadata?.scheduled_plan || null;
+  const pendingPlanChange =
+    rawScheduledPlan &&
+    rawScheduledPlan !== plan &&
+    (!scheduledPlanAt || scheduledPlanAt * 1000 > Date.now())
+      ? rawScheduledPlan
+      : null;
+
   const invoiceList = await stripe.invoices.list({ customer: customerId, limit: 10 });
   const invoices = invoiceList.data.map((inv) => ({
     id: inv.id,
@@ -110,10 +124,12 @@ export async function buildStateResponse(customerId, subscriptionId) {
     // Set when an annual plan has been switched to monthly: the price is
     // already changed but the first monthly charge only lands at renewal,
     // so the UI must say "annual until then" rather than "monthly now".
-    scheduledPlan: subscription.metadata?.scheduled_plan || null,
-    scheduledPlanAt: subscription.metadata?.scheduled_plan_at
-      ? Number(subscription.metadata.scheduled_plan_at)
-      : null,
+    // Only while it is still PENDING though. Nothing clears this metadata
+    // once the change has taken effect, so a subscription that finished
+    // moving to monthly months ago was still reporting a scheduled switch,
+    // and the UI kept calling it "Annual".
+    scheduledPlan: pendingPlanChange,
+    scheduledPlanAt: pendingPlanChange ? scheduledPlanAt : null,
     pausedUntil: subscription.pause_collection?.resumes_at ?? null,
     card,
     invoices,
