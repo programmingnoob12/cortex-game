@@ -1894,7 +1894,7 @@ const EXERCISE_LIBRARY = {
     comingSoon: false,
     scoreType: "accuracy",
     description:
-      "Continuous Calculation Task. Numbers are spoken one after another; add each new number to the one before it and answer before the next arrives. Three right in a row and the gap between numbers shortens.",
+      "Cognitive Control Training. Numbers are spoken one after another; add each new number to the one before it and answer before the next arrives. Three right in a row and the gap between numbers shortens.",
   },
   iqnb: {
     key: "iqnb",
@@ -2855,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 268;
+const BUILD_VERSION = 269;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:30 PM";
+const BUILD_TIME = "5:45 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Every tutorial opens with what the exercise is for",
+  "CCT is Cognitive Control Training",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5131,7 +5131,7 @@ const EXERCISE_INTROS = {
     ],
   },
   cct: {
-    name: "Continuous Calculation Task",
+    name: "Cognitive Control Training",
     blurb:
       "Numbers are spoken one after another and you answer the running sum of the last two before the next arrives. Three right in a row and the gap shortens. It is relentless on purpose: the target is attention that does not drift, which is the exact opposite of what scrolling trains.",
     trains: [
@@ -16014,7 +16014,7 @@ const RRT_DROP_AFTER_WRONG = 10;
 const RRT_FOOTER_MIN_HEIGHT = 116;
 
 // =======================================================================
-// CCT — Continuous Calculation Task
+// CCT — Cognitive Control Training
 // =======================================================================
 // Single digits are spoken one after another at a fixed gap. From the second
 // number on, the answer is that number plus the one before it: 5, 3 -> 8,
