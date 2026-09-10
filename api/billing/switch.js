@@ -23,6 +23,14 @@ export default withBillingHandler(async (req) => {
   const isRevert =
     subscription.metadata?.scheduled_plan === "monthly" && plan === "annual";
 
+  // A pause defers the next invoice. Annual has one invoice a year, so a
+  // pause carried onto it defers nothing and leaves the account claiming to
+  // be paused while it is paid up for a year. Pausing annual is refused in
+  // pause.js; this is the other way in — pause on monthly, then switch.
+  const clearPause = plan === "annual" && subscription.pause_collection
+    ? { pause_collection: "" }
+    : {};
+
   if (isRevert) {
     // Put the annual price back and clear the schedule. proration_behavior
     // "none" means no invoice and no credit — nothing was ever charged for
@@ -31,6 +39,7 @@ export default withBillingHandler(async (req) => {
       items: [{ id: currentItem.id, price: PRICE_IDS.annual }],
       proration_behavior: "none",
       cancel_at_period_end: false,
+      ...clearPause,
       metadata: {
         ...subscription.metadata,
         scheduled_plan: "",
@@ -63,6 +72,7 @@ export default withBillingHandler(async (req) => {
   await stripe.subscriptions.update(subscriptionId, {
     items: [{ id: currentItem.id, price: newPriceId }],
     proration_behavior: "create_prorations",
+    ...clearPause,
     // Reuses the exact proration_date the person already saw in the preview
     // step, so what they confirmed matches what actually bills — without
     // this, a few seconds' drift could change the amount charged.
