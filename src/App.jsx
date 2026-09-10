@@ -439,6 +439,7 @@ function AuthGate({ children }) {
   // null = not known yet. Seeded from the last known answer for this user so
   // a returning member goes straight into the app instead of waiting on a
   // round trip; the real check still runs underneath and corrects it.
+  const [creatingAccount, setCreatingAccount] = useState(false);
   const [membershipOk, setMembershipOk] = useState(null);
   // The raw value behind membershipOk — "paused", "past_due", "inactive" —
   // so a locked-out person is told which one applies and offered the action
@@ -571,6 +572,33 @@ function AuthGate({ children }) {
       setAuthError(err?.message || "Could not reach the sign-in service.");
     } finally {
       setSendingLink(false);
+    }
+  };
+
+  // Creating a free account. With email confirmation off in Supabase this
+  // returns a session immediately and they are straight into the app, no
+  // email involved. If confirmation is on, there is no session and they get
+  // told to go and click the link instead.
+  const handleCreateAccount = async (e) => {
+    e.preventDefault();
+    if (creatingAccount) return;
+    setAuthError("");
+    setCreatingAccount(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setAuthError(
+          /already/i.test(error.message)
+            ? "That email already has an account. Sign in instead."
+            : error.message
+        );
+        return;
+      }
+      if (!data.session) setLinkSent(true);
+    } catch (err) {
+      setAuthError(err?.message || "Could not create your account.");
+    } finally {
+      setCreatingAccount(false);
     }
   };
 
@@ -759,6 +787,66 @@ function AuthGate({ children }) {
       );
     }
 
+    if (mode === "signup") {
+      return (
+        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+          <div className="max-w-sm w-full space-y-5">
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-semibold">Start free</h1>
+              <p className="text-slate-400 text-base">
+                Anti-brainrot is free. No card needed.
+              </p>
+            </div>
+            {linkSent ? (
+              <p className="text-slate-300 text-center text-base">
+                Check <span className="font-medium">{email}</span> to confirm your
+                account.
+              </p>
+            ) : (
+              <>
+                <form onSubmit={handleCreateAccount} className="space-y-3">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                  />
+                  <input
+                    type="password"
+                    required
+                    minLength={6}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Choose a password"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-base text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-400"
+                  />
+                  <button
+                    type="submit"
+                    disabled={creatingAccount}
+                    className="w-full bg-indigo-500 hover:bg-indigo-400 disabled:opacity-60 transition-colors rounded-lg py-3 text-base font-medium"
+                  >
+                    {creatingAccount ? "Creating\u2026" : "Create free account"}
+                  </button>
+                  {authError && <p className="text-red-400 text-sm">{authError}</p>}
+                </form>
+                <button
+                  onClick={() => {
+                    setAuthError("");
+                    setMode("magic");
+                  }}
+                  className="w-full text-center text-slate-400 text-sm hover:underline"
+                >
+                  Already have an account? Sign in
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // Default: magic-link sign in
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
@@ -794,6 +882,19 @@ function AuthGate({ children }) {
               >
                 Have a password? Sign in with it instead
               </button>
+              {/* The free tier has no front door without this: someone with
+                  no account had nothing to click. */}
+              <div className="pt-2 border-t border-slate-800 text-center">
+                <button
+                  onClick={() => {
+                    setAuthError("");
+                    setMode("signup");
+                  }}
+                  className="text-slate-300 text-sm hover:underline"
+                >
+                  New here? Start free
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -2521,14 +2622,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 255;
+const BUILD_VERSION = 256;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Notes moved to their own page",
+  "Free account creation",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
