@@ -2877,14 +2877,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 275;
+const BUILD_VERSION = 276;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:10 PM";
+const BUILD_TIME = "9:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One strong colour per RRT tile, clear of every other tile's",
+  "History lists premises in the order they were shown",
+  "No unglowed strip down the right edge",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6320,6 +6321,11 @@ function RrtTutorialAnimated({ onDone }) {
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         It should be like feeling where your door is in the room.
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        At the end review the spatial model and make sure you know exactly
+        where each item is and are certain about the conclusion but without
+        visualizing, just feeling
       </p>
       {/* The one habit that stops the exercise working. Looking back while
           the model is still being built means never building one. */}
@@ -11574,7 +11580,16 @@ function NBackSessionApp() {
           height, which is where the dead space under every page came from.
           Clipping them in their own inset-0 overflow-hidden layer keeps the
           look and removes the phantom 160px. */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div
+        className="pointer-events-none fixed inset-0 overflow-hidden"
+        /* 100vw, not 100%: the viewport width includes the scrollbar gutter,
+           the wrapper's width does not. Fixed rather than absolute for the
+           same reason — anchored to the viewport, it cannot stop at the
+           wrapper's right edge and leave an unglowed strip beside it. It also
+           keeps the glows out of the scroll height for good. */
+        style={{ width: "100vw", left: 0 }}
+        aria-hidden="true"
+      >
         <div className="absolute -top-40 -left-32 w-[32rem] h-[32rem] rounded-full bg-indigo-600/20 blur-[120px]" />
         <div className="absolute -bottom-40 -right-32 w-[32rem] h-[32rem] rounded-full bg-violet-600/15 blur-[120px]" />
       </div>
@@ -16829,6 +16844,11 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
           puzzleType: puzzle.puzzleType,
           items: puzzle.items,
           premises: puzzle.premises,
+          // The order they were actually read in. The premises array is the
+          // chain's natural order, which is not what was on screen — the
+          // scramble means premise 1 of the round is rarely premises[0], so
+          // the history was replaying a round nobody saw.
+          premiseOrder: puzzle.premiseOrder,
           positions: puzzle.positions, // space2d only — the grid the map is drawn from
 
           conclusion: puzzle.conclusion,
@@ -17351,7 +17371,13 @@ function RRTExercise({ exercise, onFinish, onStageChange, onLevelUp, onSessionEn
                       <div className="text-slate-300 uppercase text-sm tracking-wide font-semibold">
                         Premises
                       </div>
-                      {entry.premises.map((p, pi) => (
+                      {/* Shown order, first premise at the top. Entries saved
+                          before premiseOrder was recorded fall back to the
+                          natural order they were stored in. */}
+                      {(entry.premiseOrder && entry.premiseOrder.length === entry.premises.length
+                        ? entry.premiseOrder.map((idx) => entry.premises[idx])
+                        : entry.premises
+                      ).map((p, pi) => (
                         <div key={pi} className="flex items-center gap-3 flex-wrap">
                           <RrtHistoryItemChip item={p.subject} onClick={setHistoryItemPopup} />
                           <span className="font-medium">{rrtRelationPhrase(p.relation)}</span>
