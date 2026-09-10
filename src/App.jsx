@@ -2855,15 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 270;
+const BUILD_VERSION = 271;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:20 PM";
+const BUILD_TIME = "6:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Earned free-month card stays dismissed",
-  "Show tutorials clears per-exercise dismissals",
+  "Testing station can force every tutorial back on",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12369,6 +12368,25 @@ function NBackSessionApp() {
                   🧪 Clear free month claim
                 </button>
               </div>
+              {/* Both switches at once. "Don't show this again" inside a
+                  tutorial sets that exercise's own flag AND turns the global
+                  one off, so clearing only one of them leaves that exercise
+                  silently skipped while every other tutorial returns. */}
+              <button
+                onClick={() => {
+                  clearTutorialDismissals();
+                  setHideTutorials(false);
+                  try {
+                    RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
+                    localStorage.removeItem(RRT_ANSWERED_KEY);
+                  } catch {
+                    /* nothing persisted to clear */
+                  }
+                }}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Show every tutorial again
+              </button>
               <button
                 onClick={seedFakeHistory}
                 className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
