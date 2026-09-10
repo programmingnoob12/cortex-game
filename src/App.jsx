@@ -2436,14 +2436,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 246;
+const BUILD_VERSION = 247;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "6:12 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Log out sits on the footer",
+  "Get membership button on the regime page",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10926,6 +10926,25 @@ function NBackSessionApp() {
             </div>
 
             <div className="flex flex-col gap-6">
+              {/* The one thing on this page a free account is meant to do.
+                  Sits above the regimes rather than under them, because
+                  every locked card below it points here anyway. */}
+              {!isMember && (
+                <button
+                  onClick={goToCheckout}
+                  style={{ "--ex": "#1E982B" }}
+                  className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
+                >
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="text-2xl font-semibold">Get membership</div>
+                    <div className="text-lg font-medium">Unlock all regimes ›</div>
+                  </div>
+                  <div className="text-base font-medium mt-1">
+                    Quick, Balanced and Deep, plus Motivation.
+                  </div>
+                </button>
+              )}
+
               {REGIMES.map((r) => {
                 const rc = REGIME_COLORS[r.key] || "#4CB9D8";
                 const locked = !isMember && r.key !== FREE_REGIME_KEY;
