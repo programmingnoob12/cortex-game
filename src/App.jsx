@@ -2855,14 +2855,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 271;
+const BUILD_VERSION = 272;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:40 PM";
+const BUILD_TIME = "7:00 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Testing station can force every tutorial back on",
+  "RRT intro page wording",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -5096,10 +5096,10 @@ function rrtHasRealPointer() {
 const EXERCISE_INTROS = {
   rrt: {
     name: "Relational Reasoning Training",
-    lead: "This is the most beneficial exercise here if what you want is a higher IQ.",
+    lead: "This exercise is the most beneficial if you want to improve IQ.",
     blurb:
-      "You read a chain of relationships between items, build a spatial model of them in your head, then answer a question the premises never state directly. That answer is only available to someone who held the whole structure at once.",
-    trains: ["Fluid reasoning", "Spatialization", "Integration", "Recall", "Speed"],
+      "It trains fluid reasoning, spatialization, integration, recall and speed.",
+    trains: [],
   },
   dual: {
     name: "Dual N-Back",
@@ -5164,6 +5164,7 @@ function ExerciseIntro({ exerciseKey, accent }) {
         </p>
       )}
       <p className="text-slate-300 text-lg leading-relaxed">{intro.blurb}</p>
+      {intro.trains.length > 0 && (
       <div className="pt-1">
         <div className="text-slate-500 text-sm uppercase tracking-wide font-semibold">
           What it trains
@@ -5184,6 +5185,7 @@ function ExerciseIntro({ exerciseKey, accent }) {
           ))}
         </div>
       </div>
+      )}
     </div>
   );
 }
