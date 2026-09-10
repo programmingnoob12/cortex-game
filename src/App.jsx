@@ -2849,15 +2849,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 260;
+const BUILD_VERSION = 261;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:05 PM";
+const BUILD_TIME = "12:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Checkout returns straight to the regime picker, unlocked",
-  "Contact line on the last RRT tutorial page",
+  "Achievements are member-only",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10840,6 +10839,12 @@ function NBackSessionApp() {
     }
   };
 
+  // A membership that lapses while the Achievements screen is open would
+  // otherwise leave them on a screen that no longer renders anything.
+  useEffect(() => {
+    if (!isMember && mainView === "achievements") setMainView("home");
+  }, [isMember, mainView]);
+
   // A membership that lapses leaves a paid regime selected. Rather than
   // letting them keep training it for free, send them back to the picker,
   // where everything but Anti-brainrot now reads as locked.
@@ -11484,7 +11489,7 @@ function NBackSessionApp() {
           </div>
         )}
 
-        {mainView === "achievements" && (
+        {mainView === "achievements" && isMember && (
           <div className="space-y-14">
             <div>
               <button
@@ -14937,7 +14942,7 @@ function NBackSessionApp() {
         </div>
       )}
 
-      {!unlockInfo && achievementCelebrationQueue.length > 0 && (() => {
+      {isMember && !unlockInfo && achievementCelebrationQueue.length > 0 && (() => {
         const current = achievementCelebrationQueue[0];
         const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[current.group]];
         return (
@@ -15393,7 +15398,9 @@ function NBackSessionApp() {
         </button>
       )}
 
-      {mainView === "home" && (
+      {/* Part of the membership, like Motivation. A free account never sees
+          the pill, and the screen below is unreachable without it. */}
+      {mainView === "home" && isMember && (
         <button
           onClick={() => setMainView("achievements")}
           /* Top right while the Leaderboard is hidden. When that comes back it
