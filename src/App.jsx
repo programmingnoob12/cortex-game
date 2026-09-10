@@ -372,6 +372,55 @@ function saveSessionSnapshot(snap) {
   } catch { /* no storage */ }
 }
 
+// Everything parked for later, in one place. Was pink text on the regime
+// screen; it outgrew a corner of another page, so it lives behind its own
+// button on Home now.
+const NOTE_GROUPS = [
+  {
+    title: "To fix",
+    items: [
+      "Fix the problem with how they view all of their stats.",
+      "One of the pages has its text off-centre, unlike the others.",
+      "Make the 3D MOT balls look better.",
+    ],
+  },
+  {
+    title: "Make it an experience",
+    items: [
+      "A ritual of wisdom that is an experience, not just training.",
+      "Write more motivational lines and psychology-boosting lines.",
+      "Glorify it: animations, edits, TikToks, songs, anything that makes it look cool and HARD as fuck.",
+      "Show up differently. Make all the little details higher quality to give a premium feel.",
+      "Cool songs when the session is finished.",
+      "Add TikTok hard songs and mix up when they're played.",
+      "The goal isn't just a brain training app. It is psychological solutions that make it feel better and easier, a pseudo motivation mindset coach on top of the exercises.",
+    ],
+  },
+  {
+    title: "Build",
+    items: [
+      "Add a studies link at the bottom with ToS, privacy etc.",
+      "Add a nutrition section that tracks raw milk, raw eggs, sunlight etc.",
+      "Maybe change the overview to a horizontal layout so it fits on one screen.",
+    ],
+  },
+  {
+    title: "Business",
+    items: [
+      "Consolidate and get this to take off and make bank before competitors catch on and copy what I'm doing. Be flying, and potentially cashing out, before anyone gets a chance to compete. Ideally with an exit.",
+    ],
+  },
+  {
+    title: "Marketing",
+    items: [
+      "Hype animations for social, not for the app. Punchy motion, big numbers climbing, hard cuts, a repeatable visual signature. Gem climbing tiers, a grid lighting up faster as N climbs, a score line ripping upward, the record reveal cut to 6 seconds. Square and vertical exports, no audio dependency.",
+      "Proper illustration for the checkout page. Must work at desktop and mobile width and not fight the price and the button for attention.",
+      "Pre-checkout quiz showing cognitive indices rising, modelled on Chessreps. Working Memory, Fluid Reasoning, Processing Speed, Full Scale IQ estimate. Settle how the numbers are derived first: an IQ figure has to be computed from their own sessions or plainly labelled a projection, or it is a false claim about a health-adjacent measure.",
+      "Ragebait occasionally, not exclusively. Opinions about the field, never attacks on named people. Ration it, an account that is only ragebait stops converting.",
+    ],
+  },
+];
+
 const FREE_REGIME_KEY = "cct";
 
 // True for a paying account, false for a free one. AuthGate is the only
@@ -2472,14 +2521,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 254;
+const BUILD_VERSION = 255;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "7:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One honest line on the plan card",
+  "Notes moved to their own page",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10954,74 +11003,7 @@ function NBackSessionApp() {
               <div className="text-slate-100 text-lg font-semibold">
                 VERSION {BUILD_VERSION} · {BUILD_TIME}
               </div>
-              {/* Standing reminder, kept in the app rather than a note
-                  elsewhere so it is unavoidable. Remove the block when the
-                  work is done. */}
-              <div
-                className="mt-3 mb-5 space-y-2 text-sm leading-relaxed"
-                style={{ color: "#E8158F" }}
-              >
-                <div className="font-semibold uppercase tracking-wide text-xs">
-                  To fix
-                </div>
-                <div>
-                  Fix the problem with how they view all of their stats.
-                </div>
-                <div>
-                  One of the pages has its text off-centre, unlike the others.
-                </div>
-                <div>
-                  Make the 3D MOT balls look better.
-                </div>
-                <div>
-                  And to make this an experience, a ritual of wisdom that is an
-                  experience not just training.
-                </div>
-                <div>
-                  Write more motivational lines and psychology-boosting lines.
-                </div>
-                <div>
-                  Glorify it: animations, edits, TikToks, songs, anything that
-                  makes it look cool and HARD as fuck.
-                </div>
-                <div>
-                  Show up differently. Make all the little details higher
-                  quality to give a premium feel.
-                </div>
-                <div>
-                  Add a studies link on the bottom with ToS, privacy etc.
-                </div>
-                <div>
-                  Cool songs when the session is finished.
-                </div>
-                <div>
-                  Add TikTok hard songs and mix up when they're played.
-                </div>
-                <div>
-                  Add a nutrition section that tracks raw milk, raw eggs,
-                  sunlight, etc.
-                </div>
-                <div>
-                  Consolidate and get this to take off and make bank before
-                  competitors start to catch on and copy what I'm doing. I need
-                  to already be flying and doing well, and potentially cashing
-                  out of the business, before people even get a chance to start
-                  competing. Don't give them any time to catch up before I've
-                  already made it and got all the value I can out of this
-                  business, ideally with an exit.
-                </div>
-                <div>
-                  Maybe change the overview to a horizontal layout so it fits
-                  on one screen. We'll see.
-                </div>
-                <div>
-                  The goal isn't to just be a brain training app, it also is to
-                  have psychological solutions that make it feel better and
-                  easier, and to essentially nee like a pseudo motivation
-                  mindset coach on top of the training exercises.
-                </div>
-              </div>
-              <ul className="mt-1.5 mb-5 space-y-0.5">
+                <ul className="mt-1.5 mb-5 space-y-0.5">
                 {BUILD_NOTES.map((note) => (
                   <li key={note} className="text-slate-500 text-xs flex gap-2">
                     <span aria-hidden="true">·</span>
@@ -11560,6 +11542,44 @@ function NBackSessionApp() {
               )}
             </div>
 
+          </div>
+        )}
+
+        {mainView === "notes" && (
+          <div className="space-y-8">
+            <div>
+              <button
+                onClick={() => setMainView("home")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+              >
+                &lsaquo; Back
+              </button>
+              <h1 className="text-4xl font-semibold tracking-tight">Notes</h1>
+              <div className="text-slate-500 text-base mt-2">
+                {NOTE_GROUPS.reduce((n, g) => n + g.items.length, 0)} parked
+              </div>
+            </div>
+
+            {NOTE_GROUPS.map((group) => (
+              <div key={group.title} className="space-y-3">
+                <div
+                  className="text-xs font-semibold uppercase tracking-[0.16em]"
+                  style={{ color: "#E8158F" }}
+                >
+                  {group.title}
+                </div>
+                <div className="space-y-2">
+                  {group.items.map((item, i) => (
+                    <div
+                      key={i}
+                      className="bg-slate-900 border border-slate-700/60 rounded-lg px-5 py-4 text-slate-200 text-base leading-relaxed"
+                    >
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -14995,6 +15015,16 @@ function NBackSessionApp() {
             </button>
           </div>
         </div>
+      )}
+
+      {mainView === "home" && (
+        <button
+          onClick={() => setMainView("notes")}
+          /* Under the Testing station pill, same treatment. */
+          className="fixed top-14 left-3 sm:top-[4.5rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+        >
+          Notes
+        </button>
       )}
 
       {mainView === "home" && (
