@@ -2893,14 +2893,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 287;
+const BUILD_VERSION = 288;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:05 PM";
+const BUILD_TIME = "4:45 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview cards centred and full width, glows brought in",
+  "Overview rebuilt: one summary panel, a card per exercise",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14270,118 +14270,137 @@ function NBackSessionApp() {
                       : "\u2014",
                 };
               });
-              // Never fewer than three tracks: a single-exercise regime would
-              // otherwise stretch one card across the whole page. Spare tracks
-              // all sit on the right, so cards stay left-aligned with the
-              // heading no matter how short the regime is.
-              const cols = Math.max(rows.length, 3);
-              const spare = cols - rows.length;
-              const lead = Math.floor(spare / 2);
-              const tail = spare - lead;
-              const leadBlanks = Array.from({ length: lead });
-              const tailBlanks = Array.from({ length: tail });
-              const track = { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` };
+              // One panel across the top for the three session-wide
+              // numbers, then a card per exercise. The cards are sized off a
+              // minimum width rather than a column count, so Regime and All
+              // give the same card at the same size — only how many of them
+              // there are changes, which is what stopped the board resizing
+              // under the scope switch.
+              const summary = [
+                {
+                  label: overviewSource === "home" ? "Total duration" : "Duration",
+                  value:
+                    overviewSource === "home"
+                      ? formatLongDuration(msTrainedTotal(exerciseHistory))
+                      : formatDuration(msTrainedToday(exerciseHistory)),
+                },
+                (() => {
+                  const isAll = overviewScope === "all";
+                  const days = isAll
+                    ? longestStreakDays(exerciseHistory)
+                    : achievementState.streak;
+                  return {
+                    label: isAll ? "Best streak" : "Current streak",
+                    value: `${days} ${days === 1 ? "day" : "days"}`,
+                    color: EXERCISE_COLORS.rrt,
+                  };
+                })(),
+                {
+                  label: "Sessions",
+                  value: String(achievementState.totalSessions),
+                },
+              ];
+
               return (
                 <>
-                  {/* Laid on the same track as the exercises below, so it
-                      lines up with the first of them at any regime, centring
-                      with them when the regime is short. */}
-                  <div className="grid gap-6" style={track}>
-                    {leadBlanks.map((_, i) => (
-                      <div key={`db-${i}`} />
+                  <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
+                    {summary.map((s2) => (
+                      <div key={s2.label} className="px-7 py-6">
+                        <div className="text-slate-400 text-base">{s2.label}</div>
+                        <div
+                          className="text-3xl font-semibold tracking-tight mt-1.5"
+                          style={s2.color ? { color: s2.color } : undefined}
+                        >
+                          {s2.value}
+                        </div>
+                      </div>
                     ))}
-                    <Stat
-                      reserveLabel
-                      label={overviewSource === "home" ? "Total duration" : "Duration"}
-                      value={
-                        overviewSource === "home"
-                          ? formatLongDuration(msTrainedTotal(exerciseHistory))
-                          : formatDuration(msTrainedToday(exerciseHistory))
-                      }
-                    />
-                    {/* Regime is the run being kept up right now; All is the
-                        whole record, so it shows the best ever instead. */}
-                    {(() => {
-                      const isAll = overviewScope === "all";
-                      const days = isAll
-                        ? longestStreakDays(exerciseHistory)
-                        : achievementState.streak;
-                      return (
-                        <Stat
-                          label={isAll ? "Best streak" : "Current streak"}
-                          value={`${days} ${days === 1 ? "day" : "days"}`}
-                          reserveLabel
-                        />
-                      );
-                    })()}
-                    <Stat
-                      label="Sessions"
-                      value={String(achievementState.totalSessions)}
-                      reserveLabel
-                    />
                   </div>
 
-                  {/* The three bands are one grid so a wrapped name cannot
-                      knock the cards out of line with their neighbours. */}
-                  <div className="grid gap-x-6 gap-y-4" style={track}>
-                    {leadBlanks.map((_, i) => (
-                      <div key={`hl-${i}`} />
-                    ))}
-                    {rows.map(({ e }) => (
-                      <h2
-                        key={`h-${e.key}`}
-                        className="text-2xl font-semibold tracking-tight text-slate-100 flex items-center gap-3 h-9 self-end"
-                      >
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{
-                            backgroundColor: EXERCISE_COLORS[e.key] || "#4CB9D8",
-                          }}
-                        />
-                        <span className="truncate">{e.title}</span>
-                      </h2>
-                    ))}
-                    {tailBlanks.map((_, i) => (
-                      <div key={`ht-${i}`} />
-                    ))}
-                    {leadBlanks.map((_, i) => (
-                      <div key={`bl-${i}`} />
-                    ))}
-                    {rows.map((r) => (
-                      <Stat
-                        key={`b-${r.e.key}`}
-                        label={r.bestLabel}
-                        value={r.bestValue}
-                        reserveLabel
-                        pr={
+                  <div className="space-y-3">
+                    <div className="text-slate-500 text-base">By exercise</div>
+                    <div
+                      className="grid gap-5"
+                      style={{
+                        gridTemplateColumns:
+                          "repeat(auto-fill, minmax(min(100%, 17rem), 1fr))",
+                      }}
+                    >
+                      {rows.map((r) => {
+                        const ex = EXERCISE_COLORS[r.e.key] || "#4CB9D8";
+                        const isPR =
                           overviewSource === "training" &&
                           !!sessionPRs[r.e.key] &&
-                          !overviewPRSeen[r.e.key]
-                        }
-                        color={
-                          r.stat && r.isAccuracy
-                            ? accuracyColor(r.stat.bestAccuracy)
-                            : undefined
-                        }
-                      />
-                    ))}
-                    {tailBlanks.map((_, i) => (
-                      <div key={`bt-${i}`} />
-                    ))}
-                    {leadBlanks.map((_, i) => (
-                      <div key={`al-${i}`} />
-                    ))}
-                    {rows.map((r) => (
-                      <Stat
-                        key={`a-${r.e.key}`}
-                        reserveLabel
-                        label={r.avgLabel}
-                        value={r.avgValue}
-                        color={
-                          r.stat && r.isAccuracy ? accuracyColor(r.avgVal) : undefined
-                        }
-                      />
-                    ))}
+                          !overviewPRSeen[r.e.key];
+                        const line = (label, value, color) => (
+                          <div className="flex items-baseline justify-between gap-4 py-3">
+                            <span className="text-slate-400 text-base">{label}</span>
+                            <span
+                              className="text-lg font-semibold tabular-nums text-right"
+                              style={color ? { color } : undefined}
+                            >
+                              {value}
+                            </span>
+                          </div>
+                        );
+                        return (
+                          <div
+                            key={r.e.key}
+                            className="rounded-xl bg-slate-900 border border-slate-700/60 overflow-hidden"
+                            style={{
+                              // The exercise's own colour as a top rule, the
+                              // one place each card is allowed to be loud.
+                              borderTop: `3px solid ${isPR ? "#FACC15" : ex}`,
+                              ...(isPR
+                                ? {
+                                    borderColor: "#FACC15",
+                                    backgroundColor: "rgba(250,204,21,0.06)",
+                                  }
+                                : null),
+                            }}
+                          >
+                            <div className="px-6 pt-5 flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: ex }}
+                                />
+                                <span className="text-lg font-semibold tracking-tight truncate">
+                                  {r.e.title}
+                                </span>
+                              </div>
+                              {isPR && (
+                                <span
+                                  className="shrink-0 text-xs font-bold uppercase tracking-wide rounded-full px-2.5 py-1"
+                                  style={{
+                                    color: "#FACC15",
+                                    border: "1px solid #FACC15",
+                                  }}
+                                >
+                                  New PR!
+                                </span>
+                              )}
+                            </div>
+                            <div className="px-6 pb-5 pt-2 divide-y divide-slate-700/60">
+                              {line(
+                                r.bestLabel,
+                                r.bestValue,
+                                r.stat && r.isAccuracy
+                                  ? accuracyColor(r.stat.bestAccuracy)
+                                  : undefined
+                              )}
+                              {line(
+                                r.avgLabel,
+                                r.avgValue,
+                                r.stat && r.isAccuracy
+                                  ? accuracyColor(r.avgVal)
+                                  : undefined
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               );
