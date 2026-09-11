@@ -2893,14 +2893,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 288;
+const BUILD_VERSION = 289;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:45 PM";
+const BUILD_TIME = "5:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview rebuilt: one summary panel, a card per exercise",
+  "Overview fits one screen in All",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14188,9 +14188,9 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div className="space-y-8">
+          <div className="space-y-5">
             <div className="flex items-center gap-4 flex-wrap">
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl font-semibold tracking-tight">
                 Overview
               </h1>
               {/* Same switch as Stats, driving the same scope: Regime is
@@ -14305,10 +14305,10 @@ function NBackSessionApp() {
                 <>
                   <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
                     {summary.map((s2) => (
-                      <div key={s2.label} className="px-7 py-6">
-                        <div className="text-slate-400 text-base">{s2.label}</div>
+                      <div key={s2.label} className="px-6 py-4">
+                        <div className="text-slate-400 text-sm">{s2.label}</div>
                         <div
-                          className="text-3xl font-semibold tracking-tight mt-1.5"
+                          className="text-2xl font-semibold tracking-tight mt-1"
                           style={s2.color ? { color: s2.color } : undefined}
                         >
                           {s2.value}
@@ -14317,13 +14317,17 @@ function NBackSessionApp() {
                     ))}
                   </div>
 
-                  <div className="space-y-3">
-                    <div className="text-slate-500 text-base">By exercise</div>
+                  <div className="space-y-2">
+                    <div className="text-slate-500 text-sm">By exercise</div>
+                    {/* 12rem, so six cards sit on one row on a laptop rather
+                        than wrapping to a second and pushing the buttons off
+                        the bottom. Still a minimum rather than a count, so a
+                        card is the same size in Regime and All. */}
                     <div
-                      className="grid gap-5"
+                      className="grid gap-3"
                       style={{
                         gridTemplateColumns:
-                          "repeat(auto-fill, minmax(min(100%, 17rem), 1fr))",
+                          "repeat(auto-fill, minmax(min(100%, 12rem), 1fr))",
                       }}
                     >
                       {rows.map((r) => {
@@ -14333,10 +14337,10 @@ function NBackSessionApp() {
                           !!sessionPRs[r.e.key] &&
                           !overviewPRSeen[r.e.key];
                         const line = (label, value, color) => (
-                          <div className="flex items-baseline justify-between gap-4 py-3">
-                            <span className="text-slate-400 text-base">{label}</span>
+                          <div className="flex items-baseline justify-between gap-3 py-2">
+                            <span className="text-slate-400 text-sm">{label}</span>
                             <span
-                              className="text-lg font-semibold tabular-nums text-right"
+                              className="text-base font-semibold tabular-nums text-right"
                               style={color ? { color } : undefined}
                             >
                               {value}
@@ -14359,19 +14363,19 @@ function NBackSessionApp() {
                                 : null),
                             }}
                           >
-                            <div className="px-6 pt-5 flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="px-4 pt-3 flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
                                 <span
-                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  className="w-2 h-2 rounded-full shrink-0"
                                   style={{ backgroundColor: ex }}
                                 />
-                                <span className="text-lg font-semibold tracking-tight truncate">
+                                <span className="text-base font-semibold tracking-tight truncate">
                                   {r.e.title}
                                 </span>
                               </div>
                               {isPR && (
                                 <span
-                                  className="shrink-0 text-xs font-bold uppercase tracking-wide rounded-full px-2.5 py-1"
+                                  className="shrink-0 text-[0.625rem] font-bold uppercase tracking-wide rounded-full px-2 py-0.5"
                                   style={{
                                     color: "#FACC15",
                                     border: "1px solid #FACC15",
@@ -14381,7 +14385,7 @@ function NBackSessionApp() {
                                 </span>
                               )}
                             </div>
-                            <div className="px-6 pb-5 pt-2 divide-y divide-slate-700/60">
+                            <div className="px-4 pb-3 pt-1 divide-y divide-slate-700/60">
                               {line(
                                 r.bestLabel,
                                 r.bestValue,
@@ -14406,10 +14410,10 @@ function NBackSessionApp() {
               );
             })()}
 
-            <div className="flex gap-6 pt-4">
+            <div className="flex gap-4 pt-1">
               <button
                 onClick={() => setOverviewView("graph")}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
               >
                 Stats
               </button>
@@ -14434,7 +14438,7 @@ function NBackSessionApp() {
                     setMainView("hypnosis");
                   }, 6100);
                 }}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
               >
                 {overviewSource === "home" ? "Home" : "Done"}
               </button>
