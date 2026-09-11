@@ -47,8 +47,8 @@ body{background-color:transparent;}
 body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
 background-color:#08090A;
 background-image:
-radial-gradient(32rem 32rem at -8rem -10rem, rgba(76,185,216,0.2), rgba(76,185,216,0) 70%),
-radial-gradient(32rem 32rem at calc(100vw - 8rem) calc(100% + 10rem), rgba(139,127,232,0.15), rgba(139,127,232,0) 70%);}
+radial-gradient(32rem 32rem at -2rem -3rem, rgba(76,185,216,0.2), rgba(76,185,216,0) 70%),
+radial-gradient(32rem 32rem at calc(100vw - 14rem) calc(100% + 3rem), rgba(139,127,232,0.15), rgba(139,127,232,0) 70%);}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -2893,14 +2893,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 286;
+const BUILD_VERSION = 287;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:35 PM";
+const BUILD_TIME = "4:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Background reaches the right edge, glows and all",
+  "Overview cards centred and full width, glows brought in",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14274,10 +14274,9 @@ function NBackSessionApp() {
               // otherwise stretch one card across the whole page. Spare tracks
               // all sit on the right, so cards stay left-aligned with the
               // heading no matter how short the regime is.
-              // Fixed across both scopes, not derived from what is showing.
-              const cols = Math.max(overviewColumnCount, rows.length);
+              const cols = Math.max(rows.length, 3);
               const spare = cols - rows.length;
-              const lead = 0;
+              const lead = Math.floor(spare / 2);
               const tail = spare - lead;
               const leadBlanks = Array.from({ length: lead });
               const tailBlanks = Array.from({ length: tail });
