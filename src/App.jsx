@@ -47,8 +47,8 @@ body{background-color:transparent;}
 body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
 background-color:#08090A;
 background-image:
-radial-gradient(32rem 32rem at -2rem -3rem, rgba(76,185,216,0.2), rgba(76,185,216,0) 70%),
-radial-gradient(32rem 32rem at calc(100vw - 14rem) calc(100% + 3rem), rgba(139,127,232,0.15), rgba(139,127,232,0) 70%);}
+radial-gradient(30rem 30rem at -4rem -4rem, rgba(76,185,216,0.22), rgba(76,185,216,0) 70%),
+radial-gradient(30rem 30rem at calc(100% + 4rem) calc(100% + 4rem), rgba(139,127,232,0.18), rgba(139,127,232,0) 70%);}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -1963,7 +1963,7 @@ const OVERVIEW_SLOTS = Object.keys(EXERCISE_LIBRARY).length;
 // Overview screen. Distinguished from the "coming soon" placeholders by key.
 const OVERVIEW_EXERCISE = {
   key: "overview",
-  title: "Overview",
+  title: "Stats",
   accent: "indigo",
   modalities: [],
   maxN: 1,
@@ -2898,14 +2898,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 293;
+const BUILD_VERSION = 294;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:20 PM";
+const BUILD_TIME = "7:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview pinned to the top so the scope switch cannot move it",
+  "Stats holds still, glows in the corners",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11701,15 +11701,6 @@ function NBackSessionApp() {
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
           ? "items-start justify-center px-2 md:px-4 pt-2 pb-2"
-          : mainView === "app" &&
-            exercise.key === "overview" &&
-            overviewView === "summary"
-          ? // Top-aligned, not centred: the Overview's height changes a little
-            // between Regime and All, and centring shares that difference
-            // between the top and the bottom, so the whole screen creeps up
-            // and down as the scope is switched. Anchored to the top, the
-            // heading and everything under it stay exactly where they are.
-            "items-start justify-center p-5 sm:p-8 lg:p-12"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -12485,7 +12476,7 @@ function NBackSessionApp() {
                 onClick={goToOverview}
                 className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
               >
-                Overview
+                Stats
               </button>
               {/* Part of the membership, not the free tier. */}
               {isMember && (
@@ -14205,7 +14196,7 @@ function NBackSessionApp() {
           <div className="space-y-6">
             <div className="flex items-center gap-4 flex-wrap">
               <h1 className="text-3xl font-semibold tracking-tight">
-                Overview
+                Stats
               </h1>
               {/* Same switch as Stats, driving the same scope: Regime is
                   what is being trained, All is every exercise with any
@@ -14363,7 +14354,13 @@ function NBackSessionApp() {
                             <div
                               key={`empty-${slot}`}
                               aria-hidden="true"
-                              style={{ visibility: "hidden" }}
+                              style={{
+                                visibility: "hidden",
+                                // Matches the real cards' 3px coloured rule,
+                                // or this placeholder is 2px shorter and the
+                                // board's height depends on the scope.
+                                borderTop: "3px solid transparent",
+                              }}
                               className="rounded-xl bg-slate-900 border border-slate-700/60 overflow-hidden"
                             >
                               <div className="px-5 pt-4 flex items-center gap-2">
@@ -14473,12 +14470,12 @@ function NBackSessionApp() {
               );
             })()}
 
-            <div className="flex gap-4 pt-2">
+            <div className="flex gap-3 pt-2">
               <button
                 onClick={() => setOverviewView("graph")}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium"
               >
-                Stats
+                Graph
               </button>
               {/* Opened from Home this is just a page they were browsing, so
                   it goes back Home. Reached at the end of a regime it is the
@@ -14501,7 +14498,7 @@ function NBackSessionApp() {
                     setMainView("hypnosis");
                   }, 6100);
                 }}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium"
               >
                 {overviewSource === "home" ? "Home" : "Done"}
               </button>
@@ -14522,7 +14519,7 @@ function NBackSessionApp() {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-semibold tracking-tight">
-                  Stats
+                  Graph
                 </h1>
                 {/* Regime is what is being trained; All is every exercise
                     that has any history, so scores from a regime someone has
