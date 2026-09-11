@@ -2830,7 +2830,6 @@ const MOTIVATION_LINES = [
   { id: 34, text: "Other people aren't willing to do what you do. That's why you have an edge." },
   { id: 35, text: "Most people never train this. That's why you have an edge." },
   { id: 36, text: "Your edge is built on days like this." },
-  { id: 37, text: "You're building the thing everyone else calls talent." },
   { id: 38, text: "What used to be impossible is now your average. That's how far you've come.", cond: "avgPR" },
   { id: 39, text: "Celebrate this. Then go higher.", cond: "pr" },
   { id: 40, text: "Faster decisions. Better reactions." },
@@ -2888,15 +2887,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 280;
+const BUILD_VERSION = 281;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:05 PM";
+const BUILD_TIME = "1:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Misses flash white, wrong answers stay red",
-  "Overview cards hold one height across both scopes",
+  "Dropped the \u201Ccalls talent\u201D line",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
