@@ -43,7 +43,11 @@ const THEME_CSS = `
 color-scheme:dark;}
 html,body{background-color:#08090A;color:#F7F8F8;}
 html{scrollbar-gutter:stable;}
-body{overflow-x:hidden;}
+body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
+background-color:#08090A;
+background-image:
+radial-gradient(32rem 32rem at -8rem -10rem, rgba(76,185,216,0.2), rgba(76,185,216,0) 70%),
+radial-gradient(32rem 32rem at calc(100vw - 8rem) calc(100% + 10rem), rgba(139,127,232,0.15), rgba(139,127,232,0) 70%);}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -861,7 +865,7 @@ function AuthGate({ children }) {
     // Bare background rather than a "Loading…" line. The wait is one read of
     // the stored session, and a word on screen for a few hundred
     // milliseconds reads as a slower app than an empty page does.
-    return <div className="min-h-screen bg-slate-950" />;
+    return <div className="min-h-screen" />;
   }
 
   // A password-recovery session takes priority over everything else —
@@ -869,7 +873,7 @@ function AuthGate({ children }) {
   // set a new one before they can do anything else in the app.
   if (mode === "recovery") {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Set a new password</h1>
           <form onSubmit={handleSetNewPassword} className="space-y-3">
@@ -898,7 +902,7 @@ function AuthGate({ children }) {
   if (!session) {
     if (mode === "forgotSent") {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-4 text-center">
             <h1 className="text-2xl font-semibold">Check your email</h1>
             <p className="text-slate-300 text-base">
@@ -917,7 +921,7 @@ function AuthGate({ children }) {
 
     if (mode === "forgot") {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Reset your password</h1>
             <form onSubmit={handleForgotPassword} className="space-y-3">
@@ -950,7 +954,7 @@ function AuthGate({ children }) {
 
     if (mode === "password") {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Sign in</h1>
             <form onSubmit={handlePasswordLogin} className="space-y-3">
@@ -998,7 +1002,7 @@ function AuthGate({ children }) {
     // no marketing. Somebody who arrives here has already decided.
     if (mode === "signup") {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Create your account</h1>
             {linkSent ? (
@@ -1118,7 +1122,7 @@ function AuthGate({ children }) {
 
     // Default: magic-link sign in
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Sign in</h1>
           {linkSent ? (
@@ -1162,7 +1166,7 @@ function AuthGate({ children }) {
     // No interstitial. On the first check of a new browser this is a blank
     // dark page for a moment, which reads as the app still loading rather
     // than as a step it is making the person wait through.
-    return <div className="min-h-screen bg-slate-950" />;
+    return <div className="min-h-screen" />;
   }
 
   // Someone with no membership at all is a FREE account, not a locked-out
@@ -1256,7 +1260,7 @@ function AuthGate({ children }) {
     };
 
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-3 text-center">
           <h1 className="text-xl font-semibold">{state.title}</h1>
           <p className="text-slate-400 text-base">{state.body}</p>
@@ -1306,7 +1310,7 @@ function AuthGate({ children }) {
   // nothing about their account or data.
   if (passwordPrompt) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
         <div className="max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Set a password?</h1>
           <p className="text-slate-400 text-sm text-center">
@@ -1423,7 +1427,7 @@ class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
           <div className="max-w-sm w-full space-y-5 text-center">
             <div className="text-5xl">⚠️</div>
             <h1 className="text-2xl font-semibold">Something went wrong</h1>
@@ -2888,14 +2892,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 283;
+const BUILD_VERSION = 284;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:10 PM";
+const BUILD_TIME = "2:50 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "App paints the full width, no black strip on the right",
+  "Background is one full-viewport surface — black strip gone",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11656,11 +11660,6 @@ function NBackSessionApp() {
       // Reserving one here as well just painted an empty strip of page
       // background down the right-hand edge, inside the app.
       style={{
-        // 100vw, not 100%: the viewport width includes the scrollbar gutter
-        // reserved on <html>, the wrapper's own 100% does not — and that
-        // difference was a bare black strip down the right-hand edge on every
-        // screen. body{overflow-x:hidden} absorbs the extra width.
-        width: "100vw",
         "--ex": themeColor,
         // The two pages that end in the legal footer sit it close to the
         // bottom edge rather than a full page-padding above it. Inline so it
@@ -11669,7 +11668,7 @@ function NBackSessionApp() {
           ? { paddingBottom: "1.125rem" }
           : null),
       }}
-      className={`relative bg-slate-950 text-slate-100 flex overflow-x-hidden ${
+      className={`relative w-full text-slate-100 flex overflow-x-hidden ${
         /* Home and Account are laid out to fit exactly one screen, so they
            are pinned to the viewport height instead of min-height: with
            min-h-screen the page could still be a few pixels taller than the
@@ -11699,25 +11698,9 @@ function NBackSessionApp() {
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
-      {/* The decorative glows sit at -top-40 / -bottom-40, i.e. 10rem OUTSIDE
-          this container. An absolutely positioned descendant that overflows
-          the bottom of a scroll container still contributes to its scrollable
-          height, which is where the dead space under every page came from.
-          Clipping them in their own inset-0 overflow-hidden layer keeps the
-          look and removes the phantom 160px. */}
-      <div
-        className="pointer-events-none fixed inset-0 overflow-hidden"
-        /* 100vw, not 100%: the viewport width includes the scrollbar gutter,
-           the wrapper's width does not. Fixed rather than absolute for the
-           same reason — anchored to the viewport, it cannot stop at the
-           wrapper's right edge and leave an unglowed strip beside it. It also
-           keeps the glows out of the scroll height for good. */
-        style={{ width: "100vw", left: 0 }}
-        aria-hidden="true"
-      >
-        <div className="absolute -top-40 -left-32 w-[32rem] h-[32rem] rounded-full bg-indigo-600/20 blur-[120px]" />
-        <div className="absolute -bottom-40 -right-32 w-[32rem] h-[32rem] rounded-full bg-violet-600/15 blur-[120px]" />
-      </div>
+      {/* The glows used to live here, clipped to this element and so stopping
+          at the scrollbar gutter. They are now a fixed full-viewport backdrop
+          in THEME_CSS, which is the only surface that can paint across it. */}
       <style>{`
         @keyframes auraPulseGlow {
           0%, 100% { box-shadow: 0 0 6px 1px rgba(236,72,153,0.35); }
