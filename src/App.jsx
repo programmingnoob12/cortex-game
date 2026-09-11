@@ -1954,6 +1954,11 @@ const EXERCISE_LIBRARY = {
   },
 };
 
+// The Overview's exercise board always has this many slots, so switching
+// Regime and All changes which of them are filled and nothing else — same
+// card size, same wrapping, same height.
+const OVERVIEW_SLOTS = Object.keys(EXERCISE_LIBRARY).length;
+
 // Terminal step appended to every regime — landing here shows the Session
 // Overview screen. Distinguished from the "coming soon" placeholders by key.
 const OVERVIEW_EXERCISE = {
@@ -2893,14 +2898,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 290;
+const BUILD_VERSION = 291;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:55 PM";
+const BUILD_TIME = "6:25 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview spacing eased, n-backs report a score",
+  "Regime lays out like All, empty slots left empty",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14334,7 +14339,44 @@ function NBackSessionApp() {
                           "repeat(auto-fill, minmax(min(100%, 14rem), 1fr))",
                       }}
                     >
-                      {rows.map((r) => {
+                      {/* One slot per exercise in the library, always, so
+                          Regime lays out exactly like All and the missing ones
+                          are simply empty. The placeholders are real cards
+                          rendered invisible rather than empty divs — that way
+                          they hold a card's height, so the row below them and
+                          the buttons underneath sit where they do in All
+                          instead of sliding up. */}
+                      {Array.from({
+                        length: Math.max(rows.length, OVERVIEW_SLOTS),
+                      }).map((_, slot) => {
+                        const r = rows[slot];
+                        if (!r) {
+                          return (
+                            <div
+                              key={`empty-${slot}`}
+                              aria-hidden="true"
+                              style={{ visibility: "hidden" }}
+                              className="rounded-xl bg-slate-900 border border-slate-700/60 overflow-hidden"
+                            >
+                              <div className="px-5 pt-4 flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full shrink-0" />
+                                <span className="text-base font-semibold tracking-tight">
+                                  &nbsp;
+                                </span>
+                              </div>
+                              <div className="px-5 pb-4 pt-1 divide-y divide-slate-700/60">
+                                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                  <span className="text-slate-400 text-sm">Best score</span>
+                                  <span className="text-base font-semibold">&mdash;</span>
+                                </div>
+                                <div className="flex items-baseline justify-between gap-3 py-2.5">
+                                  <span className="text-slate-400 text-sm">Avg score</span>
+                                  <span className="text-base font-semibold">&mdash;</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
                         const ex = EXERCISE_COLORS[r.e.key] || "#4CB9D8";
                         const isPR =
                           overviewSource === "training" &&
