@@ -43,6 +43,7 @@ const THEME_CSS = `
 color-scheme:dark;}
 html,body{background-color:#08090A;color:#F7F8F8;}
 html{scrollbar-gutter:stable;}
+body{overflow-x:hidden;}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -2887,14 +2888,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 282;
+const BUILD_VERSION = 283;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:40 PM";
+const BUILD_TIME = "2:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "PR highlight survives a trip to Stats, spent on Done",
+  "App paints the full width, no black strip on the right",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11655,6 +11656,11 @@ function NBackSessionApp() {
       // Reserving one here as well just painted an empty strip of page
       // background down the right-hand edge, inside the app.
       style={{
+        // 100vw, not 100%: the viewport width includes the scrollbar gutter
+        // reserved on <html>, the wrapper's own 100% does not — and that
+        // difference was a bare black strip down the right-hand edge on every
+        // screen. body{overflow-x:hidden} absorbs the extra width.
+        width: "100vw",
         "--ex": themeColor,
         // The two pages that end in the legal footer sit it close to the
         // bottom edge rather than a full page-padding above it. Inline so it
@@ -11663,7 +11669,7 @@ function NBackSessionApp() {
           ? { paddingBottom: "1.125rem" }
           : null),
       }}
-      className={`relative w-full bg-slate-950 text-slate-100 flex overflow-x-hidden ${
+      className={`relative bg-slate-950 text-slate-100 flex overflow-x-hidden ${
         /* Home and Account are laid out to fit exactly one screen, so they
            are pinned to the viewport height instead of min-height: with
            min-h-screen the page could still be a few pixels taller than the
