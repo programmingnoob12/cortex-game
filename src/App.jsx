@@ -41,8 +41,9 @@ const THEME_CSS = `
 --primary:#4CB9D8;--primary-hover:#5FC5E0;--primary-text:#8FD8EC;
 --green:#4CB782;--red:#EB5757;--yellow:#F2C94C;--cyan:#4CB9D8;--violet:#8B7FE8;--lime:#68CC58;
 color-scheme:dark;}
-html,body{background-color:#08090A;color:#F7F8F8;}
-html{scrollbar-gutter:stable;}
+html{background-color:#08090A;}
+html,body{color:#F7F8F8;}
+body{background-color:transparent;}
 body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
 background-color:#08090A;
 background-image:
@@ -2892,14 +2893,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 284;
+const BUILD_VERSION = 286;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:50 PM";
+const BUILD_TIME = "3:35 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Background is one full-viewport surface — black strip gone",
+  "Background reaches the right edge, glows and all",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
