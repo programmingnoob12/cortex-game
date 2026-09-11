@@ -2881,15 +2881,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 278;
+const BUILD_VERSION = 279;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:30 AM";
+const BUILD_TIME = "12:15 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "No exercise moves on by itself now",
-  "Overview holds still when switching Regime and All",
+  "N-back results fit one screen, same green and red as RRT",
+  "New PR highlighted on the Overview, once",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8832,6 +8832,10 @@ function NBackSessionApp() {
   const [feedback, setFeedback] = useState({});
   const [lowScoreStreak, setLowScoreStreak] = useState({});
   const [levelChangeNotice, setLevelChangeNotice] = useState(null); // { direction: "down" } — level dropped after 3 failing runs
+  // Exercises whose new PR has already been shown on the Overview. The
+  // highlight is worth exactly one look — it marks what just happened, and on
+  // every viewing after that it is just decoration on an old number.
+  const [overviewPRSeen, setOverviewPRSeen] = useState({});
   const [newPRBanners, setNewPRBanners] = useState({}); // { [exerciseKey]: title } — shown as boxes on the results screen only, cleared when that exercise is (re)started
   const [unlockInfo, setUnlockInfo] = useState(null); // { exerciseKey, level, title } — drives the "new emblem unlocked" overlay (see the fixed-position block near the other celebration overlays, not a mainView)
   const [profileTarget, setProfileTarget] = useState(null); // "you" | <leaderboard name> | null — who the Profile screen is showing
@@ -10629,6 +10633,31 @@ function NBackSessionApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mainView, switchNotice, screen, exercise, n, startTask]);
 
+  // Marks the PRs as seen on the way OUT of the Overview, not on the way in —
+  // otherwise the highlight would be cleared before it had been looked at.
+  // Reached from Home it never shows at all, so there is nothing to mark.
+  const newPRBannersRef = useRef({});
+  newPRBannersRef.current = newPRBanners;
+  const overviewShowingPRs =
+    mainView === "app" &&
+    exercise.key === "overview" &&
+    overviewView === "summary" &&
+    overviewSource === "training";
+  useEffect(() => {
+    if (!overviewShowingPRs) return;
+    return () => {
+      const keys = Object.keys(newPRBannersRef.current || {});
+      if (keys.length === 0) return;
+      setOverviewPRSeen((prev) => {
+        const next = { ...prev };
+        keys.forEach((k) => {
+          next[k] = true;
+        });
+        return next;
+      });
+    };
+  }, [overviewShowingPRs]);
+
   const [, setHomeTick] = useState(0);
   useEffect(() => {
     if (mainView !== "home") return;
@@ -11536,17 +11565,23 @@ function NBackSessionApp() {
     const render = (m) => {
       const meta = MODALITY_META[m];
       const state = feedback[m];
+      // The same two colours RRT answers with. bg-red-500/bg-emerald-500 map
+      // to #EB5757 and #4CB782 in THEME_CSS, which read as a different pair
+      // of greens and reds from one exercise to the next.
       const cls =
+        state === "wrong" || state === "correct" ? "no-sheen" : BUTTON_BASE;
+      const toneStyle =
         state === "wrong"
-          ? "no-sheen bg-red-500"
+          ? { backgroundColor: RRT_RED }
           : state === "correct"
-          ? BUTTON_PULSE
-          : BUTTON_BASE;
+          ? { backgroundColor: RRT_GREEN }
+          : undefined;
       return (
         <button
           key={m}
           onClick={() => handlePress(m)}
           disabled={!armed}
+          style={toneStyle}
           className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 md:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
         >
           <span className="text-[0.65rem] md:text-sm font-medium uppercase tracking-wide opacity-70">
@@ -14245,12 +14280,20 @@ function NBackSessionApp() {
                           : formatDuration(msTrainedToday(exerciseHistory))
                       }
                     />
-                    <Stat
-                      label="Streak"
-                      value={`${achievementState.streak} ${
-                        achievementState.streak === 1 ? "day" : "days"
-                      }`}
-                    />
+                    {/* Regime is the run being kept up right now; All is the
+                        whole record, so it shows the best ever instead. */}
+                    {(() => {
+                      const isAll = overviewScope === "all";
+                      const days = isAll
+                        ? longestStreakDays(exerciseHistory)
+                        : achievementState.streak;
+                      return (
+                        <Stat
+                          label={isAll ? "Best streak" : "Current streak"}
+                          value={`${days} ${days === 1 ? "day" : "days"}`}
+                        />
+                      );
+                    })()}
                     <Stat
                       label="Sessions"
                       value={String(achievementState.totalSessions)}
@@ -14288,6 +14331,11 @@ function NBackSessionApp() {
                         key={`b-${r.e.key}`}
                         label={r.bestLabel}
                         value={r.bestValue}
+                        pr={
+                          overviewSource === "training" &&
+                          !!newPRBanners[r.e.key] &&
+                          !overviewPRSeen[r.e.key]
+                        }
                         color={
                           r.stat && r.isAccuracy
                             ? accuracyColor(r.stat.bestAccuracy)
@@ -15239,7 +15287,11 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && screen === "results" && exercise.key !== "overview" && (
-          <div className="space-y-14">
+          /* space-y-14 put 56px between every child, which on four
+             modalities pushed Continue off the bottom. Tightened here and
+             the few gaps that have to stay larger are set on the elements
+             themselves. */
+          <div className="space-y-6">
             {Object.keys(newPRBanners).length > 0 && (
               <div className="grid grid-cols-1 gap-5">
                 {Object.values(EXERCISE_LIBRARY).filter((e) => newPRBanners[e.key]).map((e) => (
@@ -15263,10 +15315,10 @@ function NBackSessionApp() {
               ‹ Home
             </button>
 
-            <h1 className="text-4xl font-semibold tracking-tight">
+            <h1 className="text-3xl font-semibold tracking-tight">
               Round {Math.max(1, roundNumber - 1)}
             </h1>
-            <div className="text-slate-400 text-lg -mt-6">
+            <div className="text-slate-400 text-lg" style={{ marginTop: "0.25rem" }}>
               Accuracy:{" "}
               <span
                 className="font-semibold"
@@ -15285,13 +15337,17 @@ function NBackSessionApp() {
             )}
 
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Two columns from the narrowest width up, and four across once
+                there is room: four modality cards stacked was most of the
+                scroll on its own. */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
               {exercise.modalities.map((m) => (
                 <Stat
                   key={m}
                   label={MODALITY_META[m].label}
                   value={`${accuracyFor(m)}%`}
                   color={accuracyColor(accuracyFor(m))}
+                  compact
                 />
               ))}
             </div>
@@ -15303,10 +15359,9 @@ function NBackSessionApp() {
             )}
             <button
               onClick={continueFromResults}
-              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30`}
             >
-              {sessionTimeUp[exercise.key] ? "Continue" : "Continue"}{" "}
-              <span className="text-base font-normal opacity-70">(space)</span>
+              Continue <span className="text-base font-normal opacity-70">(space)</span>
             </button>
           </div>
         )}
@@ -19550,19 +19605,45 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
   );
 }
 
-function Stat({ label, value, color, size = "lg", accent }) {
+function Stat({ label, value, color, size = "lg", accent, pr = false, compact = false }) {
   const valueClass = size === "sm" ? "text-sm" : "text-base";
   const cardClass = accent
     ? `${accent.bg} border ${accent.border}`
     : "bg-slate-900 border border-slate-700/60";
+  // A personal best, called out for the one viewing it happened on.
+  const prStyle = pr
+    ? { borderColor: "#FACC15", backgroundColor: "rgba(250,204,21,0.08)" }
+    : undefined;
   return (
-    <div className={`${cardClass} rounded-lg p-6`}>
-      <div className="text-slate-100 text-lg font-semibold uppercase tracking-wide">
+    <div
+      className={`${pr ? "bg-slate-900 border" : cardClass} rounded-lg ${
+        compact ? "px-4 py-3" : size === "sm" ? "p-3" : "p-6"
+      }`}
+      style={prStyle}
+    >
+      <div
+        className={`text-slate-100 font-semibold uppercase tracking-wide ${
+          compact ? "text-sm" : size === "sm" ? "text-sm" : "text-lg"
+        }`}
+      >
         {label}
       </div>
-      <div className={`${valueClass} font-medium mt-2`} style={color ? { color } : undefined}>
+      <div
+        className={`${compact ? "text-xl" : valueClass} font-medium ${
+          compact ? "mt-1" : "mt-2"
+        }`}
+        style={color ? { color } : undefined}
+      >
         {value}
       </div>
+      {pr && (
+        <div
+          className="text-xs font-bold uppercase tracking-wide mt-2"
+          style={{ color: "#FACC15" }}
+        >
+          New PR!
+        </div>
+      )}
     </div>
   );
 }
