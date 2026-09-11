@@ -2898,14 +2898,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 291;
+const BUILD_VERSION = 292;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:25 PM";
+const BUILD_TIME = "6:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Regime lays out like All, empty slots left empty",
+  "Overview does not move when the scope changes",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14326,8 +14326,7 @@ function NBackSessionApp() {
                     ))}
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="text-slate-500 text-sm">By exercise</div>
+                  <div>
                     {/* Wide enough that a label never wraps, which is what
                         made 12rem feel cramped. Still a minimum rather than a
                         column count, so a card is the same size in Regime and
@@ -14365,14 +14364,16 @@ function NBackSessionApp() {
                                 </span>
                               </div>
                               <div className="px-5 pb-4 pt-1 divide-y divide-slate-700/60">
-                                <div className="flex items-baseline justify-between gap-3 py-2.5">
-                                  <span className="text-slate-400 text-sm">Best score</span>
-                                  <span className="text-base font-semibold">&mdash;</span>
-                                </div>
-                                <div className="flex items-baseline justify-between gap-3 py-2.5">
-                                  <span className="text-slate-400 text-sm">Avg score</span>
-                                  <span className="text-base font-semibold">&mdash;</span>
-                                </div>
+                                {["Best score", "Avg score"].map((lbl) => (
+                                  <div
+                                    key={lbl}
+                                    className="flex items-baseline justify-between gap-3"
+                                    style={{ height: "2.875rem" }}
+                                  >
+                                    <span className="text-slate-400 text-sm">{lbl}</span>
+                                    <span className="text-base font-semibold">&mdash;</span>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           );
@@ -14383,12 +14384,17 @@ function NBackSessionApp() {
                           !!sessionPRs[r.e.key] &&
                           !overviewPRSeen[r.e.key];
                         const line = (label, value, color) => (
-                          <div className="flex items-baseline justify-between gap-3 py-2.5">
+                          <div
+                            className="flex items-baseline justify-between gap-3"
+                            style={{ height: "2.875rem" }}
+                          >
                             <span className="text-slate-400 text-sm whitespace-nowrap">
                               {label}
                             </span>
                             <span
-                              className="text-base font-semibold tabular-nums text-right"
+                              className={`font-semibold tabular-nums text-right whitespace-nowrap ${
+                                String(value).length > 10 ? "text-sm" : "text-base"
+                              }`}
                               style={color ? { color } : undefined}
                             >
                               {value}
