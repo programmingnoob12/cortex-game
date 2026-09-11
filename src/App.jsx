@@ -2887,14 +2887,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 281;
+const BUILD_VERSION = 282;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "1:20 PM";
+const BUILD_TIME = "1:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Dropped the \u201Ccalls talent\u201D line",
+  "PR highlight survives a trip to Stats, spent on Done",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10663,30 +10663,21 @@ function NBackSessionApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mainView, switchNotice, screen, exercise, n, startTask]);
 
-  // Marks the PRs as seen on the way OUT of the Overview, not on the way in —
-  // otherwise the highlight would be cleared before it had been looked at.
-  // Reached from Home it never shows at all, so there is nothing to mark.
-  const sessionPRsRef = useRef({});
-  sessionPRsRef.current = sessionPRs;
-  const overviewShowingPRs =
-    mainView === "app" &&
-    exercise.key === "overview" &&
-    overviewView === "summary" &&
-    overviewSource === "training";
-  useEffect(() => {
-    if (!overviewShowingPRs) return;
-    return () => {
-      const keys = Object.keys(sessionPRsRef.current || {});
-      if (keys.length === 0) return;
-      setOverviewPRSeen((prev) => {
-        const next = { ...prev };
-        keys.forEach((k) => {
-          next[k] = true;
-        });
-        return next;
+  // Spends the PR highlight. Called from Done and nowhere else: it used to
+  // fire whenever the Overview stopped being on screen, which meant stepping
+  // across to Stats and back lost the highlight — and Stats is exactly what
+  // someone looks at while a new PR is in front of them.
+  const retireSessionPRHighlights = () => {
+    const keys = Object.keys(sessionPRs || {});
+    if (keys.length === 0) return;
+    setOverviewPRSeen((prev) => {
+      const next = { ...prev };
+      keys.forEach((k) => {
+        next[k] = true;
       });
-    };
-  }, [overviewShowingPRs]);
+      return next;
+    });
+  };
 
   const [, setHomeTick] = useState(0);
   useEffect(() => {
@@ -14424,6 +14415,8 @@ function NBackSessionApp() {
                     setMainView("home");
                     return;
                   }
+                  // Seen and done with. Only here — Stats and back keeps it.
+                  retireSessionPRHighlights();
                   setNudgeIdOverride(null);
                   setSessionCompleteAnim(true);
                   playLevelUp();
