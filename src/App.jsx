@@ -2589,6 +2589,8 @@ function sessionNudge(state, forcedId) {
   let pool;
   if (forced) {
     pool = [forced];
+  } else if (state?.prTwoInARow) {
+    pool = from("prStreak");
   } else if (state?.hitPRToday) {
     pool = from("pr");
   } else if (state?.strongSession === false) {
@@ -2811,7 +2813,9 @@ const MOTIVATION_LINES = [
   { id: 21, text: "Other people won't be able to keep up with you." },
   { id: 22, text: "You showed up today. That's a win." },
   { id: 23, text: "Today was a little harder. You still got it done anyway. Good job.", cond: "worse" },
-  { id: 24, text: "Another personal best. You're on fire!", cond: "pr" },
+  // Two sessions running, not one — "on fire" claims a run, so it waits for
+  // one.
+  { id: 24, text: "Another personal best. You're on fire!", cond: "prStreak" },
   { id: 25, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
   { id: 26, text: "Progress is messy sometimes." },
   { id: 27, text: "It was a hard session but you got it done.", cond: "worse" },
@@ -2877,14 +2881,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 277;
+const BUILD_VERSION = 278;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:40 PM";
+const BUILD_TIME = "11:30 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "RRT waits for you before moving on, and has a Home button",
+  "No exercise moves on by itself now",
+  "Overview holds still when switching Regime and All",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8942,6 +8947,10 @@ function NBackSessionApp() {
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
+  // { [exerciseKey]: true } once that exercise's session budget has run out.
+  // Nothing moves on by itself: this only changes what the results screen's
+  // Continue does.
+  const [sessionTimeUp, setSessionTimeUp] = useState({});
   const [selectedAvatarId, setSelectedAvatarIdState] = useState(DEFAULT_AVATAR_ID); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
   const [customAvatarImage, setCustomAvatarImageState] = useState(null); // data URL string | null — an uploaded photo, takes priority over the preset avatar when set
   const [displayName, setDisplayNameState] = useState("You"); // persisted via window.storage, feeds the Account screen + leaderboard "You" row
@@ -10424,7 +10433,9 @@ function NBackSessionApp() {
         sessionTimerStartRef.current[ex.key] = Date.now();
         const fromIndex = activeExercisesRef.current.findIndex((e) => e.key === ex.key);
         sessionTimersRef.current[ex.key] = setTimeout(
-          () => forceSwitchToNext(fromIndex),
+          // Was forceSwitchToNext(fromIndex) — which took people out of a
+          // round they were halfway through, and took the results with it.
+          () => setSessionTimeUp((prev) => ({ ...prev, [ex.key]: true })),
           ex.sessionDurationMs
         );
       }
@@ -10594,6 +10605,16 @@ function NBackSessionApp() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [screen, exercise]);
 
+  // What Continue does on the results screen: another round normally, or on
+  // to the next exercise once the session's time is up.
+  const continueFromResults = () => {
+    if (sessionTimeUp[exercise.key]) {
+      forceSwitchToNext(exerciseIndex);
+      return;
+    }
+    startTask(exercise, n);
+  };
+
   // Space starts the next round directly from the results screen —
   // no click, no trip back through the setup screen.
   useEffect(() => {
@@ -10601,7 +10622,7 @@ function NBackSessionApp() {
     const onKeyDown = (e) => {
       if (e.code === "Space" || e.key === " ") {
         e.preventDefault();
-        startTask(exercise, n);
+        continueFromResults();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -10661,6 +10682,16 @@ function NBackSessionApp() {
       : Array.from(new Set(overviewRegime.steps.map((s) => s.key))).map(
           (key) => EXERCISE_LIBRARY[key]
         );
+
+  // Both scopes' exercise counts, so the grid can be laid on a track that is
+  // the same in either — switching Regime/All used to change the column count
+  // (3 or 4 becoming 6), which resized every column and re-wrapped the names,
+  // so the whole board shifted under the click.
+  const overviewAllCount = ALL_SCOPE_ORDER.map((key) => EXERCISE_LIBRARY[key]).filter(
+    (e) => e && (exerciseHistory[e.key] || []).length > 0
+  ).length;
+  const overviewRegimeCount = new Set(overviewRegime.steps.map((s) => s.key)).size;
+  const overviewColumnCount = Math.max(overviewAllCount, overviewRegimeCount, 3);
 
   const statsChartExercise =
     overviewSummaryExercises.find((e) => e.key === statsExerciseKey) ||
@@ -10784,6 +10815,30 @@ function NBackSessionApp() {
         nearBest = true;
       }
     });
+    // A personal best in the latest session AND the one before it, for the
+    // same exercise. Worked out from the history rather than remembered, so
+    // it cannot drift out of step with the numbers on screen.
+    let prTwoInARow = false;
+    Object.entries(exerciseHistory).forEach(([key, hist]) => {
+      if (key.startsWith("_")) return;
+      const runs = (hist || []).filter((h) => typeof h.n === "number" && !h.partial);
+      if (runs.length < 2) return;
+      let best = -Infinity;
+      const wasPR = runs.map((h) => {
+        const pr = h.n > best;
+        if (pr) best = h.n;
+        return pr;
+      });
+      const last = runs.length - 1;
+      if (
+        wasPR[last] &&
+        wasPR[last - 1] &&
+        new Date(runs[last].ts).toDateString() === todayKey
+      ) {
+        prTwoInARow = true;
+      }
+    });
+
     // Only judged when there is enough history for "better than usual" to
     // mean anything.
     let strongSession = null;
@@ -10796,6 +10851,7 @@ function NBackSessionApp() {
     return sessionNudge(
       {
         streak: currentStreakDays(exerciseHistory, streakBrokenAt),
+        prTwoInARow,
         longestStreak: longestStreakDays(exerciseHistory),
         totalSessions: Object.values(exerciseStats).reduce(
           (sum, v) => sum + (v?.sessions || 0),
@@ -14164,7 +14220,8 @@ function NBackSessionApp() {
               // otherwise stretch one card across the whole page. Spare tracks
               // all sit on the right, so cards stay left-aligned with the
               // heading no matter how short the regime is.
-              const cols = Math.max(rows.length, 3);
+              // Fixed across both scopes, not derived from what is showing.
+              const cols = Math.max(overviewColumnCount, rows.length);
               const spare = cols - rows.length;
               const lead = 0;
               const tail = spare - lead;
@@ -15239,11 +15296,17 @@ function NBackSessionApp() {
               ))}
             </div>
 
+            {sessionTimeUp[exercise.key] && (
+              <div className="text-slate-400 text-base">
+                That's the session for {exercise.title}. Take your time here.
+              </div>
+            )}
             <button
-              onClick={() => startTask(exercise, n)}
+              onClick={continueFromResults}
               className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
             >
-              Continue <span className="text-base font-normal opacity-70">(space)</span>
+              {sessionTimeUp[exercise.key] ? "Continue" : "Continue"}{" "}
+              <span className="text-base font-normal opacity-70">(space)</span>
             </button>
           </div>
         )}
@@ -16301,6 +16364,8 @@ function saveCctFloor(ms) {
 const CCT_MAX_SPOKEN = 9;
 
 function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }) {
+  // Set when the session's time is up. Nothing advances until Continue.
+  const [sessionDone, setSessionDone] = useState(false);
   const accent = EXERCISE_COLORS.cct;
   // setup | countdown | running
   const [stage, setStage] = useState("setup");
@@ -16514,7 +16579,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       saveCctLowRun(0);
     }
     setStage("setup");
-    onFinish?.();
+    // Was onFinish?.() — straight on to the next exercise. The panel waits.
+    setSessionDone(true);
   };
   const finishRef = useRef(finish);
   finishRef.current = finish;
@@ -16616,6 +16682,29 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
   return (
     <div className="space-y-5">
+      {/* Time is up. An overlay rather than a screen of its own, so the
+          exercise underneath is left exactly as it was and nothing about this
+          component's layout had to change. */}
+      {sessionDone && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-8">
+          <div className="max-w-sm w-full space-y-6 text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Session complete
+            </h2>
+            <p className="text-slate-400 text-lg leading-relaxed">
+              That's {exercise.title} done. Look over your numbers for as long
+              as you like.
+            </p>
+            <button
+              onClick={onFinish}
+              style={{ "--ex": EXERCISE_COLORS[exercise.key] || "#4CB9D8" }}
+              className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
       {/* Interval and time left are the two numbers worth watching, so they
           are set at a size that can be read without looking for them. */}
       <div className="flex items-end justify-between gap-4">
@@ -18678,6 +18767,8 @@ function HypnosisScreen({ onDone, afterSession }) {
 }
 
 function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, onLevelUp, onSessionEnd, onResetProgress, paused }) {
+  // Set when the session budget runs out. Nothing advances until Continue.
+  const [sessionDone, setSessionDone] = useState(false);
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | highlight | track | select | result
   const [speed, setSpeed] = useState(MOT_START_SPEED);
@@ -19239,7 +19330,9 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             durationMs: totalElapsedMs,
           });
         }
-        onFinish?.();
+        // Was onFinish?.() — which jumped straight to the next exercise the
+        // instant the budget ran out. The panel below waits instead.
+        setSessionDone(true);
       } else {
         startRound();
       }
@@ -19301,6 +19394,29 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
   return (
     <div className="relative w-full h-full">
+      {/* Time is up. An overlay rather than a screen of its own, so the
+          exercise underneath is left exactly as it was and nothing about this
+          component's layout had to change. */}
+      {sessionDone && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-8">
+          <div className="max-w-sm w-full space-y-6 text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Session complete
+            </h2>
+            <p className="text-slate-400 text-lg leading-relaxed">
+              That's {exercise.title} done. Look over your numbers for as long
+              as you like.
+            </p>
+            <button
+              onClick={onFinish}
+              style={{ "--ex": EXERCISE_COLORS[exercise.key] || "#4CB9D8" }}
+              className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
       {/* No card border/padding/background here anymore — the canvas fills
           the entire space this component is given, edge to edge. No setup
           screen either: the exercise starts tracking on its own as soon as
