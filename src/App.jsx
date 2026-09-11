@@ -2893,14 +2893,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 289;
+const BUILD_VERSION = 290;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:20 PM";
+const BUILD_TIME = "5:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview fits one screen in All",
+  "Overview spacing eased, n-backs report a score",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14188,7 +14188,7 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div className="flex items-center gap-4 flex-wrap">
               <h1 className="text-3xl font-semibold tracking-tight">
                 Overview
@@ -14228,6 +14228,10 @@ function NBackSessionApp() {
               const rows = overviewSummaryExercises.map((e) => {
                 const stat = exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
+                // Dual and Quad are scored on accuracy internally, but what
+                // the card shows is a level and a percentage together — a
+                // score. Only CCT's number is an accuracy on its own.
+                const scoreWord = e.key !== "cct";
                 const avgVal = stat ? stat.totalAccuracy / stat.sessions : null;
                 const bestValue = stat
                   ? e.key === "motion3d"
@@ -14235,12 +14239,12 @@ function NBackSessionApp() {
                     : e.key === "iqnb"
                     ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
                     : e.key === "cct"
-                    ? `${stat.intervalMs ?? CCT_START_MS}ms \u00B7 ${
-                        stat.bestAtInterval ?? 0
-                      }%`
+                    ? `${stat.bestAtInterval ?? 0}% at ${
+                        stat.intervalMs ?? CCT_START_MS
+                      }ms`
                     : e.key === "rrt"
                     ? `${formatScoreValue(e, stat.bestAccuracy)} ${stat.bestStreak ?? 0}/20`
-                    : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} \u00B7 ${formatScoreValue(
+                    : `${e.abbrev}${stat.bestN}${isAccuracy ? "B" : ""} ${formatScoreValue(
                         e,
                         stat.bestAccuracy
                       )}`
@@ -14250,15 +14254,15 @@ function NBackSessionApp() {
                   stat,
                   isAccuracy,
                   avgVal,
-                  bestLabel: isAccuracy ? "Best accuracy" : "Best score",
+                  bestLabel: scoreWord || !isAccuracy ? "Best score" : "Best accuracy",
                   // CCT has no meaningful average: the run of right answers
                   // is the second number worth reading.
                   avgLabel:
                     e.key === "cct"
                       ? "Best streak"
-                      : isAccuracy
-                      ? "Avg accuracy"
-                      : "Avg score",
+                      : scoreWord || !isAccuracy
+                      ? "Avg score"
+                      : "Avg accuracy",
                   bestValue,
                   avgValue:
                     e.key === "cct"
@@ -14305,7 +14309,7 @@ function NBackSessionApp() {
                 <>
                   <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
                     {summary.map((s2) => (
-                      <div key={s2.label} className="px-6 py-4">
+                      <div key={s2.label} className="px-6 py-5">
                         <div className="text-slate-400 text-sm">{s2.label}</div>
                         <div
                           className="text-2xl font-semibold tracking-tight mt-1"
@@ -14319,15 +14323,15 @@ function NBackSessionApp() {
 
                   <div className="space-y-2">
                     <div className="text-slate-500 text-sm">By exercise</div>
-                    {/* 12rem, so six cards sit on one row on a laptop rather
-                        than wrapping to a second and pushing the buttons off
-                        the bottom. Still a minimum rather than a count, so a
-                        card is the same size in Regime and All. */}
+                    {/* Wide enough that a label never wraps, which is what
+                        made 12rem feel cramped. Still a minimum rather than a
+                        column count, so a card is the same size in Regime and
+                        All — only how many of them there are changes. */}
                     <div
-                      className="grid gap-3"
+                      className="grid gap-4"
                       style={{
                         gridTemplateColumns:
-                          "repeat(auto-fill, minmax(min(100%, 12rem), 1fr))",
+                          "repeat(auto-fill, minmax(min(100%, 14rem), 1fr))",
                       }}
                     >
                       {rows.map((r) => {
@@ -14337,8 +14341,10 @@ function NBackSessionApp() {
                           !!sessionPRs[r.e.key] &&
                           !overviewPRSeen[r.e.key];
                         const line = (label, value, color) => (
-                          <div className="flex items-baseline justify-between gap-3 py-2">
-                            <span className="text-slate-400 text-sm">{label}</span>
+                          <div className="flex items-baseline justify-between gap-3 py-2.5">
+                            <span className="text-slate-400 text-sm whitespace-nowrap">
+                              {label}
+                            </span>
                             <span
                               className="text-base font-semibold tabular-nums text-right"
                               style={color ? { color } : undefined}
@@ -14363,7 +14369,7 @@ function NBackSessionApp() {
                                 : null),
                             }}
                           >
-                            <div className="px-4 pt-3 flex items-center justify-between gap-2">
+                            <div className="px-5 pt-4 flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0">
                                 <span
                                   className="w-2 h-2 rounded-full shrink-0"
@@ -14385,7 +14391,7 @@ function NBackSessionApp() {
                                 </span>
                               )}
                             </div>
-                            <div className="px-4 pb-3 pt-1 divide-y divide-slate-700/60">
+                            <div className="px-5 pb-4 pt-1 divide-y divide-slate-700/60">
                               {line(
                                 r.bestLabel,
                                 r.bestValue,
@@ -14410,7 +14416,7 @@ function NBackSessionApp() {
               );
             })()}
 
-            <div className="flex gap-4 pt-1">
+            <div className="flex gap-4 pt-2">
               <button
                 onClick={() => setOverviewView("graph")}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
