@@ -2898,14 +2898,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 292;
+const BUILD_VERSION = 293;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:55 PM";
+const BUILD_TIME = "7:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Overview does not move when the scope changes",
+  "Overview pinned to the top so the scope switch cannot move it",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11701,6 +11701,15 @@ function NBackSessionApp() {
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
           ? "items-start justify-center px-2 md:px-4 pt-2 pb-2"
+          : mainView === "app" &&
+            exercise.key === "overview" &&
+            overviewView === "summary"
+          ? // Top-aligned, not centred: the Overview's height changes a little
+            // between Regime and All, and centring shares that difference
+            // between the top and the bottom, so the whole screen creeps up
+            // and down as the scope is switched. Anchored to the top, the
+            // heading and everything under it stay exactly where they are.
+            "items-start justify-center p-5 sm:p-8 lg:p-12"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
