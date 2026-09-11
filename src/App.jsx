@@ -2816,6 +2816,8 @@ const MOTIVATION_LINES = [
   // Two sessions running, not one — "on fire" claims a run, so it waits for
   // one.
   { id: 24, text: "Another personal best. You're on fire!", cond: "prStreak" },
+  { id: 101, text: "You see reality more clearly now." },
+  { id: 102, text: "Enjoy being mentally superior to other people, not everyone." },
   { id: 25, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
   { id: 26, text: "Progress is messy sometimes." },
   { id: 27, text: "It was a hard session but you got it done.", cond: "worse" },
@@ -2846,6 +2848,11 @@ const MOTIVATION_LINES = [
     text: "The most important thing is to keep your streak going. Don't worry about scores for now. They'll come later.",
   },
 ];
+// Shown once, the first time Quad N-Back reaches 5 back, in place of the
+// usual random transition line. Not in MOTIVATION_LINES, because it must
+// never come up in the ordinary rotation.
+const QUAD_5_BACK_LINE = "Enjoy having HD vision.";
+
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
 
@@ -2881,15 +2888,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 279;
+const BUILD_VERSION = 280;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:15 PM";
+const BUILD_TIME = "1:05 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "N-back results fit one screen, same green and red as RRT",
-  "New PR highlighted on the Overview, once",
+  "Misses flash white, wrong answers stay red",
+  "Overview cards hold one height across both scopes",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8777,7 +8784,15 @@ function NBackSessionApp() {
   // makes the whole thing read as canned. Draws only from what is left, and
   // starts over once the pool is exhausted.
   const usedQuotesRef = useRef(new Set());
+  // Set when something has earned a specific line; the next transition uses
+  // it instead of drawing from the pool, then it is spent.
+  const pendingTransitionQuoteRef = useRef(null);
   const nextTransitionQuote = () => {
+    if (pendingTransitionQuoteRef.current) {
+      const held = pendingTransitionQuoteRef.current;
+      pendingTransitionQuoteRef.current = null;
+      return held;
+    }
     let pool = TRANSITION_QUOTES.filter((q) => !usedQuotesRef.current.has(q));
     if (pool.length === 0) {
       usedQuotesRef.current.clear();
@@ -8836,6 +8851,11 @@ function NBackSessionApp() {
   // highlight is worth exactly one look — it marks what just happened, and on
   // every viewing after that it is just decoration on an old number.
   const [overviewPRSeen, setOverviewPRSeen] = useState({});
+  // Every exercise that set a personal best during THIS session. newPRBanners
+  // could not be used for the Overview highlight: it is deleted the moment
+  // that exercise is restarted, so by the time the session ends and the
+  // Overview opens, the PR that happened two exercises ago is long gone.
+  const [sessionPRs, setSessionPRs] = useState({});
   const [newPRBanners, setNewPRBanners] = useState({}); // { [exerciseKey]: title } — shown as boxes on the results screen only, cleared when that exercise is (re)started
   const [unlockInfo, setUnlockInfo] = useState(null); // { exerciseKey, level, title } — drives the "new emblem unlocked" overlay (see the fixed-position block near the other celebration overlays, not a mainView)
   const [profileTarget, setProfileTarget] = useState(null); // "you" | <leaderboard name> | null — who the Profile screen is showing
@@ -9787,6 +9807,7 @@ function NBackSessionApp() {
       const wholeLevel = Math.floor(nextLevel);
       const title = `${ex.title} ${nextLevel.toFixed(2)}`;
       const isNewPR = wholeLevel > prevStat.bestN;
+      if (isNewPR) setSessionPRs((prev) => ({ ...prev, iqnb: true }));
       setUnlockInfo({ exerciseKey: "iqnb", level: wholeLevel, title, isNewPR });
     }
     return delta;
@@ -9809,6 +9830,7 @@ function NBackSessionApp() {
       };
       const isNewPR = level > prevStat.bestN;
       if (isNewPR) {
+        setSessionPRs((prev) => ({ ...prev, rrt: true }));
         const newStat = {
           ...prevStat,
           bestN: level,
@@ -9977,6 +9999,7 @@ function NBackSessionApp() {
       };
       const isNewPR = tier > prevStat.bestN;
       if (isNewPR) {
+        setSessionPRs((prev) => ({ ...prev, motion3d: true }));
         const newStat = {
           ...prevStat,
           bestN: tier,
@@ -10224,7 +10247,13 @@ function NBackSessionApp() {
       // bestN had already been bumped to that number last time.
       const isNewPR = nextN > prevBestN;
       const title = ex.title.replace("N-Back", `${nextN}-Back`);
+      // The first Quad 5-back is its own moment, so it gets its own line on
+      // the next hand-off screen rather than a random one.
+      if (isNewPR && exerciseKey === "quad" && nextN === 5) {
+        pendingTransitionQuoteRef.current = QUAD_5_BACK_LINE;
+      }
       if (isNewPR) {
+        setSessionPRs((prev) => ({ ...prev, [exerciseKey]: true }));
         // Small banner on the Results screen — stays PR-only, separate from
         // the full-screen level-up celebration below.
         setNewPRBanners((prev) => ({
@@ -10398,9 +10427,12 @@ function NBackSessionApp() {
         if (matches[m] && !responded) missedModalities.push(m);
       });
       if (missedModalities.length > 0) {
+        // A miss is not a wrong answer — nothing was pressed. It reads as
+        // white so the two are never confused: red means you said yes and it
+        // was not a match, white means a match went by untouched.
         setFeedback((prev) => {
           const next = { ...prev };
-          missedModalities.forEach((m) => (next[m] = "wrong"));
+          missedModalities.forEach((m) => (next[m] = "missed"));
           return next;
         });
       }
@@ -10636,8 +10668,8 @@ function NBackSessionApp() {
   // Marks the PRs as seen on the way OUT of the Overview, not on the way in —
   // otherwise the highlight would be cleared before it had been looked at.
   // Reached from Home it never shows at all, so there is nothing to mark.
-  const newPRBannersRef = useRef({});
-  newPRBannersRef.current = newPRBanners;
+  const sessionPRsRef = useRef({});
+  sessionPRsRef.current = sessionPRs;
   const overviewShowingPRs =
     mainView === "app" &&
     exercise.key === "overview" &&
@@ -10646,7 +10678,7 @@ function NBackSessionApp() {
   useEffect(() => {
     if (!overviewShowingPRs) return;
     return () => {
-      const keys = Object.keys(newPRBannersRef.current || {});
+      const keys = Object.keys(sessionPRsRef.current || {});
       if (keys.length === 0) return;
       setOverviewPRSeen((prev) => {
         const next = { ...prev };
@@ -11272,6 +11304,9 @@ function NBackSessionApp() {
     setScreen("setup");
     setSwitchNotice(false);
     setLevelChangeNotice(null);
+    // New session, so last session's PR highlights are done with.
+    setSessionPRs({});
+    setOverviewPRSeen({});
     setMainView("home");
   };
 
@@ -11569,12 +11604,17 @@ function NBackSessionApp() {
       // to #EB5757 and #4CB782 in THEME_CSS, which read as a different pair
       // of greens and reds from one exercise to the next.
       const cls =
-        state === "wrong" || state === "correct" ? "no-sheen" : BUTTON_BASE;
+        state === "wrong" || state === "correct" || state === "missed"
+          ? "no-sheen"
+          : BUTTON_BASE;
       const toneStyle =
         state === "wrong"
           ? { backgroundColor: RRT_RED }
           : state === "correct"
           ? { backgroundColor: RRT_GREEN }
+          : state === "missed"
+          ? // Dark text, or the label disappears into the white.
+            { backgroundColor: "#F7F8F8", color: "#08090A" }
           : undefined;
       return (
         <button
@@ -14273,6 +14313,7 @@ function NBackSessionApp() {
                       <div key={`db-${i}`} />
                     ))}
                     <Stat
+                      reserveLabel
                       label={overviewSource === "home" ? "Total duration" : "Duration"}
                       value={
                         overviewSource === "home"
@@ -14291,12 +14332,14 @@ function NBackSessionApp() {
                         <Stat
                           label={isAll ? "Best streak" : "Current streak"}
                           value={`${days} ${days === 1 ? "day" : "days"}`}
+                          reserveLabel
                         />
                       );
                     })()}
                     <Stat
                       label="Sessions"
                       value={String(achievementState.totalSessions)}
+                      reserveLabel
                     />
                   </div>
 
@@ -14331,9 +14374,10 @@ function NBackSessionApp() {
                         key={`b-${r.e.key}`}
                         label={r.bestLabel}
                         value={r.bestValue}
+                        reserveLabel
                         pr={
                           overviewSource === "training" &&
-                          !!newPRBanners[r.e.key] &&
+                          !!sessionPRs[r.e.key] &&
                           !overviewPRSeen[r.e.key]
                         }
                         color={
@@ -14352,6 +14396,7 @@ function NBackSessionApp() {
                     {rows.map((r) => (
                       <Stat
                         key={`a-${r.e.key}`}
+                        reserveLabel
                         label={r.avgLabel}
                         value={r.avgValue}
                         color={
@@ -19605,7 +19650,12 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
   );
 }
 
-function Stat({ label, value, color, size = "lg", accent, pr = false, compact = false }) {
+// `reserveLabel` holds two lines of room for the label whether it needs them
+// or not. Without it a one-line label ("BEST STREAK") and a two-line one
+// ("CURRENT STREAK", "BEST ACCURACY") give the card two different heights —
+// and since the page is vertically centred, switching Regime/All moved
+// everything on it.
+function Stat({ label, value, color, size = "lg", accent, pr = false, compact = false, reserveLabel = false }) {
   const valueClass = size === "sm" ? "text-sm" : "text-base";
   const cardClass = accent
     ? `${accent.bg} border ${accent.border}`
@@ -19625,6 +19675,7 @@ function Stat({ label, value, color, size = "lg", accent, pr = false, compact = 
         className={`text-slate-100 font-semibold uppercase tracking-wide ${
           compact ? "text-sm" : size === "sm" ? "text-sm" : "text-lg"
         }`}
+        style={reserveLabel ? { minHeight: "3.5rem" } : undefined}
       >
         {label}
       </div>
