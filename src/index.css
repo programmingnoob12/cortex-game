@@ -215,6 +215,33 @@ button.deep-fill:hover:not(:disabled) {
   transform: translateY(-2px) scale(1.014);
 }
 
+/* A built regime's card carries a delete × on top of it. The × is a sibling
+   of the card (a button cannot be nested in a button), so moving the pointer
+   onto it took the pointer OFF the card: the card dropped out of its hover
+   lift and the × rose into its own, which read as the hover firing twice.
+   The lift moves to the wrapper, which contains both, so crossing between
+   them changes nothing. */
+.regime-card {
+  transition: transform 0.2s ease;
+}
+.regime-card:hover {
+  transform: translateY(-2px) scale(1.014);
+}
+.regime-card:hover > button.deep-fill {
+  background-image: linear-gradient(
+    100deg,
+    hsl(from var(--ex) h s min(l, 51)),
+    hsl(from var(--ex) h s calc(min(l, 51) * 0.8))
+  );
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.24),
+    inset 0 -1px rgba(0, 0, 0, 0.25), 0 12px 26px -10px rgba(0, 0, 0, 0.6);
+}
+/* …and the card itself must not lift again inside it. */
+.regime-card > button.deep-fill:hover:not(:disabled),
+.regime-card > button.deep-fill:active:not(:disabled) {
+  transform: none;
+}
+
 button.deep-fill:active:not(:disabled) {
   background-image: linear-gradient(
     100deg,

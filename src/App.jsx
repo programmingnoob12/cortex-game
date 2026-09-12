@@ -3088,7 +3088,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 335;
+const BUILD_VERSION = 336;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12613,7 +12613,7 @@ function NBackSessionApp() {
                   {customRegimes.map((entry) => {
                     const r = asRegime(entry);
                     return (
-                      <div key={entry.id} className="relative">
+                      <div key={entry.id} className="regime-card relative">
                         <button
                           onClick={() => chooseRegime(r.key)}
                           style={{ "--ex": REGIME_COLORS.custom }}
@@ -12630,7 +12630,7 @@ function NBackSessionApp() {
                             setDeleteRegimeConfirm({ id: entry.id, name: r.title })
                           }
                           title="Delete this regime"
-                          className="absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
+                          className="no-lift absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
                           style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
                         >
                           ×
@@ -17011,7 +17011,9 @@ function NBackSessionApp() {
             <div className="text-lg font-semibold text-slate-100">
               Are you sure you want to delete "{deleteRegimeConfirm.name}" regime?
             </div>
-            <p className="text-slate-400 text-sm">This regime's stats go with it.</p>
+            <p className="text-slate-400 text-sm">
+              This will delete the stats for "{deleteRegimeConfirm.name}" regime.
+            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteRegimeConfirm(null)}
