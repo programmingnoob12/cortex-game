@@ -42,6 +42,7 @@ const THEME_CSS = `
 --green:#4CB782;--red:#EB5757;--yellow:#F2C94C;--cyan:#4CB9D8;--violet:#8B7FE8;--lime:#68CC58;
 color-scheme:dark;}
 html{background-color:#08090A;}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue","Segoe UI",Roboto,Arial,sans-serif;}
 html,body{color:#F7F8F8;}
 body{background-color:transparent;}
 body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
@@ -3087,15 +3088,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 330;
+const BUILD_VERSION = 331;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "One tutorial's don\u2019t-show tick no longer hides them all",
-  "Delete a built regime, bigger n-back grid, graph fixed on phones",
+  "San Francisco set as the app's typeface",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio

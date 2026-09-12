@@ -1,6 +1,29 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------
+   Typeface
+   ---------------------------------------------------------------------
+   San Francisco — Apple's system face, which is what the app has always
+   rendered in on a Mac or an iPhone, but only by accident: nothing declared
+   a font, so it fell through to Tailwind's default stack and came out as
+   Segoe UI on Windows and Roboto on Android instead. Now it is asked for by
+   name and first in the list, so every Apple device gets SF deliberately and
+   everything else falls back in a fixed, known order.
+
+   SF cannot be served as a webfont (Apple's licence covers Apple platforms
+   only), so non-Apple devices still get their own system face — there is no
+   way to ship the real thing to them. */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+    "SF Pro Icons", "Helvetica Neue", "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+html,
+body {
+  font-family: var(--font-sans);
+}
+
+/* ---------------------------------------------------------------------
    Interactive polish, applied globally so no button can be missed.
    --------------------------------------------------------------------- */
 
