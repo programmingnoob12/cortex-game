@@ -1761,6 +1761,7 @@ const REGIME_COLORS = {
   medium: EXERCISE_COLORS.rrt,
   high: EXERCISE_COLORS.iqnb,
   cct: EXERCISE_COLORS.cct,
+  custom: EXERCISE_COLORS.dual,
 };
 
 // The cards need four values from one hex: a faint fill, a visible border,
@@ -2058,6 +2059,14 @@ const REGIMES = [
   },
 ];
 
+// The custom builder's slider: 5 to 45 minutes an exercise, in 5s.
+const CUSTOM_MIN_MINUTES = 5;
+const CUSTOM_MAX_MINUTES = 45;
+const CUSTOM_MINUTE_STEP = 5;
+const CUSTOM_DEFAULT_MINUTES = 15;
+// Past this the session is long enough to be working against them.
+const CUSTOM_OVERTRAIN_MINUTES = 95;
+
 function buildRegimeExercises(regime) {
   const steps = regime.steps.map((step) => ({
     ...EXERCISE_LIBRARY[step.key],
@@ -2189,6 +2198,7 @@ const MODALITY_KEY_LABEL = { pos: "A", audio: "L", color: "F", shape: "J" };
 // to be the tab in front); reaching a phone with the site closed needs a
 // push service, which is a separate piece of work.
 const REMINDER_ENABLED_KEY = "cortex.reminderEnabled";
+const REMINDER_ASKED_KEY = "cortex.reminderAsked";
 const REMINDER_SENT_KEY = "cortex.reminderSentOn";
 const REMINDER_HOUR = 18; // 6pm, local time — six hours before the day ends
 
@@ -3041,14 +3051,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 315;
+const BUILD_VERSION = 317;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "30 more transition lines, reset and seed data buttons",
+  "Custom regime builder for members",
+  "Fresh accounts start at 2-back, not 4-back",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8815,7 +8826,12 @@ function BadgeGrid({ state, onSeeAll, onSelectBadge, hideHeader }) {
 function NBackSessionApp() {
   const [mainView, setMainView] = useState("regime"); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
   const [leaderboardTab, setLeaderboardTab] = useState("dual"); // "dual" | "quad" | "rrt"
-  const [regimeKey, setRegimeKey] = useState(null); // "low" | "medium" | "high"
+  const [regimeKey, setRegimeKey] = useState(null); // "low" | "medium" | "high" | "cct" | "custom"
+  // A regime the person built themselves: [{ key, minutes }] in the order
+  // they picked the exercises. Persisted like any other setting, and read
+  // through findRegime below wherever a regime is looked up by key.
+  const [customSteps, setCustomStepsState] = useState([]);
+  const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
   const [activeExercises, setActiveExercises] = useState(() =>
     buildRegimeExercises(REGIMES[0])
   );
@@ -9485,6 +9501,15 @@ function NBackSessionApp() {
         }
       } catch (err) {
         // no saved per-exercise tutorial dismissals yet
+      }
+      try {
+        const res = await window.storage.get("custom-regime", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          if (Array.isArray(parsed)) setCustomStepsState(parsed);
+        }
+      } catch (err) {
+        // no custom regime built yet
       }
       try {
         const res = await window.storage.get("free-month-notice-retired", false);
@@ -10763,7 +10788,26 @@ function NBackSessionApp() {
   // One single leaderboard covering every exercise, independent of whichever
   // regime is active — the person picks which exercise's leaderboard to view
   // from a dropdown instead of it being scoped/filtered by their regime.
-  const currentRegime = REGIMES.find((r) => r.key === regimeKey) || REGIMES[0];
+  const customRegimeMinutes = customSteps.reduce((t, s) => t + s.minutes, 0);
+  const customDraftMinutes = customDraft.reduce((t, s) => t + s.minutes, 0);
+  const customRegime = {
+    key: "custom",
+    title: "Custom",
+    subtitle: `${customRegimeMinutes} min`,
+    summary:
+      customSteps.map((s) => EXERCISE_LIBRARY[s.key]?.title).filter(Boolean).join(" \u00B7 ") ||
+      "Build your own regime.",
+    accent: "indigo",
+    steps: customSteps,
+  };
+  // Every regime lookup goes through here, since "custom" isn't in REGIMES.
+  const findRegime = (key) =>
+    key === "custom" ? customRegime : REGIMES.find((r) => r.key === key);
+
+  const currentRegime =
+    (regimeKey === "custom" && customSteps.length > 0 ? customRegime : null) ||
+    REGIMES.find((r) => r.key === regimeKey) ||
+    REGIMES[0];
   const leaderboardTabs = Object.values(EXERCISE_LIBRARY).map((e) => ({
     key: e.key,
     label: e.title,
@@ -10787,7 +10831,7 @@ function NBackSessionApp() {
   const overviewRegime =
     (overviewSource === "home" &&
       overviewRegimeKey &&
-      REGIMES.find((r) => r.key === overviewRegimeKey)) ||
+      findRegime(overviewRegimeKey)) ||
     currentRegime;
   // "All" widens the Overview past the regime: every exercise that has any
   // history at all, in library order, so scores from a regime someone is no
@@ -10831,55 +10875,40 @@ function NBackSessionApp() {
   // and what disables the Start button below.
   const trainedToday = regimeCompletionDates.includes(new Date().toDateString());
 
-  const [remindersOn, setRemindersOn] = useState(() => {
-    try {
-      return localStorage.getItem(REMINDER_ENABLED_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-  const [reminderNote, setReminderNote] = useState(null);
+  // Asked once, the first time this browser opens the app — not buried in a
+  // settings toggle. The browser's own permission prompt is the prompt; if
+  // they allow it, the 6pm reminder is on from then on, and if they don't,
+  // it is never asked again from here (the browser would refuse anyway —
+  // it has to be changed in the site's settings after a block).
+  const [remindersOn, setRemindersOn] = useState(
+    () => notificationsSupported() && Notification.permission === "granted"
+  );
   useDailyReminder(remindersOn, trainedToday);
-  const toggleReminders = async () => {
-    setReminderNote(null);
-    if (remindersOn) {
-      setRemindersOn(false);
-      try {
-        localStorage.setItem(REMINDER_ENABLED_KEY, "0");
-      } catch { /* nothing to persist to */ }
-      return;
-    }
-    if (!notificationsSupported()) {
-      setReminderNote("This browser can't show notifications.");
-      return;
-    }
-    let permission = Notification.permission;
-    if (permission === "default") {
-      try {
-        permission = await Notification.requestPermission();
-      } catch {
-        permission = "denied";
-      }
-    }
-    if (permission !== "granted") {
-      // Once it is denied the browser will not ask again from here — it has
-      // to be changed in the site's own settings, so say that rather than
-      // leaving a toggle that silently refuses to move.
-      setReminderNote("Notifications are blocked. Allow them for this site in your browser settings.");
-      return;
-    }
-    setRemindersOn(true);
+  useEffect(() => {
+    if (!notificationsSupported()) return;
+    let asked = null;
     try {
-      localStorage.setItem(REMINDER_ENABLED_KEY, "1");
-      localStorage.removeItem(REMINDER_SENT_KEY);
+      asked = localStorage.getItem(REMINDER_ASKED_KEY);
+    } catch {
+      return; // no storage means no way to ask only once
+    }
+    if (asked || Notification.permission !== "default") return;
+    try {
+      localStorage.setItem(REMINDER_ASKED_KEY, "1");
     } catch { /* nothing to persist to */ }
-    try {
-      new Notification("Reminders on", {
-        body: "You'll get a nudge at 6pm on any day you haven't trained yet.",
-        tag: "cortex-daily-reminder",
+    Promise.resolve(Notification.requestPermission())
+      .then((permission) => {
+        if (permission !== "granted") return;
+        setRemindersOn(true);
+        try {
+          localStorage.setItem(REMINDER_ENABLED_KEY, "1");
+          localStorage.removeItem(REMINDER_SENT_KEY);
+        } catch { /* nothing to persist to */ }
+      })
+      .catch(() => {
+        // Safari only allows this from a click; nothing to do here.
       });
-    } catch { /* the toggle is still on */ }
-  };
+  }, []);
   const todaysHint = hintForToday(new Date().toDateString());
 
   const liveStreakDays = currentStreakDays(exerciseHistory, streakBrokenAt);
@@ -11297,6 +11326,41 @@ function NBackSessionApp() {
     setN(EXERCISE_LIBRARY[exercise.key]?.defaultN ?? 1);
   };
 
+  // Drops the account onto one specific set of levels, for looking at the
+  // gems/graphs/achievements at a height without training there. RRT's level
+  // is one BELOW its premise count (level 6 is 7p — see the RRT achievement
+  // block), which is why 7p is written as 6 here.
+  const setTestLevels = () => {
+    const targets = {
+      rrt: { level: 6, score: 7.2 },        // 7p on a 20s round
+      iqnb: { level: 6, score: 6.3 },       // QNB' 6.30
+      quad: { level: 5, score: 82 },        // QNB 5-back
+      dual: { level: 7, score: 82 },        // DNB 7-back
+    };
+    const nextStats = { ...exerciseStatsRef.current };
+    Object.entries(targets).forEach(([key, t]) => {
+      setExerciseLevel(key, t.level);
+      const prev = nextStats[key] || {
+        sessions: 0,
+        totalAccuracy: 0,
+        bestAccuracy: 0,
+        bestN: 0,
+      };
+      nextStats[key] = {
+        ...prev,
+        bestN: Math.max(prev.bestN || 0, t.level),
+        bestAccuracy: Math.max(prev.bestAccuracy || 0, t.score),
+      };
+      if (window.storage) {
+        safeStorageSet(`stats-${key}`, JSON.stringify(nextStats[key]), false);
+      }
+    });
+    setQnbPrimeLevel(6.3);
+    setExerciseStats(nextStats);
+    checkForNewAchievements(nextStats);
+    setN(exerciseLevelsRef.current[exercise.key] ?? exercise.defaultN);
+  };
+
   const resetAllData = () => {
     const keys = Object.keys(EXERCISE_LIBRARY).filter((k) => k !== "overview");
     setExerciseStats({});
@@ -11538,8 +11602,13 @@ function NBackSessionApp() {
     proceedStartFromHome();
   };
 
-  const startRegime = (key) => {
-    const regime = REGIMES.find((r) => r.key === key);
+  const startRegime = (key) => startRegimeWithSteps(key, null);
+
+  const startRegimeWithSteps = (key, stepsOverride) => {
+    const regime = stepsOverride
+      ? { ...customRegime, key, steps: stepsOverride }
+      : findRegime(key);
+    if (!regime || !regime.steps.length) return;
     const built = buildRegimeExercises(regime);
     // Starting a fresh regime — clear any timers/flags from a previous session.
     Object.values(sessionTimersRef.current).forEach(clearTimeout);
@@ -11695,6 +11764,45 @@ function NBackSessionApp() {
       setMainView("regime");
     }
   }, [isMember, regimeKey]);
+
+  const setCustomSteps = (steps) => {
+    setCustomStepsState(steps);
+    if (window.storage) {
+      safeStorageSet("custom-regime", JSON.stringify(steps), false);
+    }
+  };
+
+  // Opens the builder with whatever they last saved, so editing a custom
+  // regime is editing, not starting over.
+  const openCustomBuilder = () => {
+    setCustomDraft(customSteps.map((s) => ({ ...s })));
+    setMainView("custom");
+  };
+
+  const toggleCustomExercise = (key) => {
+    setCustomDraft((prev) =>
+      prev.some((s) => s.key === key)
+        ? prev.filter((s) => s.key !== key)
+        : // Appended, so the order on Home is the order they picked them in.
+          [...prev, { key, minutes: CUSTOM_DEFAULT_MINUTES }]
+    );
+  };
+
+  const setCustomExerciseMinutes = (key, minutes) => {
+    setCustomDraft((prev) =>
+      prev.map((s) => (s.key === key ? { ...s, minutes } : s))
+    );
+  };
+
+  const saveCustomRegime = () => {
+    if (!customDraft.length) return;
+    const steps = customDraft.map((s) => ({ ...s }));
+    setCustomSteps(steps);
+    // startRegime reads the regime through findRegime, which builds the
+    // custom one off customSteps state — not yet updated in this render —
+    // so it is handed the steps directly.
+    startRegimeWithSteps("custom", steps);
+  };
 
   const chooseRegime = (key) => {
     // Everything but the free regime is behind the membership.
@@ -12305,35 +12413,182 @@ function NBackSessionApp() {
                 );
               })}
 
-              {/* Locked regime — unlocks with the "1-Month Streak" achievement.
-                  Purely a teaser for now: disabled, no click handler, just a
-                  hover tooltip explaining what unlocks it. */}
-              <div className="relative group">
+              {/* Members build their own; on a free account it stays the
+                  locked teaser it was. */}
+              {isMember ? (
                 <button
-                  disabled
-                  className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-6 cursor-not-allowed"
+                  onClick={openCustomBuilder}
+                  style={{ "--ex": REGIME_COLORS.custom }}
+                  className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
                 >
                   <div className="flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-3">
-                      <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
-                      <div className="text-2xl font-semibold text-slate-500 flex items-center gap-2">
-                        🔒 Custom
-                      </div>
+                    <div className="text-2xl font-semibold">Custom</div>
+                    <div className="text-lg font-medium">
+                      {customSteps.length ? customRegime.subtitle : "Build it \u203A"}
                     </div>
-                    <div className="text-lg font-medium text-slate-600">—</div>
                   </div>
-                  <div className="text-slate-600 text-base mt-1">
-                    Build your own regime.
+                  <div className="text-base font-medium mt-1">
+                    {customSteps.length
+                      ? customRegime.summary
+                      : "Pick the exercises and how long you train each one."}
                   </div>
                 </button>
-                <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
-                  Achievement required: 1 month streak
+              ) : (
+                <div className="relative group">
+                  <button
+                    disabled
+                    className="w-full text-left bg-slate-900/60 border-2 border-slate-800 rounded-xl px-7 py-6 cursor-not-allowed"
+                  >
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex items-center gap-3">
+                        <span className="w-2.5 h-2.5 rounded-full bg-slate-700" />
+                        <div className="text-2xl font-semibold text-slate-500 flex items-center gap-2">
+                          🔒 Custom
+                        </div>
+                      </div>
+                      <div className="text-lg font-medium text-slate-600">—</div>
+                    </div>
+                    <div className="text-slate-600 text-base mt-1">
+                      Build your own regime.
+                    </div>
+                  </button>
+                  <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity bg-slate-800 border border-slate-700 text-slate-100 text-sm font-medium rounded-lg px-4 py-2 shadow-lg whitespace-nowrap z-10">
+                    Membership required
+                  </div>
                 </div>
-              </div>
+              )}
 
             </div>
 
 
+          </div>
+        )}
+
+        {mainView === "custom" && isMember && (
+          <div className="space-y-10">
+            <div>
+              <button
+                onClick={() => setMainView("regime")}
+                className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+              >
+                &lsaquo; Back
+              </button>
+              <h1 className="text-5xl font-semibold tracking-tight">
+                Build your regime
+              </h1>
+              <p className="text-slate-400 text-base mt-3">
+                Pick the exercises you want and how long you train each one.
+                They run in the order you pick them.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {Object.values(EXERCISE_LIBRARY)
+                .filter((e) => e.key !== "overview")
+                .map((e) => {
+                  const position = customDraft.findIndex((s) => s.key === e.key);
+                  const picked = position !== -1;
+                  const minutes = picked
+                    ? customDraft[position].minutes
+                    : CUSTOM_DEFAULT_MINUTES;
+                  const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
+                  return (
+                    <div
+                      key={e.key}
+                      className="rounded-xl px-7 py-5"
+                      style={
+                        picked
+                          ? {
+                              backgroundImage: exerciseDeepFill(exColor),
+                              boxShadow:
+                                "inset 0 1px rgba(255,255,255,0.16), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                            }
+                          : {
+                              background: "#14161A",
+                              border: "1px solid #2C2F34",
+                            }
+                      }
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleCustomExercise(e.key)}
+                        className="w-full text-left flex items-center justify-between gap-6"
+                      >
+                        <div className="flex items-center gap-3">
+                          {/* The order number IS the feedback that it is in
+                              the regime, so there is no separate tick. */}
+                          <span
+                            className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-sm font-semibold"
+                            style={
+                              picked
+                                ? { background: "rgba(255,255,255,0.22)", color: "#F7F8F8" }
+                                : { border: "1px solid #3A3E46", color: "#6B7280" }
+                            }
+                          >
+                            {picked ? position + 1 : ""}
+                          </span>
+                          <span
+                            className={`text-2xl font-semibold ${
+                              picked ? "" : "text-slate-400"
+                            }`}
+                          >
+                            {e.title}
+                          </span>
+                        </div>
+                        <span
+                          className={`text-lg font-medium ${
+                            picked ? "" : "text-slate-500"
+                          }`}
+                        >
+                          {picked ? `${minutes} min` : "Add"}
+                        </span>
+                      </button>
+                      {picked && (
+                        <input
+                          type="range"
+                          min={CUSTOM_MIN_MINUTES}
+                          max={CUSTOM_MAX_MINUTES}
+                          step={CUSTOM_MINUTE_STEP}
+                          value={minutes}
+                          onChange={(ev) =>
+                            setCustomExerciseMinutes(e.key, Number(ev.target.value))
+                          }
+                          className="w-full mt-4 accent-white"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-baseline justify-between">
+                <span className="text-xl font-medium text-slate-100">Total</span>
+                <span className="text-xl font-semibold text-slate-100">
+                  {customDraftMinutes} min
+                </span>
+              </div>
+              {customDraftMinutes > CUSTOM_OVERTRAIN_MINUTES && (
+                <div
+                  className="rounded-lg px-5 py-3 text-base"
+                  style={{
+                    background: "rgba(242,194,0,0.08)",
+                    border: "1px solid rgba(242,194,0,0.4)",
+                    color: PR_YELLOW,
+                  }}
+                >
+                  Overtraining may cause diminishing returns and fatigue.
+                </div>
+              )}
+              <button
+                onClick={saveCustomRegime}
+                disabled={!customDraft.length}
+                style={{ "--ex": REGIME_COLORS.custom }}
+                className="w-full deep-fill disabled:opacity-40 rounded-xl py-5 text-xl font-medium shadow-lg shadow-black/30"
+              >
+                Set as my regime
+              </button>
+            </div>
           </div>
         )}
 
@@ -12604,17 +12859,10 @@ function NBackSessionApp() {
                 // on the Leaderboard/Profile) rather than the current
                 // adaptive practice level, which is often low right after a
                 // level-down and would otherwise show a dull grey gem.
-                // Also floor it at whatever the mock "You" leaderboard row
-                // shows for this exercise, so the two stay visually in sync
-                // instead of Home falling back to a real (currently empty)
-                // level while Leaderboard shows the placeholder demo level.
-                const mockYouLevel = LEADERBOARD_DATA[e.key]?.find(
-                  (row) => row.name === "You"
-                )?.level;
-                const bestLevel = Math.max(
-                  stat?.bestN || level,
-                  mockYouLevel || level
-                );
+                // NOT floored at the placeholder leaderboard's "You" row any
+                // more: that row says level 4, so a brand new account opened
+                // on "D4B / Q4B" when it is actually starting at 2-back.
+                const bestLevel = Math.max(stat?.bestN || 0, level);
                 const acc = ACCENT_STYLES[e.accent];
                 const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
                 return (
@@ -12900,6 +13148,12 @@ function NBackSessionApp() {
                 className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
                 🧪 Show every tutorial again
+              </button>
+              <button
+                onClick={setTestLevels}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Set levels: RRT 7p · QNB' 6.30 · QNB 5 · DNB 7
               </button>
               <button
                 onClick={resetLevelsToStart}
@@ -13839,7 +14093,7 @@ function NBackSessionApp() {
             >
               <span>Regime</span>
               <span className="text-slate-500 text-base font-normal">
-                {REGIMES.find((r) => r.key === regimeKey)?.title || "Choose"} ›
+                {findRegime(regimeKey)?.title || "Choose"} ›
               </span>
             </button>
 
@@ -13863,19 +14117,6 @@ function NBackSessionApp() {
                   setBinauralBeatsEnabled(!binauralBeatsEnabled);
                 }}
               />
-            </div>
-
-            <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
-              <div>
-                <div className="text-xl font-medium">Daily reminder</div>
-                <div className="text-slate-500 text-base mt-1">
-                  A notification at 6pm on days you haven't trained
-                </div>
-                {reminderNote && (
-                  <div className="text-rose-400 text-base mt-1">⚠ {reminderNote}</div>
-                )}
-              </div>
-              <Toggle on={remindersOn} onToggle={toggleReminders} />
             </div>
 
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
@@ -16335,7 +16576,7 @@ function NBackSessionApp() {
       })()}
 
       {restDayConfirm && (() => {
-        const regime = REGIMES.find((r) => r.key === restDayConfirm.regimeKey);
+        const regime = findRegime(restDayConfirm.regimeKey);
         const isSwitch = restDayConfirm.reason === "switch";
         return (
           <div
