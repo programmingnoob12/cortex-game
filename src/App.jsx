@@ -2760,6 +2760,25 @@ function accuracyColor(pct) {
 // 3D Motion use a decimal composite score (e.g. 4.33). This maps a raw
 // stored number to the right display string for its exercise. RRT's raw
 // value packs both parts as points + seconds/100 (e.g. 6.25 = "6p 25s").
+// What an exercise reads as before it has ever been played. The level
+// number is not a score: RRT's level 1 IS a 2-premise round on a 30s timer,
+// and 3D MOT's is a 0.10 ball speed — passing the raw level into
+// formatScoreValue is what printed "1p 0s" and "1.00" on a fresh account.
+function startingScoreValue(exercise) {
+  switch (exercise.key) {
+    case "rrt":
+      // Packed the way every RRT score is: premises in the whole part, the
+      // round length in seconds in the decimals.
+      return 2 + 30 / 100;
+    case "motion3d":
+      return MOT_START_SPEED;
+    case "iqnb":
+      return QNB_PRIME_START_LEVEL;
+    default:
+      return null;
+  }
+}
+
 function formatScoreValue(exercise, value) {
   if (value == null || Number.isNaN(value)) return "—";
   switch (exercise.scoreType) {
@@ -2941,7 +2960,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 312;
+const BUILD_VERSION = 313;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11122,7 +11141,18 @@ function NBackSessionApp() {
       setExerciseLevel(key, ex.defaultN);
       const prev = nextStats[key];
       if (prev) {
-        nextStats[key] = { ...prev, bestN: 0 };
+        // bestAccuracy is the number the Home tile prints, and for RRT,
+        // QNB' and 3D MOT that number IS the level — so it has to go back
+        // to the start alongside bestN or the tile keeps showing the old
+        // level. CCT's interval/at-interval best are the same story.
+        nextStats[key] = {
+          ...prev,
+          bestN: 0,
+          bestAccuracy: 0,
+          bestStreak: 0,
+          bestAtInterval: 0,
+          intervalMs: CCT_START_MS,
+        };
         if (window.storage) {
           safeStorageSet(`stats-${key}`, JSON.stringify(nextStats[key]), false);
         }
@@ -12495,7 +12525,10 @@ function NBackSessionApp() {
                               }%`
                             : isAccuracy
                             ? `${e.abbrev}${bestLevel}B`
-                            : formatScoreValue(e, stat ? stat.bestAccuracy : level)}
+                            : formatScoreValue(
+                                e,
+                                stat?.bestAccuracy || startingScoreValue(e) || level
+                              )}
                         </div>
                       </div>
                       {/* The gem's own drop-shadow is tuned for the
