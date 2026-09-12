@@ -2909,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 304;
+const BUILD_VERSION = 305;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "4:20 PM";
+const BUILD_TIME = "5:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Graph renders again, speed readout on 3D MOT, tutorial copy",
+  "3D MOT colours and halo, every tick on the y axis",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6204,9 +6204,9 @@ function RrtTutorialAnimated({ onDone }) {
         transition: "background 0.3s ease, border-color 0.3s ease",
       }}
     >
-      <RrtItemTile item={a} size={46} />
-      <span className="text-slate-100 text-xl font-medium">{text}</span>
-      <RrtItemTile item={b} size={46} />
+      <RrtItemTile item={a} size={40} />
+      <span className="text-slate-100 text-lg font-medium">{text}</span>
+      <RrtItemTile item={b} size={40} />
     </div>
   );
 
@@ -6271,11 +6271,11 @@ function RrtTutorialAnimated({ onDone }) {
         </div>
       </div>
       {row(green, "is South-West of", blue, beat >= 1)}
-      <div className="flex items-center justify-center gap-3.5 flex-wrap text-center text-slate-100 text-2xl font-medium">
+      <div className="flex items-center justify-center gap-3 flex-wrap text-center text-slate-100 text-xl font-medium">
         <span>Can you feel how</span>
-        <RrtItemTile item={green} size={46} />
+        <RrtItemTile item={green} size={40} />
         <span>is south-west of</span>
-        <RrtItemTile item={blue} size={46} />
+        <RrtItemTile item={blue} size={40} />
         <span>?</span>
       </div>
     </div>,
@@ -6287,14 +6287,14 @@ function RrtTutorialAnimated({ onDone }) {
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         Its like feeling where your door is in the room, not visualizing the
-        door
+        door.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         After all the premises have been read in order, review the spatial
-        model by feeling the items
+        model by feeling the items.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Check if the conclusion is true or false
+        Check if the conclusion is true or false.
       </p>
       <p className="text-slate-400 text-base leading-relaxed pt-5 border-t border-slate-700/70">
         Have any questions? Email{" "}
@@ -14559,6 +14559,24 @@ function NBackSessionApp() {
                   grain
                 )
               );
+              // One tick per step the score can actually take, so nothing is
+              // skipped and a decimal scale does not land on ragged numbers.
+              const yTicks = (() => {
+                if (e.key === "cct") return null;
+                const vals = chartData
+                  .map((d) => d.level)
+                  .filter((v) => typeof v === "number");
+                if (vals.length === 0) return null;
+                const step = e.key === "motion3d" ? 0.05 : 1;
+                const lo = Math.floor(Math.min(...vals) / step) * step;
+                const hi = Math.ceil(Math.max(...vals) / step) * step;
+                const out = [];
+                for (let v = lo; v <= hi + step / 2 && out.length < 24; v += step) {
+                  out.push(Number(v.toFixed(2)));
+                }
+                return out.length > 1 ? out : null;
+              })();
+
               return (
                 <div key={e.key} className="flex-1 min-h-0 flex flex-col">
                   {chartData.length > 0 ? (
@@ -14666,7 +14684,8 @@ function NBackSessionApp() {
                             // Recharts pads the top of an "auto" domain, which
                             // put a 105% tick on a scale that cannot exceed
                             // 100.
-                            domain={e.key === "cct" ? [0, 100] : ["auto", "auto"]}
+                            domain={yTicks ? [yTicks[0], yTicks[yTicks.length - 1]] : (e.key === "cct" ? [0, 100] : ["auto", "auto"])}
+                            ticks={yTicks || undefined}
                             stroke="#6E7178"
                             width={56}
                             tick={{ fill: "#6E7178", fontSize: 12 }}
@@ -16167,7 +16186,7 @@ function NBackSessionApp() {
               key === "rrt"
                 ? `${level}p`
                 : key === "motion3d"
-                ? `Tier ${level}`
+                ? `Level ${level}`
                 : key === "cct"
                 ? `${level} in a row`
                 : exercise.title.replace("N-Back", `${level}-Back`);
@@ -16182,7 +16201,13 @@ function NBackSessionApp() {
       {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
         <button
           onClick={() => forceSwitchToNext(exerciseIndex)}
-          className="fixed top-2 right-2 md:top-6 md:right-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30"
+          className={`fixed flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30 ${
+            // 3D MOT puts the speed readout in the top right, so the pill
+            // moves to the bottom right there rather than sitting on it.
+            isMotion3dApp
+              ? "bottom-2 right-2 md:bottom-6 md:right-6"
+              : "top-2 right-2 md:top-6 md:right-6"
+          }`}
         >
           🧪 Skip to next exercise
         </button>
@@ -18555,11 +18580,13 @@ function motDisplaySpeedToVelocity(displaySpeed) {
 // exerciseStats.motion3d instead of trusting it when this doesn't match.
 const MOT_TIER_SCHEMA_VERSION = 2;
 const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still read dark against the volume
-const MOT_COLOR_TARGET = 0xb4a55a; // muted gold — desaturated to match the neutral ball's sophistication
-// The same green and red RRT uses for a right and a wrong answer, so one
-// signal means one thing across the whole app.
-const MOT_COLOR_CORRECT = 0x1e982b;
-const MOT_COLOR_WRONG = 0x971426;
+// The balls to track, called out in orange with a pale cyan halo around them
+// (see MOT_HALO_COLOR) rather than by colour alone.
+const MOT_COLOR_TARGET = 0xc8811e;
+const MOT_HALO_COLOR = 0xa6cfce;
+// Right and wrong at the end of a round.
+const MOT_COLOR_CORRECT = 0xc2c246;
+const MOT_COLOR_WRONG = 0xb4101e;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
 // Uniform-random unit vector (so starting directions don't bunch up near
@@ -19118,12 +19145,25 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.6, 12, 8),
         new THREE.MeshBasicMaterial({ visible: false })
       );
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.22, 20, 14),
+        new THREE.MeshBasicMaterial({
+          color: MOT_HALO_COLOR,
+          transparent: true,
+          opacity: 0.55,
+          side: THREE.BackSide,
+          depthWrite: false,
+        })
+      );
+      halo.visible = false;
+      mesh.add(halo);
       mesh.add(hitMesh);
       scene.add(mesh);
       balls.push({
         id: i,
         letter: letters[i],
         mesh,
+        halo,
         hitMesh,
         vel: motRandomUnitVector(),
         selected: false,
@@ -19382,6 +19422,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       b.isTarget = false;
       b.mesh.scale.setScalar(1);
       b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
+      if (b.halo) b.halo.visible = false;
     });
 
     const ids = Array.from({ length: MOT_BALL_COUNT }, (_, i) => i);
@@ -19392,7 +19433,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     const targetIds = new Set(ids.slice(0, MOT_TARGET_COUNT));
     ctx.balls.forEach((b) => {
       b.isTarget = targetIds.has(b.id);
-      if (b.isTarget) b.mesh.material.color.setHex(MOT_COLOR_TARGET);
+      if (b.isTarget) {
+        b.mesh.material.color.setHex(MOT_COLOR_TARGET);
+        if (b.halo) b.halo.visible = true;
+      }
     });
 
     setSelectedCount(0);
@@ -19400,7 +19444,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     setStage("highlight");
 
     stageTimeoutRef.current = setTimeout(() => {
-      ctx.balls.forEach((b) => b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL));
+      ctx.balls.forEach((b) => {
+        b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
+        if (b.halo) b.halo.visible = false;
+      });
       setStage("track");
       stageTimeoutRef.current = setTimeout(() => {
         setStage("select");
