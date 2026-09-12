@@ -3051,15 +3051,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 317;
+const BUILD_VERSION = 318;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Custom regime builder for members",
-  "Fresh accounts start at 2-back, not 4-back",
+  "Custom regime: drag the cards to reorder",
+  "Home fits one screen with five or six exercises",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8832,6 +8832,7 @@ function NBackSessionApp() {
   // through findRegime below wherever a regime is looked up by key.
   const [customSteps, setCustomStepsState] = useState([]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
+  const [customDragKey, setCustomDragKey] = useState(null); // exercise being dragged in the builder
   const [activeExercises, setActiveExercises] = useState(() =>
     buildRegimeExercises(REGIMES[0])
   );
@@ -10824,6 +10825,7 @@ function NBackSessionApp() {
   const overviewExercises = Array.from(
     new Set(currentRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
+  const compactHome = overviewExercises.length > 4;
 
   // Only the Overview summary follows the regime picker. Home's exercise
   // cards and the Stats list stay on the regime actually being trained —
@@ -11332,7 +11334,7 @@ function NBackSessionApp() {
   // block), which is why 7p is written as 6 here.
   const setTestLevels = () => {
     const targets = {
-      rrt: { level: 6, score: 7.2 },        // 7p on a 20s round
+      rrt: { level: 6, score: 7.3 },        // 7p on a 30s round
       iqnb: { level: 6, score: 6.3 },       // QNB' 6.30
       quad: { level: 5, score: 82 },        // QNB 5-back
       dual: { level: 7, score: 82 },        // DNB 7-back
@@ -11792,6 +11794,21 @@ function NBackSessionApp() {
     setCustomDraft((prev) =>
       prev.map((s) => (s.key === key ? { ...s, minutes } : s))
     );
+  };
+
+  // Drops the dragged exercise in at the target's position, so the numbers
+  // down the left are the running order and dragging is how it's changed.
+  const moveCustomExercise = (fromKey, toKey) => {
+    if (!fromKey || fromKey === toKey) return;
+    setCustomDraft((prev) => {
+      const from = prev.findIndex((s) => s.key === fromKey);
+      const to = prev.findIndex((s) => s.key === toKey);
+      if (from === -1 || to === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
   };
 
   const saveCustomRegime = () => {
@@ -12428,9 +12445,7 @@ function NBackSessionApp() {
                     </div>
                   </div>
                   <div className="text-base font-medium mt-1">
-                    {customSteps.length
-                      ? customRegime.summary
-                      : "Pick the exercises and how long you train each one."}
+                    {customSteps.length ? customRegime.summary : "Build your own regime."}
                   </div>
                 </button>
               ) : (
@@ -12478,14 +12493,24 @@ function NBackSessionApp() {
               </h1>
               <p className="text-slate-400 text-base mt-3">
                 Pick the exercises you want and how long you train each one.
-                They run in the order you pick them.
+                They run top to bottom — drag a card to change the order.
               </p>
             </div>
 
             <div className="flex flex-col gap-4">
-              {Object.values(EXERCISE_LIBRARY)
-                .filter((e) => e.key !== "overview")
-                .map((e) => {
+              {/* Chosen exercises first, in the order they will run, then
+                  everything still available — so the list itself reads as
+                  the regime and dragging within it is the reordering. */}
+              {[
+                ...customDraft
+                  .map((s) => EXERCISE_LIBRARY[s.key])
+                  .filter(Boolean),
+                ...Object.values(EXERCISE_LIBRARY).filter(
+                  (e) =>
+                    e.key !== "overview" &&
+                    !customDraft.some((s) => s.key === e.key)
+                ),
+              ].map((e) => {
                   const position = customDraft.findIndex((s) => s.key === e.key);
                   const picked = position !== -1;
                   const minutes = picked
@@ -12495,7 +12520,20 @@ function NBackSessionApp() {
                   return (
                     <div
                       key={e.key}
-                      className="rounded-xl px-7 py-5"
+                      draggable={picked}
+                      onDragStart={() => setCustomDragKey(e.key)}
+                      onDragEnd={() => setCustomDragKey(null)}
+                      onDragOver={(ev) => {
+                        if (picked && customDragKey) ev.preventDefault();
+                      }}
+                      onDrop={(ev) => {
+                        ev.preventDefault();
+                        moveCustomExercise(customDragKey, e.key);
+                        setCustomDragKey(null);
+                      }}
+                      className={`rounded-xl px-7 py-5${
+                        picked ? " cursor-grab active:cursor-grabbing" : ""
+                      }${customDragKey === e.key ? " opacity-50" : ""}`}
                       style={
                         picked
                           ? {
@@ -12534,6 +12572,15 @@ function NBackSessionApp() {
                           >
                             {e.title}
                           </span>
+                          {picked && (
+                            <span
+                              className="text-lg leading-none opacity-60 select-none"
+                              title="Drag to reorder"
+                              aria-hidden="true"
+                            >
+                              ⠿
+                            </span>
+                          )}
                         </div>
                         <span
                           className={`text-lg font-medium ${
@@ -12799,7 +12846,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className="space-y-6 pt-12 sm:pt-0">
+          <div className={`${compactHome ? "space-y-4" : "space-y-6"} pt-12 sm:pt-0`}>
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -12850,7 +12897,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3" : "gap-4"}`}>
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -12877,9 +12924,9 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card rounded-xl p-5 text-white text-left${
-                      shineCard === e.key ? " ex-card-shine" : ""
-                    }`}
+                    className={`ex-card rounded-xl ${
+                      compactHome ? "px-5 py-3.5" : "p-5"
+                    } text-white text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
                     style={{
                       backgroundImage: exerciseDeepFill(exColor),
                       boxShadow:
@@ -12892,8 +12939,10 @@ function NBackSessionApp() {
                         eye should land on first. */}
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <div className="text-xl font-semibold">{e.title}</div>
-                        <div className="text-lg font-medium mt-2">
+                        <div className={compactHome ? "text-lg font-semibold" : "text-xl font-semibold"}>
+                          {e.title}
+                        </div>
+                        <div className={compactHome ? "text-base font-medium mt-1" : "text-lg font-medium mt-2"}>
                           {/* CCT has no N level. Its score is the interval it
                               is being trained at and the best accuracy held
                               at that interval. */}
@@ -12923,7 +12972,7 @@ function NBackSessionApp() {
                           )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
                         }}
                       >
-                        <LevelGem level={bestLevel} size={64} />
+                        <LevelGem level={bestLevel} size={compactHome ? 48 : 64} />
                       </span>
                     </div>
                   </button>
@@ -12931,8 +12980,12 @@ function NBackSessionApp() {
               })}
             </div>
 
-            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-4">
-              <div className="text-xl font-semibold text-slate-100">
+            <div
+              className={`bg-slate-900 border border-slate-700/70 rounded-xl ${
+                compactHome ? "px-4 py-3" : "p-4"
+              }`}
+            >
+              <div className={`font-semibold text-slate-100 ${compactHome ? "text-lg" : "text-xl"}`}>
                 Next session
               </div>
               {sessionInProgress || sessionParked ? (
@@ -12953,7 +13006,7 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
@@ -12971,7 +13024,9 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
-                className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                }`}
               >
                 {sessionInProgress
                   ? "Resume Training"
@@ -12984,7 +13039,9 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={goToOverview}
-                className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                }`}
               >
                 Stats
               </button>
@@ -12995,7 +13052,9 @@ function NBackSessionApp() {
                     setHypnosisAfterSession(false);
                     setMainView("hypnosis");
                   }}
-                  className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+                  className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                    compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                  }`}
                 >
                   Motivation
                 </button>
