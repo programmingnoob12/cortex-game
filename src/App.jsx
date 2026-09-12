@@ -1878,7 +1878,7 @@ const EXERCISE_LIBRARY = {
     accent: "indigo",
     modalities: ["pos", "audio"],
     maxN: 10,
-    defaultN: 4,
+    defaultN: 2,
     stimMs: 2500,
     scoreType: "accuracy",
     description:
@@ -1891,7 +1891,7 @@ const EXERCISE_LIBRARY = {
     accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
     maxN: 10,
-    defaultN: 3,
+    defaultN: 2,
     stimMs: 3000,
     scoreType: "accuracy",
     description:
@@ -1904,7 +1904,7 @@ const EXERCISE_LIBRARY = {
     accent: "indigo",
     modalities: [],
     maxN: 10, // level = premise count, so level 10 = 10p — the ceiling for RRT's own achievements/gem tiers
-    defaultN: 1,
+    defaultN: 1, // level 1 IS 2p — see the RRT achievement block: premiseCount = level + 1
     stimMs: 0,
     comingSoon: false,
     scoreType: "points",
@@ -1932,7 +1932,7 @@ const EXERCISE_LIBRARY = {
     accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
     maxN: 10,
-    defaultN: 4,
+    defaultN: 2,
     stimMs: 2500, // overridden per-run from qnbPrimeSettingsFor once a session starts
     comingSoon: false,
     scoreType: "decimal",
@@ -2420,6 +2420,8 @@ function qnbPrimeStimulusMs(step) {
 
 // step is 0-99 — the two digits after the decimal point (X.00 → step 0,
 // X.37 → step 37, X.99 → step 99). Returns that step's full settings.
+const QNB_PRIME_START_LEVEL = 2.0;
+
 function qnbPrimeSettingsFor(step) {
   const clamped = Math.max(0, Math.min(99, Math.round(step)));
   return {
@@ -2939,7 +2941,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 311;
+const BUILD_VERSION = 312;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8779,8 +8781,8 @@ function NBackSessionApp() {
   // whole N is played (Math.floor) and which row of qnbPrimeSettingsFor
   // applies (the 0-99 step) each run; moved by qnbPrimeLevelDelta after
   // each session instead of the generic pass/fail recordSessionResult.
-  const [qnbPrimeLevel, setQnbPrimeLevelState] = useState(4.0);
-  const qnbPrimeLevelRef = useRef(4.0);
+  const [qnbPrimeLevel, setQnbPrimeLevelState] = useState(QNB_PRIME_START_LEVEL);
+  const qnbPrimeLevelRef = useRef(QNB_PRIME_START_LEVEL);
   useEffect(() => {
     qnbPrimeLevelRef.current = qnbPrimeLevel;
   }, [qnbPrimeLevel]);
@@ -9728,7 +9730,10 @@ function NBackSessionApp() {
   const recordQnbPrimeResult = useCallback((overallAcc) => {
     const prevLevel = qnbPrimeLevelRef.current;
     const delta = qnbPrimeLevelDelta(overallAcc);
-    const nextLevel = Math.max(1, Math.round((prevLevel + delta) * 100) / 100);
+    const nextLevel = Math.max(
+      QNB_PRIME_START_LEVEL,
+      Math.round((prevLevel + delta) * 100) / 100
+    );
     setQnbPrimeLevel(nextLevel);
     setExerciseLevel("iqnb", Math.floor(nextLevel));
 
@@ -11123,7 +11128,7 @@ function NBackSessionApp() {
         }
       }
     });
-    setQnbPrimeLevel(4.0);
+    setQnbPrimeLevel(QNB_PRIME_START_LEVEL);
     setExerciseStats(nextStats);
     PREVIOUSLY_UNLOCKED_IDS.clear();
     unlockedAchievementIdsRef.current = null;
@@ -11137,7 +11142,7 @@ function NBackSessionApp() {
     setExerciseStats({});
     setExerciseHistory({});
     setExerciseLevels({});
-    setQnbPrimeLevel(4.0);
+    setQnbPrimeLevel(QNB_PRIME_START_LEVEL);
     setN(EXERCISE_LIBRARY[exercise.key]?.defaultN ?? 1);
     setRegimeCompletionDatesState([]);
     setStreakBrokenAtState(null);
@@ -18538,9 +18543,9 @@ const MOT_TRACK_MS = 8000; // how long balls drift before freezing for selection
 // (and the manual +/- Speed buttons) still have real headroom above that
 // for anyone who can actually keep up; 1.00 is genuinely very fast, not
 // meant to be where most people land.
-const MOT_MIN_SPEED = 0.15;
+const MOT_MIN_SPEED = 0.1;
 const MOT_MAX_SPEED = 1.0;
-const MOT_START_SPEED = 0.25;
+const MOT_START_SPEED = 0.1; // tier 1 — the bottom of the staircase
 const MOT_SPEED_STEP = 0.01; // flat per-round adjustment — up on a perfect round, down otherwise
 // The staircase/UI speed value (0.15–1.00 above) isn't applied to the
 // balls directly as their actual velocity — it's remapped through this
