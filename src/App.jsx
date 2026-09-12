@@ -1959,6 +1959,11 @@ const EXERCISE_LIBRARY = {
 // card size, same wrapping, same height.
 const OVERVIEW_SLOTS = Object.keys(EXERCISE_LIBRARY).length;
 
+// The Stats and Graph screens are the same height as each other, whatever is
+// in them, so the buttons at the bottom never move between the two. The Graph
+// panel was taller than the Stats board, which is what shifted the screen.
+const STATS_BODY_HEIGHT = "min(calc(100vh - 17rem), 34rem)";
+
 // Terminal step appended to every regime — landing here shows the Session
 // Overview screen. Distinguished from the "coming soon" placeholders by key.
 const OVERVIEW_EXERCISE = {
@@ -2898,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 295;
+const BUILD_VERSION = 296;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "9:30 AM";
+const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats and Graph share one button row",
+  "Stats and Graph are the same height",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10875,7 +10880,7 @@ function NBackSessionApp() {
       className={`w-32 shrink-0 transition-colors rounded-lg py-3 text-base font-medium ${
         active
           ? "bg-slate-700 text-slate-100"
-          : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+          : "bg-slate-800 hover:bg-slate-700 text-slate-100"
       }`}
     >
       {label}
@@ -14383,7 +14388,7 @@ function NBackSessionApp() {
                     ))}
                   </div>
 
-                  <div>
+                  <div style={{ minHeight: STATS_BODY_HEIGHT }}>
                     {/* Wide enough that a label never wraps, which is what
                         made 12rem feel cramped. Still a minimum rather than a
                         column count, so a card is the same size in Regime and
@@ -14620,7 +14625,7 @@ function NBackSessionApp() {
                       className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
                       // Both views declare the same height, so moving between
                       // Graph and Spreadsheet does not resize the page.
-                      style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
+                      style={{ height: STATS_BODY_HEIGHT }}
                     >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
@@ -14665,7 +14670,7 @@ function NBackSessionApp() {
                         // Sized off the viewport so the whole Stats screen fits
                         // without scrolling, whatever the window height.
                         style={{
-                          height: "min(calc(100vh - 22rem), 36rem)",
+                          height: "min(calc(100vh - 28rem), 24rem)",
                           minHeight: "14rem",
                         }}
                       >
@@ -14857,7 +14862,7 @@ function NBackSessionApp() {
                 return (
                   <div
                     className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 flex flex-col"
-                    style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
+                    style={{ height: STATS_BODY_HEIGHT }}
                   >
                     <div className="flex-1 rounded-lg border border-slate-700/60 flex items-center justify-center text-slate-500 text-base">
                       No completed sessions yet.
@@ -14933,7 +14938,7 @@ function NBackSessionApp() {
               return (
                 <div
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
-                  style={{ height: "min(calc(100vh - 11rem), 46rem)" }}
+                  style={{ height: STATS_BODY_HEIGHT }}
                 >
                   <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-hidden">
                     {/* Fixed layout with declared widths: an auto table
