@@ -2066,6 +2066,8 @@ const CUSTOM_MINUTE_STEP = 5;
 const CUSTOM_DEFAULT_MINUTES = 15;
 // Past this the session is long enough to be working against them.
 const CUSTOM_OVERTRAIN_MINUTES = 95;
+// The gap-4 between the builder's cards, in px — the drag maths needs it.
+const CUSTOM_CARD_GAP = 16;
 
 function buildRegimeExercises(regime) {
   const steps = regime.steps.map((step) => ({
@@ -3051,7 +3053,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 318;
+const BUILD_VERSION = 319;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8832,7 +8834,12 @@ function NBackSessionApp() {
   // through findRegime below wherever a regime is looked up by key.
   const [customSteps, setCustomStepsState] = useState([]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
-  const [customDragKey, setCustomDragKey] = useState(null); // exercise being dragged in the builder
+  // Reordering is a pointer drag, not HTML5 drag-and-drop: the native one
+  // drew nothing while dragging (so it read as a guess), and a draggable
+  // card also swallows the pointer from the minutes slider inside it, which
+  // is why the slider stopped moving. { key, from, to, dy, height, startY }.
+  const [customDrag, setCustomDrag] = useState(null);
+  const customDragRef = useRef(null);
   const [activeExercises, setActiveExercises] = useState(() =>
     buildRegimeExercises(REGIMES[0])
   );
@@ -11796,17 +11803,49 @@ function NBackSessionApp() {
     );
   };
 
-  // Drops the dragged exercise in at the target's position, so the numbers
-  // down the left are the running order and dragging is how it's changed.
-  const moveCustomExercise = (fromKey, toKey) => {
-    if (!fromKey || fromKey === toKey) return;
+  // Picked cards are all the same height, so where the dragged card has got
+  // to is just the distance moved divided by one card — no measuring every
+  // card on every frame. The cards it passes slide out of its way.
+  const beginCustomDrag = (key, ev) => {
+    const from = customDraft.findIndex((s) => s.key === key);
+    const card = ev.currentTarget.closest("[data-custom-card]");
+    if (from === -1 || !card) return;
+    ev.preventDefault();
+    const state = {
+      key,
+      from,
+      to: from,
+      dy: 0,
+      height: card.offsetHeight + CUSTOM_CARD_GAP,
+      startY: ev.clientY,
+    };
+    customDragRef.current = state;
+    setCustomDrag(state);
+    ev.currentTarget.setPointerCapture?.(ev.pointerId);
+  };
+
+  const moveCustomDrag = (ev) => {
+    const st = customDragRef.current;
+    if (!st) return;
+    const dy = ev.clientY - st.startY;
+    const to = Math.max(
+      0,
+      Math.min(customDraft.length - 1, st.from + Math.round(dy / st.height))
+    );
+    const next = { ...st, dy, to };
+    customDragRef.current = next;
+    setCustomDrag(next);
+  };
+
+  const endCustomDrag = () => {
+    const st = customDragRef.current;
+    customDragRef.current = null;
+    setCustomDrag(null);
+    if (!st || st.to === st.from) return;
     setCustomDraft((prev) => {
-      const from = prev.findIndex((s) => s.key === fromKey);
-      const to = prev.findIndex((s) => s.key === toKey);
-      if (from === -1 || to === -1) return prev;
       const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
+      const [moved] = next.splice(st.from, 1);
+      next.splice(st.to, 0, moved);
       return next;
     });
   };
@@ -12517,36 +12556,63 @@ function NBackSessionApp() {
                     ? customDraft[position].minutes
                     : CUSTOM_DEFAULT_MINUTES;
                   const exColor = EXERCISE_COLORS[e.key] || "#4CB9D8";
+                  // Where this card sits while a drag is running: the one
+                  // being dragged follows the pointer, and every card it has
+                  // passed slides one slot the other way.
+                  const isDragging = customDrag?.key === e.key;
+                  let shift = 0;
+                  if (customDrag && picked && !isDragging) {
+                    const { from, to, height } = customDrag;
+                    if (from < to && position > from && position <= to) shift = -height;
+                    else if (from > to && position >= to && position < from) shift = height;
+                  }
+                  const dragOffset = isDragging ? customDrag.dy : shift;
                   return (
                     <div
                       key={e.key}
-                      draggable={picked}
-                      onDragStart={() => setCustomDragKey(e.key)}
-                      onDragEnd={() => setCustomDragKey(null)}
-                      onDragOver={(ev) => {
-                        if (picked && customDragKey) ev.preventDefault();
-                      }}
-                      onDrop={(ev) => {
-                        ev.preventDefault();
-                        moveCustomExercise(customDragKey, e.key);
-                        setCustomDragKey(null);
-                      }}
-                      className={`rounded-xl px-7 py-5${
-                        picked ? " cursor-grab active:cursor-grabbing" : ""
-                      }${customDragKey === e.key ? " opacity-50" : ""}`}
-                      style={
-                        picked
+                      data-custom-card=""
+                      /* Extra left padding on a picked card makes room for
+                         the grip, so it never sits on the order number. */
+                      className={`rounded-xl py-5 relative ${
+                        picked ? "pl-14 pr-7" : "px-7"
+                      }${isDragging ? " z-20" : ""}`}
+                      style={{
+                        ...(picked
                           ? {
                               backgroundImage: exerciseDeepFill(exColor),
-                              boxShadow:
-                                "inset 0 1px rgba(255,255,255,0.16), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                              boxShadow: isDragging
+                                ? "inset 0 1px rgba(255,255,255,0.22), 0 22px 34px -10px rgba(0,0,0,0.65)"
+                                : "inset 0 1px rgba(255,255,255,0.16), 0 10px 15px -3px rgba(0,0,0,0.3)",
                             }
                           : {
                               background: "#14161A",
                               border: "1px solid #2C2F34",
-                            }
-                      }
+                            }),
+                        transform: `translateY(${dragOffset}px)${
+                          isDragging ? " scale(1.02)" : ""
+                        }`,
+                        // The dragged card tracks the pointer with no easing
+                        // of its own; the ones moving out of its way ease,
+                        // which is what makes the reorder readable.
+                        transition: isDragging
+                          ? "box-shadow 140ms ease"
+                          : "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+                        touchAction: "none",
+                      }}
                     >
+                      {picked && (
+                        <span
+                          onPointerDown={(ev) => beginCustomDrag(e.key, ev)}
+                          onPointerMove={moveCustomDrag}
+                          onPointerUp={endCustomDrag}
+                          onPointerCancel={endCustomDrag}
+                          title="Drag to reorder"
+                          className="absolute left-3 top-0 bottom-0 w-7 flex items-center justify-center text-xl opacity-50 hover:opacity-90 cursor-grab active:cursor-grabbing select-none"
+                          style={{ touchAction: "none" }}
+                        >
+                          ⠿
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => toggleCustomExercise(e.key)}
@@ -12572,15 +12638,7 @@ function NBackSessionApp() {
                           >
                             {e.title}
                           </span>
-                          {picked && (
-                            <span
-                              className="text-lg leading-none opacity-60 select-none"
-                              title="Drag to reorder"
-                              aria-hidden="true"
-                            >
-                              ⠿
-                            </span>
-                          )}
+
                         </div>
                         <span
                           className={`text-lg font-medium ${
