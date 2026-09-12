@@ -2898,14 +2898,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 294;
+const BUILD_VERSION = 295;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:55 PM";
+const BUILD_TIME = "9:30 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats holds still, glows in the corners",
+  "Stats and Graph share one button row",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10840,6 +10840,60 @@ function NBackSessionApp() {
     simulatedUnlockedIds,
   };
 
+  // Ending the session. Guarded, because a second press during the six
+  // seconds of the celebration would start it — and its sound — over.
+  const sessionEndingRef = useRef(false);
+  const finishSessionFromStats = () => {
+    if (overviewSource === "home") {
+      setMainView("home");
+      return;
+    }
+    if (sessionEndingRef.current) return;
+    sessionEndingRef.current = true;
+    // Seen and done with. Only here — Graph and back keeps it.
+    retireSessionPRHighlights();
+    setNudgeIdOverride(null);
+    setSessionCompleteAnim(true);
+    playLevelUp();
+    setTimeout(() => {
+      sessionEndingRef.current = false;
+      setSessionCompleteAnim(false);
+      setHypnosisAfterSession(true);
+      setMainView("hypnosis");
+    }, 6100);
+  };
+
+  // The same three buttons in the same place on both the Stats screen and
+  // the Graph screen, so moving between them changes the panel above and
+  // nothing else. The Graph screen used to have a "‹ Back" link instead,
+  // which put the way out somewhere different on each screen.
+  const statsNavButton = (label, onClick, active) => (
+    <button
+      key={label}
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`w-32 shrink-0 transition-colors rounded-lg py-3 text-base font-medium ${
+        active
+          ? "bg-slate-700 text-slate-100"
+          : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  const statsNav = (
+    <div className="flex gap-3 pt-2">
+      {statsNavButton("Stats", () => setOverviewView("summary"), overviewView === "summary")}
+      {statsNavButton("Graph", () => setOverviewView("graph"), overviewView === "graph")}
+      {statsNavButton(
+        overviewSource === "home" ? "Home" : "Done",
+        finishSessionFromStats,
+        false
+      )}
+    </div>
+  );
+
   const freeMonthDays = Math.min(7, achievementState.regimeStreak || 0);
   const freeMonthEarned = freeMonthDays >= 7;
   // The one line the session-complete screen shows. Chosen once when the
@@ -11564,8 +11618,11 @@ function NBackSessionApp() {
   // fight over the moment.
   const pendingAchievement = achievementCelebrationQueue[0];
   useEffect(() => {
-    if (pendingAchievement) playLevelUp();
-  }, [pendingAchievement]);
+    // Not while the end-of-session celebration is running: pressing Done
+    // plays this once, and an achievement resolving a moment later played it
+    // again, past the de-duplication window, so it landed twice.
+    if (pendingAchievement && !sessionCompleteAnim) playLevelUp();
+  }, [pendingAchievement, sessionCompleteAnim]);
 
   // Reaching a level for the FIRST time gets the celebration track and the
   // applause. Climbing back to a level already reached before gets the short
@@ -14244,7 +14301,7 @@ function NBackSessionApp() {
                     : e.key === "iqnb"
                     ? `${e.abbrev} ${formatScoreValue(e, stat.bestAccuracy)}`
                     : e.key === "cct"
-                    ? `${stat.bestAtInterval ?? 0}% at ${
+                    ? `${stat.bestAtInterval ?? 0}% ${
                         stat.intervalMs ?? CCT_START_MS
                       }ms`
                     : e.key === "rrt"
@@ -14470,39 +14527,7 @@ function NBackSessionApp() {
               );
             })()}
 
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setOverviewView("graph")}
-                className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium"
-              >
-                Graph
-              </button>
-              {/* Opened from Home this is just a page they were browsing, so
-                  it goes back Home. Reached at the end of a regime it is the
-                  real end of a session, which is the only time the Motivation
-                  track should be offered. */}
-              <button
-                onClick={() => {
-                  if (overviewSource === "home") {
-                    setMainView("home");
-                    return;
-                  }
-                  // Seen and done with. Only here — Stats and back keeps it.
-                  retireSessionPRHighlights();
-                  setNudgeIdOverride(null);
-                  setSessionCompleteAnim(true);
-                  playLevelUp();
-                  setTimeout(() => {
-                    setSessionCompleteAnim(false);
-                    setHypnosisAfterSession(true);
-                    setMainView("hypnosis");
-                  }, 6100);
-                }}
-                className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-base font-medium"
-              >
-                {overviewSource === "home" ? "Home" : "Done"}
-              </button>
-            </div>
+            {statsNav}
           </div>
         )}
 
@@ -14510,12 +14535,6 @@ function NBackSessionApp() {
           /* Tight at the top: the panel is the page, so the heading and the
              Back link give up their spacing to it. */
           <div className="space-y-3">
-            <button
-              onClick={() => setOverviewView("summary")}
-              className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium self-start"
-            >
-              ‹ Back
-            </button>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-semibold tracking-tight">
@@ -15131,6 +15150,7 @@ function NBackSessionApp() {
             })()            }
             </div>
 
+            {statsNav}
           </div>
         )}
 
