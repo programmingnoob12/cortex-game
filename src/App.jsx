@@ -2014,7 +2014,7 @@ const STATS_SCREEN_HEIGHT = "calc(100vh - 8rem)";
 
 // Tailwind's own `sm` breakpoint, readable from JS — for the few places a
 // height has to be set inline and so cannot be done with a class.
-const NARROW_QUERY = "(max-width: 639px)";
+const NARROW_QUERY = "(max-width: 639px), (max-height: 700px)";
 function useIsNarrow() {
   const [narrow, setNarrow] = useState(
     () => typeof window !== "undefined" && window.matchMedia?.(NARROW_QUERY).matches
@@ -3086,15 +3086,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 328;
+const BUILD_VERSION = 329;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats and Graph scroll properly on a phone",
-  "N-back tutorial and running screen fit a narrow screen",
+  "N-back answers sit in a column each side at every width",
+  "Stats works in landscape and on a phone",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11097,7 +11097,7 @@ function NBackSessionApp() {
   );
 
   const statsNav = (
-    <div className="flex gap-3 pt-2">
+    <div className="flex gap-3 pt-2 pb-1">
       {statsNavButton("Stats", () => setOverviewView("summary"), overviewView === "summary")}
       {statsNavButton("Graph", () => setOverviewView("graph"), overviewView === "graph")}
       {statsNavButton(
@@ -12177,10 +12177,10 @@ function NBackSessionApp() {
           style={toneStyle}
           className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 md:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
         >
-          <span className="text-[0.65rem] md:text-sm font-medium uppercase tracking-wide opacity-70">
+          <span className="text-[0.6rem] sm:text-xs md:text-sm font-medium uppercase tracking-wide opacity-70">
             {meta.label}
           </span>
-          <span className="text-xl md:text-4xl font-semibold leading-none">
+          <span className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-none">
             {MODALITY_KEY_LABEL[m]}
           </span>
         </button>
@@ -12189,7 +12189,7 @@ function NBackSessionApp() {
     const spaced = (list) =>
       list.map((el, i) => (
         <Fragment key={el.key}>
-          {i > 0 && <div className="hidden md:block h-6 lg:h-10 shrink-0" />}
+          {i > 0 && <div className="h-3 md:h-6 lg:h-10 shrink-0" />}
           {el}
         </Fragment>
       ));
@@ -15232,7 +15232,7 @@ function NBackSessionApp() {
                 <div ref={statsBodyRef} className="space-y-6 flex-1 min-h-0">
                   <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
                     {summary.map((s2) => (
-                      <div key={s2.label} className="px-6 py-5">
+                      <div key={s2.label} className="px-5 py-3.5 sm:px-6 sm:py-5">
                         <div className="text-slate-400 text-sm">{s2.label}</div>
                         <div
                           className="text-2xl font-semibold tracking-tight mt-1"
@@ -15264,7 +15264,9 @@ function NBackSessionApp() {
                           the buttons underneath sit where they do in All
                           instead of sliding up. */}
                       {Array.from({
-                        length: Math.max(rows.length, OVERVIEW_SLOTS),
+                        length: isNarrow
+                          ? rows.length
+                          : Math.max(rows.length, OVERVIEW_SLOTS),
                       }).map((_, slot) => {
                         const r = rows[slot];
                         if (!r) {
@@ -16272,16 +16274,15 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            {/* Side by side from md up, stacked below it: on a phone the two
-                button columns cannot sit beside a square grid and leave the
-                grid anything usable, so they drop underneath it instead,
-                which also puts them under the thumbs. */}
-            <div className="flex flex-col md:flex-row items-center md:items-stretch justify-between gap-2.5 w-full">
-            <div className="order-2 md:order-1 flex md:flex-col justify-between gap-2.5 md:gap-0 h-14 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
+            {/* A column of answers down each side at every width, so both
+                thumbs sit on their own targets and the grid keeps the
+                vertical space a button row underneath would have taken. */}
+            <div className="flex flex-row items-stretch justify-between gap-2 sm:gap-2.5 w-full">
+            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[22vw] max-w-28 lg:max-w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
-              className="nback-box order-1 md:order-2"
+              className="nback-box"
               style={{
                 aspectRatio: "1 / 1",
                 display: "grid",
@@ -16331,7 +16332,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="order-3 flex md:flex-col justify-between gap-2.5 md:gap-0 h-14 md:h-auto w-full md:w-28 lg:w-36 shrink-0">
+            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[22vw] max-w-28 lg:max-w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>

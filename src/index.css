@@ -270,8 +270,11 @@ button.ex-card.ex-card-shine::after {
   width: max(240px, min(100%, 1400px, calc(100vh - 140px)));
 }
 @media (max-width: 767px) {
+  /* The columns either side leave the grid the rest of the row, and it is
+     square, so its height is what has to fit — not a fixed sum of the old
+     stacked layout's parts. */
   .nback-box {
-    width: min(100%, calc(100vh - 220px));
+    width: min(100%, calc(100vh - 150px));
   }
 }
 
