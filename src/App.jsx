@@ -3068,15 +3068,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 322;
+const BUILD_VERSION = 323;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Rank names on every level achievement",
-  "Custom regime: drag anywhere on a card, smoother drop",
+  "Name your regimes and build as many as you want",
+  "Whole card is tappable when adding an exercise",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8854,8 +8854,12 @@ function NBackSessionApp() {
   // A regime the person built themselves: [{ key, minutes }] in the order
   // they picked the exercises. Persisted like any other setting, and read
   // through findRegime below wherever a regime is looked up by key.
-  const [customSteps, setCustomStepsState] = useState([]);
+  // Any number of regimes they have built: [{ id, name, steps }]. The key
+  // a built regime is selected by is "custom:<id>".
+  const [customRegimes, setCustomRegimesState] = useState([]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
+  const [customName, setCustomName] = useState(""); // its name, in the builder
+  const [customEditId, setCustomEditId] = useState(null); // which one is being edited, null = a new one
   // Reordering is a pointer drag, not HTML5 drag-and-drop: the native one
   // drew nothing while dragging (so it read as a guess), and a draggable
   // card also swallows the pointer from the minutes slider inside it, which
@@ -9542,10 +9546,17 @@ function NBackSessionApp() {
         // no saved per-exercise tutorial dismissals yet
       }
       try {
-        const res = await window.storage.get("custom-regime", false);
+        const res = await window.storage.get("custom-regimes", false);
         if (res && res.value) {
           const parsed = JSON.parse(res.value);
-          if (Array.isArray(parsed)) setCustomStepsState(parsed);
+          if (Array.isArray(parsed)) setCustomRegimesState(parsed);
+        } else {
+          // The first version of this held one unnamed regime; carry it over.
+          const old = await window.storage.get("custom-regime", false);
+          const steps = old && old.value ? JSON.parse(old.value) : null;
+          if (Array.isArray(steps) && steps.length) {
+            setCustomRegimesState([{ id: "r0", name: "Custom", steps }]);
+          }
         }
       } catch (err) {
         // no custom regime built yet
@@ -10827,26 +10838,32 @@ function NBackSessionApp() {
   // One single leaderboard covering every exercise, independent of whichever
   // regime is active — the person picks which exercise's leaderboard to view
   // from a dropdown instead of it being scoped/filtered by their regime.
-  const customRegimeMinutes = customSteps.reduce((t, s) => t + s.minutes, 0);
   const customDraftMinutes = customDraft.reduce((t, s) => t + s.minutes, 0);
-  const customRegime = {
-    key: "custom",
-    title: "Custom",
-    subtitle: `${customRegimeMinutes} min`,
+  // One of their built regimes, shaped like the built-in ones.
+  const asRegime = (entry) => ({
+    key: `custom:${entry.id}`,
+    title: entry.name || "Custom",
+    subtitle: `${entry.steps.reduce((t, s) => t + s.minutes, 0)} min`,
     summary:
-      customSteps.map((s) => EXERCISE_LIBRARY[s.key]?.title).filter(Boolean).join(" \u00B7 ") ||
-      "Build your own regime.",
+      entry.steps
+        .map((s) => EXERCISE_LIBRARY[s.key]?.title)
+        .filter(Boolean)
+        .join(" \u00B7 ") || "Build your own regime.",
     accent: "indigo",
-    steps: customSteps,
+    custom: true,
+    steps: entry.steps,
+  });
+  // Every regime lookup goes through here, since built regimes aren't in
+  // REGIMES.
+  const findRegime = (key) => {
+    if (typeof key === "string" && key.startsWith("custom:")) {
+      const entry = customRegimes.find((r) => `custom:${r.id}` === key);
+      return entry ? asRegime(entry) : null;
+    }
+    return REGIMES.find((r) => r.key === key);
   };
-  // Every regime lookup goes through here, since "custom" isn't in REGIMES.
-  const findRegime = (key) =>
-    key === "custom" ? customRegime : REGIMES.find((r) => r.key === key);
 
-  const currentRegime =
-    (regimeKey === "custom" && customSteps.length > 0 ? customRegime : null) ||
-    REGIMES.find((r) => r.key === regimeKey) ||
-    REGIMES[0];
+  const currentRegime = findRegime(regimeKey) || REGIMES[0];
   const leaderboardTabs = Object.values(EXERCISE_LIBRARY).map((e) => ({
     key: e.key,
     label: e.title,
@@ -11646,7 +11663,7 @@ function NBackSessionApp() {
 
   const startRegimeWithSteps = (key, stepsOverride) => {
     const regime = stepsOverride
-      ? { ...customRegime, key, steps: stepsOverride }
+      ? { key, title: "Custom", steps: stepsOverride }
       : findRegime(key);
     if (!regime || !regime.steps.length) return;
     const built = buildRegimeExercises(regime);
@@ -11800,23 +11817,39 @@ function NBackSessionApp() {
   useEffect(() => {
     if (isMember) return;
     if (regimeKey && regimeKey !== FREE_REGIME_KEY) {
+      // (a built regime is a paid feature too, so it falls in here)
       setRegimeKey(null);
       setMainView("regime");
     }
   }, [isMember, regimeKey]);
 
-  const setCustomSteps = (steps) => {
-    setCustomStepsState(steps);
+  const setCustomRegimes = (list) => {
+    setCustomRegimesState(list);
     if (window.storage) {
-      safeStorageSet("custom-regime", JSON.stringify(steps), false);
+      safeStorageSet("custom-regimes", JSON.stringify(list), false);
     }
   };
 
-  // Opens the builder with whatever they last saved, so editing a custom
-  // regime is editing, not starting over.
-  const openCustomBuilder = () => {
-    setCustomDraft(customSteps.map((s) => ({ ...s })));
+  // id = null builds a new one; otherwise the builder opens on that regime,
+  // so editing is editing rather than starting over.
+  const openCustomBuilder = (id = null) => {
+    const entry = id ? customRegimes.find((r) => r.id === id) : null;
+    setCustomEditId(entry ? entry.id : null);
+    setCustomName(entry ? entry.name : "");
+    setCustomDraft(entry ? entry.steps.map((s) => ({ ...s })) : []);
     setMainView("custom");
+  };
+
+  const deleteCustomRegime = (id) => {
+    const next = customRegimes.filter((r) => r.id !== id);
+    setCustomRegimes(next);
+    // Training it right now? Nothing to train any more, so back to the picker.
+    if (regimeKey === `custom:${id}`) {
+      setRegimeKey(null);
+      setMainView("regime");
+    } else {
+      setMainView("regime");
+    }
   };
 
   const toggleCustomExercise = (key) => {
@@ -11921,11 +11954,19 @@ function NBackSessionApp() {
   const saveCustomRegime = () => {
     if (!customDraft.length) return;
     const steps = customDraft.map((s) => ({ ...s }));
-    setCustomSteps(steps);
-    // startRegime reads the regime through findRegime, which builds the
-    // custom one off customSteps state — not yet updated in this render —
-    // so it is handed the steps directly.
-    startRegimeWithSteps("custom", steps);
+    const id = customEditId || `r${Date.now().toString(36)}`;
+    const name =
+      customName.trim() ||
+      `Custom ${customRegimes.length + (customEditId ? 0 : 1)}`.trim();
+    const entry = { id, name, steps };
+    setCustomRegimes(
+      customEditId
+        ? customRegimes.map((r) => (r.id === id ? entry : r))
+        : [...customRegimes, entry]
+    );
+    // findRegime reads customRegimes, which this render has not updated
+    // yet, so the steps are handed over directly.
+    startRegimeWithSteps(`custom:${id}`, steps);
   };
 
   const chooseRegime = (key) => {
@@ -11934,6 +11975,7 @@ function NBackSessionApp() {
       goToCheckout();
       return;
     }
+    if (!findRegime(key)) return;
     // Switching to a different regime abandons whatever daily streak is
     // currently live — warn whenever the person has one (> 0 days), using
     // the same streak the 🔥 badge on Home shows, so what's warned about
@@ -12540,21 +12582,50 @@ function NBackSessionApp() {
               {/* Members build their own; on a free account it stays the
                   locked teaser it was. */}
               {isMember ? (
-                <button
-                  onClick={openCustomBuilder}
-                  style={{ "--ex": REGIME_COLORS.custom }}
-                  className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
-                >
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="text-2xl font-semibold">Custom</div>
-                    <div className="text-lg font-medium">
-                      {customSteps.length ? customRegime.subtitle : "Build it \u203A"}
+                <>
+                  {/* One card per regime they have built — tap to train it,
+                      Edit to change it. */}
+                  {customRegimes.map((entry) => {
+                    const r = asRegime(entry);
+                    return (
+                      <div key={entry.id} className="relative">
+                        <button
+                          onClick={() => chooseRegime(r.key)}
+                          style={{ "--ex": REGIME_COLORS.custom }}
+                          className="w-full text-left deep-fill rounded-xl pl-7 pr-24 py-6 shadow-lg shadow-black/30"
+                        >
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="text-2xl font-semibold">{r.title}</div>
+                            <div className="text-lg font-medium">{r.subtitle}</div>
+                          </div>
+                          <div className="text-base font-medium mt-1">{r.summary}</div>
+                        </button>
+                        <button
+                          onClick={() => openCustomBuilder(entry.id)}
+                          className="absolute right-5 top-5 rounded-lg px-3 py-1.5 text-sm font-medium"
+                          style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    onClick={() => openCustomBuilder(null)}
+                    className="w-full text-left rounded-xl px-7 py-6 border border-dashed transition-colors"
+                    style={{ borderColor: "#3A3E46", color: "#A6A9B1" }}
+                  >
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="text-2xl font-semibold">
+                        {customRegimes.length ? "Build another regime" : "Custom"}
+                      </div>
+                      <div className="text-lg font-medium">+</div>
                     </div>
-                  </div>
-                  <div className="text-base font-medium mt-1">
-                    {customSteps.length ? customRegime.summary : "Build your own regime."}
-                  </div>
-                </button>
+                    <div className="text-base font-medium mt-1">
+                      Build your own regime.
+                    </div>
+                  </button>
+                </>
               ) : (
                 <div className="relative group">
                   <button
@@ -12598,6 +12669,13 @@ function NBackSessionApp() {
               <h1 className="text-5xl font-semibold tracking-tight">
                 Build your regime
               </h1>
+              <input
+                value={customName}
+                onChange={(ev) => setCustomName(ev.target.value)}
+                placeholder="Name it"
+                maxLength={28}
+                className="mt-5 w-full bg-slate-900 border border-slate-700/70 focus:border-slate-500 outline-none rounded-lg px-5 py-3.5 text-xl font-medium text-slate-100 placeholder-slate-600"
+              />
             </div>
 
             {/* Only worth saying once there is something to reorder. */}
@@ -12674,6 +12752,7 @@ function NBackSessionApp() {
                     <div
                       key={e.key}
                       data-custom-card=""
+                      onClick={picked ? undefined : () => toggleCustomExercise(e.key)}
                       onPointerDown={
                         picked ? (ev) => beginCustomDrag(e.key, ev) : undefined
                       }
@@ -12722,7 +12801,7 @@ function NBackSessionApp() {
                             : "box-shadow 140ms ease"
                           : "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
                         touchAction: picked ? "none" : undefined,
-                        cursor: picked ? (isDragging ? "grabbing" : "grab") : undefined,
+                        cursor: picked ? (isDragging ? "grabbing" : "grab") : "pointer",
                       }}
                     >
                       {picked && (
@@ -12733,11 +12812,9 @@ function NBackSessionApp() {
                           ⠿
                         </span>
                       )}
-                      <button
-                        type="button"
-                        onClick={picked ? undefined : () => toggleCustomExercise(e.key)}
+                      <div
                         className={`w-full text-left flex items-center justify-between gap-6${
-                          picked ? " pr-9 cursor-grab" : ""
+                          picked ? " pr-9" : ""
                         }`}
                       >
                         <div className="flex items-center gap-3">
@@ -12769,7 +12846,7 @@ function NBackSessionApp() {
                         >
                           {picked ? `${minutes} min` : "Add"}
                         </span>
-                      </button>
+                      </div>
                       {/* An explicit way back out — a tap on the card does
                           it too, but on a card that is also draggable that
                           is not something to have to guess at. */}
@@ -12820,6 +12897,14 @@ function NBackSessionApp() {
                 >
                   Overtraining may cause diminishing returns and fatigue.
                 </div>
+              )}
+              {customEditId && (
+                <button
+                  onClick={() => deleteCustomRegime(customEditId)}
+                  className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-rose-300 hover:border-rose-500/60 transition-colors rounded-lg py-3 text-base"
+                >
+                  Delete this regime
+                </button>
               )}
               <button
                 onClick={saveCustomRegime}
