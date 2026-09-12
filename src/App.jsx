@@ -671,12 +671,27 @@ function AuthGate({ children }) {
     }
     let cancelled = false;
     (async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("membership_status, current_period_end")
-        .eq("id", session.user.id)
-        .maybeSingle();
-      if (cancelled) return;
+      // Coming straight back from checkout, the row is usually still being
+      // written by the Stripe webhook — asking once lands a fraction of a
+      // second too early, which is why the regime screen came back still
+      // showing "Get membership" until the page was refreshed by hand.
+      // Ask again for a few seconds instead of making them do that.
+      const attempts = CAME_FROM_CHECKOUT ? 12 : 1;
+      let data = null;
+      let error = null;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        ({ data, error } = await supabase
+          .from("users")
+          .select("membership_status, current_period_end")
+          .eq("id", session.user.id)
+          .maybeSingle());
+        if (cancelled) return;
+        if (!error && data?.membership_status === "active") break;
+        if (attempt < attempts - 1) {
+          await new Promise((r) => setTimeout(r, 1500));
+          if (cancelled) return;
+        }
+      }
       if (error) {
         // A failed request is not proof of a lapsed membership. With a
         // cached answer in hand, keep showing it rather than throwing a
@@ -1167,8 +1182,22 @@ function AuthGate({ children }) {
   if (membershipOk === null) {
     // No interstitial. On the first check of a new browser this is a blank
     // dark page for a moment, which reads as the app still loading rather
-    // than as a step it is making the person wait through.
-    return <div className="min-h-screen" />;
+    // than as a step it is making the person wait through. Straight after
+    // checkout the wait can run a few seconds while the payment lands, and
+    // a blank screen that long reads as broken — so that one case says what
+    // it is waiting for.
+    return CAME_FROM_CHECKOUT ? (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center space-y-2">
+          <div className="text-xl font-semibold text-slate-100">
+            Setting up your membership
+          </div>
+          <div className="text-slate-400 text-base">One moment.</div>
+        </div>
+      </div>
+    ) : (
+      <div className="min-h-screen" />
+    );
   }
 
   // Someone with no membership at all is a FREE account, not a locked-out
@@ -2960,7 +2989,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 313;
+const BUILD_VERSION = 314;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -6333,19 +6362,18 @@ function RrtTutorialAnimated({ onDone }) {
 
     <div className={`${card} space-y-6`} key="s5">
       <p className="text-slate-100 text-lg leading-relaxed">
-        Feel where each item is. Don't imagine the items moving around on your
-        screen.
+        Don't imagine the items moving around on your screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         Its like feeling where your door is in the room, not visualizing the
         door.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        After all the premises have been read in order, review the spatial
-        model by feeling the items.
+        After you read all the premises in order, review the spatial model by
+        feeling the items.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        Check if the conclusion is true or false.
+        Then check if the conclusion is true or false.
       </p>
       <p className="text-slate-400 text-base leading-relaxed pt-5 border-t border-slate-700/70">
         Have any questions? Email{" "}
@@ -18189,14 +18217,16 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
 
   const backHint = showBackHint ? (
     <>
-      <div className="hidden lg:block absolute right-full bottom-[6.3rem] mr-3 w-56">
+      <div className="hidden lg:block absolute right-full top-1/2 -translate-y-1/2 mr-3 w-56">
         <svg
           width="40"
           height="22"
           viewBox="0 0 40 22"
           fill="none"
           className="absolute pointer-events-none"
-          style={{ right: -38, top: 6 }}
+          /* Centred on the box, which is itself centred on the Back button —
+             so the arrow lands on the button at any card height. */
+          style={{ right: -38, top: "50%", marginTop: -11 }}
           aria-hidden="true"
         >
           <path
@@ -18234,7 +18264,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         </div>
       </div>
       <div
-        className="lg:hidden absolute top-full left-0 right-0 mt-48 rounded-lg px-3 py-2 border text-sm"
+        className="lg:hidden absolute top-full left-0 right-0 mt-3 rounded-lg px-3 py-2 border text-sm"
         style={{
           borderColor: `${EXERCISE_COLORS.rrt}66`,
           background: "#0F1115",
@@ -18406,9 +18436,11 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       <div className="relative max-w-sm mx-auto">
         {rrtPanels}
         {flashOverlay}
+        {homeLink && (
+          <div className="absolute -top-9 left-0">{homeLink}</div>
+        )}
         {timerHint}
         {historyHint}
-        {backHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
@@ -18439,7 +18471,8 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
               className="flex flex-col justify-start gap-3 mt-4"
               style={{ minHeight: RRT_FOOTER_MIN_HEIGHT }}
             >
-              <div className="flex gap-3">
+              <div className="relative flex gap-3">
+                {backHint}
                 <button
                   onClick={() => setPremiseIndex((i) => Math.max(0, i - 1))}
                   disabled={isFirst || !reachedQuestion}
@@ -18477,9 +18510,11 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
     <div className="relative max-w-sm mx-auto">
       {rrtPanels}
       {flashOverlay}
+      {homeLink && (
+          <div className="absolute -top-9 left-0">{homeLink}</div>
+        )}
       {timerHint}
       {historyHint}
-      {backHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
