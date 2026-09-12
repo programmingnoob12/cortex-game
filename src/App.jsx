@@ -2909,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 306;
+const BUILD_VERSION = 307;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "6:40 PM";
+const BUILD_TIME = "7:45 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Even axis steps with headroom, 3D MOT colours refined",
+  "Sessions on every x axis with dates under them",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14546,8 +14546,11 @@ function NBackSessionApp() {
               // Chooses itself from how much history there is: every session
               // for the first 90 days, then one point a week, then one a
               // month past a year. Nothing for anyone to set.
-              const grain =
-                spanDays > 400 ? "month" : spanDays > 90 ? "week" : "session";
+              // Always sessions. A long history used to switch the axis over
+              // to weeks or months, which is why one exercise showed dates
+              // where every other showed a session number. The date is still
+              // there, under the number on a few ticks.
+              const grain = "session";
               const chartData = withRunningAverage(
                 aggregateSessions(
                   windowed.map((h, i) => ({
@@ -14582,6 +14585,19 @@ function NBackSessionApp() {
                 }
                 return out.length > 1 ? out : null;
               })();
+
+              // Which ticks also carry a date, and what that date reads as.
+              const dateByLabel = new Map(
+                chartData
+                  .filter((d) => d.ts)
+                  .map((d) => [
+                    d.label,
+                    new Date(d.ts).toLocaleDateString(undefined, {
+                      day: "numeric",
+                      month: "short",
+                    }),
+                  ])
+              );
 
               // One interval across the whole axis, so the gaps between
               // labels are all the same width.
@@ -14685,6 +14701,37 @@ function NBackSessionApp() {
                             tick={{ fill: "#6E7178", fontSize: 12 }}
                             ticks={xTicks}
                             interval={0}
+                            height={38}
+                            tick={(props) => {
+                              const { x, y, payload, index } = props;
+                              // Every third tick carries a date, so the row
+                              // reads as an occasional marker rather than a
+                              // second axis competing with the numbers.
+                              const when =
+                                index % 3 === 0 ? dateByLabel.get(payload.value) : null;
+                              return (
+                                <g transform={`translate(${x},${y})`}>
+                                  <text
+                                    dy={12}
+                                    textAnchor="middle"
+                                    fill="#6E7178"
+                                    fontSize={12}
+                                  >
+                                    {payload.value}
+                                  </text>
+                                  {when && (
+                                    <text
+                                      dy={26}
+                                      textAnchor="middle"
+                                      fill="#4E5157"
+                                      fontSize={10}
+                                    >
+                                      {when}
+                                    </text>
+                                  )}
+                                </g>
+                              );
+                            }}
                             label={{
                               value:
                                 grain === "month"
@@ -14693,7 +14740,7 @@ function NBackSessionApp() {
                                   ? "Week"
                                   : "Session",
                               position: "insideBottom",
-                              offset: -8,
+                              offset: -2,
                               fill: "#6E7178",
                               fontSize: 12,
                             }}
@@ -18601,10 +18648,10 @@ const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still rea
 // The balls to track, called out in orange with a pale cyan halo around them
 // (see MOT_HALO_COLOR) rather than by colour alone.
 const MOT_COLOR_TARGET = 0xc8811e;
-const MOT_HALO_COLOR = 0xa6cfce;
+const MOT_HALO_COLOR = 0x9fd2d8;
 // Right and wrong at the end of a round.
-const MOT_COLOR_CORRECT = 0xc2c246;
-const MOT_COLOR_WRONG = 0xb4101e;
+const MOT_COLOR_CORRECT = 0x8f8f2e;
+const MOT_COLOR_WRONG = 0x8e1220;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
 // Uniform-random unit vector (so starting directions don't bunch up near
@@ -19164,13 +19211,14 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         new THREE.MeshBasicMaterial({ visible: false })
       );
       const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.22, 20, 14),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.06, 28, 18),
         new THREE.MeshBasicMaterial({
           color: MOT_HALO_COLOR,
           transparent: true,
-          opacity: 0.55,
+          opacity: 0.5,
           side: THREE.BackSide,
           depthWrite: false,
+          blending: THREE.AdditiveBlending,
         })
       );
       halo.visible = false;
@@ -19182,6 +19230,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         letter: letters[i],
         mesh,
         halo,
+        lines,
         hitMesh,
         vel: motRandomUnitVector(),
         selected: false,
@@ -19441,6 +19490,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       b.mesh.scale.setScalar(1);
       b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
       if (b.halo) b.halo.visible = false;
+      if (b.lines) b.lines.visible = true;
     });
 
     const ids = Array.from({ length: MOT_BALL_COUNT }, (_, i) => i);
@@ -19454,6 +19504,9 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       if (b.isTarget) {
         b.mesh.material.color.setHex(MOT_COLOR_TARGET);
         if (b.halo) b.halo.visible = true;
+        // The lat/long overlay smears against a lit rim, so it steps out
+        // while the ball is called out.
+        if (b.lines) b.lines.visible = false;
       }
     });
 
@@ -19465,6 +19518,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       ctx.balls.forEach((b) => {
         b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
         if (b.halo) b.halo.visible = false;
+        if (b.lines) b.lines.visible = true;
       });
       setStage("track");
       stageTimeoutRef.current = setTimeout(() => {
@@ -19766,7 +19820,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             e.stopPropagation();
             startRound();
           }}
-          className="absolute top-3 right-3 text-sm font-medium text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 transition-colors"
+          className="absolute bottom-3 left-3 text-sm font-medium text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 transition-colors"
         >
           Restart Game
         </button>
