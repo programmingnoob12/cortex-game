@@ -2811,7 +2811,7 @@ const MOTIVATION_LINES = [
   { id: 1, text: "A sharper mind gives you an edge." },
   { id: 2, text: "Great job! You're getting ahead of the competition." },
   { id: 3, text: "Sharper reactions. Stronger performance." },
-  { id: 4, text: "Other people aren't willing to do what you just did. That's why you have an edge." },
+  { id: 4, text: "Other people aren't willing to do what you do. That's why you have an edge." },
   { id: 5, text: "OUTTHINK. OUTREACT. OUTPERFORM." },
   { id: 6, text: "GET AHEAD." },
   { id: 7, text: "MAKE YOUR MIND STRONGER." },
@@ -2909,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 303;
+const BUILD_VERSION = 304;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "3:10 PM";
+const BUILD_TIME = "4:20 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Taller graph, softer rank glow, tutorial copy",
+  "Graph renders again, speed readout on 3D MOT, tutorial copy",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6233,11 +6233,9 @@ function RrtTutorialAnimated({ onDone }) {
     </div>,
 
     <div className={`${card} space-y-4`} key="s1">
-      <p
-        className="text-2xl font-semibold tracking-tight underline underline-offset-4"
-        style={{ color: accent }}
-      >
-        This is called spatializing.
+      <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
+        This is called{" "}
+        <span className="underline underline-offset-4">spatializing</span>.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         In RRT you spatialize the items. You don't imagine them. You{" "}
@@ -6273,11 +6271,11 @@ function RrtTutorialAnimated({ onDone }) {
         </div>
       </div>
       {row(green, "is South-West of", blue, beat >= 1)}
-      <div className="flex items-center justify-center gap-2 flex-wrap text-center text-slate-100 text-lg">
+      <div className="flex items-center justify-center gap-3.5 flex-wrap text-center text-slate-100 text-2xl font-medium">
         <span>Can you feel how</span>
-        <RrtItemTile item={green} size={30} />
+        <RrtItemTile item={green} size={46} />
         <span>is south-west of</span>
-        <RrtItemTile item={blue} size={30} />
+        <RrtItemTile item={blue} size={46} />
         <span>?</span>
       </div>
     </div>,
@@ -6288,12 +6286,15 @@ function RrtTutorialAnimated({ onDone }) {
         screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        It should be like feeling where your door is in the room.
+        Its like feeling where your door is in the room, not visualizing the
+        door
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         After all the premises have been read in order, review the spatial
-        model by feeling the items and checking if the conclusion is true or
-        false
+        model by feeling the items
+      </p>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Check if the conclusion is true or false
       </p>
       <p className="text-slate-400 text-base leading-relaxed pt-5 border-t border-slate-700/70">
         Have any questions? Email{" "}
@@ -14532,7 +14533,7 @@ function NBackSessionApp() {
 
             {/* Both views show one exercise at a time, chosen from the switch
                 inside the panel. */}
-            <div>
+            <div className="flex-1 min-h-0 flex flex-col">
             {!SHOW_SPREADSHEET || statsDisplay === "chart" || overviewScope === "all"
               ? (statsChartExercise ? [statsChartExercise] : []).map((e) => {
               const history = exerciseHistory[e.key] || [];
@@ -14615,7 +14616,7 @@ function NBackSessionApp() {
                         // Sized off the viewport so the whole Stats screen fits
                         // without scrolling, whatever the window height.
                         className="flex-1"
-                        style={{ minHeight: "10rem" }}
+                        style={{ minHeight: 0, position: "relative" }}
                       >
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
@@ -16148,6 +16149,36 @@ function NBackSessionApp() {
           screens) rather than duplicated per-screen, so there's exactly one
           place this can go stale. Hidden during the brief switchNotice
           transition since forceSwitchToNext is already mid-flight then. */}
+      {/* Fires the level-up celebration for whichever exercise is on screen,
+          at one above its current level, so every exercise's version can be
+          looked at without training up to it. Bottom left, clear of the RRT
+          hints on the right and the 3D MOT speed readout up top. */}
+      {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
+        <button
+          onClick={() => {
+            const key = exercise.key;
+            const stat = exerciseStats[key];
+            const current =
+              key === "iqnb"
+                ? Math.floor(qnbPrimeLevel)
+                : stat?.bestN || n || 1;
+            const level = current + 1;
+            const title =
+              key === "rrt"
+                ? `${level}p`
+                : key === "motion3d"
+                ? `Tier ${level}`
+                : key === "cct"
+                ? `${level} in a row`
+                : exercise.title.replace("N-Back", `${level}-Back`);
+            setUnlockInfo({ exerciseKey: key, level, title, isNewPR: true });
+          }}
+          className="fixed bottom-2 left-2 md:bottom-6 md:left-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30"
+        >
+          🧪 Level up
+        </button>
+      )}
+
       {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
         <button
           onClick={() => forceSwitchToNext(exerciseIndex)}
@@ -19529,6 +19560,23 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
   return (
     <div className="relative w-full h-full">
+      {/* The speed the staircase is currently on. Top right, over the scene
+          rather than in it: big enough to read without looking for it, and
+          far enough out of the way that it never competes with the balls. */}
+      {!sessionDone && (
+        <div className="absolute top-3 right-4 z-20 text-right pointer-events-none select-none">
+          <div className="text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
+            Speed
+          </div>
+          <div
+            className="text-2xl font-semibold tabular-nums leading-none mt-0.5"
+            style={{ color: EXERCISE_COLORS.motion3d || "#4CB9D8" }}
+          >
+            {speed.toFixed(2)}
+          </div>
+        </div>
+      )}
+
       {/* Time is up. An overlay rather than a screen of its own, so the
           exercise underneath is left exactly as it was and nothing about this
           component's layout had to change. */}
