@@ -533,6 +533,7 @@ const NOTE_GROUPS = [
       "Cool songs when the session is finished.",
       "Add TikTok hard songs and mix up when they're played.",
       "The goal isn't just a brain training app. It is psychological solutions that make it feel better and easier, a pseudo motivation mindset coach on top of the exercises.",
+      "Guide their mind and provide psychological solutions so training feels easier and they see the vision.",
     ],
   },
   {
@@ -1964,6 +1965,11 @@ const OVERVIEW_SLOTS = Object.keys(EXERCISE_LIBRARY).length;
 // panel was taller than the Stats board, which is what shifted the screen.
 const STATS_BODY_HEIGHT = "min(calc(100vh - 17rem), 34rem)";
 
+// The Stats and Graph screens are this tall, so the buttons sit near the
+// bottom of the window on both and the graph has the room to be worth
+// looking at. Leaves the page's own padding plus a little air underneath.
+const STATS_SCREEN_HEIGHT = "calc(100vh - 8rem)";
+
 // Terminal step appended to every regime — landing here shows the Session
 // Overview screen. Distinguished from the "coming soon" placeholders by key.
 const OVERVIEW_EXERCISE = {
@@ -2903,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 302;
+const BUILD_VERSION = 303;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "2:15 PM";
+const BUILD_TIME = "3:10 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Tutorials trimmed, miss colour, setup screen back, session hand-off",
+  "Taller graph, softer rank glow, tutorial copy",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6123,7 +6129,7 @@ function RrtTutorialAnimatedMap({ items, positions, revealed, highlight, size = 
               borderRight: "1px solid #3A3D44",
               borderBottom: "1px solid #3A3D44",
               background: lit ? `${PR_YELLOW}1A` : "transparent",
-              outline: lit ? `2px solid ${PR_YELLOW}` : "none",
+              outline: `2px solid ${lit ? PR_YELLOW : "transparent"}`,
               outlineOffset: "-2px",
               transition: "background 0.3s ease, outline-color 0.3s ease",
             }}
@@ -6227,7 +6233,10 @@ function RrtTutorialAnimated({ onDone }) {
     </div>,
 
     <div className={`${card} space-y-4`} key="s1">
-      <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
+      <p
+        className="text-2xl font-semibold tracking-tight underline underline-offset-4"
+        style={{ color: accent }}
+      >
         This is called spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
@@ -6282,14 +6291,11 @@ function RrtTutorialAnimated({ onDone }) {
         It should be like feeling where your door is in the room.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        At the end review the spatial model and make sure you know exactly
-        where each item is
+        After all the premises have been read in order, review the spatial
+        model by feeling the items and checking if the conclusion is true or
+        false
       </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
-        Don't look back at the items until you've constructed the spatial model
-        in order.
-      </p>
-      <p className="text-slate-400 text-base leading-relaxed">
+      <p className="text-slate-400 text-base leading-relaxed pt-5 border-t border-slate-700/70">
         Have any questions? Email{" "}
         <a
           href={`mailto:${LEGAL_CONTACT}`}
@@ -11715,8 +11721,8 @@ function NBackSessionApp() {
           100% { transform: scale(1); opacity: 1; }
         }
         @keyframes rankGlowPulse {
-          0%, 100% { box-shadow: 0 0 10px 1px rgba(250,204,21,0.35), 0 0 0 1px rgba(250,204,21,0.4) inset; }
-          50% { box-shadow: 0 0 24px 6px rgba(250,204,21,0.6), 0 0 0 1px rgba(250,204,21,0.7) inset; }
+          0%, 100% { box-shadow: 0 0 8px 1px rgba(250,204,21,0.18), 0 0 0 1px rgba(250,204,21,0.25) inset; }
+          50% { box-shadow: 0 0 18px 4px rgba(250,204,21,0.32), 0 0 0 1px rgba(250,204,21,0.45) inset; }
         }
         /* Belt-and-suspenders hover/press feedback: written as plain CSS
            (not a Tailwind utility class) so it renders regardless of which
@@ -14150,12 +14156,6 @@ function NBackSessionApp() {
              the running screen and the others, which is why this landed in
              the middle after one exercise and near the top after another. */
           <div className="fixed inset-0 z-40 flex flex-col items-center justify-center text-center gap-8 px-6 bg-slate-950">
-            <div
-              className="text-xl font-medium uppercase tracking-[0.2em] text-slate-500"
-              style={{ animation: "switchIn 0.5s ease-out both" }}
-            >
-              {exercise.key === "overview" ? "Session complete" : "Next exercise"}
-            </div>
             <h1
               className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
               style={{ animation: "switchIn 0.9s 0.18s cubic-bezier(0.16,0.8,0.24,1) both", textWrap: "balance" }}
@@ -14183,7 +14183,10 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
-          <div className="space-y-6">
+          <div
+            className="space-y-6 flex flex-col"
+            style={{ height: STATS_SCREEN_HEIGHT }}
+          >
             <div className="flex items-center gap-3">
               <h1
                 className="text-3xl font-semibold tracking-tight shrink-0"
@@ -14304,7 +14307,7 @@ function NBackSessionApp() {
               ];
 
               return (
-                <div ref={statsBodyRef} className="space-y-6">
+                <div ref={statsBodyRef} className="space-y-6 flex-1 min-h-0">
                   <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
                     {summary.map((s2) => (
                       <div key={s2.label} className="px-6 py-5">
@@ -14470,7 +14473,10 @@ function NBackSessionApp() {
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
           /* Same gaps as the Stats screen, so with the blocks matched the two
              screens are identical top to bottom. */
-          <div className="space-y-6">
+          <div
+            className="space-y-6 flex flex-col"
+            style={{ height: STATS_SCREEN_HEIGHT }}
+          >
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <h1
@@ -14553,16 +14559,15 @@ function NBackSessionApp() {
                 )
               );
               return (
-                <div key={e.key}>
+                <div key={e.key} className="flex-1 min-h-0 flex flex-col">
                   {chartData.length > 0 ? (
                     <div
                       className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
-                      // The Stats board's measured height, so the two screens
-                      // are the same without either being padded out.
+                      // Fills the column, so the chart is as tall as the
+                      // window allows rather than matching the card board.
                       style={{
-                        height: statsBodyHeight
-                          ? `${statsBodyHeight}px`
-                          : STATS_BODY_HEIGHT,
+                        flex: "1 1 auto",
+                        minHeight: 0,
                         display: "flex",
                         flexDirection: "column",
                       }}
@@ -14642,7 +14647,7 @@ function NBackSessionApp() {
                             dataKey="label"
                             stroke="#6E7178"
                             tick={{ fill: "#6E7178", fontSize: 12 }}
-                            minTickGap={24}
+                            minTickGap={4}
                             label={{
                               value:
                                 grain === "month"
@@ -15633,7 +15638,7 @@ function NBackSessionApp() {
                   textShadow: `0 0 24px ${PR_YELLOW}66`,
                 }}
               >
-                New personal record
+                New level reached
               </div>
             ) : (
               <div className="text-base uppercase tracking-wide text-slate-400">
@@ -18518,7 +18523,7 @@ function motDisplaySpeedToVelocity(displaySpeed) {
 // under the current scale. See the hydration effect below, which resets
 // exerciseStats.motion3d instead of trusting it when this doesn't match.
 const MOT_TIER_SCHEMA_VERSION = 2;
-const MOT_COLOR_NEUTRAL = 0xd2cfc6; // light grey — the previous value read as too dark against the dark volume
+const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still read dark against the volume
 const MOT_COLOR_TARGET = 0xb4a55a; // muted gold — desaturated to match the neutral ball's sophistication
 // The same green and red RRT uses for a right and a wrong answer, so one
 // signal means one thing across the whole app.
@@ -18889,7 +18894,7 @@ function HypnosisScreen({ onDone, afterSession }) {
           onClick={onDone}
           className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
         >
-          Done
+          Skip
         </button>
       )}
     </div>
