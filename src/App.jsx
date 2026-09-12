@@ -2903,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 296;
+const BUILD_VERSION = 297;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:05 AM";
+const BUILD_TIME = "10:45 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats and Graph are the same height",
+  "Graph sized to the Stats board, no empty gap",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10899,6 +10899,25 @@ function NBackSessionApp() {
     </div>
   );
 
+  // Measured, not guessed: the Graph panel is sized to whatever the Stats
+  // board actually comes out at, so the button row underneath sits in the same
+  // place on both screens with no padding-out of either.
+  const statsBodyRef = useRef(null);
+  const [statsBodyHeight, setStatsBodyHeight] = useState(null);
+  useLayoutEffect(() => {
+    const el = statsBodyRef.current;
+    if (!el) return;
+    const measure = () => {
+      const h = el.offsetHeight;
+      if (h > 0) setStatsBodyHeight((prev) => (prev === h ? prev : h));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+
   const freeMonthDays = Math.min(7, achievementState.regimeStreak || 0);
   const freeMonthEarned = freeMonthDays >= 7;
   // The one line the session-complete screen shows. Chosen once when the
@@ -14388,7 +14407,7 @@ function NBackSessionApp() {
                     ))}
                   </div>
 
-                  <div style={{ minHeight: STATS_BODY_HEIGHT }}>
+                  <div ref={statsBodyRef}>
                     {/* Wide enough that a label never wraps, which is what
                         made 12rem feel cramped. Still a minimum rather than a
                         column count, so a card is the same size in Regime and
@@ -14623,9 +14642,15 @@ function NBackSessionApp() {
                   {chartData.length > 0 ? (
                     <div
                       className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4"
-                      // Both views declare the same height, so moving between
-                      // Graph and Spreadsheet does not resize the page.
-                      style={{ height: STATS_BODY_HEIGHT }}
+                      // The Stats board's measured height, so the two screens
+                      // are the same without either being padded out.
+                      style={{
+                        height: statsBodyHeight
+                          ? `${statsBodyHeight}px`
+                          : STATS_BODY_HEIGHT,
+                        display: "flex",
+                        flexDirection: "column",
+                      }}
                     >
                       {/* Title on the left, exercise switch on the right, both
                           inside the panel so the chart owns its own controls. */}
@@ -14669,10 +14694,8 @@ function NBackSessionApp() {
                       <div
                         // Sized off the viewport so the whole Stats screen fits
                         // without scrolling, whatever the window height.
-                        style={{
-                          height: "min(calc(100vh - 28rem), 24rem)",
-                          minHeight: "14rem",
-                        }}
+                        className="flex-1"
+                        style={{ minHeight: "10rem" }}
                       >
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
@@ -14862,7 +14885,9 @@ function NBackSessionApp() {
                 return (
                   <div
                     className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 flex flex-col"
-                    style={{ height: STATS_BODY_HEIGHT }}
+                    style={{
+                      height: statsBodyHeight ? `${statsBodyHeight}px` : STATS_BODY_HEIGHT,
+                    }}
                   >
                     <div className="flex-1 rounded-lg border border-slate-700/60 flex items-center justify-center text-slate-500 text-base">
                       No completed sessions yet.
@@ -14938,7 +14963,9 @@ function NBackSessionApp() {
               return (
                 <div
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
-                  style={{ height: STATS_BODY_HEIGHT }}
+                  style={{
+                    height: statsBodyHeight ? `${statsBodyHeight}px` : STATS_BODY_HEIGHT,
+                  }}
                 >
                   <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-hidden">
                     {/* Fixed layout with declared widths: an auto table
