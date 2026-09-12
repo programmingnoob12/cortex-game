@@ -3088,7 +3088,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 336;
+const BUILD_VERSION = 337;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14952,8 +14952,7 @@ function NBackSessionApp() {
                         ))}
                       </div>
                       <p className="text-slate-500 text-sm">
-                        You keep your streak and history while you are away. Your membership
-                        will start again after the pause.
+                        You keep your streak and history while you are away.
                       </p>
                     </div>
                   ))}
@@ -17012,7 +17011,7 @@ function NBackSessionApp() {
               Are you sure you want to delete "{deleteRegimeConfirm.name}" regime?
             </div>
             <p className="text-slate-400 text-sm">
-              This will delete the stats for "{deleteRegimeConfirm.name}" regime.
+              This will also delete the stats for "{deleteRegimeConfirm.name}" regime.
             </p>
             <div className="flex gap-3">
               <button
