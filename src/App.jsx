@@ -2180,6 +2180,58 @@ function speak(letter, onstart) {
 const KEY_BINDINGS = { a: "pos", l: "audio", f: "color", j: "shape" };
 const MODALITY_KEY_LABEL = { pos: "A", audio: "L", color: "F", shape: "J" };
 
+// Daily reminder — a browser notification at 6pm on a day they haven't
+// trained yet, saying how long is left before the day (and the streak) is
+// gone. Browser notifications are per-device, not per-account: the
+// permission belongs to this browser, so the preference is kept in
+// localStorage rather than in the user's synced settings. It fires while
+// the app is open in a tab (it can be in the background — it does not have
+// to be the tab in front); reaching a phone with the site closed needs a
+// push service, which is a separate piece of work.
+const REMINDER_ENABLED_KEY = "cortex.reminderEnabled";
+const REMINDER_SENT_KEY = "cortex.reminderSentOn";
+const REMINDER_HOUR = 18; // 6pm, local time — six hours before the day ends
+
+function notificationsSupported() {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
+function useDailyReminder(enabled, trainedToday) {
+  // Read through a ref so the day's progress can change without tearing
+  // down and re-arming the timer.
+  const trainedRef = useRef(trainedToday);
+  trainedRef.current = trainedToday;
+  useEffect(() => {
+    if (!enabled || !notificationsSupported()) return undefined;
+    const tick = () => {
+      if (Notification.permission !== "granted") return;
+      const now = new Date();
+      if (now.getHours() < REMINDER_HOUR) return;
+      if (trainedRef.current) return; // already trained — nothing to nudge
+      const today = now.toDateString();
+      try {
+        if (localStorage.getItem(REMINDER_SENT_KEY) === today) return;
+        localStorage.setItem(REMINDER_SENT_KEY, today);
+      } catch {
+        // Without storage it would repeat every minute, so don't send.
+        return;
+      }
+      const hoursLeft = Math.max(1, 24 - now.getHours());
+      try {
+        new Notification(`${hoursLeft} hours left`, {
+          body: `${hoursLeft} hours left to finish today's session.`,
+          tag: "cortex-daily-reminder",
+        });
+      } catch {
+        // Some browsers only allow this from a service worker.
+      }
+    };
+    tick();
+    const id = setInterval(tick, 60 * 1000);
+    return () => clearInterval(id);
+  }, [enabled]);
+}
+
 // Binaural beats — plays a real produced focus-music/binaural-beats track.
 // This is loaded as a normal external file rather than embedded as a
 // base64 data URI: large (multi-minute) audio embedded inline as text
@@ -2989,7 +3041,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 314;
+const BUILD_VERSION = 315;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -10778,6 +10830,56 @@ function NBackSessionApp() {
   // one exercise) — this is what "Tomorrow" on the Next-session card means,
   // and what disables the Start button below.
   const trainedToday = regimeCompletionDates.includes(new Date().toDateString());
+
+  const [remindersOn, setRemindersOn] = useState(() => {
+    try {
+      return localStorage.getItem(REMINDER_ENABLED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [reminderNote, setReminderNote] = useState(null);
+  useDailyReminder(remindersOn, trainedToday);
+  const toggleReminders = async () => {
+    setReminderNote(null);
+    if (remindersOn) {
+      setRemindersOn(false);
+      try {
+        localStorage.setItem(REMINDER_ENABLED_KEY, "0");
+      } catch { /* nothing to persist to */ }
+      return;
+    }
+    if (!notificationsSupported()) {
+      setReminderNote("This browser can't show notifications.");
+      return;
+    }
+    let permission = Notification.permission;
+    if (permission === "default") {
+      try {
+        permission = await Notification.requestPermission();
+      } catch {
+        permission = "denied";
+      }
+    }
+    if (permission !== "granted") {
+      // Once it is denied the browser will not ask again from here — it has
+      // to be changed in the site's own settings, so say that rather than
+      // leaving a toggle that silently refuses to move.
+      setReminderNote("Notifications are blocked. Allow them for this site in your browser settings.");
+      return;
+    }
+    setRemindersOn(true);
+    try {
+      localStorage.setItem(REMINDER_ENABLED_KEY, "1");
+      localStorage.removeItem(REMINDER_SENT_KEY);
+    } catch { /* nothing to persist to */ }
+    try {
+      new Notification("Reminders on", {
+        body: "You'll get a nudge at 6pm on any day you haven't trained yet.",
+        tag: "cortex-daily-reminder",
+      });
+    } catch { /* the toggle is still on */ }
+  };
   const todaysHint = hintForToday(new Date().toDateString());
 
   const liveStreakDays = currentStreakDays(exerciseHistory, streakBrokenAt);
@@ -13761,6 +13863,19 @@ function NBackSessionApp() {
                   setBinauralBeatsEnabled(!binauralBeatsEnabled);
                 }}
               />
+            </div>
+
+            <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-medium">Daily reminder</div>
+                <div className="text-slate-500 text-base mt-1">
+                  A notification at 6pm on days you haven't trained
+                </div>
+                {reminderNote && (
+                  <div className="text-rose-400 text-base mt-1">⚠ {reminderNote}</div>
+                )}
+              </div>
+              <Toggle on={remindersOn} onToggle={toggleReminders} />
             </div>
 
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
@@ -17154,6 +17269,33 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       return false;
     }
   });
+  // The Back hint has to live OUTSIDE the card — the card clips its own
+  // contents (overflow-hidden), which is what swallowed the callout when it
+  // was rendered next to the button — but it has to line up with a button
+  // INSIDE the card. So its vertical position is measured off the button
+  // rather than guessed at with a fixed offset from the card's edge, which
+  // is what put the arrow on the wrong row every time the card changed
+  // height.
+  const backBtnRef = useRef(null);
+  const cardWrapRef = useRef(null);
+  const [backHintTop, setBackHintTop] = useState(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const btn = backBtnRef.current;
+      const wrap = cardWrapRef.current;
+      if (!btn || !wrap) {
+        setBackHintTop(null);
+        return;
+      }
+      const b = btn.getBoundingClientRect();
+      const w = wrap.getBoundingClientRect();
+      setBackHintTop(b.top - w.top + b.height / 2);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  });
+
   const markAnswered = () => {
     setAnsweredAny(true);
     try {
@@ -17621,9 +17763,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   const homeLink = onHome ? (
     <button
       onClick={onHome}
-      className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium"
+      className="self-start text-slate-500 hover:text-slate-300 transition-colors text-base"
     >
-      &lsaquo; Home
+      &larr; Home
     </button>
   ) : null;
 
@@ -18217,7 +18359,14 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
 
   const backHint = showBackHint ? (
     <>
-      <div className="hidden lg:block absolute right-full top-1/2 -translate-y-1/2 mr-3 w-56">
+      <div
+        className="hidden lg:block absolute right-full mr-3 w-56"
+        style={{
+          top: backHintTop ?? "50%",
+          transform: "translateY(-50%)",
+          visibility: backHintTop === null ? "hidden" : undefined,
+        }}
+      >
         <svg
           width="40"
           height="22"
@@ -18433,13 +18582,14 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
     const isFirst = premiseIndex === 0;
     const isLast = premiseIndex === puzzle.premises.length - 1;
     return (
-      <div className="relative max-w-sm mx-auto">
+      <div className="relative max-w-sm mx-auto" ref={cardWrapRef}>
         {rrtPanels}
         {flashOverlay}
         {homeLink && (
           <div className="absolute -top-9 left-0">{homeLink}</div>
         )}
         {timerHint}
+        {backHint}
         {historyHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
@@ -18471,9 +18621,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
               className="flex flex-col justify-start gap-3 mt-4"
               style={{ minHeight: RRT_FOOTER_MIN_HEIGHT }}
             >
-              <div className="relative flex gap-3">
-                {backHint}
+              <div className="flex gap-3">
                 <button
+                  ref={backBtnRef}
                   onClick={() => setPremiseIndex((i) => Math.max(0, i - 1))}
                   disabled={isFirst || !reachedQuestion}
                   className="flex-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:hover:bg-slate-700 transition-colors rounded-lg py-2 text-base font-medium"
