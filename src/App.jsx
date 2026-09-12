@@ -2903,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 297;
+const BUILD_VERSION = 298;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "10:45 AM";
+const BUILD_TIME = "11:25 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Graph sized to the Stats board, no empty gap",
+  "Graph matches the whole Stats block, not just the cards",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14392,7 +14392,7 @@ function NBackSessionApp() {
               ];
 
               return (
-                <>
+                <div ref={statsBodyRef} className="space-y-6">
                   <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
                     {summary.map((s2) => (
                       <div key={s2.label} className="px-6 py-5">
@@ -14407,7 +14407,7 @@ function NBackSessionApp() {
                     ))}
                   </div>
 
-                  <div ref={statsBodyRef}>
+                  <div>
                     {/* Wide enough that a label never wraps, which is what
                         made 12rem feel cramped. Still a minimum rather than a
                         column count, so a card is the same size in Regime and
@@ -14547,7 +14547,7 @@ function NBackSessionApp() {
                       })}
                     </div>
                   </div>
-                </>
+                </div>
               );
             })()}
 
