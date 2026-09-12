@@ -2068,6 +2068,9 @@ const CUSTOM_DEFAULT_MINUTES = 15;
 const CUSTOM_OVERTRAIN_MINUTES = 95;
 // The gap-4 between the builder's cards, in px — the drag maths needs it.
 const CUSTOM_CARD_GAP = 16;
+// How long the dropped card takes to settle into its slot.
+const CUSTOM_DROP_MS = 190;
+const CUSTOM_DRAG_HINT_KEY = "cortex.customDragHint";
 
 function buildRegimeExercises(regime) {
   const steps = regime.steps.map((step) => ({
@@ -3053,15 +3056,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 319;
+const BUILD_VERSION = 320;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Custom regime: drag the cards to reorder",
-  "Home fits one screen with five or six exercises",
+  "Rank names on every level achievement",
+  "Custom regime: drag anywhere on a card, smoother drop",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -8396,7 +8399,7 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
     tierLabel: gemTierFor(level).label,
     group: "Performance",
     icon: exerciseKey === "dual" ? "🧠" : "🧩",
-    title: tierTitle,
+    title: `${tierTitle} ${gemTierFor(level).label}`,
     description: `Reach ${levelTitle} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats[exerciseKey]?.bestN || 0) >= level,
@@ -8432,7 +8435,9 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
     exercise: "iqnb",
     group: "Performance",
     icon: "🌀",
-    title: `QNB' ${level}.00`,
+    tierColor: gemTierFor(level).color,
+    tierLabel: gemTierFor(level).label,
+    title: `QNB' ${level}.00 ${gemTierFor(level).label}`,
     description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
@@ -8466,7 +8471,9 @@ function rrtLevelAchievement(level, overrides = {}) {
     exercise: "rrt",
     group: "Performance",
     icon: "🔗",
-    title: `RRT ${premiseCount}p`,
+    tierColor: gemTierFor(level).color,
+    tierLabel: gemTierFor(level).label,
+    title: `RRT ${premiseCount}p ${gemTierFor(level).label}`,
     description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
@@ -8504,7 +8511,9 @@ function motion3dLevelAchievement(level, overrides = {}) {
     exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
-    title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)}`,
+    tierColor: gemTierFor(level).color,
+    tierLabel: gemTierFor(level).label,
+    title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} ${gemTierFor(level).label}`,
     description: `Reach 3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
@@ -8534,7 +8543,8 @@ function cctRankAchievement(level, overrides = {}) {
     group: "Performance",
     icon: "🧮",
     tierColor: gemTierFor(level).color,
-    title: `CCT ${step.accuracy}% at ${step.interval}ms`,
+    tierLabel: gemTierFor(level).label,
+    title: `CCT ${step.accuracy}% at ${step.interval}ms ${gemTierFor(level).label}`,
     description: `Finish a CCT session at ${step.accuracy}% accuracy or better on a ${step.interval}ms interval.`,
     reward: isMax ? "New personal-best badge · max rank" : "New personal-best badge",
     unlocked: (s) => cctRankFor(s.exerciseStats.cct?.bestByInterval) >= level,
@@ -8840,6 +8850,14 @@ function NBackSessionApp() {
   // is why the slider stopped moving. { key, from, to, dy, height, startY }.
   const [customDrag, setCustomDrag] = useState(null);
   const customDragRef = useRef(null);
+  const customDragMovedRef = useRef(false); // true once a drag actually moved, so the drop doesn't also count as a tap
+  const [customDragHintOff, setCustomDragHintOff] = useState(() => {
+    try {
+      return localStorage.getItem(CUSTOM_DRAG_HINT_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [activeExercises, setActiveExercises] = useState(() =>
     buildRegimeExercises(REGIMES[0])
   );
@@ -11806,11 +11824,15 @@ function NBackSessionApp() {
   // Picked cards are all the same height, so where the dragged card has got
   // to is just the distance moved divided by one card — no measuring every
   // card on every frame. The cards it passes slide out of its way.
+  // Anywhere on the card starts a drag — except the minutes slider, which
+  // needs its own pointer.
   const beginCustomDrag = (key, ev) => {
+    if (ev.button != null && ev.button !== 0) return;
+    if (ev.target.closest?.('input[type="range"]')) return;
     const from = customDraft.findIndex((s) => s.key === key);
-    const card = ev.currentTarget.closest("[data-custom-card]");
+    const card = ev.currentTarget;
     if (from === -1 || !card) return;
-    ev.preventDefault();
+    customDragMovedRef.current = false;
     const state = {
       key,
       from,
@@ -11821,13 +11843,16 @@ function NBackSessionApp() {
     };
     customDragRef.current = state;
     setCustomDrag(state);
-    ev.currentTarget.setPointerCapture?.(ev.pointerId);
+    card.setPointerCapture?.(ev.pointerId);
   };
 
   const moveCustomDrag = (ev) => {
     const st = customDragRef.current;
-    if (!st) return;
+    if (!st || st.settling) return;
     const dy = ev.clientY - st.startY;
+    // A few pixels of slop, so a plain tap to add/remove still registers as
+    // a click rather than a one-pixel drag.
+    if (Math.abs(dy) > 4) customDragMovedRef.current = true;
     const to = Math.max(
       0,
       Math.min(customDraft.length - 1, st.from + Math.round(dy / st.height))
@@ -11839,15 +11864,28 @@ function NBackSessionApp() {
 
   const endCustomDrag = () => {
     const st = customDragRef.current;
-    customDragRef.current = null;
-    setCustomDrag(null);
-    if (!st || st.to === st.from) return;
-    setCustomDraft((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(st.from, 1);
-      next.splice(st.to, 0, moved);
-      return next;
-    });
+    if (!st || st.settling) return;
+    if (st.to === st.from) {
+      customDragRef.current = null;
+      setCustomDrag(null);
+      return;
+    }
+    // Glide the card into the slot it is over FIRST, then swap the list
+    // underneath once it is already sitting exactly where the swap will put
+    // it — so the reorder is invisible instead of a jump.
+    const settled = { ...st, dy: (st.to - st.from) * st.height, settling: true };
+    customDragRef.current = settled;
+    setCustomDrag(settled);
+    setTimeout(() => {
+      customDragRef.current = null;
+      setCustomDrag(null);
+      setCustomDraft((prev) => {
+        const next = [...prev];
+        const [moved] = next.splice(st.from, 1);
+        next.splice(st.to, 0, moved);
+        return next;
+      });
+    }, CUSTOM_DROP_MS);
   };
 
   const saveCustomRegime = () => {
@@ -12536,6 +12574,59 @@ function NBackSessionApp() {
               </p>
             </div>
 
+            {/* Only worth saying once there is something to reorder. */}
+            {customDraft.length > 1 && !customDragHintOff && (
+              <div className="flex items-start gap-3">
+                <div
+                  className="rounded-lg px-4 py-3 border text-base"
+                  style={{
+                    borderColor: `${REGIME_COLORS.custom}66`,
+                    background: "#0F1115",
+                    color: "#F7F8F8",
+                  }}
+                >
+                  <div>Drag a card to change the order they run in.</div>
+                  <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={false}
+                      onChange={() => {
+                        setCustomDragHintOff(true);
+                        try {
+                          localStorage.setItem(CUSTOM_DRAG_HINT_KEY, "1");
+                        } catch { /* nothing to persist to */ }
+                      }}
+                      className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
+                    />
+                    Don't show again
+                  </label>
+                </div>
+                {/* Curls down to the first card's grip. */}
+                <svg
+                  width="46"
+                  height="54"
+                  viewBox="0 0 46 54"
+                  fill="none"
+                  className="shrink-0 -ml-1 mt-2 pointer-events-none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 4C2 4 40 6 40 46"
+                    stroke={REGIME_COLORS.custom}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M33 39 40 48 46 38"
+                    stroke={REGIME_COLORS.custom}
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </div>
+            )}
+
             <div className="flex flex-col gap-4">
               {/* Chosen exercises first, in the order they will run, then
                   everything still available — so the list itself reads as
@@ -12571,6 +12662,21 @@ function NBackSessionApp() {
                     <div
                       key={e.key}
                       data-custom-card=""
+                      onPointerDown={
+                        picked ? (ev) => beginCustomDrag(e.key, ev) : undefined
+                      }
+                      onPointerMove={picked ? moveCustomDrag : undefined}
+                      onPointerUp={picked ? endCustomDrag : undefined}
+                      onPointerCancel={picked ? endCustomDrag : undefined}
+                      onClickCapture={(ev) => {
+                        // A drag ends in a click on the card; that must not
+                        // also toggle the exercise out of the regime.
+                        if (customDragMovedRef.current) {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          customDragMovedRef.current = false;
+                        }
+                      }}
                       /* Extra left padding on a picked card makes room for
                          the grip, so it never sits on the order number. */
                       className={`rounded-xl py-5 relative ${
@@ -12580,35 +12686,35 @@ function NBackSessionApp() {
                         ...(picked
                           ? {
                               backgroundImage: exerciseDeepFill(exColor),
-                              boxShadow: isDragging
-                                ? "inset 0 1px rgba(255,255,255,0.22), 0 22px 34px -10px rgba(0,0,0,0.65)"
-                                : "inset 0 1px rgba(255,255,255,0.16), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                              boxShadow:
+                                isDragging && !customDrag.settling
+                                  ? "inset 0 1px rgba(255,255,255,0.22), 0 22px 34px -10px rgba(0,0,0,0.65)"
+                                  : "inset 0 1px rgba(255,255,255,0.16), 0 10px 15px -3px rgba(0,0,0,0.3)",
                             }
                           : {
                               background: "#14161A",
                               border: "1px solid #2C2F34",
                             }),
                         transform: `translateY(${dragOffset}px)${
-                          isDragging ? " scale(1.02)" : ""
+                          isDragging && !customDrag.settling ? " scale(1.03)" : ""
                         }`,
-                        // The dragged card tracks the pointer with no easing
-                        // of its own; the ones moving out of its way ease,
-                        // which is what makes the reorder readable.
+                        // While it is under the pointer it tracks with no
+                        // easing of its own; the cards moving out of its way
+                        // ease, and on release the dragged card eases into
+                        // the slot too.
                         transition: isDragging
-                          ? "box-shadow 140ms ease"
+                          ? customDrag.settling
+                            ? `transform ${CUSTOM_DROP_MS}ms cubic-bezier(0.2, 0, 0, 1), box-shadow ${CUSTOM_DROP_MS}ms ease`
+                            : "box-shadow 140ms ease"
                           : "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
-                        touchAction: "none",
+                        touchAction: picked ? "none" : undefined,
+                        cursor: picked ? (isDragging ? "grabbing" : "grab") : undefined,
                       }}
                     >
                       {picked && (
                         <span
-                          onPointerDown={(ev) => beginCustomDrag(e.key, ev)}
-                          onPointerMove={moveCustomDrag}
-                          onPointerUp={endCustomDrag}
-                          onPointerCancel={endCustomDrag}
-                          title="Drag to reorder"
-                          className="absolute left-3 top-0 bottom-0 w-7 flex items-center justify-center text-xl opacity-50 hover:opacity-90 cursor-grab active:cursor-grabbing select-none"
-                          style={{ touchAction: "none" }}
+                          className="absolute left-3 top-0 bottom-0 w-7 flex items-center justify-center text-xl opacity-50 select-none pointer-events-none"
+                          aria-hidden="true"
                         >
                           ⠿
                         </span>
