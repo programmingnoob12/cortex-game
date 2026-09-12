@@ -3068,7 +3068,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 323;
+const BUILD_VERSION = 324;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12583,31 +12583,23 @@ function NBackSessionApp() {
                   locked teaser it was. */}
               {isMember ? (
                 <>
-                  {/* One card per regime they have built — tap to train it,
-                      Edit to change it. */}
+                  {/* One card per regime they have built — same as any
+                      other regime card: tap it to train it. */}
                   {customRegimes.map((entry) => {
                     const r = asRegime(entry);
                     return (
-                      <div key={entry.id} className="relative">
-                        <button
-                          onClick={() => chooseRegime(r.key)}
-                          style={{ "--ex": REGIME_COLORS.custom }}
-                          className="w-full text-left deep-fill rounded-xl pl-7 pr-24 py-6 shadow-lg shadow-black/30"
-                        >
-                          <div className="flex items-center justify-between gap-6">
-                            <div className="text-2xl font-semibold">{r.title}</div>
-                            <div className="text-lg font-medium">{r.subtitle}</div>
-                          </div>
-                          <div className="text-base font-medium mt-1">{r.summary}</div>
-                        </button>
-                        <button
-                          onClick={() => openCustomBuilder(entry.id)}
-                          className="absolute right-5 top-5 rounded-lg px-3 py-1.5 text-sm font-medium"
-                          style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
-                        >
-                          Edit
-                        </button>
-                      </div>
+                      <button
+                        key={entry.id}
+                        onClick={() => chooseRegime(r.key)}
+                        style={{ "--ex": REGIME_COLORS.custom }}
+                        className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
+                      >
+                        <div className="flex items-center justify-between gap-6">
+                          <div className="text-2xl font-semibold">{r.title}</div>
+                          <div className="text-lg font-medium">{r.subtitle}</div>
+                        </div>
+                        <div className="text-base font-medium mt-1">{r.summary}</div>
+                      </button>
                     );
                   })}
                   <button
@@ -12912,7 +12904,7 @@ function NBackSessionApp() {
                 style={{ "--ex": REGIME_COLORS.custom }}
                 className="w-full deep-fill disabled:opacity-40 rounded-xl py-5 text-xl font-medium shadow-lg shadow-black/30"
               >
-                Set as my regime
+                Create
               </button>
             </div>
           </div>
