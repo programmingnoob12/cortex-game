@@ -2903,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 298;
+const BUILD_VERSION = 299;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:25 AM";
+const BUILD_TIME = "11:50 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Graph matches the whole Stats block, not just the cards",
+  "Stats and Graph stack with the same gaps",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14556,9 +14556,9 @@ function NBackSessionApp() {
         )}
 
         {!switchNotice && exercise.key === "overview" && overviewView === "graph" && (
-          /* Tight at the top: the panel is the page, so the heading and the
-             Back link give up their spacing to it. */
-          <div className="space-y-3">
+          /* Same gaps as the Stats screen, so with the blocks matched the two
+             screens are identical top to bottom. */
+          <div className="space-y-6">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <h1 className="text-3xl font-semibold tracking-tight">
