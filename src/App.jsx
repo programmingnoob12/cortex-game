@@ -3068,7 +3068,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 324;
+const BUILD_VERSION = 325;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12608,13 +12608,8 @@ function NBackSessionApp() {
                     style={{ borderColor: "#3A3E46", color: "#A6A9B1" }}
                   >
                     <div className="flex items-center justify-between gap-6">
-                      <div className="text-2xl font-semibold">
-                        {customRegimes.length ? "Build another regime" : "Custom"}
-                      </div>
+                      <div className="text-2xl font-semibold">Build your own regime</div>
                       <div className="text-lg font-medium">+</div>
-                    </div>
-                    <div className="text-base font-medium mt-1">
-                      Build your own regime.
                     </div>
                   </button>
                 </>
