@@ -2839,7 +2839,6 @@ const MOTIVATION_LINES = [
   // one.
   { id: 24, text: "Another personal best. You're on fire!", cond: "prStreak" },
   { id: 101, text: "You see reality more clearly now." },
-  { id: 102, text: "Enjoy being mentally superior to other people, not everyone." },
   { id: 25, text: "You're right on the edge of a new personal best!", cond: "nearBest" },
   { id: 26, text: "Progress is messy sometimes." },
   { id: 27, text: "It was a hard session but you got it done.", cond: "worse" },
@@ -2868,11 +2867,42 @@ const MOTIVATION_LINES = [
     id: 50,
     text: "The most important thing is to keep your streak going. Don't worry about scores for now. They'll come later.",
   },
+  { id: 103, text: "Reps nobody sees. Results everybody does." },
+  { id: 104, text: "Hard is the point." },
+  { id: 105, text: "You are not here to be entertained." },
+  { id: 106, text: "Attention is the whole game." },
+  { id: 107, text: "Nobody is coming to do this for you." },
+  { id: 108, text: "The work is boring. The edge is not." },
+  { id: 109, text: "Strain is the signal." },
+  { id: 110, text: "Do it tired. That is the rep that counts." },
+  { id: 111, text: "You are rebuilding how you think." },
+  { id: 112, text: "Most people quit here. Keep going." },
+  { id: 113, text: "Sharper every week." },
+  { id: 114, text: "Discomfort now, clarity later." },
+  { id: 115, text: "Your focus is a weapon. Sharpen it." },
+  { id: 116, text: "One more round." },
+  { id: 117, text: "This is the part that changes you." },
+  { id: 118, text: "Slow is fine. Stopping is not." },
+  { id: 119, text: "Train the mind like it is a muscle, because it is." },
+  { id: 120, text: "Everything gets easier except this." },
+  { id: 121, text: "You chose the hard version. Good." },
+  { id: 122, text: "Hold the thread." },
+  { id: 123, text: "Push past where it gets uncomfortable." },
+  { id: 124, text: "Quiet mind. Full effort." },
+  { id: 125, text: "Nothing about this is wasted." },
+  { id: 126, text: "Show up again tomorrow." },
+  { id: 127, text: "Your ceiling moves every session." },
+  { id: 128, text: "Concentration is trainable. Prove it." },
+  { id: 129, text: "Stay with it." },
+  { id: 130, text: "You are building something invisible and real." },
+  { id: 131, text: "Effort compounds." },
+  { id: 132, text: "Feel it working." },
 ];
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
 // usual random transition line. Not in MOTIVATION_LINES, because it must
 // never come up in the ordinary rotation.
 const QUAD_5_BACK_LINE = "Enjoy having HD vision.";
+
 
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
@@ -2909,14 +2939,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 308;
+const BUILD_VERSION = 309;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "8:55 PM";
+const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Round session steps, dark yellow, session ends on Stats",
+  "30 more transition lines, reset and seed data buttons",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -11070,6 +11100,36 @@ function NBackSessionApp() {
   // Dev/test only: fills every exercise with ~90 days of plausible history
   // so the table and graph can be judged at a realistic size rather than
   // with three rows in them.
+  // Wipes every score, every history row and everything derived from them,
+  // so the seeded data below can be judged from a clean slate rather than
+  // landing on top of whatever was there.
+  const resetAllData = () => {
+    const keys = Object.keys(EXERCISE_LIBRARY).filter((k) => k !== "overview");
+    setExerciseStats({});
+    setExerciseHistory({});
+    setRegimeCompletionDatesState([]);
+    setStreakBrokenAtState(null);
+    setSessionPRs({});
+    setOverviewPRSeen({});
+    setNewPRBanners({});
+    setAchievementCelebrationQueue([]);
+    setAchievementDates({});
+    saveAchievementDates({});
+    PREVIOUSLY_UNLOCKED_IDS.clear();
+    unlockedAchievementIdsRef.current = null;
+    loggedElapsedRef.current = {};
+    exerciseElapsedMsRef.current = {};
+    if (window.storage) {
+      keys.forEach((k) => {
+        window.storage.delete?.(`stats-${k}`, false)?.catch?.(() => {});
+        window.storage.delete?.(`history-${k}`, false)?.catch?.(() => {});
+      });
+      window.storage.delete?.("history-_streakTest", false)?.catch?.(() => {});
+      safeStorageSet("regime-completion-dates", JSON.stringify([]), false);
+      safeStorageSet("streak-broken-at", JSON.stringify(null), false);
+    }
+  };
+
   const seedFakeHistory = () => {
     const dayMs = 24 * 60 * 60 * 1000;
     const now = Date.now();
@@ -12640,12 +12700,25 @@ function NBackSessionApp() {
               >
                 🧪 Show every tutorial again
               </button>
-              <button
-                onClick={seedFakeHistory}
-                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
-              >
-                🧪 Fill 90 days of fake history
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={resetAllData}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Reset all data
+                </button>
+                <button
+                  onClick={() => {
+                    // Clean slate first, so seeding twice does not stack two
+                    // runs of history on top of each other.
+                    resetAllData();
+                    setTimeout(seedFakeHistory, 0);
+                  }}
+                  className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+                >
+                  🧪 Add 90 days of realistic data
+                </button>
+              </div>
               <button
                 onClick={() => setSimulateFree((v) => !v)}
                 className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
@@ -14705,7 +14778,6 @@ function NBackSessionApp() {
                           <XAxis
                             dataKey="label"
                             stroke="#6E7178"
-                            tick={{ fill: "#6E7178", fontSize: 12 }}
                             ticks={xTicks}
                             interval={0}
                             height={54}
@@ -18654,10 +18726,10 @@ const MOT_TIER_SCHEMA_VERSION = 2;
 const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still read dark against the volume
 // The balls to track, called out in orange with a pale cyan halo around them
 // (see MOT_HALO_COLOR) rather than by colour alone.
-const MOT_COLOR_TARGET = 0xc8811e;
+const MOT_COLOR_TARGET = 0xd99a2b;
 const MOT_HALO_COLOR = 0x9fd2d8;
 // Right and wrong at the end of a round.
-const MOT_COLOR_CORRECT = 0xc69214;
+const MOT_COLOR_CORRECT = 0xbca41a;
 const MOT_COLOR_WRONG = 0x8e1220;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
@@ -19824,7 +19896,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             e.stopPropagation();
             startRound();
           }}
-          className="absolute top-3 right-3 text-sm font-medium text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 transition-colors"
+          className="absolute top-3 right-3 text-sm font-medium text-slate-200 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5"
         >
           Restart Game
         </button>
