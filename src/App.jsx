@@ -3068,15 +3068,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 325;
+const BUILD_VERSION = 326;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Name your regimes and build as many as you want",
-  "Whole card is tappable when adding an exercise",
+  "Phone pass: corner pills move into the page, Home scrolls",
+  "Headings and floating cards scale down on small screens",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -7742,7 +7742,7 @@ function LegalPage({ doc, onBack }) {
         >
           &lsaquo; Back
         </button>
-        <h1 className="text-4xl font-semibold tracking-tight">{doc.title}</h1>
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{doc.title}</h1>
         <div className="text-slate-500 text-sm mt-2">
           Last updated {LEGAL_UPDATED}
         </div>
@@ -12217,8 +12217,9 @@ function NBackSessionApp() {
            padding and clipped, which is why the gap under it never matched
            Membership's. Measured in the browser: min-h-screen puts both
            footers exactly one page-padding (48px) above the bottom. */
-        mainView === "home" ||
-        (mainView === "app" && exercise.key === "overview" && overviewView === "graph")
+        mainView === "home"
+          ? "min-h-screen overflow-y-auto sm:h-screen sm:overflow-y-hidden"
+          : mainView === "app" && exercise.key === "overview" && overviewView === "graph"
           ? "h-screen overflow-y-hidden"
           : "min-h-screen overflow-y-auto"
       } ${
@@ -12494,7 +12495,7 @@ function NBackSessionApp() {
                   </li>
                 ))}
               </ul>
-              <h1 className="text-5xl font-semibold tracking-tight">
+              <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
                 Choose your regime
               </h1>
               <p className="text-slate-400 text-base mt-3">
@@ -12653,7 +12654,7 @@ function NBackSessionApp() {
               >
                 &lsaquo; Back
               </button>
-              <h1 className="text-5xl font-semibold tracking-tight">
+              <h1 className="text-4xl sm:text-5xl font-semibold tracking-tight">
                 Build your regime
               </h1>
               <input
@@ -12914,7 +12915,7 @@ function NBackSessionApp() {
               >
                 ‹ Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">Achievements</h1>
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Achievements</h1>
               <p className="text-slate-400 text-base mt-3">
                 {ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, achievementState)).length} of{" "}
                 {ACHIEVEMENTS_CATALOG.length} unlocked
@@ -13112,7 +13113,45 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`${compactHome ? "space-y-4" : "space-y-6"} pt-12 sm:pt-0`}>
+          <div className={compactHome ? "space-y-4" : "space-y-6"}>
+            {/* On a phone the corner pills would sit on top of the page, so
+                they run as a row inside it instead. */}
+            <div className="sm:hidden flex flex-wrap gap-2">
+              {[
+                { label: "🧪 Testing", onClick: () => setMainView("testing") },
+                { label: "Notes", onClick: () => setMainView("notes") },
+                ...(isMember
+                  ? [
+                      {
+                        label: `🏅 ${
+                          ACHIEVEMENTS_CATALOG.filter((a) =>
+                            isAchievementUnlocked(a, achievementState)
+                          ).length
+                        }/${ACHIEVEMENTS_CATALOG.length}`,
+                        onClick: () => setMainView("achievements"),
+                      },
+                    ]
+                  : []),
+                { label: "Account", onClick: () => setMainView("account") },
+                {
+                  label: "💬 Feedback",
+                  onClick: () => {
+                    setFeedbackSubmitted(false);
+                    setFeedbackText("");
+                    setFeedbackOpen(true);
+                  },
+                },
+              ].map((chip) => (
+                <button
+                  key={chip.label}
+                  onClick={chip.onClick}
+                  className="bg-slate-900 border border-slate-700/70 rounded-full py-1.5 px-3.5 text-sm font-medium text-slate-300"
+                >
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+
             <div className="flex items-start justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
@@ -13339,7 +13378,7 @@ function NBackSessionApp() {
               >
                 &lsaquo; Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">Notes</h1>
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Notes</h1>
               <div className="text-slate-500 text-base mt-2">
                 {NOTE_GROUPS.reduce((n, g) => n + g.items.length, 0)} parked
               </div>
@@ -13377,7 +13416,7 @@ function NBackSessionApp() {
               >
                 &lsaquo; Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 Testing station
               </h1>
               <div className="text-slate-500 text-base mt-2">
@@ -13606,7 +13645,7 @@ function NBackSessionApp() {
               >
                 ‹ Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 Leaderboard
               </h1>
             </div>
@@ -13797,7 +13836,7 @@ function NBackSessionApp() {
         {mainView === "tutorial" && (
           <div className="space-y-6">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 {tutorialStepExercise.title} Tutorial
               </h1>
             </div>
@@ -13943,7 +13982,7 @@ function NBackSessionApp() {
               >
                 ‹ Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 Account
               </h1>
             </div>
@@ -14550,7 +14589,7 @@ function NBackSessionApp() {
               >
                 &lsaquo; Back
               </button>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 Membership
               </h1>
             </div>
@@ -16105,7 +16144,7 @@ function NBackSessionApp() {
           exercise.key !== "motion3d" && (
           <div className="space-y-14 text-center">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 {exercise.title}
               </h1>
               {exercise.sessionDurationMs && (
@@ -16133,7 +16172,7 @@ function NBackSessionApp() {
         {!switchNotice && exercise.modalities.length > 0 && screen === "setup" && (
           <div className="space-y-14">
             <div>
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
                 {exercise.title}
               </h1>
               {exercise.key === "iqnb" && (
@@ -17012,7 +17051,7 @@ function NBackSessionApp() {
           </div>
           <div className="mt-12 text-center">
             <div
-              className="text-4xl font-semibold tracking-tight"
+              className="text-3xl sm:text-4xl font-semibold tracking-tight"
               style={{ animation: "sessionDoneText 6s ease-out forwards" }}
             >
               Session complete
@@ -17033,7 +17072,7 @@ function NBackSessionApp() {
       {SHOW_LEADERBOARD && mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
-          className="fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
         >
           <span>🏆</span>
           <span className="hidden sm:inline">Leaderboard</span>
@@ -17046,7 +17085,7 @@ function NBackSessionApp() {
           off. Solid card with a green rail, not the tinted-panel treatment
           the rest of the app uses for inline notes. */}
       {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
-        <div className="fixed right-6 top-1/2 -translate-y-1/2 z-40 w-[min(28rem,calc(100vw-2rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-4 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
@@ -17100,7 +17139,7 @@ function NBackSessionApp() {
       {/* Bottom left, the one corner Home leaves free — Notes and Testing
           are top left, Achievements top right, Account bottom right. */}
       {mainView === "home" && !hintDismissed && (hintForced || todaysHint) && (
-        <div className="fixed bottom-6 left-6 z-40 w-[min(24rem,calc(100vw-3rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-4 sm:inset-x-auto sm:left-6 sm:bottom-6 sm:w-[min(24rem,calc(100vw-3rem))]">
           <div
             className="flex items-start gap-4 rounded-xl pl-0 pr-3 py-4 overflow-hidden"
             style={{
@@ -17133,7 +17172,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("notes")}
           /* Under the Testing station pill, same treatment. */
-          className="fixed top-14 left-3 sm:top-[4.5rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-14 left-3 sm:top-[4.5rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           Notes
         </button>
@@ -17143,7 +17182,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("testing")}
           /* Top left, opposite Achievements. */
-          className="fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           🧪 Testing station
         </button>
@@ -17156,7 +17195,7 @@ function NBackSessionApp() {
           onClick={() => setMainView("achievements")}
           /* Top right while the Leaderboard is hidden. When that comes back it
              takes this corner and Achievements returns to the left. */
-          className="fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
         >
           <span className="text-lg">🏅</span>
           <span className="hidden sm:inline">Achievements</span>
@@ -17170,7 +17209,7 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("account")}
-          className="fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
           {SHOW_PROFILE_IDENTITY_EDIT && (
             <AvatarFrame tier={ownAvatarFrameTier}>
@@ -17188,7 +17227,7 @@ function NBackSessionApp() {
             setFeedbackText("");
             setFeedbackOpen(true);
           }}
-          className="fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
         >
           💬 Feedback
         </button>
@@ -17650,7 +17689,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{exercise.title}</h1>
         </div>
 
         <div
@@ -18340,7 +18379,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       <div className="space-y-6">
         {homeLink}
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{exercise.title}</h1>
         </div>
 
         {/* Exactly the construction the N-back setup card uses — the
@@ -19105,7 +19144,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         {rrtPanels}
         {homeLink}
         <div>
-          <h1 className="text-4xl font-semibold tracking-tight">Session complete</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Session complete</h1>
           <div className="text-slate-400 text-lg mt-2">
             {exercise.title} · {Math.round(elapsedMs / 60000)} min
           </div>
@@ -19613,7 +19652,7 @@ function HypnosisScreen({ onDone, afterSession }) {
             &lsaquo; Back
           </button>
         )}
-        <h1 className="text-4xl font-semibold tracking-tight">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
           {HYPNOSIS_TRACK.title}
         </h1>
         <div className="text-slate-500 text-base mt-2">{HYPNOSIS_TRACK.length}</div>
