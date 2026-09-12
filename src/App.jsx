@@ -2012,6 +2012,24 @@ const STATS_BODY_HEIGHT = "min(calc(100vh - 17rem), 34rem)";
 // looking at. Leaves the page's own padding plus a little air underneath.
 const STATS_SCREEN_HEIGHT = "calc(100vh - 8rem)";
 
+// Tailwind's own `sm` breakpoint, readable from JS — for the few places a
+// height has to be set inline and so cannot be done with a class.
+const NARROW_QUERY = "(max-width: 639px)";
+function useIsNarrow() {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== "undefined" && window.matchMedia?.(NARROW_QUERY).matches
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mq = window.matchMedia(NARROW_QUERY);
+    const onChange = (ev) => setNarrow(ev.matches);
+    setNarrow(mq.matches);
+    mq.addEventListener?.("change", onChange);
+    return () => mq.removeEventListener?.("change", onChange);
+  }, []);
+  return narrow;
+}
+
 // Terminal step appended to every regime — landing here shows the Session
 // Overview screen. Distinguished from the "coming soon" placeholders by key.
 const OVERVIEW_EXERCISE = {
@@ -3068,15 +3086,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 327;
+const BUILD_VERSION = 328;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Phone pass: corner pills move into the page, Home scrolls",
-  "Headings and floating cards scale down on small screens",
+  "Stats and Graph scroll properly on a phone",
+  "N-back tutorial and running screen fit a narrow screen",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -6525,6 +6543,8 @@ function NBackTutorialDemo({ exercise, accent }) {
   const hasColor = mods.includes("color");
   const hasAudio = mods.includes("audio");
   const isPrime = exercise.key === "iqnb";
+  const demoNarrow = useIsNarrow();
+  const demoCell = demoNarrow ? "3.6rem" : "5rem";
   const shapeSet = isPrime ? QNB_PRIME_SHAPES : SHAPE_TYPES;
   const label = isPrime ? "QNB' 2.00" : `${exercise.abbrev}2B`;
 
@@ -6639,16 +6659,16 @@ function NBackTutorialDemo({ exercise, accent }) {
 
       {/* Keys flank the grid the way they do in the exercise itself, which
           also keeps the card short enough to fit on one screen. */}
-      <div className="flex items-stretch justify-center gap-4 w-full">
-        <div className="flex flex-col justify-between w-28 shrink-0 py-1">
+      <div className="flex flex-col sm:flex-row items-center sm:items-stretch justify-center gap-3 sm:gap-4 w-full">
+        <div className="flex flex-row sm:flex-col justify-center sm:justify-between gap-2 sm:gap-0 w-full sm:w-28 shrink-0 py-1">
           {mods.slice(0, Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
         </div>
       <div
         className="shrink-0"
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(3, 5rem)",
-          gridTemplateRows: "repeat(3, 5rem)",
+          gridTemplateColumns: `repeat(3, ${demoCell})`,
+          gridTemplateRows: `repeat(3, ${demoCell})`,
           borderTop: `1px solid ${NBACK_GRID_LINE}`,
           borderLeft: `1px solid ${NBACK_GRID_LINE}`,
           borderRadius: 4,
@@ -6667,13 +6687,13 @@ function NBackTutorialDemo({ exercise, accent }) {
                 transition: "background 0.12s linear",
               }}
             >
-              {active && stimulus(cur, 62)}
+              {active && stimulus(cur, demoNarrow ? 44 : 62)}
             </div>
           );
         })}
       </div>
 
-        <div className="flex flex-col justify-between w-28 shrink-0 py-1">
+        <div className="flex flex-row sm:flex-col justify-center sm:justify-between gap-2 sm:gap-0 w-full sm:w-28 shrink-0 py-1">
           {mods.slice(Math.ceil(mods.length / 2)).map((m) => keyChip(m))}
         </div>
       </div>
@@ -6756,14 +6776,14 @@ function NBackTutorial({ exercise, onDone, level }) {
       <button
         onClick={() => setStep((v) => Math.max(0, v - 1))}
         disabled={step === 0}
-        className="w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+        className="flex-1 sm:flex-none sm:w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
       >
         Back
       </button>
       <button
         onClick={onClick}
         style={{ "--ex": accent }}
-        className="w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        className="flex-1 sm:flex-none sm:w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
       >
         {label}
       </button>
@@ -11066,7 +11086,7 @@ function NBackSessionApp() {
       key={label}
       onClick={onClick}
       aria-current={active ? "page" : undefined}
-      className={`w-32 shrink-0 transition-colors rounded-lg py-3 text-base font-medium ${
+      className={`flex-1 sm:flex-none sm:w-32 shrink-0 transition-colors rounded-lg py-3 text-base font-medium ${
         active
           ? "bg-slate-700 text-slate-100"
           : "bg-slate-800 hover:bg-slate-700 text-slate-100"
@@ -12180,6 +12200,7 @@ function NBackSessionApp() {
   }, [exercise.modalities, feedback, handlePress, index, n]);
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
+  const isNarrow = useIsNarrow();
 
   // Drives --ex, which every accent button reads from. Only set while an
   // exercise is actually on screen; the Overview step and every screen
@@ -12220,7 +12241,7 @@ function NBackSessionApp() {
         mainView === "home"
           ? "min-h-screen overflow-y-auto sm:h-screen sm:overflow-y-hidden"
           : mainView === "app" && exercise.key === "overview" && overviewView === "graph"
-          ? "h-screen overflow-y-hidden"
+          ? "min-h-screen overflow-y-auto sm:h-screen sm:overflow-y-hidden"
           : "min-h-screen overflow-y-auto"
       } ${
         isMotion3dApp
@@ -12234,7 +12255,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-start justify-center px-2 md:px-4 pt-2 pb-2"
+          ? "items-center sm:items-start justify-center px-2 md:px-4 pt-14 sm:pt-2 pb-2"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -15086,7 +15107,7 @@ function NBackSessionApp() {
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
           <div
             className="space-y-6 flex flex-col"
-            style={{ height: STATS_SCREEN_HEIGHT }}
+            style={{ height: isNarrow ? undefined : STATS_SCREEN_HEIGHT }}
           >
             <div className="flex items-center gap-3">
               <h1
@@ -15376,7 +15397,7 @@ function NBackSessionApp() {
              screens are identical top to bottom. */
           <div
             className="space-y-6 flex flex-col"
-            style={{ height: STATS_SCREEN_HEIGHT }}
+            style={{ height: isNarrow ? undefined : STATS_SCREEN_HEIGHT }}
           >
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -15795,7 +15816,15 @@ function NBackSessionApp() {
                   <div
                     className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 flex flex-col"
                     style={{
-                      height: statsBodyHeight ? `${statsBodyHeight}px` : STATS_BODY_HEIGHT,
+                      // On a phone the Stats board is as tall as its
+                      // content (the page scrolls), so matching its height
+                      // would make a graph metres tall — it gets its own
+                      // sensible height there instead.
+                      height: isNarrow
+                        ? "22rem"
+                        : statsBodyHeight
+                        ? `${statsBodyHeight}px`
+                        : STATS_BODY_HEIGHT,
                     }}
                   >
                     <div className="flex-1 rounded-lg border border-slate-700/60 flex items-center justify-center text-slate-500 text-base">
@@ -15873,7 +15902,11 @@ function NBackSessionApp() {
                 <div
                   className="bg-slate-900 border border-slate-700/70 rounded-xl p-4 sm:p-5 space-y-4 flex flex-col"
                   style={{
-                    height: statsBodyHeight ? `${statsBodyHeight}px` : STATS_BODY_HEIGHT,
+                    height: isNarrow
+                      ? "22rem"
+                      : statsBodyHeight
+                      ? `${statsBodyHeight}px`
+                      : STATS_BODY_HEIGHT,
                   }}
                 >
                   <div className="flex-1 min-h-0 rounded-lg border border-slate-700/60 overflow-hidden">
@@ -20472,7 +20505,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           rather than in it: big enough to read without looking for it, and
           far enough out of the way that it never competes with the balls. */}
       {!sessionDone && (
-        <div className="absolute top-14 right-4 z-20 text-right pointer-events-none select-none">
+        <div className="absolute top-12 right-3 sm:top-14 sm:right-4 z-20 text-right pointer-events-none select-none">
           <div className="text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
             Speed
           </div>
