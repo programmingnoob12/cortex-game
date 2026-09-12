@@ -3056,7 +3056,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 320;
+const BUILD_VERSION = 321;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8850,6 +8850,7 @@ function NBackSessionApp() {
   // is why the slider stopped moving. { key, from, to, dy, height, startY }.
   const [customDrag, setCustomDrag] = useState(null);
   const customDragRef = useRef(null);
+  const [customSkipAnim, setCustomSkipAnim] = useState(false); // true for the single frame the reordered list paints on
   const customDragMovedRef = useRef(false); // true once a drag actually moved, so the drop doesn't also count as a tap
   const [customDragHintOff, setCustomDragHintOff] = useState(() => {
     try {
@@ -11843,7 +11844,6 @@ function NBackSessionApp() {
     };
     customDragRef.current = state;
     setCustomDrag(state);
-    card.setPointerCapture?.(ev.pointerId);
   };
 
   const moveCustomDrag = (ev) => {
@@ -11852,7 +11852,18 @@ function NBackSessionApp() {
     const dy = ev.clientY - st.startY;
     // A few pixels of slop, so a plain tap to add/remove still registers as
     // a click rather than a one-pixel drag.
-    if (Math.abs(dy) > 4) customDragMovedRef.current = true;
+    if (Math.abs(dy) > 4 && !customDragMovedRef.current) {
+      customDragMovedRef.current = true;
+      // Now that it is a drag and not a tap, take the pointer.
+      ev.currentTarget.setPointerCapture?.(ev.pointerId);
+      // They have done it once; the hint has served its purpose.
+      if (!customDragHintOff) {
+        setCustomDragHintOff(true);
+        try {
+          localStorage.setItem(CUSTOM_DRAG_HINT_KEY, "1");
+        } catch { /* nothing to persist to */ }
+      }
+    }
     const to = Math.max(
       0,
       Math.min(customDraft.length - 1, st.from + Math.round(dy / st.height))
@@ -11878,6 +11889,7 @@ function NBackSessionApp() {
     setCustomDrag(settled);
     setTimeout(() => {
       customDragRef.current = null;
+      setCustomSkipAnim(true);
       setCustomDrag(null);
       setCustomDraft((prev) => {
         const next = [...prev];
@@ -11885,6 +11897,12 @@ function NBackSessionApp() {
         next.splice(st.to, 0, moved);
         return next;
       });
+      // Every card is already exactly where the swap puts it, so the frame
+      // the list changes on must not be animated at all. Two frames, since
+      // the first is the one that paints the new order.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => setCustomSkipAnim(false))
+      );
     }, CUSTOM_DROP_MS);
   };
 
@@ -12568,10 +12586,6 @@ function NBackSessionApp() {
               <h1 className="text-5xl font-semibold tracking-tight">
                 Build your regime
               </h1>
-              <p className="text-slate-400 text-base mt-3">
-                Pick the exercises you want and how long you train each one.
-                They run top to bottom — drag a card to change the order.
-              </p>
             </div>
 
             {/* Only worth saying once there is something to reorder. */}
@@ -12585,21 +12599,7 @@ function NBackSessionApp() {
                     color: "#F7F8F8",
                   }}
                 >
-                  <div>Drag a card to change the order they run in.</div>
-                  <label className="mt-2 flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors text-xs cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={() => {
-                        setCustomDragHintOff(true);
-                        try {
-                          localStorage.setItem(CUSTOM_DRAG_HINT_KEY, "1");
-                        } catch { /* nothing to persist to */ }
-                      }}
-                      className="w-4 h-4 rounded border-slate-500 bg-slate-800 accent-slate-400"
-                    />
-                    Don't show again
-                  </label>
+                  Drag exercises in the order you want
                 </div>
                 {/* Curls down to the first card's grip. */}
                 <svg
@@ -12702,7 +12702,9 @@ function NBackSessionApp() {
                         // easing of its own; the cards moving out of its way
                         // ease, and on release the dragged card eases into
                         // the slot too.
-                        transition: isDragging
+                        transition: customSkipAnim
+                          ? "none"
+                          : isDragging
                           ? customDrag.settling
                             ? `transform ${CUSTOM_DROP_MS}ms cubic-bezier(0.2, 0, 0, 1), box-shadow ${CUSTOM_DROP_MS}ms ease`
                             : "box-shadow 140ms ease"
@@ -12722,7 +12724,9 @@ function NBackSessionApp() {
                       <button
                         type="button"
                         onClick={() => toggleCustomExercise(e.key)}
-                        className="w-full text-left flex items-center justify-between gap-6"
+                        className={`w-full text-left flex items-center justify-between gap-6${
+                          picked ? " pr-9" : ""
+                        }`}
                       >
                         <div className="flex items-center gap-3">
                           {/* The order number IS the feedback that it is in
@@ -12754,6 +12758,20 @@ function NBackSessionApp() {
                           {picked ? `${minutes} min` : "Add"}
                         </span>
                       </button>
+                      {/* An explicit way back out — a tap on the card does
+                          it too, but on a card that is also draggable that
+                          is not something to have to guess at. */}
+                      {picked && (
+                        <button
+                          type="button"
+                          onClick={() => toggleCustomExercise(e.key)}
+                          title="Remove from regime"
+                          className="absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
+                          style={{ background: "rgba(0,0,0,0.28)", color: "#F7F8F8" }}
+                        >
+                          ×
+                        </button>
+                      )}
                       {picked && (
                         <input
                           type="range"
