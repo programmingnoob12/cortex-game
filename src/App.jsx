@@ -2903,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 299;
+const BUILD_VERSION = 300;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "11:50 AM";
+const BUILD_TIME = "12:30 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Stats and Graph stack with the same gaps",
+  "Back above Stats/Graph, headings hold the pills still",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10887,15 +10887,24 @@ function NBackSessionApp() {
     </button>
   );
 
+  const statsBack =
+    overviewSource === "home" ? (
+      <button
+        onClick={() => setMainView("home")}
+        className="self-start text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium"
+      >
+        &lsaquo; Back
+      </button>
+    ) : null;
+
   const statsNav = (
     <div className="flex gap-3 pt-2">
       {statsNavButton("Stats", () => setOverviewView("summary"), overviewView === "summary")}
       {statsNavButton("Graph", () => setOverviewView("graph"), overviewView === "graph")}
-      {statsNavButton(
-        overviewSource === "home" ? "Home" : "Done",
-        finishSessionFromStats,
-        false
-      )}
+      {/* Only when a session is actually being finished. Browsing from Home
+          leaves by the Back link above instead. */}
+      {overviewSource !== "home" &&
+        statsNavButton("Done", finishSessionFromStats, false)}
     </div>
   );
 
@@ -14275,8 +14284,12 @@ function NBackSessionApp() {
 
         {!switchNotice && exercise.key === "overview" && overviewView === "summary" && (
           <div className="space-y-6">
-            <div className="flex items-center gap-4 flex-wrap">
-              <h1 className="text-3xl font-semibold tracking-tight">
+            {statsBack}
+            <div className="flex items-center gap-4">
+              <h1
+                className="text-3xl font-semibold tracking-tight shrink-0"
+                style={{ width: "6.5rem" }}
+              >
                 Stats
               </h1>
               {/* Same switch as Stats, driving the same scope: Regime is
@@ -14559,9 +14572,13 @@ function NBackSessionApp() {
           /* Same gaps as the Stats screen, so with the blocks matched the two
              screens are identical top to bottom. */
           <div className="space-y-6">
+            {statsBack}
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <h1 className="text-3xl font-semibold tracking-tight">
+                <h1
+                  className="text-3xl font-semibold tracking-tight shrink-0"
+                  style={{ width: "6.5rem" }}
+                >
                   Graph
                 </h1>
                 {/* Regime is what is being trained; All is every exercise
