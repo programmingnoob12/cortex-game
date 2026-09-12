@@ -3088,7 +3088,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 331;
+const BUILD_VERSION = 332;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11862,6 +11862,7 @@ function NBackSessionApp() {
   };
 
   const deleteCustomRegime = (id) => {
+    setDeleteRegimeConfirm(null);
     const next = customRegimes.filter((r) => r.id !== id);
     setCustomRegimes(next);
     // Training it right now? Nothing to train any more, so back to the picker.
@@ -12624,7 +12625,9 @@ function NBackSessionApp() {
                           <div className="text-base font-medium mt-1">{r.summary}</div>
                         </button>
                         <button
-                          onClick={() => deleteCustomRegime(entry.id)}
+                          onClick={() =>
+                            setDeleteRegimeConfirm({ id: entry.id, name: r.title })
+                          }
                           title="Delete this regime"
                           className="absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
                           style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
@@ -16993,6 +16996,40 @@ function NBackSessionApp() {
           </div>
         );
       })()}
+
+      {deleteRegimeConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-6"
+          onClick={() => setDeleteRegimeConfirm(null)}
+        >
+          <div
+            className="w-full max-w-xs bg-slate-900 border border-rose-400/30 rounded-2xl p-8 text-center space-y-6 shadow-2xl shadow-rose-950/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-4xl">⚠️</div>
+            <div className="text-lg font-semibold text-slate-100">
+              Are you sure you want to delete "{deleteRegimeConfirm.name}" regime?
+            </div>
+            <p className="text-slate-400 text-sm">
+              Your training history is kept — only the regime itself goes.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteRegimeConfirm(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 font-medium text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteCustomRegime(deleteRegimeConfirm.id)}
+                className="flex-1 bg-gradient-to-r from-rose-600 to-red-500 hover:opacity-90 transition-opacity rounded-lg py-3 font-medium text-base"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {restDayConfirm && (() => {
         const regime = findRegime(restDayConfirm.regimeKey);
