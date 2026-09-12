@@ -2939,7 +2939,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 309;
+const BUILD_VERSION = 311;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11103,10 +11103,42 @@ function NBackSessionApp() {
   // Wipes every score, every history row and everything derived from them,
   // so the seeded data below can be judged from a clean slate rather than
   // landing on top of whatever was there.
+  // Puts every exercise back on its starting level without touching the
+  // session history or the stats — so the ladder can be walked up again
+  // from the bottom while the graphs still have data in them. bestN is the
+  // value the Home tiles, gems and level achievements read, so it has to be
+  // cleared alongside the level itself, and the achievement tracker
+  // re-baselined against the cleared stats so nothing re-celebrates.
+  const resetLevelsToStart = () => {
+    const keys = Object.keys(EXERCISE_LIBRARY).filter((k) => k !== "overview");
+    const nextStats = { ...exerciseStatsRef.current };
+    keys.forEach((key) => {
+      const ex = EXERCISE_LIBRARY[key];
+      setExerciseLevel(key, ex.defaultN);
+      const prev = nextStats[key];
+      if (prev) {
+        nextStats[key] = { ...prev, bestN: 0 };
+        if (window.storage) {
+          safeStorageSet(`stats-${key}`, JSON.stringify(nextStats[key]), false);
+        }
+      }
+    });
+    setQnbPrimeLevel(4.0);
+    setExerciseStats(nextStats);
+    PREVIOUSLY_UNLOCKED_IDS.clear();
+    unlockedAchievementIdsRef.current = null;
+    checkForNewAchievements(nextStats);
+    // The exercise currently on screen holds its own copy of the level.
+    setN(EXERCISE_LIBRARY[exercise.key]?.defaultN ?? 1);
+  };
+
   const resetAllData = () => {
     const keys = Object.keys(EXERCISE_LIBRARY).filter((k) => k !== "overview");
     setExerciseStats({});
     setExerciseHistory({});
+    setExerciseLevels({});
+    setQnbPrimeLevel(4.0);
+    setN(EXERCISE_LIBRARY[exercise.key]?.defaultN ?? 1);
     setRegimeCompletionDatesState([]);
     setStreakBrokenAtState(null);
     setSessionPRs({});
@@ -11123,6 +11155,7 @@ function NBackSessionApp() {
       keys.forEach((k) => {
         window.storage.delete?.(`stats-${k}`, false)?.catch?.(() => {});
         window.storage.delete?.(`history-${k}`, false)?.catch?.(() => {});
+        window.storage.delete?.(`level-${k}`, false)?.catch?.(() => {});
       });
       window.storage.delete?.("history-_streakTest", false)?.catch?.(() => {});
       safeStorageSet("regime-completion-dates", JSON.stringify([]), false);
@@ -12699,6 +12732,12 @@ function NBackSessionApp() {
                 className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
               >
                 🧪 Show every tutorial again
+              </button>
+              <button
+                onClick={resetLevelsToStart}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Reset every level to the start
               </button>
               <div className="flex gap-3">
                 <button
@@ -15392,47 +15431,6 @@ function NBackSessionApp() {
               Start
             </button>
 
-            <div className="flex flex-col gap-4">
-              {exercise.sessionDurationMs && activeExercises[exerciseIndex + 1] && (
-                <button
-                  onClick={() => forceSwitchToNext(exerciseIndex)}
-                  className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-                >
-                  🧪 Test: skip to session-timeout switch
-                </button>
-              )}
-              {exercise.key === "iqnb" ? (
-                <>
-                  <button
-                    onClick={() => setQnbPrimeLastDelta(recordQnbPrimeResult(20))}
-                    className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-                  >
-                    🧪 Test: simulate a bad run (~20%)
-                  </button>
-                  <button
-                    onClick={() => setQnbPrimeLastDelta(recordQnbPrimeResult(85))}
-                    className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-                  >
-                    🧪 Test: simulate a good run (~85%)
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    onClick={() => recordSessionResult(0, exercise.key, n)}
-                    className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-                  >
-                    🧪 Test: simulate a failing run ({(lowScoreStreak[exercise.key] || 0)}/3)
-                  </button>
-                  <button
-                    onClick={() => recordSessionResult(80, exercise.key, n)}
-                    className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-base"
-                  >
-                    🧪 Test: simulate a passing run (80%+)
-                  </button>
-                </>
-              )}
-            </div>
           </div>
         )}
 
@@ -15518,15 +15516,6 @@ function NBackSessionApp() {
               {nbackSideButtons.right}
             </div>
             </div>
-
-            {exercise.sessionDurationMs && activeExercises[exerciseIndex + 1] && (
-              <button
-                onClick={() => forceSwitchToNext(exerciseIndex)}
-                className="border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 px-6 text-base"
-              >
-                🧪 Test: skip to session-timeout switch
-              </button>
-            )}
           </div>
         )}
 
@@ -16304,58 +16293,6 @@ function NBackSessionApp() {
         </button>
       )}
 
-      {/* Testing convenience — jumps straight to the next exercise in the
-          regime (same mechanic as forceSwitchToNext everywhere else,
-          including the tutorial-screen gate) without needing to sit through
-          the current one's full duration. Shown on every exercise page
-          (setup/running/results, and RRT/3D MOT's own self-contained
-          screens) rather than duplicated per-screen, so there's exactly one
-          place this can go stale. Hidden during the brief switchNotice
-          transition since forceSwitchToNext is already mid-flight then. */}
-      {/* Fires the level-up celebration for whichever exercise is on screen,
-          at one above its current level, so every exercise's version can be
-          looked at without training up to it. Bottom left, clear of the RRT
-          hints on the right and the 3D MOT speed readout up top. */}
-      {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
-        <button
-          onClick={() => {
-            const key = exercise.key;
-            const stat = exerciseStats[key];
-            const current =
-              key === "iqnb"
-                ? Math.floor(qnbPrimeLevel)
-                : stat?.bestN || n || 1;
-            const level = current + 1;
-            const title =
-              key === "rrt"
-                ? `${level}p`
-                : key === "motion3d"
-                ? `Level ${level}`
-                : key === "cct"
-                ? `${level} in a row`
-                : exercise.title.replace("N-Back", `${level}-Back`);
-            setUnlockInfo({ exerciseKey: key, level, title, isNewPR: true });
-          }}
-          className="fixed bottom-2 left-2 md:bottom-6 md:left-6 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30"
-        >
-          🧪 Level up
-        </button>
-      )}
-
-      {mainView === "app" && !switchNotice && exercise.key !== "overview" && (
-        <button
-          onClick={() => forceSwitchToNext(exerciseIndex)}
-          className={`fixed flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-1.5 md:py-2.5 px-3 md:px-5 text-xs md:text-sm font-medium shadow-lg z-30 ${
-            // 3D MOT puts the speed readout in the top right, so the pill
-            // moves to the bottom right there rather than sitting on it.
-            isMotion3dApp
-              ? "bottom-2 right-2 md:bottom-6 md:right-6"
-              : "top-2 right-2 md:top-6 md:right-6"
-          }`}
-        >
-          🧪 Skip to next exercise
-        </button>
-      )}
 
       {/* Floats over Home rather than sitting in it: Home is laid out to fit
           one screen exactly, and a row in the flow would push the footer
@@ -17132,13 +17069,6 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         </div>
 
       </div>
-
-      <button
-        onClick={() => finish(true)}
-        className="w-full border border-dashed border-slate-700 text-slate-500 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-base"
-      >
-        🧪 Test: finish this session with a result
-      </button>
     </div>
   );
 }
@@ -18499,44 +18429,6 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
             </div>
           </div>
         </div>
-
-        <div className="flex gap-2 mt-3">
-          <button
-            onClick={() => {
-              setCorrectStreak(0);
-              // Threads the new {premiseCount, roundMs} through to an
-              // actual fresh round via triggerFlash — same as a real 20th
-              // correct answer does. Just calling triggerRrtIncrement()
-              // alone bumped the stats/level and showed the celebration,
-              // but left the CURRENT round exactly as it was, since nothing
-              // told it to regenerate — so the premise count/timer only
-              // ever looked "leveled up" once something else (the round
-              // ending normally, or manually toggling the timer checkbox,
-              // which reads fresh state) happened to regenerate the puzzle.
-              const override = triggerRrtIncrement();
-              triggerFlash("correct", override);
-            }}
-            className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-          >
-            🧪 20 in a row
-          </button>
-          <button
-            onClick={() => {
-              setCorrectStreak(0);
-              const override = jumpRrtTo7p();
-              triggerFlash("correct", override);
-            }}
-            className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-          >
-            🧪 Skip to 7p
-          </button>
-          <button
-            onClick={onFinish}
-            className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-          >
-            🧪 Skip to overview
-          </button>
-        </div>
       </div>
     );
   }
@@ -18616,38 +18508,6 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={() => {
-            setCorrectStreak(0);
-            // Same fix as the premises-screen version of this button — see
-            // that comment for why the plain triggerRrtIncrement() call
-            // alone wasn't enough to actually refresh the round on screen.
-            const override = triggerRrtIncrement();
-            triggerFlash("correct", override);
-          }}
-          className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-        >
-          🧪 20 in a row
-        </button>
-        <button
-          onClick={() => {
-            setCorrectStreak(0);
-            const override = jumpRrtTo7p();
-            triggerFlash("correct", override);
-          }}
-          className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-        >
-          🧪 Skip to 7p
-        </button>
-        <button
-          onClick={onFinish}
-          className="flex-1 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-2 text-sm"
-        >
-          🧪 Skip to overview
-        </button>
       </div>
     </div>
   );
@@ -19849,47 +19709,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         <div className="absolute top-3 left-3 text-sm font-medium text-slate-200 bg-slate-950/70 backdrop-blur-sm rounded-lg px-3 py-1.5 pointer-events-none">
           {formatDuration(elapsedMs)}
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            // Fast-forwards the trained-time accumulator itself (rather
-            // than faking a start timestamp, which no longer exists) so it
-            // looks like the full budget has already been spent, then ends
-            // the session exactly the way the real 15-minute cutoff does —
-            // for testing what happens at the end without waiting 15 real
-            // minutes every time.
-            const sessionBudgetMs = exercise.sessionDurationMs || 15 * 60 * 1000;
-            trainedMsRef.current = sessionBudgetMs + 1000;
-            setElapsedMs(trainedMsRef.current);
-            if (tallyRef.current.correct + tallyRef.current.wrong > 0) {
-              onSessionEnd?.({
-                speedReached: speedRef.current,
-                tierReached: Math.floor(speedRef.current / MOT_TIER_STEP),
-                durationMs: trainedMsRef.current,
-              });
-            }
-            // Straight to Overview, not just "whatever's next" — this is
-            // simulating the whole session ending, so it should land where
-            // a real 15-minute cutoff eventually would even if motion3d
-            // isn't the last step in the current regime.
-            (onForceOverview || onFinish)?.();
-          }}
-          className="absolute top-12 left-3 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1 transition-colors"
-        >
-          🧪 Simulate 15 min elapsed
-        </button>
-
-        {onResetProgress && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onResetProgress();
-            }}
-            className="absolute top-[5.25rem] left-3 text-xs font-medium text-slate-400 hover:text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1 transition-colors"
-          >
-            🧪 Reset progress (fixes stale achievements)
-          </button>
-        )}
 
         <button
           onClick={(e) => {
@@ -19900,29 +19719,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         >
           Restart Game
         </button>
-        <div className="absolute bottom-3 right-3 text-xs text-slate-400 bg-slate-950/70 backdrop-blur-sm rounded-lg px-3 py-1 pointer-events-none">
-          Speed: {speed.toFixed(2)}
-        </div>
-        <div className="absolute bottom-11 right-3 flex gap-1.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSpeed((s) => Math.max(MOT_MIN_SPEED, s - MOT_SPEED_STEP));
-            }}
-            className="text-xs font-medium text-slate-300 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-2.5 py-1 transition-colors"
-          >
-            − Speed
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setSpeed((s) => Math.min(MOT_MAX_SPEED, s + MOT_SPEED_STEP));
-            }}
-            className="text-xs font-medium text-slate-300 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-2.5 py-1 transition-colors"
-          >
-            + Speed
-          </button>
-        </div>
       </div>
     </div>
   );
