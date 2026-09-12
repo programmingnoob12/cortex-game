@@ -2903,14 +2903,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 301;
+const BUILD_VERSION = 302;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "12:55 PM";
+const BUILD_TIME = "2:15 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Home button kept, Regime/All sits closer to the heading",
+  "Tutorials trimmed, miss colour, setup screen back, session hand-off",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -4011,6 +4011,8 @@ const RRT_COLOR_PALETTE = [
 const RRT_GREEN = "#1E982B";
 const RRT_RED = "#971426";
 const RRT_TIMEOUT = "#8A8F98";
+// A match that was there and went unanswered. Not red — nothing was pressed.
+const RRT_MISS = "#986931";
 
 // How scrambled the premise viewing order is. Fixed rather than adjustable:
 // this is the difficulty the exercise is tuned around, and letting it vary
@@ -6029,51 +6031,23 @@ function CctTutorialDemo() {
 
 function CctTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.cct;
-  const [step, setStep] = useState(0);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-1 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? accent : "#1E293B" }}
-          />
-        ))}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6">
+        <p className="text-slate-100 text-xl leading-relaxed text-center">
+          Numbers are spoken one at a time. Add the next number.
+        </p>
+        <CctTutorialDemo />
       </div>
 
-      <div
-        key={step}
-        className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-6"
-        style={{ animation: "switchIn 0.5s ease-out both" }}
-      >
-        {step === 0 ? (
-          <ExerciseIntro exerciseKey="cct" accent={accent} />
-        ) : (
-          <>
-            <p className="text-slate-100 text-xl leading-relaxed text-center">
-              Numbers are spoken one at a time. Add the next number.
-            </p>
-            <CctTutorialDemo />
-          </>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-end">
         <button
-          onClick={() => setStep(0)}
-          disabled={step === 0}
-          className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
-        >
-          Back
-        </button>
-        <button
-          onClick={() => (step === 0 ? setStep(1) : onDone())}
+          onClick={onDone}
           style={{ "--ex": accent }}
           className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
-          {step === 0 ? "Next" : "I Get It"}
+          I Get It
         </button>
       </div>
     </div>
@@ -6082,53 +6056,23 @@ function CctTutorial({ onDone }) {
 
 function Motion3DTutorial({ onDone }) {
   const accent = EXERCISE_COLORS.motion3d;
-  // Two pages: what it is for, then the demo. The demo only mounts on the
-  // second, which also means its audio context is resumed by a real click.
-  const [step, setStep] = useState(0);
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center gap-2">
-        {[0, 1].map((i) => (
-          <div
-            key={i}
-            className="h-1 flex-1 rounded-full transition-colors"
-            style={{ background: i <= step ? accent : "#1E293B" }}
-          />
-        ))}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6">
+        <p className="text-slate-100 text-xl leading-relaxed text-center">
+          Follow the balls.
+        </p>
+        <Motion3DTutorialDemo />
       </div>
 
-      <div
-        key={step}
-        className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-6"
-        style={{ animation: "switchIn 0.5s ease-out both" }}
-      >
-        {step === 0 ? (
-          <ExerciseIntro exerciseKey="motion3d" accent={accent} />
-        ) : (
-          <>
-            <p className="text-slate-100 text-xl leading-relaxed text-center">
-              Follow the balls.
-            </p>
-            <Motion3DTutorialDemo />
-          </>
-        )}
-      </div>
-
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-end">
         <button
-          onClick={() => setStep(0)}
-          disabled={step === 0}
-          className="w-32 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
-        >
-          Back
-        </button>
-        <button
-          onClick={() => (step === 0 ? setStep(1) : onDone())}
+          onClick={onDone}
           style={{ "--ex": accent }}
           className="w-32 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
-          {step === 0 ? "Next" : "I Get It"}
+          I Get It
         </button>
       </div>
     </div>
@@ -6216,8 +6160,6 @@ function RrtTutorialAnimated({ onDone }) {
   // moment after its premise appears, so the map is seen being built rather
   // than arriving finished.
   const STEPS = [
-    // Step 0 is the intro page — nothing on the map yet.
-    { revealAt: [[], []], highlight: [] },
     { revealAt: [[], []], highlight: [] },
     { revealAt: [[], []], highlight: [] },
     { revealAt: [[0], [0, 1]], highlight: [] },
@@ -6263,10 +6205,6 @@ function RrtTutorialAnimated({ onDone }) {
   );
 
   const bodies = [
-    <div className={`${card}`} key="intro">
-      <ExerciseIntro exerciseKey="rrt" accent={accent} />
-    </div>,
-
     <div className={`${card} space-y-4`} key="s0">
       <p className="text-slate-200 text-xl leading-relaxed">
         Close your eyes and feel where different objects are in your room.
@@ -6290,7 +6228,7 @@ function RrtTutorialAnimated({ onDone }) {
 
     <div className={`${card} space-y-4`} key="s1">
       <p className="text-2xl font-semibold tracking-tight" style={{ color: accent }}>
-        This is spatializing.
+        This is called spatializing.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         In RRT you spatialize the items. You don't imagine them. You{" "}
@@ -6341,46 +6279,26 @@ function RrtTutorialAnimated({ onDone }) {
         screen.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
-        If it helps, you can close your eyes until you get the hang of
-        spatializing.
-      </p>
-      <p className="text-slate-100 text-lg leading-relaxed">
         It should be like feeling where your door is in the room.
       </p>
       <p className="text-slate-100 text-lg leading-relaxed">
         At the end review the spatial model and make sure you know exactly
-        where each item is and are certain about the conclusion but without
-        visualizing, just feeling
+        where each item is
       </p>
-      {/* The one habit that stops the exercise working. Looking back while
-          the model is still being built means never building one. */}
-      <div
-        className="rounded-lg px-4 py-3"
-        style={{
-          background: `${accent}14`,
-          border: `1px solid ${accent}55`,
-        }}
-      >
-        <p className="text-slate-100 text-lg leading-relaxed">
-          Don't look back until you've made the model and are just looking back
-          to double check items.
-        </p>
-      </div>
-      {/* The tutorial is the point where someone either gets spatializing or
-          quietly gives up on it, so this is the one place worth offering a
-          reply. */}
-      <div className="pt-5 border-t border-slate-700/70">
-        <p className="text-slate-400 text-base leading-relaxed">
-          Still have questions? Email{" "}
-          <a
-            href={`mailto:${LEGAL_CONTACT}`}
-            className="underline underline-offset-2"
-            style={{ color: accent }}
-          >
-            {LEGAL_CONTACT}
-          </a>
-        </p>
-      </div>
+      <p className="text-slate-100 text-lg leading-relaxed">
+        Don't look back at the items until you've constructed the spatial model
+        in order.
+      </p>
+      <p className="text-slate-400 text-base leading-relaxed">
+        Have any questions? Email{" "}
+        <a
+          href={`mailto:${LEGAL_CONTACT}`}
+          className="underline underline-offset-2"
+          style={{ color: accent }}
+        >
+          {LEGAL_CONTACT}
+        </a>
+      </p>
     </div>,
   ];
 
@@ -6687,14 +6605,6 @@ function NBackTutorial({ exercise, onDone, level }) {
   );
 
   const steps = [];
-
-  steps.push({
-    body: (
-      <div className={`${card}`}>
-        <ExerciseIntro exerciseKey={exercise.key} accent={accent} />
-      </div>
-    ),
-  });
 
   steps.push({
     body: (
@@ -10586,10 +10496,11 @@ function NBackSessionApp() {
     // four-second wait between finishing and seeing the result.
     const goingToOverview = nextExercise.key === "overview";
 
-    if (!goingToOverview) {
-      setSwitchNotice(true);
-      setSwitchQuote(nextTransitionQuote());
-    }
+    // The hand-off screen runs before the Stats screen too. Finishing the
+    // last exercise used to cut straight to the numbers, which read as the
+    // app skipping the end of the session rather than marking it.
+    setSwitchNotice(true);
+    setSwitchQuote(nextTransitionQuote());
     setExerciseIndex(nextIndex);
     setScreen("setup");
 
@@ -10618,8 +10529,7 @@ function NBackSessionApp() {
       }
       // land on the setup screen for the next exercise; user presses Start themselves
     };
-    if (goingToOverview) land();
-    else setTimeout(land, 3900);
+    setTimeout(land, 3900);
   }, []);
 
   useEffect(() => {
@@ -11694,8 +11604,9 @@ function NBackSessionApp() {
           : state === "correct"
           ? { backgroundColor: RRT_GREEN }
           : state === "missed"
-          ? // Dark text, or the label disappears into the white.
-            { backgroundColor: "#F7F8F8", color: "#08090A" }
+          ? // A match that went by untouched. Its own colour, so it is never
+            // confused with a wrong press (red) or a hit (green).
+            { backgroundColor: RRT_MISS }
           : undefined;
       return (
         <button
@@ -13038,13 +12949,11 @@ function NBackSessionApp() {
                     // turns Show tutorials off on the Account page.
                     setHideTutorials(true);
                   }
+                  // The setup screen, not straight into the run: it is where
+                  // the level and the round length are read before starting,
+                  // and the tutorial was skipping past it.
                   setMainView("app");
-                  startTask(
-                    tutorialStepExercise,
-                    tutorialStepExercise.key === "iqnb"
-                      ? Math.floor(qnbPrimeLevel)
-                      : n
-                  );
+                  setScreen("setup");
                 }}
               />
             ) : tutorialStepExercise.key === "rrt" ? (
@@ -14245,7 +14154,7 @@ function NBackSessionApp() {
               className="text-xl font-medium uppercase tracking-[0.2em] text-slate-500"
               style={{ animation: "switchIn 0.5s ease-out both" }}
             >
-              Next exercise
+              {exercise.key === "overview" ? "Session complete" : "Next exercise"}
             </div>
             <h1
               className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
@@ -18609,7 +18518,7 @@ function motDisplaySpeedToVelocity(displaySpeed) {
 // under the current scale. See the hydration effect below, which resets
 // exerciseStats.motion3d instead of trusting it when this doesn't match.
 const MOT_TIER_SCHEMA_VERSION = 2;
-const MOT_COLOR_NEUTRAL = 0xaba89f; // light grey, matches the reference ball color (slightly darkened)
+const MOT_COLOR_NEUTRAL = 0xd2cfc6; // light grey — the previous value read as too dark against the dark volume
 const MOT_COLOR_TARGET = 0xb4a55a; // muted gold — desaturated to match the neutral ball's sophistication
 // The same green and red RRT uses for a right and a wrong answer, so one
 // signal means one thing across the whole app.
