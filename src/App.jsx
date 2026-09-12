@@ -3088,7 +3088,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 332;
+const BUILD_VERSION = 333;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8880,6 +8880,7 @@ function NBackSessionApp() {
   const [customRegimes, setCustomRegimesState] = useState([]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
   const [customName, setCustomName] = useState(""); // its name, in the builder
+  const [deleteRegimeConfirm, setDeleteRegimeConfirm] = useState(null); // { id, name } of the built regime awaiting a yes
   const [customEditId, setCustomEditId] = useState(null); // which one is being edited, null = a new one
   // Reordering is a pointer drag, not HTML5 drag-and-drop: the native one
   // drew nothing while dragging (so it read as a guess), and a draggable
