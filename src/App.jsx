@@ -2909,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 307;
+const BUILD_VERSION = 308;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "7:45 PM";
+const BUILD_TIME = "8:55 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "Sessions on every x axis with dates under them",
+  "Round session steps, dark yellow, session ends on Stats",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -10515,6 +10515,8 @@ function NBackSessionApp() {
       // Landing on the Session Overview screen straight out of a training session —
       // show today's training time, not the lifetime total.
       setOverviewSource("training");
+      // Stats, never whichever of the two was open last.
+      setOverviewView("summary");
       // They've gone through every step of today's regime — count it toward
       // the 7-day regime-streak achievement.
       markRegimeCompletedToday();
@@ -10782,7 +10784,7 @@ function NBackSessionApp() {
       setSessionCompleteAnim(false);
       setHypnosisAfterSession(true);
       setMainView("hypnosis");
-    }, 6100);
+    }, 5900);
   };
 
   // The same three buttons in the same place on both the Stats screen and
@@ -12672,7 +12674,7 @@ function NBackSessionApp() {
                         setNudgeIdOverride(l.id);
                         setSessionCompleteAnim(true);
                         playLevelUp();
-                        setTimeout(() => setSessionCompleteAnim(false), 6100);
+                        setTimeout(() => setSessionCompleteAnim(false), 5900);
                       }}
                       className={`w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border text-slate-300 hover:border-slate-400 ${
                         l.cond
@@ -12690,7 +12692,7 @@ function NBackSessionApp() {
                       setNudgeIdOverride(null);
                       setSessionCompleteAnim(true);
                       playLevelUp();
-                      setTimeout(() => setSessionCompleteAnim(false), 6100);
+                      setTimeout(() => setSessionCompleteAnim(false), 5900);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -14603,11 +14605,16 @@ function NBackSessionApp() {
               // labels are all the same width.
               const xTicks = (() => {
                 const labels = chartData.map((d) => d.label);
-                if (labels.length <= 14) return labels;
-                const step = Math.ceil(labels.length / 14);
-                const out = [];
-                for (let i = 0; i < labels.length; i += step) out.push(labels[i]);
-                return out;
+                const n = labels.length;
+                if (n <= 12) return labels;
+                // A round step — 5, 10, 25, 50 — rather than "however many
+                // fit", so the axis counts 10, 20, 30 instead of 1, 8, 15, 22.
+                const raw = n / 10;
+                const step =
+                  [1, 2, 5, 10, 20, 25, 50, 100, 200, 500].find((v) => v >= raw) || 1000;
+                const out = ["1"];
+                for (let i = step; i <= n; i += step) out.push(String(i));
+                return out.filter((l) => labels.includes(l));
               })();
 
               return (
@@ -14701,7 +14708,7 @@ function NBackSessionApp() {
                             tick={{ fill: "#6E7178", fontSize: 12 }}
                             ticks={xTicks}
                             interval={0}
-                            height={38}
+                            height={54}
                             tick={(props) => {
                               const { x, y, payload, index } = props;
                               // Every third tick carries a date, so the row
@@ -14740,7 +14747,7 @@ function NBackSessionApp() {
                                   ? "Week"
                                   : "Session",
                               position: "insideBottom",
-                              offset: -2,
+                              offset: -14,
                               fill: "#6E7178",
                               fontSize: 12,
                             }}
@@ -16141,7 +16148,7 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
-              animation: "sessionDoneWash 6.1s cubic-bezier(0.2,0.7,0.3,1) forwards",
+              animation: "sessionDoneWash 5.9s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
           <div className="relative flex items-center justify-center">
@@ -16198,14 +16205,14 @@ function NBackSessionApp() {
           <div className="mt-12 text-center">
             <div
               className="text-4xl font-semibold tracking-tight"
-              style={{ animation: "sessionDoneText 6.2s ease-out forwards" }}
+              style={{ animation: "sessionDoneText 6s ease-out forwards" }}
             >
               Session complete
             </div>
             <div
               className="text-slate-400 text-lg mt-3 max-w-md mx-auto px-6"
               style={{
-                animation: "sessionDoneSub 6.2s ease-out forwards",
+                animation: "sessionDoneSub 6s ease-out forwards",
                 textWrap: "balance",
               }}
             >
@@ -18650,7 +18657,7 @@ const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still rea
 const MOT_COLOR_TARGET = 0xc8811e;
 const MOT_HALO_COLOR = 0x9fd2d8;
 // Right and wrong at the end of a round.
-const MOT_COLOR_CORRECT = 0x8f8f2e;
+const MOT_COLOR_CORRECT = 0xc69214;
 const MOT_COLOR_WRONG = 0x8e1220;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
@@ -19504,9 +19511,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       if (b.isTarget) {
         b.mesh.material.color.setHex(MOT_COLOR_TARGET);
         if (b.halo) b.halo.visible = true;
-        // The lat/long overlay smears against a lit rim, so it steps out
-        // while the ball is called out.
-        if (b.lines) b.lines.visible = false;
       }
     });
 
@@ -19683,7 +19687,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           rather than in it: big enough to read without looking for it, and
           far enough out of the way that it never competes with the balls. */}
       {!sessionDone && (
-        <div className="absolute top-3 right-4 z-20 text-right pointer-events-none select-none">
+        <div className="absolute top-14 right-4 z-20 text-right pointer-events-none select-none">
           <div className="text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
             Speed
           </div>
@@ -19820,7 +19824,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             e.stopPropagation();
             startRound();
           }}
-          className="absolute bottom-3 left-3 text-sm font-medium text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 transition-colors"
+          className="absolute top-3 right-3 text-sm font-medium text-slate-200 bg-slate-950/70 hover:bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5 transition-colors"
         >
           Restart Game
         </button>
