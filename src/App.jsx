@@ -2909,14 +2909,14 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 305;
+const BUILD_VERSION = 306;
 // Local NZ time this version was pushed, set by hand alongside the number.
-const BUILD_TIME = "5:30 PM";
+const BUILD_TIME = "6:40 PM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "3D MOT colours and halo, every tick on the y axis",
+  "Even axis steps with headroom, 3D MOT colours refined",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -14569,12 +14569,29 @@ function NBackSessionApp() {
                 if (vals.length === 0) return null;
                 const step = e.key === "motion3d" ? 0.05 : 1;
                 const lo = Math.floor(Math.min(...vals) / step) * step;
-                const hi = Math.ceil(Math.max(...vals) / step) * step;
+                // Room above the best score, so climbing does not run the
+                // line into the top of the panel — and never past the
+                // exercise's own ceiling.
+                const ceiling = e.key === "motion3d" ? MOT_MAX_SPEED : e.maxN;
+                let hi = Math.ceil(Math.max(...vals) / step) * step + step * 2;
+                if (typeof ceiling === "number") hi = Math.min(hi, ceiling);
+                if (hi <= lo) hi = lo + step;
                 const out = [];
-                for (let v = lo; v <= hi + step / 2 && out.length < 24; v += step) {
+                for (let v = lo; v <= hi + step / 2 && out.length < 26; v += step) {
                   out.push(Number(v.toFixed(2)));
                 }
                 return out.length > 1 ? out : null;
+              })();
+
+              // One interval across the whole axis, so the gaps between
+              // labels are all the same width.
+              const xTicks = (() => {
+                const labels = chartData.map((d) => d.label);
+                if (labels.length <= 14) return labels;
+                const step = Math.ceil(labels.length / 14);
+                const out = [];
+                for (let i = 0; i < labels.length; i += step) out.push(labels[i]);
+                return out;
               })();
 
               return (
@@ -14666,7 +14683,8 @@ function NBackSessionApp() {
                             dataKey="label"
                             stroke="#6E7178"
                             tick={{ fill: "#6E7178", fontSize: 12 }}
-                            minTickGap={4}
+                            ticks={xTicks}
+                            interval={0}
                             label={{
                               value:
                                 grain === "month"
@@ -19752,10 +19770,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         >
           Restart Game
         </button>
-        <div className="absolute top-12 right-3 text-xs text-slate-400 bg-slate-950/70 backdrop-blur-sm rounded-lg px-3 py-1 pointer-events-none">
+        <div className="absolute bottom-3 right-3 text-xs text-slate-400 bg-slate-950/70 backdrop-blur-sm rounded-lg px-3 py-1 pointer-events-none">
           Speed: {speed.toFixed(2)}
         </div>
-        <div className="absolute top-[5.5rem] right-3 flex gap-1.5">
+        <div className="absolute bottom-11 right-3 flex gap-1.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
