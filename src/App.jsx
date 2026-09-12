@@ -3088,7 +3088,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 333;
+const BUILD_VERSION = 334;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -17011,9 +17011,6 @@ function NBackSessionApp() {
             <div className="text-lg font-semibold text-slate-100">
               Are you sure you want to delete "{deleteRegimeConfirm.name}" regime?
             </div>
-            <p className="text-slate-400 text-sm">
-              Your training history is kept — only the regime itself goes.
-            </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setDeleteRegimeConfirm(null)}
