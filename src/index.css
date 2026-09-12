@@ -274,7 +274,10 @@ button.ex-card.ex-card-shine::after {
      square, so its height is what has to fit — not a fixed sum of the old
      stacked layout's parts. */
   .nback-box {
-    width: min(100%, calc(100vh - 150px));
+    /* Width comes from the flex row (the two answer columns take theirs
+       first); this only stops the square growing taller than the screen. */
+    width: auto;
+    max-width: calc(100vh - 150px);
   }
 }
 

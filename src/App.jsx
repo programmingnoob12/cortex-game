@@ -3044,6 +3044,7 @@ const MOTIVATION_LINES = [
   { id: 130, text: "You are building something invisible and real." },
   { id: 131, text: "Effort compounds." },
   { id: 132, text: "Feel it working." },
+  { id: 133, text: "Benefits get better as you train consistently." },
 ];
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
 // usual random transition line. Not in MOTIVATION_LINES, because it must
@@ -3086,15 +3087,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 329;
+const BUILD_VERSION = 330;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "N-back answers sit in a column each side at every width",
-  "Stats works in landscape and on a phone",
+  "One tutorial's don\u2019t-show tick no longer hides them all",
+  "Delete a built regime, bigger n-back grid, graph fixed on phones",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12610,18 +12611,27 @@ function NBackSessionApp() {
                   {customRegimes.map((entry) => {
                     const r = asRegime(entry);
                     return (
-                      <button
-                        key={entry.id}
-                        onClick={() => chooseRegime(r.key)}
-                        style={{ "--ex": REGIME_COLORS.custom }}
-                        className="w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30"
-                      >
-                        <div className="flex items-center justify-between gap-6">
-                          <div className="text-2xl font-semibold">{r.title}</div>
-                          <div className="text-lg font-medium">{r.subtitle}</div>
-                        </div>
-                        <div className="text-base font-medium mt-1">{r.summary}</div>
-                      </button>
+                      <div key={entry.id} className="relative">
+                        <button
+                          onClick={() => chooseRegime(r.key)}
+                          style={{ "--ex": REGIME_COLORS.custom }}
+                          className="w-full text-left deep-fill rounded-xl pl-7 pr-14 py-6 shadow-lg shadow-black/30"
+                        >
+                          <div className="flex items-center justify-between gap-6">
+                            <div className="text-2xl font-semibold">{r.title}</div>
+                            <div className="text-lg font-medium">{r.subtitle}</div>
+                          </div>
+                          <div className="text-base font-medium mt-1">{r.summary}</div>
+                        </button>
+                        <button
+                          onClick={() => deleteCustomRegime(entry.id)}
+                          title="Delete this regime"
+                          className="absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
+                          style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     );
                   })}
                   <button
@@ -13872,10 +13882,12 @@ function NBackSessionApp() {
                 }
                 onDone={() => {
                   if (tutorialDontShowAgain) {
+                    // Only THIS exercise's tutorial. It used to also flip
+                    // the global "Show tutorials" switch off, so ticking the
+                    // box on one exercise silently killed every other
+                    // exercise's tutorial as well — which is why QNB's never
+                    // appeared again after a single tick somewhere else.
                     setTutorialDismissed(tutorialStepExercise.key, true);
-                    // Same switch, seen from the other end: opting out here
-                    // turns Show tutorials off on the Account page.
-                    setHideTutorials(true);
                   }
                   // The setup screen, not straight into the run: it is where
                   // the level and the round length are read before starting,
@@ -13888,10 +13900,12 @@ function NBackSessionApp() {
               <RrtTutorialAnimated
                 onDone={() => {
                   if (tutorialDontShowAgain) {
+                    // Only THIS exercise's tutorial. It used to also flip
+                    // the global "Show tutorials" switch off, so ticking the
+                    // box on one exercise silently killed every other
+                    // exercise's tutorial as well — which is why QNB's never
+                    // appeared again after a single tick somewhere else.
                     setTutorialDismissed(tutorialStepExercise.key, true);
-                    // Same switch, seen from the other end: opting out here
-                    // turns Show tutorials off on the Account page.
-                    setHideTutorials(true);
                   }
                   // Straight into the round. The setup screen only exists for
                   // people who did not just read the tutorial. RRT runs its
@@ -13905,7 +13919,6 @@ function NBackSessionApp() {
                 onDone={() => {
                   if (tutorialDontShowAgain) {
                     setTutorialDismissed(tutorialStepExercise.key, true);
-                    setHideTutorials(true);
                   }
                   setMainView("app");
                 }}
@@ -13914,10 +13927,12 @@ function NBackSessionApp() {
               <Motion3DTutorial
                 onDone={() => {
                   if (tutorialDontShowAgain) {
+                    // Only THIS exercise's tutorial. It used to also flip
+                    // the global "Show tutorials" switch off, so ticking the
+                    // box on one exercise silently killed every other
+                    // exercise's tutorial as well — which is why QNB's never
+                    // appeared again after a single tick somewhere else.
                     setTutorialDismissed(tutorialStepExercise.key, true);
-                    // Same switch, seen from the other end: opting out here
-                    // turns Show tutorials off on the Account page.
-                    setHideTutorials(true);
                   }
                   setMainView("app");
                 }}
@@ -13971,10 +13986,12 @@ function NBackSessionApp() {
               <button
                 onClick={() => {
                   if (tutorialDontShowAgain) {
+                    // Only THIS exercise's tutorial. It used to also flip
+                    // the global "Show tutorials" switch off, so ticking the
+                    // box on one exercise silently killed every other
+                    // exercise's tutorial as well — which is why QNB's never
+                    // appeared again after a single tick somewhere else.
                     setTutorialDismissed(tutorialStepExercise.key, true);
-                    // Same switch, seen from the other end: opting out here
-                    // turns Show tutorials off on the Account page.
-                    setHideTutorials(true);
                   }
                   setMainView("app");
                 }}
@@ -15546,7 +15563,8 @@ function NBackSessionApp() {
                       // Fills the column, so the chart is as tall as the
                       // window allows rather than matching the card board.
                       style={{
-                        flex: "1 1 auto",
+                        flex: isNarrow ? "0 0 auto" : "1 1 auto",
+                        height: isNarrow ? "24rem" : undefined,
                         minHeight: 0,
                         display: "flex",
                         flexDirection: "column",
@@ -16277,13 +16295,16 @@ function NBackSessionApp() {
             {/* A column of answers down each side at every width, so both
                 thumbs sit on their own targets and the grid keeps the
                 vertical space a button row underneath would have taken. */}
-            <div className="flex flex-row items-stretch justify-between gap-2 sm:gap-2.5 w-full">
-            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[22vw] max-w-28 lg:max-w-36 shrink-0">
+            <div className="flex flex-row items-center justify-between gap-2 sm:gap-2.5 w-full">
+            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[18vw] min-w-[3.9rem] max-w-28 lg:max-w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
               className="nback-box"
               style={{
+                flex: "1 1 0%",
+                minWidth: 0,
+                alignSelf: "center",
                 aspectRatio: "1 / 1",
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
@@ -16332,7 +16353,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[22vw] max-w-28 lg:max-w-36 shrink-0">
+            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[18vw] min-w-[3.9rem] max-w-28 lg:max-w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>
