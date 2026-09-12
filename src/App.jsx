@@ -3068,7 +3068,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 326;
+const BUILD_VERSION = 327;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -17069,6 +17069,27 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {/* Move on to the next exercise in the regime without sitting out the
+          rest of this one's clock. Real UI, not a test shortcut: it is on
+          every exercise, and only when there is something to skip to. */}
+      {mainView === "app" &&
+        !switchNotice &&
+        exercise.key !== "overview" &&
+        activeExercises[exerciseIndex + 1] && (
+          <button
+            onClick={() => forceSwitchToNext(exerciseIndex)}
+            className={`fixed z-30 flex items-center gap-2 bg-slate-900/90 hover:bg-slate-800 border border-slate-700 hover:border-slate-500 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium text-slate-300 shadow-lg ${
+              // 3D MOT keeps the speed readout in the top right, so the
+              // button takes the bottom corner there instead of sitting on it.
+              isMotion3dApp
+                ? "bottom-3 right-3 sm:bottom-6 sm:right-6"
+                : "top-3 right-3 sm:top-6 sm:right-6"
+            }`}
+          >
+            Skip exercise ›
+          </button>
+        )}
+
       {SHOW_LEADERBOARD && mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
@@ -18941,7 +18962,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         </div>
       </div>
       <div
-        className="lg:hidden absolute top-full left-0 right-0 mt-3 rounded-lg px-3 py-2 border text-sm"
+        className="lg:hidden rounded-lg px-3 py-2 border text-sm"
         style={{
           borderColor: `${EXERCISE_COLORS.rrt}66`,
           background: "#0F1115",
@@ -19018,7 +19039,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         </div>
       </div>
       <div
-        className="lg:hidden absolute top-full left-0 right-0 mt-3 rounded-lg px-3 py-2 border text-sm"
+        className="lg:hidden rounded-lg px-3 py-2 border text-sm"
         style={{
           borderColor: `${EXERCISE_COLORS.rrt}66`,
           background: "#0F1115",
@@ -19086,7 +19107,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         </div>
       </div>
       <div
-        className="lg:hidden absolute top-full left-0 right-0 mt-24 rounded-lg px-3 py-2 border text-sm"
+        className="lg:hidden rounded-lg px-3 py-2 border text-sm"
         style={{
           borderColor: `${EXERCISE_COLORS.rrt}66`,
           background: "#0F1115",
@@ -19193,9 +19214,6 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         {homeLink && (
           <div className="absolute -top-9 left-0">{homeLink}</div>
         )}
-        {timerHint}
-        {backHint}
-        {historyHint}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
             <div className="space-y-5">
@@ -19255,6 +19273,11 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
             </div>
           </div>
         </div>
+        <div className="flex flex-col gap-2 mt-3 lg:mt-0 lg:gap-0">
+          {timerHint}
+          {backHint}
+          {historyHint}
+        </div>
       </div>
     );
   }
@@ -19268,8 +19291,6 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       {homeLink && (
           <div className="absolute -top-9 left-0">{homeLink}</div>
         )}
-      {timerHint}
-      {historyHint}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
           <div className="space-y-5">
@@ -19336,6 +19357,10 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
             </div>
           </div>
         </div>
+      </div>
+      <div className="flex flex-col gap-2 mt-3 lg:mt-0 lg:gap-0">
+        {timerHint}
+        {historyHint}
       </div>
     </div>
   );
