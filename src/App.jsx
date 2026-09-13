@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 344;
+const BUILD_VERSION = 345;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7554,6 +7554,49 @@ function gemTierFor(level) {
     GEM_TIERS[1]
   );
 }
+// How far through the CURRENT rank they are, as 0-1, per exercise's own
+// level-up rule — not "percent of a perfect score". An n-back levels up at
+// PASS_THRESHOLD, so 80% IS the top of the bar and anything above it is
+// already a level-up; QNB' carries its own 0.00-0.99 sub-level; RRT steps
+// 30s → 25s → 20s within a premise count; 3D MOT climbs 0.10 at a time
+// inside a tier; CCT walks a fixed ladder of accuracy-at-interval rungs.
+function rankProgressFor(exercise, stat, history, qnbLevel) {
+  const clamp = (v) => Math.max(0, Math.min(1, v));
+  if (!exercise) return 0;
+  switch (exercise.key) {
+    case "iqnb": {
+      const lvl = typeof qnbLevel === "number" ? qnbLevel : stat?.bestAccuracy || 0;
+      return clamp(lvl - Math.floor(lvl));
+    }
+    case "rrt": {
+      // Score is premises + round-seconds/100, and the round shortens
+      // 30 → 25 → 20 twice before the premise count goes up.
+      const score = stat?.bestAccuracy || 0;
+      const seconds = Math.round((score - Math.floor(score)) * 100);
+      if (!seconds) return 0;
+      return clamp((30 - seconds) / 15);
+    }
+    case "motion3d": {
+      const speed = stat?.bestAccuracy || 0;
+      return clamp((speed * 10) % 1);
+    }
+    case "cct": {
+      const rank = cctRankFor(stat?.bestByInterval);
+      const next = CCT_RANKS[rank]; // the rung above the one they hold
+      if (!next) return 1;
+      const held = stat?.bestByInterval?.[next.interval] || 0;
+      return clamp(held / next.accuracy);
+    }
+    default: {
+      // Dual and Quad: the last session's accuracy against the 80% that
+      // actually moves the level, so a full bar means "that run leveled up".
+      const last = (history || []).length ? history[history.length - 1] : null;
+      const acc = typeof last?.accuracy === "number" ? last.accuracy : 0;
+      return clamp(acc / PASS_THRESHOLD);
+    }
+  }
+}
+
 function rankNameFor(level) {
   return gemTierFor(level).label;
 }
@@ -13338,7 +13381,9 @@ function NBackSessionApp() {
                         it at the right edge and larger: it is the thing the
                         eye should land on first. */}
                     <div className="flex items-center justify-between gap-4">
-                      <div>
+                      {/* flex-1 so the progress line spans the card rather
+                          than only the width of the exercise's name. */}
+                      <div className="flex-1 min-w-0">
                         <div className={compactHome ? "text-lg font-semibold" : "text-xl font-semibold"}>
                           {e.title}
                         </div>
@@ -13357,25 +13402,50 @@ function NBackSessionApp() {
                                 stat?.bestAccuracy || startingScoreValue(e) || level
                               )}
                         </div>
-                        <span
-                          className={`inline-flex items-center gap-1.5 rounded-full font-semibold uppercase ${
-                            compactHome
-                              ? "mt-1.5 px-2 py-0.5 text-[0.6rem]"
-                              : "mt-2.5 px-2.5 py-1 text-[0.65rem]"
-                          }`}
-                          style={{
-                            background: "rgba(0,0,0,0.34)",
-                            color: gemTierFor(bestLevel).color,
-                            letterSpacing: "0.08em",
-                            textShadow: "none",
-                          }}
-                        >
-                          <span
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ background: gemTierFor(bestLevel).color }}
-                          />
-                          {gemTierFor(bestLevel).label}
-                        </span>
+                        {/* How far through this rank they are, by the rule
+                            that actually levels the exercise up — 80% on an
+                            n-back, not 100% accuracy. */}
+                        {(() => {
+                          const tier = gemTierFor(bestLevel);
+                          const pct = Math.round(
+                            rankProgressFor(
+                              e,
+                              stat,
+                              exerciseHistory[e.key],
+                              e.key === "iqnb" ? qnbPrimeLevel : undefined
+                            ) * 100
+                          );
+                          const nextLabel =
+                            bestLevel >= MAX_GEM_TIER
+                              ? null
+                              : gemTierFor(bestLevel + 1).label;
+                          return (
+                            <div className={compactHome ? "mt-2" : "mt-3"}>
+                              <div
+                                className="h-0.5 rounded-full overflow-hidden"
+                                style={{ background: "rgba(0,0,0,0.35)" }}
+                              >
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${pct}%`, background: tier.color }}
+                                />
+                              </div>
+                              <div
+                                className="flex items-center justify-between gap-3 mt-1.5 font-semibold uppercase"
+                                style={{
+                                  fontSize: compactHome ? "0.6rem" : "0.65rem",
+                                  letterSpacing: "0.1em",
+                                  textShadow: "none",
+                                }}
+                              >
+                                <span style={{ color: tier.color }}>{tier.label}</span>
+                                <span style={{ color: "rgba(255,255,255,0.6)" }}>
+                                  {nextLabel ? `${pct}% to ${nextLabel}` : "Max rank"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                       {/* The gem's own drop-shadow is tuned for the
                           near-black page and all but vanishes on a coloured
