@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 342;
+const BUILD_VERSION = 343;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -10983,17 +10983,27 @@ function NBackSessionApp() {
   useLayoutEffect(() => {
     const measure = () => {
       const el = accountBtnRef.current;
-      if (!el) {
-        setAccountBtnAnchor(null);
-        return;
-      }
-      const r = el.getBoundingClientRect();
-      setAccountBtnAnchor({ x: r.left + r.width / 2, y: r.top });
+      const next = el
+        ? (() => {
+            const r = el.getBoundingClientRect();
+            return { x: r.left + r.width / 2, y: r.top };
+          })()
+        : null;
+      // Compared field by field, and only then written. A fresh object every
+      // render is never equal to the last one, so setting it unconditionally
+      // re-rendered forever and React gave up — which is what put the error
+      // screen on the regime page.
+      setAccountBtnAnchor((prev) => {
+        if (prev === next) return prev;
+        if (!prev || !next) return next;
+        if (prev.x === next.x && prev.y === next.y) return prev;
+        return next;
+      });
     };
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  });
+  }, [mainView, binauralHintSeen, selectedAvatarId, customAvatarImage]);
 
   const retireBinauralHint = () => {
     setBinauralHintSeen(true);
