@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 365;
+const BUILD_VERSION = 366;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -20095,10 +20095,10 @@ const MOT_TIER_SCHEMA_VERSION = 2;
 const MOT_COLOR_NEUTRAL = 0xe4e2dc; // light grey, lifted again — it still read dark against the volume
 // The balls to track, called out in orange with a pale cyan halo around them
 // (see MOT_HALO_COLOR) rather than by colour alone.
-const MOT_COLOR_TARGET = 0xd99a2b;
+const MOT_COLOR_TARGET = 0xf2a335; // a brighter orange for the balls to track
 const MOT_HALO_COLOR = 0x9fd2d8;
 // Right and wrong at the end of a round.
-const MOT_COLOR_CORRECT = 0xbca41a;
+const MOT_COLOR_CORRECT = 0xd9c42b; // a lighter, more yellow yellow
 const MOT_COLOR_WRONG = 0x8e1220;
 const MOT_COLOR_MISSED = 0xb4a55a; // same muted gold as MOT_COLOR_TARGET — never shown at the same time, so sharing a color is fine
 
@@ -20657,7 +20657,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       // (fairly small) visible pixels, without changing how raycasting
       // itself works — same proven mechanism, just a bigger target.
       const hitMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.6, 12, 8),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.35, 12, 8),
         new THREE.MeshBasicMaterial({ visible: false })
       );
       const halo = new THREE.Mesh(
@@ -20703,9 +20703,27 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       ctx.raycaster.setFromCamera(ctx.mouse, ctx.camera);
       const hits = ctx.raycaster.intersectObjects(ctx.balls.map((b) => b.hitMesh));
       if (!hits.length) return;
-      const ball = ctx.balls.find((b) => b.hitMesh === hits[0].object);
-      if (!ball) return;
-      toggleBallSelection(ball);
+      // Hit spheres are bigger than the balls so clicking is forgiving, which
+      // means two can overlap on screen. Depth order then picks whichever the
+      // ray entered first — not necessarily the one under the cursor. Among
+      // everything hit, take the ball whose centre is nearest the click in
+      // screen space.
+      const world = new THREE.Vector3();
+      let best = null;
+      let bestDist = Infinity;
+      hits.forEach((hit) => {
+        const ball = ctx.balls.find((b) => b.hitMesh === hit.object);
+        if (!ball) return;
+        ball.mesh.getWorldPosition(world);
+        world.project(ctx.camera);
+        const d = Math.hypot(world.x - ctx.mouse.x, world.y - ctx.mouse.y);
+        if (d < bestDist) {
+          bestDist = d;
+          best = ball;
+        }
+      });
+      if (!best) return;
+      toggleBallSelection(best);
     };
     // Attached directly to the canvas itself rather than relying on
     // React's onClick on a parent div — the canvas element was inserted
@@ -20941,6 +20959,12 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       b.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
       if (b.halo) b.halo.visible = false;
       if (b.lines) b.lines.visible = true;
+      // Every round starts from a new arrangement — a restart that kept the
+      // balls where they were was half a round already given away.
+      b.mesh.position.copy(
+        motRandomPointInCube(MOT_BALL_RADIUS, cubeHalfXRef.current)
+      );
+      b.vel = motRandomUnitVector();
     });
 
     const ids = Array.from({ length: MOT_BALL_COUNT }, (_, i) => i);
@@ -21089,10 +21113,9 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     const ctx = sceneRef.current;
     if (!ctx) return;
     if (ball.selected) {
-      ball.selected = false;
-      ball.mesh.scale.setScalar(1);
-      ball.mesh.material.color.setHex(MOT_COLOR_NEUTRAL);
-      setSelectedCount((c) => c - 1);
+      // Picked is picked. Un-picking a wrong answer after seeing it turn red
+      // would make the round unscoreable.
+      return;
     } else {
       const currentlySelected = ctx.balls.filter((b) => b.selected).length;
       if (currentlySelected >= MOT_TARGET_COUNT) return;
@@ -21130,12 +21153,12 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           rather than in it: big enough to read without looking for it, and
           far enough out of the way that it never competes with the balls. */}
       {!sessionDone && (
-        <div className="absolute top-12 right-3 sm:top-14 sm:right-4 z-20 text-right pointer-events-none select-none">
-          <div className="text-[0.7rem] uppercase tracking-[0.16em] text-slate-500">
+        <div className="absolute top-20 right-3 sm:top-24 sm:right-5 z-20 text-right pointer-events-none select-none">
+          <div className="text-[0.95rem] uppercase tracking-[0.16em] text-slate-500">
             Speed
           </div>
           <div
-            className="text-2xl font-semibold tabular-nums leading-none mt-0.5"
+            className="text-6xl font-semibold tabular-nums leading-none mt-1"
             /* The tier the current speed sits in — same colour as its gem. */
             style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP)).color }}
           >
@@ -21218,7 +21241,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             submitSelection checks against exercise.sessionDurationMs to end
             the session, so what's on screen always matches what's about to
             trigger the cutoff. */}
-        <div className="absolute top-3 left-3 text-sm font-medium text-slate-200 bg-slate-950/70 backdrop-blur-sm rounded-lg px-3 py-1.5 pointer-events-none">
+        <div className="absolute top-3 left-3 text-3xl font-semibold tabular-nums text-slate-200 bg-slate-950/70 backdrop-blur-sm rounded-xl px-5 py-2.5 pointer-events-none">
           {formatDuration(elapsedMs)}
         </div>
 
@@ -21227,7 +21250,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             e.stopPropagation();
             startRound();
           }}
-          className="absolute top-3 right-3 text-sm font-medium text-slate-200 bg-slate-800/80 backdrop-blur-sm rounded-lg px-3 py-1.5"
+          className="absolute top-3 right-3 text-2xl font-semibold text-slate-200 bg-slate-800/80 backdrop-blur-sm rounded-xl px-6 py-3"
         >
           Restart Game
         </button>
