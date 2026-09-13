@@ -3101,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 360;
+const BUILD_VERSION = 361;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9510,6 +9510,7 @@ function NBackSessionApp() {
   const currentRunStartRef = useRef(null);
   const runStartBankedRef = useRef(null); // { key, total } as of the moment the current round started
   const resultsExerciseRef = useRef(null); // which exercise the results on screen belong to
+  const roundsDoneRef = useRef({}); // { [key]: completed rounds this session }
   const avatarFileInputRef = useRef(null);
   // Was 200, which silently discarded a daily trainer's history after about
   // six months. The chart buckets long ranges now, so it can hold years.
@@ -10556,6 +10557,7 @@ function NBackSessionApp() {
       stopRunTimer(exerciseKey);
       setResults(resultsSoFar);
       resultsExerciseRef.current = exerciseKey; // whose results these are
+      roundsDoneRef.current[exerciseKey] = (roundsDoneRef.current[exerciseKey] || 0) + 1;
       setRoundNumber((r) => r + 1);
       setScreen("results");
       // Through a ref: runTrial is memoised, so it would otherwise hold the
@@ -10904,11 +10906,7 @@ function NBackSessionApp() {
     // Back to the last round's results only if that round was THIS exercise's
     // — otherwise the first cancelled round of a new exercise landed on the
     // previous exercise's numbers.
-    setScreen(
-      results.length > 0 && resultsExerciseRef.current === exercise.key
-        ? "results"
-        : "setup"
-    );
+    setScreen((roundsDoneRef.current[exercise.key] || 0) > 0 ? "results" : "setup");
   };
   const cancelRunRef = useRef(cancelRun);
   cancelRunRef.current = cancelRun;
@@ -11786,6 +11784,7 @@ function NBackSessionApp() {
     sessionTimersRef.current = {};
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
+    roundsDoneRef.current = {};
     sessionOpenedRef.current = false;
     saveSessionSnapshot(null);
     const today = new Date().toDateString();
@@ -11894,6 +11893,7 @@ function NBackSessionApp() {
     sessionTimersRef.current = {};
     sessionStartedRef.current = {};
     sessionTimerStartRef.current = {};
+    roundsDoneRef.current = {};
     sessionOpenedRef.current = false;
     saveSessionSnapshot(null);
     setRegimeKey(key);
@@ -16492,10 +16492,10 @@ function NBackSessionApp() {
             </div>
 
             <div className={`${ACCENT_STYLES[exercise.accent].bg} border ${ACCENT_STYLES[exercise.accent].border} rounded-xl p-6 space-y-3`}>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-7">
                 <RankedGem
                   level={exercise.key === "iqnb" ? Math.floor(qnbPrimeLevel) : n}
-                  size={48}
+                  size={56}
                 />
                 <div>
                   <div className="text-lg text-slate-300">
@@ -16522,8 +16522,8 @@ function NBackSessionApp() {
                   </div>
                 </div>
               )}
-              <div className="text-base text-slate-500">Esc to cancel a round</div>
             </div>
+            <div className="text-base text-slate-500">Esc to cancel a round</div>
 
             <button
               onClick={() => startTask(exercise, n)}
@@ -16753,37 +16753,47 @@ function NBackSessionApp() {
               ))}
             </div>
 
-            {/* Every round of this exercise today, so the session reads as
-                a run of numbers rather than one number at a time. */}
+            {/* Every round of this exercise today. On a wide screen it sits
+                in the margin beside the summary rather than inside it; on a
+                narrow one it falls in under the modality cards. */}
             {(() => {
               const today = new Date().toDateString();
               const rounds = (exerciseHistory[exercise.key] || []).filter(
                 (h) => typeof h.accuracy === "number" && new Date(h.ts).toDateString() === today
               );
-              if (rounds.length < 2) return null;
-              return (
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-500">
-                  {rounds.map((h, i) => (
-                    <span key={h.ts}>
-                      Round {i + 1}:{" "}
-                      {/* The level it was played at, so a run of numbers can
-                          be read against what was actually being trained. */}
-                      {h.n ? (
-                        <span className="text-slate-400">
-                          {exercise.key === "iqnb"
-                            ? `${exercise.abbrev} ${h.n}`
-                            : `${exercise.abbrev}${h.n}B`}{" "}
-                        </span>
-                      ) : null}
-                      <span
-                        className="font-semibold tabular-nums"
-                        style={{ color: accuracyColor(Math.round(h.accuracy)) }}
-                      >
-                        {Math.round(h.accuracy)}%
-                      </span>
+              if (rounds.length === 0) return null;
+              const line = (h, i) => (
+                <span key={h.ts} className="whitespace-nowrap">
+                  <span className="text-slate-500">Round {i + 1}</span>{" "}
+                  {h.n ? (
+                    <span className="text-slate-400">
+                      {exercise.key === "iqnb"
+                        ? `${exercise.abbrev} ${h.n}`
+                        : `${exercise.abbrev}${h.n}B`}{" "}
                     </span>
-                  ))}
-                </div>
+                  ) : null}
+                  <span
+                    className="font-semibold tabular-nums"
+                    style={{ color: accuracyColor(Math.round(h.accuracy)) }}
+                  >
+                    {Math.round(h.accuracy)}%
+                  </span>
+                </span>
+              );
+              return (
+                <>
+                  <div className="hidden xl:flex fixed right-8 top-1/2 -translate-y-1/2 z-20 flex-col gap-2 text-sm">
+                    <div className="text-xs uppercase tracking-[0.14em] text-slate-600 font-semibold">
+                      Today
+                    </div>
+                    {rounds.map(line)}
+                  </div>
+                  {rounds.length > 1 && (
+                    <div className="xl:hidden flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
+                      {rounds.map(line)}
+                    </div>
+                  )}
+                </>
               );
             })()}
 
