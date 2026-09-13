@@ -3017,7 +3017,6 @@ const MOTIVATION_LINES = [
   { id: 45, text: "KEEP CLIMBING." },
   { id: 46, text: "The goal is progress, not perfection." },
   { id: 47, text: "Feel like a God." },
-  { id: 48, text: "This training will make you mentally HARD. Be strong." },
   { id: 49, text: "Sometimes just get the session done even if the score is bad. That's progress." },
   {
     id: 50,
@@ -3039,7 +3038,6 @@ const MOTIVATION_LINES = [
   { id: 116, text: "One more round." },
   { id: 117, text: "This is the part that changes you." },
   { id: 118, text: "Slow is fine. Stopping is not." },
-  { id: 119, text: "Train the mind like it is a muscle, because it is." },
   { id: 120, text: "Everything gets easier except this." },
   { id: 121, text: "You chose the hard version. Good." },
   { id: 122, text: "Hold the thread." },
@@ -3096,7 +3094,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 339;
+const BUILD_VERSION = 340;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
