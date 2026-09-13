@@ -344,6 +344,36 @@ const sessionStore = {
   },
 };
 
+// supabase.auth.getSession() is a promise, and on a reload it can take a
+// beat — long enough that the app sat on an empty background before it
+// rendered anything. The token it is about to hand back is already sitting
+// in storage, synchronously readable, so it is read here and used as the
+// starting session. getSession() still runs and still has the last word; it
+// just no longer decides whether anything is on screen.
+function readStoredSession() {
+  try {
+    const scan = (store) => {
+      for (let i = 0; i < store.length; i++) {
+        const key = store.key(i);
+        if (!key || !/^sb-.*-auth-token$/.test(key)) continue;
+        const raw = store.getItem(key);
+        if (!raw) continue;
+        const parsed = JSON.parse(raw);
+        const sess = parsed?.currentSession || parsed;
+        if (!sess?.access_token || !sess?.user) continue;
+        // An expired token has to go back to the server before it means
+        // anything, so that case waits as it did before.
+        if (sess.expires_at && sess.expires_at * 1000 <= Date.now() + 30000) continue;
+        return sess;
+      }
+      return null;
+    };
+    return scan(localStorage) || scan(sessionStorage) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: sessionStore,
@@ -599,7 +629,7 @@ const MembershipContext = createContext(true);
 const MEMBERSHIP_CACHE_PREFIX = "cortex.membershipOk.";
 
 function AuthGate({ children }) {
-  const [session, setSession] = useState(undefined); // undefined = loading, null = signed out
+  const [session, setSession] = useState(readStoredSession); // undefined = loading, null = signed out
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   // Only the sign-up page shows this box. Signing in from the sign-in
@@ -2994,7 +3024,7 @@ const MOTIVATION_LINES = [
   { id: 13, text: "You're getting smarter than the competition." },
   { id: 14, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
   { id: 15, text: "Keep going. Your future self will thank you." },
-  { id: 16, text: "Be proud of how smart you have become." },
+  { id: 16, text: "Be proud of how smart you've become." },
   { id: 17, text: "The best don't stop improving." },
   { id: 18, text: "Become better than your old self." },
   {
@@ -3027,7 +3057,7 @@ const MOTIVATION_LINES = [
   { id: 40, text: "Faster decisions. Better reactions." },
   { id: 41, text: "You're on your way to becoming mentally unstoppable." },
   { id: 42, text: "Your opponents aren't ready." },
-  { id: 43, text: "The closest thing we have to a superpower is intellect." },
+  { id: 43, text: "The closest thing humans have to a superpower is intellect." },
   { id: 44, text: "Dominate everyone." },
   { id: 45, text: "KEEP CLIMBING." },
   { id: 46, text: "The goal is progress, not perfection." },
@@ -3056,7 +3086,6 @@ const MOTIVATION_LINES = [
   { id: 128, text: "Concentration is trainable. Prove it." },
   { id: 129, text: "Stay with it." },
   { id: 130, text: "You are building something invisible and real." },
-  { id: 132, text: "Feel it working." },
   { id: 133, text: "Benefits get better as you train consistently." },
 ];
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
@@ -3102,7 +3131,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 372;
+const BUILD_VERSION = 373;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11320,7 +11349,7 @@ function NBackSessionApp() {
       setSessionCompleteAnim(false);
       setHypnosisAfterSession(true);
       setMainView("hypnosis");
-    }, 5700);
+    }, 5500);
   };
 
   // The same three buttons in the same place on both the Stats screen and
@@ -13921,7 +13950,7 @@ function NBackSessionApp() {
                         setNudgeIdOverride(l.id);
                         setSessionCompleteAnim(true);
                         playLevelUp();
-                        setTimeout(() => setSessionCompleteAnim(false), 5700);
+                        setTimeout(() => setSessionCompleteAnim(false), 5500);
                       }}
                       className={`w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border text-slate-300 hover:border-slate-400 ${
                         l.cond
@@ -13939,7 +13968,7 @@ function NBackSessionApp() {
                       setNudgeIdOverride(null);
                       setSessionCompleteAnim(true);
                       playLevelUp();
-                      setTimeout(() => setSessionCompleteAnim(false), 5700);
+                      setTimeout(() => setSessionCompleteAnim(false), 5500);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -15444,14 +15473,16 @@ function NBackSessionApp() {
           >
             <div className="flex items-center gap-3">
               <h1
-                className="text-3xl font-semibold tracking-tight shrink-0"
-                style={{ width: "6rem" }}
+                className="text-3xl font-semibold tracking-tight shrink-0 whitespace-nowrap"
+                style={overviewSource === "home" ? { width: "6rem" } : undefined}
               >
-                {overviewSource === "home" ? "Stats" : "Today"}
+                {overviewSource === "home" ? "Stats" : "Stats Today"}
               </h1>
               {/* Same switch as Stats, driving the same scope: Regime is
                   what is being trained, All is every exercise with any
-                  history. */}
+                  history. Reached from a finished session there is nothing
+                  to switch between — that board is today's numbers only. */}
+              {overviewSource === "home" && (
               <div
                 className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
                 role="group"
@@ -15478,6 +15509,7 @@ function NBackSessionApp() {
                   );
                 })}
               </div>
+              )}
             </div>
 
             {(() => {
@@ -15776,7 +15808,9 @@ function NBackSessionApp() {
                 </h1>
                 {/* Regime is what is being trained; All is every exercise
                     that has any history, so scores from a regime someone has
-                    moved off are still reachable. */}
+                    moved off are still reachable. Not offered straight after
+                    a session, where the whole screen is about today. */}
+                {overviewSource === "home" && (
                 <div
                   className="inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1"
                   role="group"
@@ -15803,6 +15837,7 @@ function NBackSessionApp() {
                     );
                   })}
                 </div>
+                )}
               </div>
               {/* The sheet is a per-regime read: with every exercise on it
                   at once the columns stop being legible, so All is graph
@@ -17579,7 +17614,7 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
-              animation: "sessionDoneWash 5.7s cubic-bezier(0.2,0.7,0.3,1) forwards",
+              animation: "sessionDoneWash 5.5s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
           <div className="relative flex items-center justify-center">
@@ -17636,14 +17671,14 @@ function NBackSessionApp() {
           <div className="mt-12 text-center">
             <div
               className="text-3xl sm:text-4xl font-semibold tracking-tight"
-              style={{ animation: "sessionDoneText 5.8s ease-out forwards" }}
+              style={{ animation: "sessionDoneText 5.6s ease-out forwards" }}
             >
               Session complete
             </div>
             <div
               className="text-slate-400 text-lg mt-3 max-w-md mx-auto px-6"
               style={{
-                animation: "sessionDoneSub 5.8s ease-out forwards",
+                animation: "sessionDoneSub 5.6s ease-out forwards",
                 textWrap: "balance",
               }}
             >
@@ -20690,6 +20725,11 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // it, which is a much stronger depth cue than occlusion alone.
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Soft shadows are the most expensive thing in the frame. They only
+    // change while the balls are moving, so the map is redrawn during the
+    // tracking phase and left alone the rest of the time.
+    renderer.shadowMap.autoUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
     // Clearing and appending against `mount` (a div that exists solely to
     // hold the canvas) instead of `host` — `host` also has the stage
     // label, restart button, and dev controls rendered into it by React,
@@ -20955,6 +20995,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // than a few pixels also swallows the click it ends on, so looking round
     // a cluster never picks a ball by accident.
     let cameraDirty = false;
+    const collideDelta = new THREE.Vector3();
+    const collideCorrection = new THREE.Vector3();
+    const collideRelVel = new THREE.Vector3();
+    let lettersShown = null;
     let dragging = false;
     let dragMoved = false;
     let lastX = 0;
@@ -21015,14 +21059,17 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
     const animate = () => {
       ctx.animFrame = requestAnimationFrame(animate);
+      let cameraMoved = false;
       if (cameraDirty) {
         cameraDirty = false;
+        cameraMoved = true;
         const [cw, ch] = hostSize();
         placeCamera(cw, ch);
       }
       const dt = Math.min(ctx.clock.getDelta(), 0.05);
+      const moving = stageRef.current === "track" && !pausedRef.current;
 
-      if (stageRef.current === "track" && !pausedRef.current) {
+      if (moving) {
         const speedNow = motDisplaySpeedToVelocity(speedRef.current);
         const bound = MOT_CUBE_HALF - MOT_BALL_RADIUS;
         const boundX = cubeHalfXRef.current - MOT_BALL_RADIUS;
@@ -21051,25 +21098,30 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         // drifting straight through. Checked pairwise every frame; with
         // only 10 balls that's 45 checks, cheap either way.
         const minDist = MOT_BALL_RADIUS * 2;
+        // Scratch vectors, reused every pair of every frame. These used to
+        // be .clone()d per pair — 90-odd throwaway Vector3s a frame, which
+        // is exactly the kind of churn that shows up as an occasional
+        // stutter rather than a steady lower frame rate.
+        const delta = collideDelta;
+        const correction = collideCorrection;
+        const relVel = collideRelVel;
         for (let i = 0; i < ctx.balls.length; i++) {
           for (let j = i + 1; j < ctx.balls.length; j++) {
             const ballA = ctx.balls[i];
             const ballB = ctx.balls[j];
-            const delta = ballA.mesh.position.clone().sub(ballB.mesh.position);
+            delta.copy(ballA.mesh.position).sub(ballB.mesh.position);
             const dist = delta.length();
             if (dist > 0 && dist < minDist) {
               const normal = delta.multiplyScalar(1 / dist); // unit vector, B -> A
               // Separate them along the normal so they don't stay
               // overlapped and keep re-triggering the same collision.
-              const correction = normal
-                .clone()
-                .multiplyScalar((minDist - dist) / 2);
+              correction.copy(normal).multiplyScalar((minDist - dist) / 2);
               ballA.mesh.position.add(correction);
               ballB.mesh.position.sub(correction);
               // Only resolve velocity if they're actually closing — if
               // they're already separating (e.g. right after a previous
               // bounce this same frame), leave their velocities alone.
-              const relVel = ballA.vel.clone().sub(ballB.vel);
+              relVel.copy(ballA.vel).sub(ballB.vel);
               const velAlongNormal = relVel.dot(normal);
               if (velAlongNormal < 0) {
                 ballA.vel.addScaledVector(normal, -velAlongNormal);
@@ -21083,10 +21135,14 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       // Only once it is time to guess — otherwise the letters double as a
       // free "which ball is which" cheat sheet while still tracking.
       const showLetters = stageRef.current === "select";
-      ctx.balls.forEach((b) => {
-        if (b.letterSprite) b.letterSprite.visible = showLetters;
-      });
+      if (showLetters !== lettersShown) {
+        lettersShown = showLetters;
+        ctx.balls.forEach((b) => {
+          if (b.letterSprite) b.letterSprite.visible = showLetters;
+        });
+      }
 
+      if (moving || cameraMoved) ctx.renderer.shadowMap.needsUpdate = true;
       ctx.renderer.render(ctx.scene, ctx.camera);
     };
     animate();
