@@ -2634,7 +2634,11 @@ function emptyModalityState(modalities, value) {
   return obj;
 }
 
-const PASS_THRESHOLD = 80;
+const PASS_THRESHOLD = 80; // this or better levels the exercise up
+// Three runs in a row under this drop it a level. Anything between the two
+// holds the level where it is — an off day is not a demotion.
+const DROP_THRESHOLD = 50;
+const DROP_AFTER_RUNS = 3;
 
 // Trials are ~30% matches / ~70% non-matches, so raw "% correct" is misleading, and
 // even "balanced accuracy" (avg of hit-rate and correct-rejection-rate) has a hard
@@ -2991,7 +2995,7 @@ const MOTIVATION_LINES = [
   },
   { id: 20, text: "Enjoy being mentally superior to everyone." },
   { id: 21, text: "Other people won't be able to keep up with you." },
-  { id: 22, text: "You showed up today. That's a win." },
+  { id: 22, text: "You showed up today. That's a win.", endOnly: true },
   { id: 23, text: "Today was a little harder. You still got it done anyway. Good job.", cond: "worse" },
   // Two sessions running, not one — "on fire" claims a run, so it waits for
   // one.
@@ -3063,11 +3067,13 @@ const QUAD_5_BACK_LINE = "Enjoy having HD vision.";
 
 const MOTIVATION_BY_ID = new Map(MOTIVATION_LINES.map((l) => [l.id, l]));
 const MOTIVATION_UNCONDITIONAL = MOTIVATION_LINES.filter((l) => !l.cond);
+// Lines that only make sense once the whole session is done.
+const MOTIVATION_ANYTIME = MOTIVATION_UNCONDITIONAL.filter((l) => !l.endOnly);
 
 // Shown on the hand-off between exercises. The unconditional lines only:
 // anything tied to a streak or a record belongs on the session-complete
 // screen, where it can actually be true.
-const TRANSITION_QUOTES = MOTIVATION_UNCONDITIONAL.map((l) => l.text);
+const TRANSITION_QUOTES = MOTIVATION_ANYTIME.map((l) => l.text);
 
 
 
@@ -3096,7 +3102,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 351;
+const BUILD_VERSION = 352;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9040,6 +9046,9 @@ function NBackSessionApp() {
   const timeoutRef = useRef(null);
   const respondedRef = useRef({});
   const currentMatchRef = useRef({});
+  // Read synchronously by handlePress (which runs from a key listener that
+  // does not re-bind on every trial).
+  const armedRef = useRef(false);
   const runGenerationRef = useRef(0);
 
   const sessionTimersRef = useRef({}); // { [exerciseKey]: timeoutId }
@@ -10352,14 +10361,22 @@ function NBackSessionApp() {
     if (currentRunStartRef.current != null) {
       const elapsed = Date.now() - currentRunStartRef.current;
       currentRunStartRef.current = null;
+      let total = 0;
       setExerciseElapsedMs((prev) => {
-        const next = {
-          ...prev,
-          [exerciseKey]: (prev[exerciseKey] || 0) + elapsed,
-        };
+        total = (prev[exerciseKey] || 0) + elapsed;
+        const next = { ...prev, [exerciseKey]: total };
         exerciseElapsedMsRef.current = next;
         return next;
       });
+      // The budget is minutes TRAINED, not minutes since the exercise was
+      // first opened. A wall-clock timer counted time spent on Home, on the
+      // results screen and on another exercise, which is how a 25-minute
+      // session ended after 14 minutes of actual training.
+      const budget = activeExercisesRef.current.find((e) => e.key === exerciseKey)
+        ?.sessionDurationMs;
+      if (budget && total >= budget) {
+        setSessionTimeUp((prev) => ({ ...prev, [exerciseKey]: true }));
+      }
       // A finished run writes its own duration into history, so that time
       // must not be logged again as abandoned.
       loggedElapsedRef.current[exerciseKey] =
@@ -10415,10 +10432,10 @@ function NBackSessionApp() {
     // known-correct numbers in the same synchronous pass, with no
     // dependency on effect timing.
     const baseStats = statsSnapshot || exerciseStatsRef.current;
-    if (overallAcc < PASS_THRESHOLD) {
+    if (overallAcc < DROP_THRESHOLD) {
       setLowScoreStreak((prev) => {
         const nextCount = (prev[exerciseKey] || 0) + 1;
-        if (nextCount >= 3) {
+        if (nextCount >= DROP_AFTER_RUNS) {
           const nextN = Math.max(1, levelUsed - 1);
           setN(nextN);
           setExerciseLevel(exerciseKey, nextN);
@@ -10427,6 +10444,9 @@ function NBackSessionApp() {
         }
         return { ...prev, [exerciseKey]: nextCount };
       });
+    } else if (overallAcc < PASS_THRESHOLD) {
+      // Held: good enough not to count against them, not good enough to move.
+      setLowScoreStreak((prev) => ({ ...prev, [exerciseKey]: 0 }));
     } else {
       setLowScoreStreak((prev) => ({ ...prev, [exerciseKey]: 0 }));
       const nextN = Math.min(ex.maxN, levelUsed + 1);
@@ -10599,6 +10619,7 @@ function NBackSessionApp() {
       matches[m] = i >= nForTrial && seq[m][i] === seq[m][i - nForTrial];
     });
     currentMatchRef.current = matches;
+    armedRef.current = i >= nForTrial;
 
     window.__nbackRespond = (type) => {
       respondedRef.current[type] = true;
@@ -10659,13 +10680,6 @@ function NBackSessionApp() {
       if (!sessionStartedRef.current[ex.key] && ex.sessionDurationMs) {
         sessionStartedRef.current[ex.key] = true;
         sessionTimerStartRef.current[ex.key] = Date.now();
-        const fromIndex = activeExercisesRef.current.findIndex((e) => e.key === ex.key);
-        sessionTimersRef.current[ex.key] = setTimeout(
-          // Was forceSwitchToNext(fromIndex) — which took people out of a
-          // round they were halfway through, and took the results with it.
-          () => setSessionTimeUp((prev) => ({ ...prev, [ex.key]: true })),
-          ex.sessionDurationMs
-        );
       }
       const modalities = ex.modalities;
       // Dual runs at 30%, Quad at 25%. QNB' ignores both of those — it has
@@ -10810,6 +10824,9 @@ function NBackSessionApp() {
   }, []);
 
   const handlePress = (type) => {
+    // Nothing can be a match until N items have gone by, so a press before
+    // then is not an answer at all — ignored, not counted wrong.
+    if (!armedRef.current) return;
     if (respondedRef.current[type]) return;
     if (window.__nbackRespond) window.__nbackRespond(type);
 
@@ -10822,9 +10839,29 @@ function NBackSessionApp() {
   const handlePressRef = useRef(handlePress);
   handlePressRef.current = handlePress;
 
+  // Esc walks out of a round in progress. The round is thrown away whole —
+  // no score, and none of its time counted, since a cancelled round is not
+  // training. Back to the setup screen if there is nothing behind it, or to
+  // the last round's results if there is.
+  const cancelRun = () => {
+    runGenerationRef.current += 1; // anything still scheduled for this run is now stale
+    clearTimeout(timeoutRef.current);
+    currentRunStartRef.current = null; // discards this round's time
+    armedRef.current = false;
+    setFeedback({});
+    setScreen(results.length > 0 ? "results" : "setup");
+  };
+  const cancelRunRef = useRef(cancelRun);
+  cancelRunRef.current = cancelRun;
+
   useEffect(() => {
     if (screen !== "running") return;
     const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cancelRunRef.current();
+        return;
+      }
       const type = KEY_BINDINGS[e.key.toLowerCase()];
       if (type && exercise.modalities.includes(type)) {
         e.preventDefault();
@@ -11489,6 +11526,7 @@ function NBackSessionApp() {
       iqnb: { level: 6, score: 6.3 },       // QNB' 6.30
       quad: { level: 5, score: 82 },        // QNB 5-back
       dual: { level: 7, score: 82 },        // DNB 7-back
+      motion3d: { level: 5, score: 0.5 },   // 3D MOT 0.50
     };
     const nextStats = { ...exerciseStatsRef.current };
     Object.entries(targets).forEach(([key, t]) => {
@@ -11695,7 +11733,7 @@ function NBackSessionApp() {
   const proceedStartFromHome = () => {
     unlockLetterAudio();
     setSessionStartLine(
-      MOTIVATION_LINES[Math.floor(Math.random() * MOTIVATION_LINES.length)]?.text || null
+      MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
     );
     setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
     // If we're currently parked on the overview "exercise" (e.g. from a
@@ -12257,10 +12295,15 @@ function NBackSessionApp() {
       return (
         <button
           key={m}
-          onClick={() => handlePress(m)}
-          disabled={!armed}
+          // Not disabled — it looks the same throughout. There is simply
+          // nothing that could be a match until N items have gone by, so a
+          // press before then is ignored rather than counted as wrong.
+          onClick={() => {
+            if (!armed) return;
+            handlePress(m);
+          }}
           style={toneStyle}
-          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 lg:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
+          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 lg:gap-1.5 ${cls}`}
         >
           <span className="text-[0.65rem] sm:text-xs lg:text-sm font-medium uppercase tracking-wide opacity-70">
             {meta.label}
@@ -12274,7 +12317,7 @@ function NBackSessionApp() {
     const spaced = (list) =>
       list.map((el, i) => (
         <Fragment key={el.key}>
-          {i > 0 && <div className="hidden lg:block lg:h-8 xl:h-10 shrink-0" />}
+          {i > 0 && <div className="hidden lg:block lg:h-2 shrink-0" />}
           {el}
         </Fragment>
       ));
@@ -12341,7 +12384,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-center justify-center px-2 md:px-4 pt-14 sm:pt-6 pb-3"
+          ? "items-center justify-center px-2 md:px-4 pt-14 sm:py-6"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -15225,7 +15268,7 @@ function NBackSessionApp() {
 
         {!switchNotice && levelChangeNotice && (
           <div className="text-base rounded-lg px-5 py-2 mb-6 border text-amber-400 bg-amber-950/40 border-amber-800">
-            Below {PASS_THRESHOLD}% three times in a row, so N level dropped to {n}.
+            Below {DROP_THRESHOLD}% {DROP_AFTER_RUNS} times in a row, so the level dropped to {n}.
           </div>
         )}
 
@@ -16370,6 +16413,12 @@ function NBackSessionApp() {
                   </div>
                 </div>
               </div>
+              {exercise.key !== "iqnb" && (
+                <div className="text-base text-slate-400 pt-1">
+                  {PASS_THRESHOLD}%+ moves you up a level. Under {DROP_THRESHOLD}%{" "}
+                  {DROP_AFTER_RUNS} rounds in a row moves you down.
+                </div>
+              )}
             </div>
 
             <button
@@ -16406,8 +16455,8 @@ function NBackSessionApp() {
                 there is not — which is also why the block is the grid's own
                 width rather than the page's. */}
             {nbackColumns ? (
-              <div className="flex flex-row items-stretch justify-center gap-4 w-full">
-                <div className="flex flex-col justify-between w-32 xl:w-36 shrink-0">
+              <div className="flex flex-row items-stretch justify-between gap-6 xl:gap-10 w-full">
+                <div className="flex flex-col justify-center gap-4 w-32 xl:w-40 shrink-0">
                   {nbackSideButtons.left}
                 </div>
               <div
@@ -16461,7 +16510,7 @@ function NBackSessionApp() {
                   );
                 })}
               </div>
-                <div className="flex flex-col justify-between w-32 xl:w-36 shrink-0">
+                <div className="flex flex-col justify-center gap-4 w-32 xl:w-40 shrink-0">
                   {nbackSideButtons.right}
                 </div>
               </div>
@@ -16595,11 +16644,31 @@ function NBackSessionApp() {
               ))}
             </div>
 
-            {sessionTimeUp[exercise.key] && (
-              <div className="text-slate-400 text-base">
-                That's the session for {exercise.title}. Take your time here.
-              </div>
-            )}
+            {/* Every round of this exercise today, so the session reads as
+                a run of numbers rather than one number at a time. */}
+            {(() => {
+              const today = new Date().toDateString();
+              const rounds = (exerciseHistory[exercise.key] || []).filter(
+                (h) => typeof h.accuracy === "number" && new Date(h.ts).toDateString() === today
+              );
+              if (rounds.length < 2) return null;
+              return (
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-slate-500">
+                  {rounds.map((h, i) => (
+                    <span key={h.ts}>
+                      Round {i + 1}:{" "}
+                      <span
+                        className="font-semibold tabular-nums"
+                        style={{ color: accuracyColor(Math.round(h.accuracy)) }}
+                      >
+                        {Math.round(h.accuracy)}%
+                      </span>
+                    </span>
+                  ))}
+                </div>
+              );
+            })()}
+
             <button
               onClick={continueFromResults}
               className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30`}
@@ -18303,6 +18372,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   const roundMsRef = useRef(ROUND_MS);
   const rrtIncrementCountRef = useRef(rrtIncrementCount);
   const correctStreakRef = useRef(0);
+  // The longest run of correct answers in this session, for the summary at
+  // the end — the live streak is usually 0 by then.
+  const [bestStreakThisSession, setBestStreakThisSession] = useState(0);
   const sessionSavedRef = useRef(false);
   elapsedMsRef.current = elapsedMs;
   tallyRef.current = tally;
@@ -18310,6 +18382,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   roundMsRef.current = ROUND_MS;
   rrtIncrementCountRef.current = rrtIncrementCount;
   correctStreakRef.current = correctStreak;
+  useEffect(() => {
+    setBestStreakThisSession((b) => Math.max(b, correctStreak));
+  }, [correctStreak]);
 
   // Previously RRT only ever reported a completed session to the parent
   // once the full session-duration cutoff was hit inside triggerFlash —
@@ -19550,6 +19625,12 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
           <div className="text-lg text-slate-400">
             Level: <span className="text-slate-200 font-medium">
               {premiseCount}p / {ROUND_MS / 1000} sec
+            </span>
+          </div>
+          <div className="text-lg text-slate-300">
+            Best score:{" "}
+            <span className="text-slate-100 font-medium">
+              {premiseCount}p {ROUND_MS / 1000}s {bestStreakThisSession}/20
             </span>
           </div>
         </div>
