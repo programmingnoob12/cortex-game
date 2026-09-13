@@ -3222,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 379;
+const BUILD_VERSION = 380;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -18624,39 +18624,36 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       <div className="fixed inset-x-0 top-0 z-20 px-4 sm:px-8 pt-3 sm:pt-5 pointer-events-none">
         <div className="mx-auto max-w-3xl grid grid-cols-3 items-start gap-4">
           <div className="text-left">
-            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Interval
             </div>
-            <div className="text-lg font-medium tabular-nums leading-tight text-slate-400">
+            <div className="text-2xl font-semibold tabular-nums leading-tight text-slate-100">
               {intervalMs}
-              <span className="text-xs font-medium text-slate-600 ml-1">ms</span>
+              <span className="text-sm font-medium text-slate-400 ml-1">ms</span>
             </div>
           </div>
 
           <div className="text-center">
-            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Accuracy
             </div>
-            <div className="text-lg font-medium tabular-nums text-slate-400 leading-tight">
+            <div className="text-2xl font-semibold tabular-nums text-slate-300 leading-tight">
               {score(tally.correct, tally.wrong)}%
             </div>
           </div>
 
           <div className="text-right">
-            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+            <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
               Time left
             </div>
-            <div className="text-lg font-medium tabular-nums text-slate-400 leading-tight">
+            <div className="text-2xl font-semibold tabular-nums text-slate-100 leading-tight">
               {msLeft == null ? "\u2014" : formatClock(msLeft)}
             </div>
           </div>
         </div>
       </div>
 
-      <div
-        className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 space-y-6 text-center"
-
-      >
+      <div className="mx-auto w-full max-w-xs rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 text-center">
         {/* The answer lands in a box of its own, so there is somewhere for it
             to appear whether it was typed or tapped. */}
         <div
@@ -18682,7 +18679,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
               what the last few answers were. Tucked into the corner of the
               box rather than sitting under the digits, where they pulled the
               eye down every time a verdict landed. */}
-          <div className="absolute -top-3 right-2 flex items-center gap-1.5">
+          <div className="absolute top-2 right-2 flex items-center gap-1">
             {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
               const mark = marks[i];
               return (
