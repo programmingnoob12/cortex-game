@@ -2244,10 +2244,39 @@ const CUSTOM_DRAG_HINT_KEY = "cortex.customDragHint";
 // Points at the Account button once, to say what is behind it.
 const BINAURAL_HINT_KEY = "cortex.binauralHint";
 
-function buildRegimeExercises(regime) {
+// Easing into a regime. Someone who picks a 62-minute regime on day one
+// does not train 62 minutes on day one — the first session runs short and
+// grows five minutes with each session they finish, until it is the regime
+// at its full length. The whole regime is still trained every session: the
+// exercises keep their proportions and simply run shorter, so nothing is
+// missed on the way up.
+const RAMP_FIRST_MINUTES = 15;
+const RAMP_STEP_MINUTES = 5;
+const RAMP_MIN_EXERCISE_MS = 60 * 1000; // no exercise is ever shorter than a minute
+
+function regimeFullMinutes(regime) {
+  return (regime?.steps || []).reduce((sum, step) => sum + (step.minutes || 0), 0);
+}
+
+// How long this session should run, given how many sessions of this regime
+// they have already finished. Null once they are at full length.
+function rampMinutesFor(regime, sessionsDone) {
+  const full = regimeFullMinutes(regime);
+  if (!full || full <= RAMP_FIRST_MINUTES) return null;
+  const target = RAMP_FIRST_MINUTES + (sessionsDone || 0) * RAMP_STEP_MINUTES;
+  if (target >= full) return null;
+  return target;
+}
+
+function buildRegimeExercises(regime, rampMinutes = null) {
+  const full = regimeFullMinutes(regime);
+  const factor = rampMinutes && full ? rampMinutes / full : 1;
   const steps = regime.steps.map((step) => ({
     ...EXERCISE_LIBRARY[step.key],
-    sessionDurationMs: step.minutes * 60 * 1000,
+    sessionDurationMs: Math.max(
+      RAMP_MIN_EXERCISE_MS,
+      Math.round((step.minutes * 60 * 1000 * factor) / 30000) * 30000
+    ),
   }));
   return [...steps, OVERVIEW_EXERCISE];
 }
@@ -3222,7 +3251,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 380;
+const BUILD_VERSION = 381;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9077,6 +9106,18 @@ function bootSessionFromSnapshot() {
 
 // The screen the app opens on. A live session wins; otherwise whatever they
 // were last looking at; otherwise the picker.
+// The ramp count, read straight from the local mirror at boot — the same
+// number the app state is seeded with, before anything has hydrated.
+function bootRampSessions(key) {
+  try {
+    const raw = mirrorGet("regime-ramp");
+    const parsed = raw ? JSON.parse(raw) : null;
+    return (parsed && parsed[key]) || 0;
+  } catch {
+    return 0;
+  }
+}
+
 function bootViewFrom(boot) {
   if (CAME_FROM_CHECKOUT) return "regime";
   const last = loadLastView();
@@ -9096,6 +9137,20 @@ function NBackSessionApp() {
   // Any number of regimes they have built: [{ id, name, steps }]. The key
   // a built regime is selected by is "custom:<id>".
   const [customRegimes, setCustomRegimesState] = useState([]);
+  // { [regimeKey]: sessions finished } — drives the ease-in above. Read from
+  // the local mirror first so the very first render already builds the
+  // session at the right length.
+  const [regimeRamp, setRegimeRampState] = useState(() => {
+    try {
+      const raw = mirrorGet("regime-ramp");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+  const regimeRampRef = useRef(regimeRamp);
+  useEffect(() => { regimeRampRef.current = regimeRamp; }, [regimeRamp]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
   const [customName, setCustomName] = useState(""); // its name, in the builder
   const [deleteRegimeConfirm, setDeleteRegimeConfirm] = useState(null); // { id, name } of the built regime awaiting a yes
@@ -9116,7 +9171,12 @@ function NBackSessionApp() {
     }
   });
   const [activeExercises, setActiveExercises] = useState(() =>
-    buildRegimeExercises(bootSession ? bootSession.regime : REGIMES[0])
+    bootSession
+      ? buildRegimeExercises(
+          bootSession.regime,
+          rampMinutesFor(bootSession.regime, bootRampSessions(bootSession.key))
+        )
+      : buildRegimeExercises(REGIMES[0])
   );
   const activeExercisesRef = useRef(activeExercises);
   useEffect(() => {
@@ -9825,6 +9885,18 @@ function NBackSessionApp() {
         // no saved per-exercise tutorial dismissals yet
       }
       try {
+        const res = await window.storage.get("regime-ramp", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          if (parsed && typeof parsed === "object") {
+            mirrorSet("regime-ramp", res.value);
+            setRegimeRampState(parsed);
+          }
+        }
+      } catch (err) {
+        // nobody has started a regime yet
+      }
+      try {
         const res = await window.storage.get("custom-regimes", false);
         if (res && res.value) {
           const parsed = JSON.parse(res.value);
@@ -10513,7 +10585,29 @@ function NBackSessionApp() {
   // Marks today as a completed-regime day (idempotent — safe to call more
   // than once in the same day). Called when the person reaches the Session
   // Overview screen having gone through every step of their regime.
+  // The ease-in length for a given regime right now, or null at full length.
+  const rampMinutesForKey = (key, regime) => {
+    const r = regime || findRegime(key);
+    if (!r) return null;
+    return rampMinutesFor(r, regimeRampRef.current[key] || 0);
+  };
+
+  // One more session of this regime is in the books, so the next one is five
+  // minutes longer. Stops counting once it is at full length.
+  const advanceRamp = useCallback((key) => {
+    if (!key) return;
+    setRegimeRampState((prev) => {
+      const done = prev[key] || 0;
+      const next = { ...prev, [key]: done + 1 };
+      const json = JSON.stringify(next);
+      mirrorSet("regime-ramp", json);
+      if (window.storage) safeStorageSet("regime-ramp", json, false);
+      return next;
+    });
+  }, []);
+
   const markRegimeCompletedToday = useCallback(() => {
+    advanceRamp(regimeKeyRef.current);
     const today = new Date().toDateString();
     setRegimeCompletionDatesState((prev) => {
       if (prev.includes(today)) return prev;
@@ -11222,6 +11316,12 @@ function NBackSessionApp() {
   };
 
   const currentRegime = findRegime(regimeKey) || REGIMES[0];
+  // Non-null while this regime is still ramping up: the minutes this
+  // session runs, against the regime's full length.
+  const rampMinutesNow = regimeKey
+    ? rampMinutesFor(currentRegime, regimeRamp[regimeKey] || 0)
+    : null;
+  const regimeFullMinutesNow = regimeFullMinutes(currentRegime);
   const leaderboardTabs = Object.values(EXERCISE_LIBRARY).map((e) => ({
     key: e.key,
     label: e.title,
@@ -11761,7 +11861,9 @@ function NBackSessionApp() {
     setRestorePending(false);
     if (!regimeKey) {
       setRegimeKey(last.regimeKey);
-      setActiveExercises(buildRegimeExercises(regime));
+      setActiveExercises(
+        buildRegimeExercises(regime, rampMinutesForKey(last.regimeKey, regime))
+      );
     }
     setMainView((view) => (view === "regime" ? "app" : view));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -11802,7 +11904,9 @@ function NBackSessionApp() {
         return;
       }
       setRegimeKey(snap.regimeKey);
-      setActiveExercises(buildRegimeExercises(regime));
+      setActiveExercises(
+        buildRegimeExercises(regime, rampMinutesForKey(snap.regimeKey, regime))
+      );
       setScreen("setup");
       setMainView("app");
     }
@@ -12159,7 +12263,7 @@ function NBackSessionApp() {
       ? { key, title: "Custom", steps: stepsOverride }
       : findRegime(key);
     if (!regime || !regime.steps.length) return;
-    const built = buildRegimeExercises(regime);
+    const built = buildRegimeExercises(regime, rampMinutesForKey(key, regime));
     // Starting a fresh regime — clear any timers/flags from a previous session.
     Object.values(sessionTimersRef.current).forEach(clearTimeout);
     sessionTimersRef.current = {};
@@ -13829,6 +13933,13 @@ function NBackSessionApp() {
                   }`}
                 >
                   {trainedToday ? "Tomorrow" : "Today"}
+                </div>
+              )}
+              {/* Still working up to the full regime. Said plainly, so a
+                  shorter session reads as the plan rather than a bug. */}
+              {rampMinutesNow && (
+                <div className="text-sm mt-2 text-slate-400">
+                  Easing in · {rampMinutesNow} of {regimeFullMinutesNow} min
                 </div>
               )}
             </div>
