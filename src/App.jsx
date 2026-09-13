@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 362;
+const BUILD_VERSION = 363;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9130,6 +9130,14 @@ function NBackSessionApp() {
   // and each level is three 20-in-a-row steps (30s → 25s → 20s), so the step
   // it stopped on is recovered from the round length packed into its best
   // score (e.g. 7.25 = 7 premises on a 25s round = one step into that level).
+  // The speed 3D MOT opens on: the tier reached, or its own floor.
+  const motion3dStartSpeed = (() => {
+    const stat = exerciseStats.motion3d;
+    const best = stat?.bestAccuracy || 0;
+    const byTier = (stat?.bestN || 0) * MOT_TIER_STEP;
+    return Math.max(MOT_START_SPEED, Math.min(MOT_MAX_SPEED, Math.max(best, byTier)));
+  })();
+
   const rrtStartIncrement = (() => {
     const stat = exerciseStats.rrt;
     const level = exerciseLevels.rrt ?? EXERCISE_LIBRARY.rrt.defaultN;
@@ -10973,6 +10981,9 @@ function NBackSessionApp() {
     const shown = midSessionShownRef.current[exerciseKey] || 0;
     if (shown >= MID_SESSION_MARKS.length) return false;
     if (done < MID_SESSION_MARKS[shown]) return false;
+    // A level-up or achievement celebration owns the screen; a line on top of
+    // it is two animations at once.
+    if (unlockInfo || achievementCelebrationQueue.length > 0) return false;
     midSessionShownRef.current[exerciseKey] = shown + 1;
     setSessionStartLine(
       MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text ||
@@ -11297,7 +11308,7 @@ function NBackSessionApp() {
       setSessionCompleteAnim(false);
       setHypnosisAfterSession(true);
       setMainView("hypnosis");
-    }, 5900);
+    }, 5700);
   };
 
   // The same three buttons in the same place on both the Stats screen and
@@ -13557,7 +13568,7 @@ function NBackSessionApp() {
                           card. A second shadow on the wrapper follows the
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
-                      <span className="inline-flex shrink-0 mr-3 sm:mr-5">
+                      <span className="inline-flex shrink-0 mr-5 sm:mr-8">
                         <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
                       </span>
                     </div>
@@ -13857,7 +13868,7 @@ function NBackSessionApp() {
                         setNudgeIdOverride(l.id);
                         setSessionCompleteAnim(true);
                         playLevelUp();
-                        setTimeout(() => setSessionCompleteAnim(false), 5900);
+                        setTimeout(() => setSessionCompleteAnim(false), 5700);
                       }}
                       className={`w-10 rounded-md py-1.5 text-xs font-medium tabular-nums border text-slate-300 hover:border-slate-400 ${
                         l.cond
@@ -13875,7 +13886,7 @@ function NBackSessionApp() {
                       setNudgeIdOverride(null);
                       setSessionCompleteAnim(true);
                       playLevelUp();
-                      setTimeout(() => setSessionCompleteAnim(false), 5900);
+                      setTimeout(() => setSessionCompleteAnim(false), 5700);
                     }}
                     className="flex-1 rounded-lg py-2 text-xs font-medium border border-slate-600 bg-slate-800 hover:bg-slate-700 text-slate-200"
                   >
@@ -16467,6 +16478,7 @@ function NBackSessionApp() {
             onLevelUp={recordMotion3dLevelUp}
             onSessionEnd={recordMotion3dSessionEnd}
             onResetProgress={resetMotion3dProgress}
+            startSpeed={motion3dStartSpeed}
             paused={!!unlockInfo || achievementCelebrationQueue.length > 0}
           />
         )}
@@ -16555,10 +16567,19 @@ function NBackSessionApp() {
             <div className="text-base text-slate-500">Esc to cancel a round</div>
 
             <button
-              onClick={() => startTask(exercise, n)}
+              onClick={() => {
+                // The clock ran out while they were on this screen (a
+                // cancelled round lands here), so Start moves them on rather
+                // than opening a round the session has no time for.
+                if (sessionTimeUp[exercise.key]) {
+                  forceSwitchToNext(exerciseIndex);
+                  return;
+                }
+                startTask(exercise, n);
+              }}
               className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
             >
-              Start
+              {sessionTimeUp[exercise.key] ? "Next exercise" : "Start"}
             </button>
 
           </div>
@@ -17502,7 +17523,7 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
-              animation: "sessionDoneWash 5.9s cubic-bezier(0.2,0.7,0.3,1) forwards",
+              animation: "sessionDoneWash 5.7s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
           <div className="relative flex items-center justify-center">
@@ -17559,14 +17580,14 @@ function NBackSessionApp() {
           <div className="mt-12 text-center">
             <div
               className="text-3xl sm:text-4xl font-semibold tracking-tight"
-              style={{ animation: "sessionDoneText 6s ease-out forwards" }}
+              style={{ animation: "sessionDoneText 5.8s ease-out forwards" }}
             >
               Session complete
             </div>
             <div
               className="text-slate-400 text-lg mt-3 max-w-md mx-auto px-6"
               style={{
-                animation: "sessionDoneSub 6s ease-out forwards",
+                animation: "sessionDoneSub 5.8s ease-out forwards",
                 textWrap: "balance",
               }}
             >
@@ -20450,12 +20471,14 @@ function HypnosisScreen({ onDone, afterSession }) {
   );
 }
 
-function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, onLevelUp, onSessionEnd, onResetProgress, paused }) {
+function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, onLevelUp, onSessionEnd, onResetProgress, paused, startSpeed = MOT_START_SPEED }) {
   // Set when the session budget runs out. Nothing advances until Continue.
   const [sessionDone, setSessionDone] = useState(false);
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | highlight | track | select | result
-  const [speed, setSpeed] = useState(MOT_START_SPEED);
+  // Starts where they left off. Opening at the bottom of the staircase every
+  // time is what made Home say 0.50 while the exercise ran at 0.10.
+  const [speed, setSpeed] = useState(startSpeed);
   const [tally, setTally] = useState({ correct: 0, wrong: 0 });
   const [roundResult, setRoundResult] = useState(null); // { correctCount, wrongCount, allCorrect }
   const [elapsedMs, setElapsedMs] = useState(0);
