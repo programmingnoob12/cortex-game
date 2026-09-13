@@ -3035,7 +3035,6 @@ const MOTIVATION_LINES = [
   { id: 107, text: "Nobody is coming to do this for you." },
   { id: 108, text: "The work is boring. The edge is not." },
   { id: 109, text: "Strain is the signal." },
-  { id: 110, text: "Do it tired. That is the rep that counts." },
   { id: 111, text: "You are rebuilding how you think." },
   { id: 112, text: "Most people quit here. Keep going." },
   { id: 113, text: "Sharper every week." },
@@ -3102,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 354;
+const BUILD_VERSION = 355;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9478,6 +9477,7 @@ function NBackSessionApp() {
   }, [dismissedTutorials]);
   const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false); // this run's checkbox state — reset to unchecked each time a fresh tutorial starts
   const currentRunStartRef = useRef(null);
+  const runStartBankedRef = useRef(null); // { key, total } as of the moment the current round started
   const avatarFileInputRef = useRef(null);
   // Was 200, which silently discarded a daily trainer's history after about
   // six months. The chart buckets long ranges now, so it can hold years.
@@ -10722,6 +10722,10 @@ function NBackSessionApp() {
       });
       setScreen("running");
       currentRunStartRef.current = Date.now();
+      runStartBankedRef.current = {
+        key: ex.key,
+        total: exerciseElapsedMsRef.current[ex.key] || 0,
+      };
       runGenerationRef.current += 1;
       runTrial(seq, 0, [], modalities, runGenerationRef.current, ex.key, nn);
     },
@@ -10847,6 +10851,18 @@ function NBackSessionApp() {
     runGenerationRef.current += 1; // anything still scheduled for this run is now stale
     clearTimeout(timeoutRef.current);
     currentRunStartRef.current = null; // discards this round's time
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    // …and rewinds the exercise's clock to where it stood when this round
+    // began, so a cancelled round adds nothing at all.
+    const mark = runStartBankedRef.current;
+    if (mark) {
+      setExerciseElapsedMs((prev) => {
+        const next = { ...prev, [mark.key]: mark.total };
+        exerciseElapsedMsRef.current = next;
+        return next;
+      });
+      runStartBankedRef.current = null;
+    }
     armedRef.current = false;
     setFeedback({});
     setScreen(results.length > 0 ? "results" : "setup");
@@ -16448,6 +16464,7 @@ function NBackSessionApp() {
                   {DROP_AFTER_RUNS}x in a row = Demotion
                 </div>
               )}
+              <div className="text-base text-slate-500">Esc to cancel a round</div>
             </div>
 
             <button

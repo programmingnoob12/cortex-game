@@ -351,7 +351,10 @@ button.ex-card.ex-card-shine::after {
 
 @media (min-width: 1024px) {
   .nback-box {
-    width: min(calc(100vw - 26rem), calc(100dvh - 9rem), 46rem);
+    /* The title above the grid is part of the column too, so the square has
+       to leave room for it AND for an equal gap underneath — at 9rem it ran
+       to the bottom edge of the screen. */
+    width: min(calc(100vw - 26rem), calc(100dvh - 13rem), 44rem);
   }
 }
 
