@@ -3101,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 357;
+const BUILD_VERSION = 359;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7561,12 +7561,24 @@ const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
 // the app shows everywhere a level is displayed.
 function RankedGem({ level, size, glowPulse, labelClass = "text-[0.65rem]" }) {
   const tier = gemTierFor(level);
+  // The block is exactly the gem's width and the name is centred UNDER it
+  // rather than in the flow — otherwise "Illuminated" makes a wider block
+  // than "Radiant" and the gems stop lining up from one card to the next.
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div
+      className="relative flex flex-col items-center"
+      style={{ width: size, paddingBottom: "1.05rem" }}
+    >
       <LevelGem level={level} size={size} glowPulse={glowPulse} />
       <span
-        className={`font-semibold uppercase leading-none ${labelClass}`}
-        style={{ color: tier.color, letterSpacing: "0.1em", textShadow: "none" }}
+        className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-semibold uppercase leading-none ${labelClass}`}
+        style={{
+          top: size + 6,
+          color: tier.color,
+          letterSpacing: "0.1em",
+          paddingLeft: "0.1em",
+          textShadow: "none",
+        }}
       >
         {tier.label}
       </span>
@@ -9497,6 +9509,7 @@ function NBackSessionApp() {
   const [tutorialDontShowAgain, setTutorialDontShowAgain] = useState(false); // this run's checkbox state — reset to unchecked each time a fresh tutorial starts
   const currentRunStartRef = useRef(null);
   const runStartBankedRef = useRef(null); // { key, total } as of the moment the current round started
+  const resultsExerciseRef = useRef(null); // which exercise the results on screen belong to
   const avatarFileInputRef = useRef(null);
   // Was 200, which silently discarded a daily trainer's history after about
   // six months. The chart buckets long ranges now, so it can hold years.
@@ -10542,6 +10555,7 @@ function NBackSessionApp() {
           : 0;
       stopRunTimer(exerciseKey);
       setResults(resultsSoFar);
+      resultsExerciseRef.current = exerciseKey; // whose results these are
       setRoundNumber((r) => r + 1);
       setScreen("results");
       // Through a ref: runTrial is memoised, so it would otherwise hold the
@@ -10887,7 +10901,14 @@ function NBackSessionApp() {
     }
     armedRef.current = false;
     setFeedback({});
-    setScreen(results.length > 0 ? "results" : "setup");
+    // Back to the last round's results only if that round was THIS exercise's
+    // — otherwise the first cancelled round of a new exercise landed on the
+    // previous exercise's numbers.
+    setScreen(
+      results.length > 0 && resultsExerciseRef.current === exercise.key
+        ? "results"
+        : "setup"
+    );
   };
   const cancelRunRef = useRef(cancelRun);
   cancelRunRef.current = cancelRun;
@@ -13507,15 +13528,7 @@ function NBackSessionApp() {
                           card. A second shadow on the wrapper follows the
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
-                      <span
-                        className="inline-flex shrink-0"
-                        style={{
-                          filter: `drop-shadow(0 5px 7px ${exerciseShadowColor(
-                            exColor,
-                            0.85
-                          )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
-                        }}
-                      >
+                      <span className="inline-flex shrink-0">
                         <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
                       </span>
                     </div>
@@ -16502,9 +16515,11 @@ function NBackSessionApp() {
                 </div>
               </div>
               {exercise.key !== "iqnb" && (
-                <div className="text-base text-slate-400 pt-1">
-                  {PASS_THRESHOLD}% = Promotion · Below {DROP_THRESHOLD}%{" "}
-                  {DROP_AFTER_RUNS}x in a row = Demotion
+                <div className="text-base text-slate-400 pt-1 space-y-0.5">
+                  <div>{PASS_THRESHOLD}% = Promotion</div>
+                  <div>
+                    Below {DROP_THRESHOLD}% {DROP_AFTER_RUNS}x in a row = Demotion
+                  </div>
                 </div>
               )}
               <div className="text-base text-slate-500">Esc to cancel a round</div>
@@ -16545,7 +16560,7 @@ function NBackSessionApp() {
                 width rather than the page's. */}
             {nbackColumns ? (
               <div className="flex flex-row items-stretch justify-between gap-6 xl:gap-10 w-full">
-                <div className="flex flex-col justify-center gap-4 w-32 xl:w-40 shrink-0">
+                <div className="flex flex-col justify-center gap-4 w-28 xl:w-36 shrink-0">
                   {nbackSideButtons.left}
                 </div>
               <div
@@ -16599,7 +16614,7 @@ function NBackSessionApp() {
                   );
                 })}
               </div>
-                <div className="flex flex-col justify-center gap-4 w-32 xl:w-40 shrink-0">
+                <div className="flex flex-col justify-center gap-4 w-28 xl:w-36 shrink-0">
                   {nbackSideButtons.right}
                 </div>
               </div>
@@ -16701,6 +16716,11 @@ function NBackSessionApp() {
             </h1>
             <div className="text-slate-400 text-lg" style={{ marginTop: "0.25rem" }}>
               Accuracy:{" "}
+              <span className="text-slate-200 font-medium">
+                {exercise.key === "iqnb"
+                  ? `${exercise.abbrev} ${qnbPrimeLevel.toFixed(2)}`
+                  : `${exercise.abbrev}${n}B`}
+              </span>{" "}
               <span
                 className="font-semibold"
                 style={{ color: accuracyColor(overallAccuracy) }}
@@ -16746,6 +16766,15 @@ function NBackSessionApp() {
                   {rounds.map((h, i) => (
                     <span key={h.ts}>
                       Round {i + 1}:{" "}
+                      {/* The level it was played at, so a run of numbers can
+                          be read against what was actually being trained. */}
+                      {h.n ? (
+                        <span className="text-slate-400">
+                          {exercise.key === "iqnb"
+                            ? `${exercise.abbrev} ${h.n}`
+                            : `${exercise.abbrev}${h.n}B`}{" "}
+                        </span>
+                      ) : null}
                       <span
                         className="font-semibold tabular-nums"
                         style={{ color: accuracyColor(Math.round(h.accuracy)) }}
