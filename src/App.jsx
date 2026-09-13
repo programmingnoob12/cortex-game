@@ -3102,7 +3102,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 352;
+const BUILD_VERSION = 353;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -15282,7 +15282,7 @@ function NBackSessionApp() {
                 className="text-3xl font-semibold tracking-tight shrink-0"
                 style={{ width: "6rem" }}
               >
-                Stats
+                {overviewSource === "home" ? "Stats" : "Today"}
               </h1>
               {/* Same switch as Stats, driving the same scope: Regime is
                   what is being trained, All is every exercise with any
@@ -15316,8 +15316,29 @@ function NBackSessionApp() {
             </div>
 
             {(() => {
+              // Reached from a session, Stats is a report on TODAY; reached
+              // from Home it is the whole record. Same board either way —
+              // only which numbers fill it changes.
+              const todayOnly = overviewSource === "training";
+              const today = new Date().toDateString();
+              const statForToday = (key) => {
+                const rowsToday = (exerciseHistory[key] || []).filter(
+                  (h) =>
+                    typeof h.accuracy === "number" &&
+                    new Date(h.ts).toDateString() === today
+                );
+                if (rowsToday.length === 0) return null;
+                const all = exerciseStats[key] || {};
+                return {
+                  ...all, // CCT's interval bests are not in history, so they carry over
+                  sessions: rowsToday.length,
+                  totalAccuracy: rowsToday.reduce((t, h) => t + h.accuracy, 0),
+                  bestAccuracy: Math.max(...rowsToday.map((h) => h.accuracy)),
+                  bestN: Math.max(...rowsToday.map((h) => h.n || 0)),
+                };
+              };
               const rows = overviewSummaryExercises.map((e) => {
-                const stat = exerciseStats[e.key];
+                const stat = todayOnly ? statForToday(e.key) : exerciseStats[e.key];
                 const isAccuracy = e.scoreType === "accuracy";
                 // Dual and Quad are scored on accuracy internally, but what
                 // the card shows is a level and a percentage together — a
@@ -15345,15 +15366,17 @@ function NBackSessionApp() {
                   stat,
                   isAccuracy,
                   avgVal,
-                  bestLabel: scoreWord || !isAccuracy ? "Best score" : "Best accuracy",
+                  bestLabel: `${scoreWord || !isAccuracy ? "Best score" : "Best accuracy"}${
+                    todayOnly ? " today" : ""
+                  }`,
                   // CCT has no meaningful average: the run of right answers
                   // is the second number worth reading.
                   avgLabel:
                     e.key === "cct"
                       ? "Best streak"
-                      : scoreWord || !isAccuracy
-                      ? "Avg score"
-                      : "Avg accuracy",
+                      : `${scoreWord || !isAccuracy ? "Avg score" : "Avg accuracy"}${
+                          todayOnly ? " today" : ""
+                        }`,
                   bestValue,
                   avgValue:
                     e.key === "cct"
@@ -15373,7 +15396,7 @@ function NBackSessionApp() {
               // under the scope switch.
               const summary = [
                 {
-                  label: overviewSource === "home" ? "Total duration" : "Duration",
+                  label: overviewSource === "home" ? "Total duration" : "Duration today",
                   value:
                     overviewSource === "home"
                       ? formatLongDuration(msTrainedTotal(exerciseHistory))
@@ -15391,8 +15414,19 @@ function NBackSessionApp() {
                   };
                 })(),
                 {
-                  label: "Sessions",
-                  value: String(achievementState.totalSessions),
+                  label: overviewSource === "home" ? "Sessions" : "Rounds today",
+                  value:
+                    overviewSource === "home"
+                      ? String(achievementState.totalSessions)
+                      : String(
+                          Object.values(exerciseHistory)
+                            .flat()
+                            .filter(
+                              (h) =>
+                                typeof h.accuracy === "number" &&
+                                new Date(h.ts).toDateString() === new Date().toDateString()
+                            ).length
+                        ),
                 },
               ];
 
