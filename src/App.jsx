@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 367;
+const BUILD_VERSION = 368;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11566,13 +11566,32 @@ function NBackSessionApp() {
   const snapshotRestoredRef = useRef(false);
   useEffect(() => {
     if (!hasHydrated || snapshotRestoredRef.current) return;
+    if (CAME_FROM_CHECKOUT) return; // that flow lands on the regime picker
     snapshotRestoredRef.current = true;
     const snap = loadSessionSnapshot();
     if (!snap || !snap.regimeKey) return;
-    if (snap.regimeKey !== regimeKey) {
+    if (snap.day && snap.day !== new Date().toDateString()) {
+      // Yesterday's session is not this one.
+      saveSessionSnapshot(null);
+      return;
+    }
+    if (regimeKey && snap.regimeKey !== regimeKey) {
       // They changed regime since; the old position means nothing.
       saveSessionSnapshot(null);
       return;
+    }
+    if (!regimeKey) {
+      // Fresh page load: nothing has picked a regime yet, so put the one
+      // they were training back before anything else reads it.
+      const regime = findRegime(snap.regimeKey);
+      if (!regime || !regime.steps.length) {
+        saveSessionSnapshot(null);
+        return;
+      }
+      setRegimeKey(snap.regimeKey);
+      setActiveExercises(buildRegimeExercises(regime));
+      setScreen("setup");
+      setMainView("app");
     }
     sessionStartedRef.current = { ...(snap.started || {}) };
     sessionTimerStartRef.current = { ...(snap.timerStart || {}) };
@@ -18174,6 +18193,26 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
+  // Esc walks out of a run in progress: nothing scored, nothing logged, back
+  // to this exercise's own start screen.
+  useEffect(() => {
+    if (stage !== "running" && stage !== "countdown") return undefined;
+    const onKeyDown = (e) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      clearTimeout(timerRef.current);
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      setStartedAt(null);
+      setSpoken([]);
+      setEntry("");
+      setFlash(null);
+      setMarks([]);
+      setStage("setup");
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [stage]);
+
   // Ends the run and reports it. `simulated` fills in a plausible result so
   // the test button has something to put on the Overview.
   const finish = (simulated) => {
@@ -18284,11 +18323,11 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           style={{ borderColor: `${accent}55`, background: `${accent}14` }}
         >
           <div className="text-lg text-slate-300">
-            Interval:{" "}
+            Start Interval:{" "}
             <span className="text-slate-100 font-medium">{CCT_START_MS} ms</span>
           </div>
           <div className="text-lg text-slate-400">
-            Minimum:{" "}
+            Min. Interval:{" "}
             <span className="text-slate-200 font-medium">{floorMs} ms</span>
           </div>
           <p className="text-slate-400 text-base">
@@ -18299,6 +18338,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             {Math.max(CCT_FLOOR_LIMIT, floorMs - CCT_STEP_MS)}ms min. interval
           </p>
         </div>
+        <div className="text-base text-slate-500">Esc to cancel a round</div>
 
         <button
           onClick={begin}
@@ -18352,8 +18392,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
       )}
       {/* Interval and time left are the two numbers worth watching, so they
           are set at a size that can be read without looking for them. */}
-      <div className="flex items-end justify-between gap-4">
-        <div>
+      <div className="grid grid-cols-3 items-end gap-4">
+        <div className="text-left">
           <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
             Interval
           </div>
@@ -18367,7 +18407,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
             Accuracy
           </div>
-          <div className="text-xl font-semibold tabular-nums text-slate-300 leading-tight">
+          <div className="text-3xl font-semibold tabular-nums text-slate-300 leading-tight">
             {score(tally.correct, tally.wrong)}%
           </div>
         </div>
