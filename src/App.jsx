@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 350;
+const BUILD_VERSION = 351;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -4233,6 +4233,11 @@ const RRT_HINT_KEYS = [
 // Clearing them whenever the build changes keeps them visible through a round
 // of changes without needing a new storage key each time.
 const RRT_HINT_BUILD_KEY = "cortex.rrtHintBuild";
+// RRT's round-by-round log, kept under the account so History covers every
+// session rather than only the one on screen. A round carries its whole
+// puzzle, so the cap is what keeps the stored blob a sensible size.
+const RRT_HISTORY_KEY = "rrt-round-history";
+const RRT_HISTORY_MAX = 60;
 (() => {
   try {
     if (localStorage.getItem(RRT_HINT_BUILD_KEY) === String(BUILD_VERSION)) return;
@@ -9136,6 +9141,7 @@ function NBackSessionApp() {
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
+  const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
   // { [exerciseKey]: true } once that exercise's session budget has run out.
@@ -11533,6 +11539,7 @@ function NBackSessionApp() {
         window.storage.delete?.(`history-${k}`, false)?.catch?.(() => {});
         window.storage.delete?.(`level-${k}`, false)?.catch?.(() => {});
       });
+      window.storage.delete?.(RRT_HISTORY_KEY, false)?.catch?.(() => {});
       window.storage.delete?.("history-_streakTest", false)?.catch?.(() => {});
       safeStorageSet("regime-completion-dates", JSON.stringify([]), false);
       safeStorageSet("streak-broken-at", JSON.stringify(null), false);
@@ -11682,8 +11689,15 @@ function NBackSessionApp() {
     setScreen("setup");
   };
 
+  // One line, held for a beat, between pressing Start Training and the first
+  // exercise — the session starts on a thought rather than a setup screen.
+  const SESSION_START_MS = 2600;
   const proceedStartFromHome = () => {
     unlockLetterAudio();
+    setSessionStartLine(
+      MOTIVATION_LINES[Math.floor(Math.random() * MOTIVATION_LINES.length)]?.text || null
+    );
+    setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
     // If we're currently parked on the overview "exercise" (e.g. from a
     // previous visit), land on the first exercise in the regime instead of it
     // — restoring whatever level they'd actually reached there, not always
@@ -12371,6 +12385,19 @@ function NBackSessionApp() {
         /* Session complete. Built as one sequence rather than three
            overlapping effects: a wash of light, the ring drawing itself
            closed, the mark landing inside it, then the words. */
+        /* The line that opens a session: up, held, then away. */
+        @keyframes sessionStartText {
+          0% { opacity: 0; transform: translateY(14px); filter: blur(7px); }
+          22% { opacity: 1; transform: translateY(0); filter: blur(0); }
+          74% { opacity: 1; transform: translateY(0); filter: blur(0); }
+          100% { opacity: 0; transform: translateY(-10px); filter: blur(4px); }
+        }
+        @keyframes sessionStartWash {
+          0% { opacity: 0; }
+          25% { opacity: 1; }
+          78% { opacity: 1; }
+          100% { opacity: 0; }
+        }
         @keyframes sessionDoneWash {
           0% { opacity: 0; transform: scale(0.6); }
           16% { opacity: 1; }
@@ -17216,6 +17243,29 @@ function NBackSessionApp() {
           the Motivation screen so finishing a regime lands as a moment
           rather than a silent navigation. Pointer events off so it can never
           trap a click if the timer is somehow missed. */}
+      {/* Between Start Training and the first exercise: one line, held, then
+          gone. Pointer events off so it can never swallow a tap if the timer
+          is missed. */}
+      {sessionStartLine && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm pointer-events-none px-8">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
+              animation: "sessionStartWash 2.6s ease-out forwards",
+            }}
+          />
+          <div
+            className="relative text-center text-2xl sm:text-3xl font-semibold tracking-tight max-w-xl"
+            style={{ animation: "sessionStartText 2.6s ease-out forwards", textWrap: "balance" }}
+          >
+            {sessionStartLine}
+          </div>
+        </div>
+      )}
+
       {sessionCompleteAnim && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-sm pointer-events-none overflow-hidden">
           {/* A wash of light behind everything, so the screen brightens
@@ -18284,12 +18334,41 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A first pass at a round-by-round history log — every completed round
-  // (answered or missed), most recent first, capped so it doesn't grow
-  // unbounded across a long session. Local to this component only (not
-  // persisted to window.storage or exerciseHistory yet) — good enough for
-  // reviewing the current session, can be wired up further later.
+  // Every completed round (answered or missed), most recent first, and kept
+  // across sessions: it is stored under the account, loaded on mount and
+  // written after each round, so History is the whole record of RRT rather
+  // than only what happened since this screen opened.
   const [roundHistory, setRoundHistory] = useState([]);
+  const roundHistoryRef = useRef([]);
+  useEffect(() => {
+    roundHistoryRef.current = roundHistory;
+  }, [roundHistory]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!window.storage) return;
+      try {
+        const res = await window.storage.get(RRT_HISTORY_KEY, false);
+        if (cancelled || !res || !res.value) return;
+        const parsed = JSON.parse(res.value);
+        if (!Array.isArray(parsed)) return;
+        // Merge rather than replace: a round answered before this finished
+        // loading would otherwise be thrown away.
+        setRoundHistory((live) => {
+          const seen = new Set(live.map((r) => r.id));
+          return [...live, ...parsed.filter((r) => !seen.has(r.id))].slice(
+            0,
+            RRT_HISTORY_MAX
+          );
+        });
+      } catch {
+        // nothing stored yet
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [historyOpen, setHistoryOpen] = useState(false);
   // Set when the session's time is up. RRT used to call onFinish here and
   // move straight on, which took the round history away at the exact moment
@@ -18329,9 +18408,16 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
           ts: Date.now(),
         },
         ...prev,
-      ].slice(0, 50)
+      ].slice(0, RRT_HISTORY_MAX)
     );
   };
+
+  // Written after the state settles rather than inside the setter, so one
+  // round is one write and nothing is saved twice.
+  useEffect(() => {
+    if (!window.storage || roundHistory.length === 0) return;
+    safeStorageSet(RRT_HISTORY_KEY, JSON.stringify(roundHistory), false);
+  }, [roundHistory]);
 
 
   // Let the parent know whether we're still on the setup screen or actually
