@@ -3039,7 +3039,6 @@ const MOTIVATION_LINES = [
   },
   { id: 103, text: "Reps nobody sees. Results everybody does." },
   { id: 105, text: "You are not here to be entertained." },
-  { id: 107, text: "Nobody is coming to do this for you." },
   { id: 108, text: "The work is boring. The edge is not." },
   { id: 109, text: "Strain is the signal." },
   { id: 111, text: "You are rebuilding how you think." },
@@ -3105,7 +3104,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 370;
+const BUILD_VERSION = 371;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11558,6 +11557,19 @@ function NBackSessionApp() {
     setMainView("regime");
   }, [hasHydrated]);
 
+  // A reload with a session in flight used to paint the regime picker for a
+  // beat before the restore below moved them back into the exercise. This
+  // holds that screen back until the restore has had its say, so they land
+  // straight where they were.
+  const [restorePending, setRestorePending] = useState(
+    () => !CAME_FROM_CHECKOUT && !!loadSessionSnapshot()?.regimeKey
+  );
+  useEffect(() => {
+    if (!restorePending) return;
+    const t = setTimeout(() => setRestorePending(false), 4000);
+    return () => clearTimeout(t);
+  }, [restorePending]);
+
   const snapshotRestoredRef = useRef(false);
   useEffect(() => {
     if (!hasHydrated || snapshotRestoredRef.current) return;
@@ -11572,6 +11584,7 @@ function NBackSessionApp() {
       return;
     }
     snapshotRestoredRef.current = true;
+    setRestorePending(false);
     if (!snap || !snap.regimeKey) return;
     if (snap.day && snap.day !== new Date().toDateString()) {
       // Yesterday's session is not this one.
@@ -12776,7 +12789,7 @@ function NBackSessionApp() {
               }
         }
       >
-        {mainView === "regime" && (
+        {mainView === "regime" && !restorePending && (
           <div className="space-y-14">
             <div>
               {/* Same top-left Back as Account, Stats and the rest, instead
@@ -20745,7 +20758,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       // (fairly small) visible pixels, without changing how raycasting
       // itself works — same proven mechanism, just a bigger target.
       const hitMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.35, 12, 8),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.15, 12, 8),
         new THREE.MeshBasicMaterial({ visible: false })
       );
       const halo = new THREE.Mesh(
@@ -20761,7 +20774,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       );
       halo.visible = false;
       const letterSprite = motLetterSprite(letters[i]);
-      letterSprite.scale.setScalar(MOT_BALL_RADIUS * 2.1);
+      letterSprite.scale.setScalar(MOT_BALL_RADIUS * 1.45);
       mesh.add(halo);
       mesh.add(letterSprite);
       mesh.add(hitMesh);
@@ -20816,6 +20829,20 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         }
       });
       if (!best) return;
+      // The hit sphere is still a little larger than the ball itself, so a
+      // click in the gap just outside the edge could land. Measure how far
+      // the click actually is from the ball's centre against that ball's
+      // own on-screen radius, and ignore anything outside it.
+      best.mesh.getWorldPosition(world);
+      const edge = world.clone().add(
+        new THREE.Vector3()
+          .setFromMatrixColumn(ctx.camera.matrixWorld, 1)
+          .multiplyScalar(MOT_BALL_RADIUS)
+      );
+      const centreNdc = world.clone().project(ctx.camera);
+      const edgeNdc = edge.project(ctx.camera);
+      const radiusNdc = Math.hypot(edgeNdc.x - centreNdc.x, edgeNdc.y - centreNdc.y);
+      if (radiusNdc > 0 && bestDist > radiusNdc) return;
       toggleBallSelection(best);
     };
     // Attached directly to the canvas itself rather than relying on
