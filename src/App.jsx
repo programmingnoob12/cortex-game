@@ -3048,14 +3048,12 @@ const MOTIVATION_LINES = [
   { id: 114, text: "Discomfort now, clarity later." },
   { id: 115, text: "Your focus is a weapon. Sharpen it." },
   { id: 116, text: "One more round." },
-  { id: 117, text: "This is the part that changes you." },
   { id: 118, text: "Slow is fine. Stopping is not." },
   { id: 120, text: "Everything gets easier except this." },
   { id: 121, text: "You chose the hard version. Good." },
   { id: 122, text: "Hold the thread." },
   { id: 123, text: "Push past where it gets uncomfortable." },
   { id: 124, text: "Quiet mind. Full effort." },
-  { id: 125, text: "Nothing about this is wasted." },
   { id: 126, text: "Show up again tomorrow." },
   { id: 127, text: "Your ceiling moves every session." },
   { id: 128, text: "Concentration is trainable. Prove it." },
@@ -3107,7 +3105,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 369;
+const BUILD_VERSION = 370;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -11564,8 +11562,16 @@ function NBackSessionApp() {
   useEffect(() => {
     if (!hasHydrated || snapshotRestoredRef.current) return;
     if (CAME_FROM_CHECKOUT) return; // that flow lands on the regime picker
-    snapshotRestoredRef.current = true;
     const snap = loadSessionSnapshot();
+    // A built regime lives in customRegimes, which hydrates separately — so
+    // wait for it rather than deciding the regime no longer exists.
+    if (
+      snap?.regimeKey?.startsWith?.("custom:") &&
+      !customRegimes.some((r) => `custom:${r.id}` === snap.regimeKey)
+    ) {
+      return;
+    }
+    snapshotRestoredRef.current = true;
     if (!snap || !snap.regimeKey) return;
     if (snap.day && snap.day !== new Date().toDateString()) {
       // Yesterday's session is not this one.
@@ -11597,7 +11603,7 @@ function NBackSessionApp() {
       setExerciseIndex(snap.exerciseIndex);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasHydrated, regimeKey]);
+  }, [hasHydrated, regimeKey, customRegimes]);
 
   // Drops straight back into whichever exercise they left, at the screen
   // and elapsed time they left it on — nothing about the session is reset.
@@ -16581,7 +16587,7 @@ function NBackSessionApp() {
                 </div>
               )}
             </div>
-            <div className="text-base text-slate-500">Esc to cancel a round</div>
+            <div className="text-base text-slate-500">Esc to cancel the round</div>
 
             <button
               onClick={() => {
@@ -18335,7 +18341,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             {Math.max(CCT_FLOOR_LIMIT, floorMs - CCT_STEP_MS)}ms min. interval
           </p>
         </div>
-        <div className="text-base text-slate-500">Esc to cancel a round</div>
+        <div className="text-base text-slate-500">Esc to cancel the round</div>
 
         <button
           onClick={begin}
@@ -20279,6 +20285,43 @@ function computeMotionCameraDistance(width, height, fovDeg, cubeHalfX) {
 // positioning its letter label — the label is a real DOM element (crisp
 // at any zoom, unaffected by the ball's own rotation) rather than baked
 // into the 3D texture.
+// One small canvas texture per letter, drawn once and reused. White with a
+// dark outline, same as the DOM labels had.
+const motLetterTextures = new Map();
+function motLetterSprite(letter) {
+  let texture = motLetterTextures.get(letter);
+  if (!texture) {
+    const size = 128;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const c = canvas.getContext("2d");
+    c.clearRect(0, 0, size, size);
+    c.font = "bold 88px -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif";
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.lineWidth = 8;
+    c.strokeStyle = "rgba(8,9,10,0.85)";
+    c.strokeText(letter, size / 2, size / 2 + 4);
+    c.fillStyle = "#ffffff";
+    c.fillText(letter, size / 2, size / 2 + 4);
+    texture = new THREE.CanvasTexture(canvas);
+    texture.anisotropy = 4;
+    motLetterTextures.set(letter, texture);
+  }
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false, // always legible, even behind another ball
+      depthWrite: false,
+    })
+  );
+  sprite.renderOrder = 10;
+  sprite.visible = false;
+  return sprite;
+}
+
 function motProjectToScreen(position, camera, width, height) {
   const v = position.clone().project(camera);
   return {
@@ -20717,7 +20760,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         })
       );
       halo.visible = false;
+      const letterSprite = motLetterSprite(letters[i]);
+      letterSprite.scale.setScalar(MOT_BALL_RADIUS * 2.1);
       mesh.add(halo);
+      mesh.add(letterSprite);
       mesh.add(hitMesh);
       scene.add(mesh);
       balls.push({
@@ -20727,6 +20773,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         halo,
         lines,
         hitMesh,
+        letterSprite,
         vel: motRandomUnitVector(),
         selected: false,
         isTarget: false,
@@ -20867,6 +20914,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     let lastY = 0;
     const onPointerDown = (e) => {
       if (e.button != null && e.button !== 0) return;
+      if (stageRef.current !== "select") return;
       dragging = true;
       dragMoved = false;
       lastX = e.clientX;
@@ -20985,24 +21033,11 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         }
       }
 
-      ctx.balls.forEach((b, i) => {
-        const label = labelRefs.current[i];
-        if (!label) return;
-        // Only shown once it's actually time to guess — otherwise the
-        // letters double as a free "which ball is which" cheat sheet while
-        // still trying to track them.
-        if (stageRef.current !== "select") {
-          label.style.display = "none";
-          return;
-        }
-        const { x, y, behindCamera } = motProjectToScreen(
-          b.mesh.position,
-          ctx.camera,
-          ctx.renderer.domElement.clientWidth,
-          ctx.renderer.domElement.clientHeight
-        );
-        label.style.display = behindCamera ? "none" : "block";
-        label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+      // Only once it is time to guess — otherwise the letters double as a
+      // free "which ball is which" cheat sheet while still tracking.
+      const showLetters = stageRef.current === "select";
+      ctx.balls.forEach((b) => {
+        if (b.letterSprite) b.letterSprite.visible = showLetters;
       });
 
       ctx.renderer.render(ctx.scene, ctx.camera);
@@ -21345,32 +21380,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         }}
       >
         <div ref={canvasMountRef} className="absolute inset-0" />
-
-        {ballLetters.map((letter, i) => (
-          <div
-            key={i}
-            ref={(el) => (labelRefs.current[i] = el)}
-            className="absolute top-0 left-0 pointer-events-none font-bold text-white select-none"
-            style={{
-              willChange: "transform",
-              fontSize: `${Math.round(canvasSize.h * 0.032)}px`,
-              lineHeight: 1,
-              // Lowercase now (was uppercase — read as too imposing/heavy
-              // at this size). Ascenders/descenders in letters like d, f,
-              // h, k, l (taller) and g (dips below the baseline) mean these
-              // won't all read as perfectly uniform height the way capitals
-              // did, but that's an accepted tradeoff for the softer look.
-              // The actual key the person presses is unaffected either way
-              // — that's matched against the lowercase letter in
-              // MOT_KEY_LETTERS regardless of how it's displayed.
-              WebkitTextStroke: "1.5px rgba(8,9,10,0.85)",
-              textShadow: "0 1px 3px rgba(0,0,0,0.6)",
-              display: "none",
-            }}
-          >
-            {letter}
-          </div>
-        ))}
 
         <div
           className="absolute top-1/2 left-1/2 w-2 h-2 -mt-1 -ml-1 rounded-full bg-slate-200/80 pointer-events-none"
