@@ -3222,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 377;
+const BUILD_VERSION = 378;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -18352,7 +18352,8 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         // Whatever is in the box when the gap ends is the answer they gave.
         judge(typed);
       } else {
-        // The gap ran out with nothing entered: that counts as a miss.
+        // Nothing entered by the time the gap ran out. Scored exactly the
+        // same as a wrong answer — there is no separate "missed" verdict.
         answeredRef.current = true;
         setFlash("wrong");
         setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
