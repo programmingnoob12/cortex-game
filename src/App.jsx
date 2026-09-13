@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 345;
+const BUILD_VERSION = 346;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13420,27 +13420,42 @@ function NBackSessionApp() {
                               ? null
                               : gemTierFor(bestLevel + 1).label;
                           return (
-                            <div className={compactHome ? "mt-2" : "mt-3"}>
+                            <div className={compactHome ? "mt-2.5" : "mt-3.5"}>
+                              {/* On a filled tile the labels stay white —
+                                  the rank's own colour against the exercise's
+                                  colour (pink on orange) was unreadable. The
+                                  bar is the only thing carrying rank colour,
+                                  on a light track so an empty bar still reads
+                                  as a bar. */}
                               <div
-                                className="h-0.5 rounded-full overflow-hidden"
-                                style={{ background: "rgba(0,0,0,0.35)" }}
+                                className="rounded-full overflow-hidden"
+                                style={{ height: 3, background: "rgba(255,255,255,0.22)" }}
                               >
                                 <div
                                   className="h-full rounded-full"
-                                  style={{ width: `${pct}%`, background: tier.color }}
+                                  style={{
+                                    width: `${Math.max(pct, 1.5)}%`,
+                                    background: tier.color,
+                                    boxShadow: `0 0 6px ${tier.color}`,
+                                  }}
                                 />
                               </div>
                               <div
-                                className="flex items-center justify-between gap-3 mt-1.5 font-semibold uppercase"
+                                className="flex items-baseline justify-between gap-2 mt-2 font-semibold uppercase whitespace-nowrap"
                                 style={{
-                                  fontSize: compactHome ? "0.6rem" : "0.65rem",
-                                  letterSpacing: "0.1em",
+                                  fontSize: compactHome ? "0.58rem" : "0.62rem",
+                                  letterSpacing: "0.09em",
                                   textShadow: "none",
                                 }}
                               >
-                                <span style={{ color: tier.color }}>{tier.label}</span>
-                                <span style={{ color: "rgba(255,255,255,0.6)" }}>
-                                  {nextLabel ? `${pct}% to ${nextLabel}` : "Max rank"}
+                                <span style={{ color: "rgba(255,255,255,0.92)" }}>
+                                  {tier.label}
+                                </span>
+                                <span
+                                  className="truncate"
+                                  style={{ color: "rgba(255,255,255,0.6)" }}
+                                >
+                                  {nextLabel ? `${pct}% \u2192 ${nextLabel}` : "Max rank"}
                                 </span>
                               </div>
                             </div>
