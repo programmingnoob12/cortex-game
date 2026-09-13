@@ -3222,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 378;
+const BUILD_VERSION = 379;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -18660,13 +18660,51 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         {/* The answer lands in a box of its own, so there is somewhere for it
             to appear whether it was typed or tapped. */}
         <div
-          className="mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
+          className="relative mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
           style={{
             height: "5.5rem",
             borderColor: `${accent}66`,
             background: "#0F1115",
           }}
         >
+          {/* The browser's own caret blinks, which is the last thing you want
+              pulsing at you while you are counting. It is hidden (caret-color
+              below) and this still bar stands in for it, showing where the
+              digits will land. It goes the moment anything is typed. */}
+          {!entry && (
+            <span
+              aria-hidden="true"
+              className="absolute rounded-full"
+              style={{ width: "2px", height: "3rem", background: "#6A6F78" }}
+            />
+          )}
+          {/* Three squares: how close this run is to the next speed-up, and
+              what the last few answers were. Tucked into the corner of the
+              box rather than sitting under the digits, where they pulled the
+              eye down every time a verdict landed. */}
+          <div className="absolute -top-3 right-2 flex items-center gap-1.5">
+            {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
+              const mark = marks[i];
+              return (
+                <span
+                  key={i}
+                  className="rounded border transition-colors"
+                  style={{
+                    width: "0.85rem",
+                    height: "0.85rem",
+                    borderColor:
+                      mark === undefined ? "#3A3E46" : mark ? "#4CB782" : "#EB5757",
+                    background:
+                      mark === undefined
+                        ? "#0F1115"
+                        : mark
+                        ? "#4CB78233"
+                        : "#EB575733",
+                  }}
+                />
+              );
+            })}
+          </div>
           <input
             ref={inputRef}
             value={entry}
@@ -18674,42 +18712,13 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             inputMode="numeric"
             autoComplete="off"
             aria-label="Your answer"
-            className="w-full h-full bg-transparent border-0 outline-none text-center text-6xl font-semibold tabular-nums"
+            className="relative w-full h-full bg-transparent border-0 outline-none text-center text-6xl font-semibold tabular-nums"
             style={{
               color: "#F7F8F8",
+              caretColor: "transparent",
               animation: depositing ? "cctDeposit 0.26s ease-in forwards" : undefined,
             }}
           />
-        </div>
-
-        {/* Three squares: how close this run is to the next speed-up, and
-            what the last few answers were. */}
-        <div className="flex items-center justify-center gap-2.5">
-          {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
-            const mark = marks[i];
-            return (
-              <span
-                key={i}
-                className="rounded-md border transition-colors"
-                style={{
-                  width: "1.6rem",
-                  height: "1.6rem",
-                  borderColor:
-                    mark === undefined
-                      ? "#3A3E46"
-                      : mark
-                      ? "#4CB782"
-                      : "#EB5757",
-                  background:
-                    mark === undefined
-                      ? "transparent"
-                      : mark
-                      ? "#4CB78233"
-                      : "#EB575733",
-                }}
-              />
-            );
-          })}
         </div>
 
       </div>
