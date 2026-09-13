@@ -3037,7 +3037,6 @@ const MOTIVATION_LINES = [
     id: 50,
     text: "The most important thing is to keep your streak going. Don't worry about scores for now. They'll come later.",
   },
-  { id: 103, text: "Reps nobody sees. Results everybody does." },
   { id: 105, text: "You are not here to be entertained." },
   { id: 108, text: "The work is boring. The edge is not." },
   { id: 109, text: "Strain is the signal." },
@@ -3052,7 +3051,6 @@ const MOTIVATION_LINES = [
   { id: 121, text: "You chose the hard version. Good." },
   { id: 122, text: "Hold the thread." },
   { id: 123, text: "Push past where it gets uncomfortable." },
-  { id: 124, text: "Quiet mind. Full effort." },
   { id: 126, text: "Show up again tomorrow." },
   { id: 127, text: "Your ceiling moves every session." },
   { id: 128, text: "Concentration is trainable. Prove it." },
@@ -3104,7 +3102,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 371;
+const BUILD_VERSION = 372;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8939,10 +8937,26 @@ function BadgeGrid({ state, onSeeAll, onSelectBadge, hideHeader }) {
   );
 }
 
+// A reload mid-session should land on the exercise, not flash the regime
+// picker (or a blank screen) on the way. For a built-in regime the whole
+// answer is available on the very first render, so it is read here and the
+// state below starts already restored. A built regime lives in storage that
+// hydrates a moment later, so that one still waits — see restorePending.
+function bootSessionFromSnapshot() {
+  if (CAME_FROM_CHECKOUT) return null;
+  const snap = loadSessionSnapshot();
+  const key = snap?.regimeKey;
+  if (!key || typeof key !== "string" || key.startsWith("custom:")) return null;
+  const regime = REGIMES.find((r) => r.key === key);
+  if (!regime || !regime.steps.length) return null;
+  return { key, regime, snap };
+}
+
 function NBackSessionApp() {
-  const [mainView, setMainView] = useState("regime"); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
+  const [bootSession] = useState(bootSessionFromSnapshot);
+  const [mainView, setMainView] = useState(() => (bootSession ? "app" : "regime")); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
   const [leaderboardTab, setLeaderboardTab] = useState("dual"); // "dual" | "quad" | "rrt"
-  const [regimeKey, setRegimeKey] = useState(null); // "low" | "medium" | "high" | "cct" | "custom"
+  const [regimeKey, setRegimeKey] = useState(bootSession ? bootSession.key : null); // "low" | "medium" | "high" | "cct" | "custom"
   // A regime the person built themselves: [{ key, minutes }] in the order
   // they picked the exercises. Persisted like any other setting, and read
   // through findRegime below wherever a regime is looked up by key.
@@ -8969,14 +8983,18 @@ function NBackSessionApp() {
     }
   });
   const [activeExercises, setActiveExercises] = useState(() =>
-    buildRegimeExercises(REGIMES[0])
+    buildRegimeExercises(bootSession ? bootSession.regime : REGIMES[0])
   );
   const activeExercisesRef = useRef(activeExercises);
   useEffect(() => {
     activeExercisesRef.current = activeExercises;
   }, [activeExercises]);
 
-  const [exerciseIndex, setExerciseIndex] = useState(0);
+  const [exerciseIndex, setExerciseIndex] = useState(() =>
+    typeof bootSession?.snap?.exerciseIndex === "number"
+      ? bootSession.snap.exerciseIndex
+      : 0
+  );
   const exercise = activeExercises[exerciseIndex] || activeExercises[0];
   const exerciseIndexRef = useRef(0);
   useEffect(() => {
@@ -11562,11 +11580,13 @@ function NBackSessionApp() {
   // holds that screen back until the restore has had its say, so they land
   // straight where they were.
   const [restorePending, setRestorePending] = useState(
-    () => !CAME_FROM_CHECKOUT && !!loadSessionSnapshot()?.regimeKey
+    () =>
+      !CAME_FROM_CHECKOUT &&
+      !!loadSessionSnapshot()?.regimeKey?.startsWith?.("custom:")
   );
   useEffect(() => {
     if (!restorePending) return;
-    const t = setTimeout(() => setRestorePending(false), 4000);
+    const t = setTimeout(() => setRestorePending(false), 2500);
     return () => clearTimeout(t);
   }, [restorePending]);
 
@@ -20758,7 +20778,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       // (fairly small) visible pixels, without changing how raycasting
       // itself works — same proven mechanism, just a bigger target.
       const hitMesh = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.15, 12, 8),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.02, 12, 8),
         new THREE.MeshBasicMaterial({ visible: false })
       );
       const halo = new THREE.Mesh(
@@ -20774,7 +20794,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       );
       halo.visible = false;
       const letterSprite = motLetterSprite(letters[i]);
-      letterSprite.scale.setScalar(MOT_BALL_RADIUS * 1.45);
+      letterSprite.scale.setScalar(MOT_BALL_RADIUS * 0.72);
       mesh.add(halo);
       mesh.add(letterSprite);
       mesh.add(hitMesh);
@@ -20842,7 +20862,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       const centreNdc = world.clone().project(ctx.camera);
       const edgeNdc = edge.project(ctx.camera);
       const radiusNdc = Math.hypot(edgeNdc.x - centreNdc.x, edgeNdc.y - centreNdc.y);
-      if (radiusNdc > 0 && bestDist > radiusNdc) return;
+      if (radiusNdc > 0 && bestDist > radiusNdc * 0.94) return;
       toggleBallSelection(best);
     };
     // Attached directly to the canvas itself rather than relying on
