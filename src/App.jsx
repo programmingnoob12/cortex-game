@@ -3101,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 356;
+const BUILD_VERSION = 357;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -10544,6 +10544,9 @@ function NBackSessionApp() {
       setResults(resultsSoFar);
       setRoundNumber((r) => r + 1);
       setScreen("results");
+      // Through a ref: runTrial is memoised, so it would otherwise hold the
+      // first render's copy of this and never see the updated counts.
+      midSessionLineRef.current?.(exerciseKey);
 
       const overallAcc = overallSignalAccuracy(resultsSoFar, modalities);
 
@@ -10930,13 +10933,14 @@ function NBackSessionApp() {
     setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
     return true;
   };
+  const midSessionLineRef = useRef(null);
+  midSessionLineRef.current = maybeMidSessionLine;
 
   const continueFromResults = () => {
     if (sessionTimeUp[exercise.key]) {
       forceSwitchToNext(exerciseIndex);
       return;
     }
-    maybeMidSessionLine(exercise.key);
     startTask(exercise, n);
   };
 
