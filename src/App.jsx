@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 341;
+const BUILD_VERSION = 342;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -10975,6 +10975,26 @@ function NBackSessionApp() {
       return true; // without storage there is no way to stop showing it, so never start
     }
   });
+  // The arrow has to land on the middle of the Account button, whose width
+  // depends on whether the avatar is shown — so it is measured rather than
+  // guessed at with an offset.
+  const accountBtnRef = useRef(null);
+  const [accountBtnAnchor, setAccountBtnAnchor] = useState(null);
+  useLayoutEffect(() => {
+    const measure = () => {
+      const el = accountBtnRef.current;
+      if (!el) {
+        setAccountBtnAnchor(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setAccountBtnAnchor({ x: r.left + r.width / 2, y: r.top });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  });
+
   const retireBinauralHint = () => {
     setBinauralHintSeen(true);
     try {
@@ -17411,11 +17431,14 @@ function NBackSessionApp() {
 
       {/* Says what is behind Account, once. Goes for good the first time they
           open it. Desktop only — on a phone Account is a chip in the page. */}
-      {mainView === "home" && !binauralHintSeen && (
-        <div className="hidden sm:block fixed bottom-[5.5rem] right-6 z-30 w-60">
+      {mainView === "home" && !binauralHintSeen && accountBtnAnchor && (
+        <>
           <div
-            className="rounded-lg px-4 py-3 border text-sm"
+            className="hidden sm:block fixed z-30 w-60 rounded-lg px-4 py-3 border text-sm"
             style={{
+              // Sits clear of the button, with the arrow spanning the gap.
+              bottom: `calc(100vh - ${accountBtnAnchor.y}px + 3.75rem)`,
+              right: "1.5rem",
               borderColor: "#3A3E46",
               background: "#0F1115",
               color: "#F7F8F8",
@@ -17423,22 +17446,25 @@ function NBackSessionApp() {
           >
             Turn binaural beats off / on
           </div>
+          {/* Straight down onto the top edge of the button, at its middle. */}
           <svg
-            width="30"
-            height="30"
-            viewBox="0 0 30 30"
+            width="16"
+            height="52"
+            viewBox="0 0 16 52"
             fill="none"
-            className="absolute right-8 top-full pointer-events-none"
+            className="hidden sm:block fixed z-30 pointer-events-none"
+            style={{ left: accountBtnAnchor.x - 8, top: accountBtnAnchor.y - 56 }}
             aria-hidden="true"
           >
-            <path d="M8 2C8 2 24 6 22 24" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
-            <path d="M15 18 22 26 28 17" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M8 2 L8 42" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+            <path d="M2 35 L8 44 L14 35" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
-        </div>
+        </>
       )}
 
       {mainView === "home" && (
         <button
+          ref={accountBtnRef}
           onClick={() => {
             retireBinauralHint();
             setMainView("account");
