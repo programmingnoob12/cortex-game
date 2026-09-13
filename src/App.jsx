@@ -1494,7 +1494,16 @@ class AppErrorBoundary extends Component {
 }
 
 const LETTERS = ["A", "K", "L", "Z", "R", "O", "G", "Q", "S", "F", "Y"];
-const SHAPE_TYPES = ["square", "triangle", "star", "circle", "diamond", "hexagon"];
+const SHAPE_TYPES = [
+  "square",
+  "triangle",
+  "star",
+  "circle",
+  "diamond",
+  "hexagon",
+  "pentagon",
+  "octagon",
+];
 const COLORS = ["#3b82f6", "#eab308", "#f97316", "#22c55e", "#a855f7", "#ef4444"];
 // n-back grid chrome — a neutral lattice, deliberately outside the accent
 // system so the grid never picks up an exercise colour.
@@ -3101,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 361;
+const BUILD_VERSION = 362;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7133,6 +7142,21 @@ function ShapeIcon({ shape, color, size = 64 }) {
           />
         </svg>
       );
+    case "pentagon":
+      return (
+        <svg width={s} height={s} viewBox="0 0 100 100">
+          <polygon points="50,5 93,36.5 76.5,87 23.5,87 7,36.5" {...common} />
+        </svg>
+      );
+    case "octagon":
+      return (
+        <svg width={s} height={s} viewBox="0 0 100 100">
+          <polygon
+            points="67,6 94,33 94,67 67,94 33,94 6,67 6,33 33,6"
+            {...common}
+          />
+        </svg>
+      );
     default:
       return null;
   }
@@ -7280,6 +7304,11 @@ const SHAPE_CLIP_GEOMETRY = {
   circle: { el: "circle", props: { cx: 50, cy: 50, r: 42 } },
   diamond: { el: "polygon", props: { points: "50,6 94,50 50,94 6,50" } },
   hexagon: { el: "polygon", props: { points: "50,6 90,28 90,72 50,94 10,72 10,28" } },
+  pentagon: { el: "polygon", props: { points: "50,5 93,36.5 76.5,87 23.5,87 7,36.5" } },
+  octagon: {
+    el: "polygon",
+    props: { points: "67,6 94,33 94,67 67,94 33,94 6,67 6,33 33,6" },
+  },
 };
 
 
@@ -15340,7 +15369,7 @@ function NBackSessionApp() {
 
         {!switchNotice && levelChangeNotice && (
           <div className="text-base rounded-lg px-5 py-2 mb-6 border text-amber-400 bg-amber-950/40 border-amber-800">
-            Below {DROP_THRESHOLD}% {DROP_AFTER_RUNS} times in a row, so the level dropped to {n}.
+            Level dropped to {n} / {rankNameFor(n)}
           </div>
         )}
 
