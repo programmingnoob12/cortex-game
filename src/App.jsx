@@ -2016,19 +2016,27 @@ const STATS_SCREEN_HEIGHT = "calc(100vh - 8rem)";
 // Tailwind's own `sm` breakpoint, readable from JS — for the few places a
 // height has to be set inline and so cannot be done with a class.
 const NARROW_QUERY = "(max-width: 639px), (max-height: 700px)";
-function useIsNarrow() {
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia?.(NARROW_QUERY).matches
+// The n-back answer columns only fit beside the grid from here up; below it
+// they go under it, in one 2-up block the width of the grid itself.
+const NBACK_COLUMNS_QUERY = "(min-width: 1024px)";
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && !!window.matchMedia?.(query).matches
   );
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return undefined;
-    const mq = window.matchMedia(NARROW_QUERY);
-    const onChange = (ev) => setNarrow(ev.matches);
-    setNarrow(mq.matches);
+    const mq = window.matchMedia(query);
+    const onChange = (ev) => setMatches(ev.matches);
+    setMatches(mq.matches);
     mq.addEventListener?.("change", onChange);
     return () => mq.removeEventListener?.("change", onChange);
-  }, []);
-  return narrow;
+  }, [query]);
+  return matches;
+}
+
+function useIsNarrow() {
+  return useMediaQuery(NARROW_QUERY);
 }
 
 // Terminal step appended to every regime — landing here shows the Session
@@ -3088,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 338;
+const BUILD_VERSION = 339;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12205,6 +12213,7 @@ function NBackSessionApp() {
 
   const isMotion3dApp = mainView === "app" && exercise.key === "motion3d";
   const isNarrow = useIsNarrow();
+  const nbackColumns = useMediaQuery(NBACK_COLUMNS_QUERY);
 
   // Drives --ex, which every accent button reads from. Only set while an
   // exercise is actually on screen; the Overview step and every screen
@@ -16296,68 +16305,131 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            {/* Columns either side where there is room for them; under the
-                grid on anything narrower, where a column each side costs the
-                lattice half the screen. */}
-            <div className="flex flex-col lg:flex-row items-center lg:items-stretch justify-center lg:justify-between gap-2.5 w-full">
-            <div className="order-2 lg:order-1 flex lg:flex-col justify-between gap-2.5 lg:gap-0 h-16 lg:h-auto w-full lg:w-32 xl:w-36 shrink-0">
-              {nbackSideButtons.left}
-            </div>
-            <div
-              className="nback-box order-1 lg:order-2"
-              style={{
-                aspectRatio: "1 / 1",
-                display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
-                gridTemplateRows: "repeat(3, 1fr)",
-                gap: 0,
-                borderTop: `1px solid ${NBACK_GRID_LINE}`,
-                borderLeft: `1px solid ${NBACK_GRID_LINE}`,
-              }}
-            >
-              {POSITIONS.map((cellIdx) => {
-                const isActive = activeCell === cellIdx;
-                const shapeType = exercise.modalities.includes("shape")
-                  ? sequence.shape?.[index]
-                  : "square";
-                const color = exercise.modalities.includes("color")
-                  ? sequence.color?.[index]
-                  : themeColor;
-                const hasShapeOrColor =
-                  exercise.modalities.includes("shape") ||
-                  exercise.modalities.includes("color");
-                return (
-                  <div
-                    key={cellIdx}
-                    className="flex items-center justify-center overflow-hidden transition-colors"
-                    style={{
-                      borderRight: `1px solid ${NBACK_GRID_LINE}`,
-                      borderBottom: `1px solid ${NBACK_GRID_LINE}`,
-                      backgroundColor: isActive ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
-                    }}
-                  >
-                    {isActive && hasShapeOrColor && (
-                      <div className="nback-stimulus">
-                        {exercise.key === "iqnb" ? (
-                          <VoronoiShapeIcon
-                            shape={shapeType}
-                            color={color}
-                            seed={`${index}-${shapeType}-${color}`}
-                            size={220}
-                          />
-                        ) : (
-                          <ShapeIcon shape={shapeType} color={color} size={220} />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <div className="order-3 flex lg:flex-col justify-between gap-2.5 lg:gap-0 h-16 lg:h-auto w-full lg:w-32 xl:w-36 shrink-0">
-              {nbackSideButtons.right}
-            </div>
-            </div>
+            {/* Two layouts, not one that stretches: columns either side where
+                there is width for them, and a 2-up block under the grid where
+                there is not — which is also why the block is the grid's own
+                width rather than the page's. */}
+            {nbackColumns ? (
+              <div className="flex flex-row items-stretch justify-center gap-4 w-full">
+                <div className="flex flex-col justify-between w-32 xl:w-36 shrink-0">
+                  {nbackSideButtons.left}
+                </div>
+              <div
+                className="nback-box"
+                style={{
+                  aspectRatio: "1 / 1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateRows: "repeat(3, 1fr)",
+                  gap: 0,
+                  borderTop: `1px solid ${NBACK_GRID_LINE}`,
+                  borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+                }}
+              >
+                {POSITIONS.map((cellIdx) => {
+                  const isActive = activeCell === cellIdx;
+                  const shapeType = exercise.modalities.includes("shape")
+                    ? sequence.shape?.[index]
+                    : "square";
+                  const color = exercise.modalities.includes("color")
+                    ? sequence.color?.[index]
+                    : themeColor;
+                  const hasShapeOrColor =
+                    exercise.modalities.includes("shape") ||
+                    exercise.modalities.includes("color");
+                  return (
+                    <div
+                      key={cellIdx}
+                      className="flex items-center justify-center overflow-hidden transition-colors"
+                      style={{
+                        borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                        borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                        backgroundColor: isActive ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                      }}
+                    >
+                      {isActive && hasShapeOrColor && (
+                        <div className="nback-stimulus">
+                          {exercise.key === "iqnb" ? (
+                            <VoronoiShapeIcon
+                              shape={shapeType}
+                              color={color}
+                              seed={`${index}-${shapeType}-${color}`}
+                              size={220}
+                            />
+                          ) : (
+                            <ShapeIcon shape={shapeType} color={color} size={220} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+                <div className="flex flex-col justify-between w-32 xl:w-36 shrink-0">
+                  {nbackSideButtons.right}
+                </div>
+              </div>
+            ) : (
+              <div className="nback-stack flex flex-col gap-2.5">
+              <div
+                className="nback-box"
+                style={{
+                  aspectRatio: "1 / 1",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gridTemplateRows: "repeat(3, 1fr)",
+                  gap: 0,
+                  borderTop: `1px solid ${NBACK_GRID_LINE}`,
+                  borderLeft: `1px solid ${NBACK_GRID_LINE}`,
+                }}
+              >
+                {POSITIONS.map((cellIdx) => {
+                  const isActive = activeCell === cellIdx;
+                  const shapeType = exercise.modalities.includes("shape")
+                    ? sequence.shape?.[index]
+                    : "square";
+                  const color = exercise.modalities.includes("color")
+                    ? sequence.color?.[index]
+                    : themeColor;
+                  const hasShapeOrColor =
+                    exercise.modalities.includes("shape") ||
+                    exercise.modalities.includes("color");
+                  return (
+                    <div
+                      key={cellIdx}
+                      className="flex items-center justify-center overflow-hidden transition-colors"
+                      style={{
+                        borderRight: `1px solid ${NBACK_GRID_LINE}`,
+                        borderBottom: `1px solid ${NBACK_GRID_LINE}`,
+                        backgroundColor: isActive ? NBACK_CELL_ACTIVE : NBACK_CELL_BG,
+                      }}
+                    >
+                      {isActive && hasShapeOrColor && (
+                        <div className="nback-stimulus">
+                          {exercise.key === "iqnb" ? (
+                            <VoronoiShapeIcon
+                              shape={shapeType}
+                              color={color}
+                              seed={`${index}-${shapeType}-${color}`}
+                              size={220}
+                            />
+                          ) : (
+                            <ShapeIcon shape={shapeType} color={color} size={220} />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+                {/* Both streams' buttons in one 2-up block: Dual's two sit
+                    beside each other, Quad's four fall into two rows. */}
+                <div className="grid grid-cols-2 gap-2.5 auto-rows-[3.75rem]">
+                  {nbackSideButtons.left}
+                  {nbackSideButtons.right}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

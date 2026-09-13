@@ -325,15 +325,30 @@ button.ex-card.ex-card-shine::after {
    title and padding is about 15rem of vertical chrome. From lg they sit in
    columns either side, which costs width (about 26rem for both columns and
    the gaps) and almost no height. */
-.nback-box {
+/* The lattice is square, so its size is whichever runs out first — the width
+   beside it or the height above and below it. Both are in the rule, so no
+   screen shape leaves it tiny (a phone) or runs it off the bottom (a short
+   wide screen like a Nest Hub).
+
+   Under 1024px the answer buttons sit UNDER the grid, and .nback-stack — the
+   column holding both — takes this same width, so the buttons are exactly as
+   wide as the grid rather than as wide as the page. From 1024px the buttons
+   move into columns either side, which costs width (about 26rem for both
+   columns and the gaps) and almost no height. */
+.nback-stack {
   width: min(92vw, calc(100dvh - 15rem), 34rem);
 }
+.nback-box {
+  width: 100%;
+}
+
 /* Tablets still stack the buttons, but there is room for a bigger square. */
 @media (min-width: 700px) and (max-width: 1023px) {
-  .nback-box {
+  .nback-stack {
     width: min(92vw, calc(100dvh - 16rem), 40rem);
   }
 }
+
 @media (min-width: 1024px) {
   .nback-box {
     width: min(calc(100vw - 26rem), calc(100dvh - 9rem), 46rem);
