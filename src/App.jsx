@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 348;
+const BUILD_VERSION = 349;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9054,6 +9054,21 @@ function NBackSessionApp() {
   useEffect(() => {
     exerciseLevelsRef.current = exerciseLevels;
   }, [exerciseLevels]);
+
+  // RRT resumes at the level it reached. Its stored level is (premises - 1),
+  // and each level is three 20-in-a-row steps (30s → 25s → 20s), so the step
+  // it stopped on is recovered from the round length packed into its best
+  // score (e.g. 7.25 = 7 premises on a 25s round = one step into that level).
+  const rrtStartIncrement = (() => {
+    const stat = exerciseStats.rrt;
+    const level = exerciseLevels.rrt ?? EXERCISE_LIBRARY.rrt.defaultN;
+    const reached = Math.max(1, Math.max(stat?.bestN || 0, level));
+    const score = stat?.bestAccuracy || 0;
+    const seconds = Math.round((score - Math.floor(score)) * 100);
+    const step = seconds === 25 ? 1 : seconds === 20 ? 2 : 0;
+    return (reached - 1) * 3 + step;
+  })();
+
   const [regimeCompletionDates, setRegimeCompletionDatesState] = useState([]); // persisted — toDateString() entries for each day the person completed their FULL regime, feeds the 7-day regime-streak achievement
   const [regimeTrainingDates, setRegimeTrainingDatesState] = useState({ low: [], medium: [], high: [] }); // persisted — per-regime toDateString() entries for each day the person completed that regime's FULL session; drives each regime's automatic train/rest schedule (see REGIME_SCHEDULE)
   const [regimeStreakBrokenAt, setRegimeStreakBrokenAtState] = useState({}); // persisted — { [regimeKey]: dateString } set when the person trains through a confirmed rest-day warning, severing that regime's scheduled streak at that date
@@ -16230,6 +16245,7 @@ function NBackSessionApp() {
             scrambleFactor={rrtScrambleFactor}
             branchingEnabled={true}
             autoStart={rrtAutoStart}
+            startIncrement={rrtStartIncrement}
           />
         )}
 
@@ -18133,7 +18149,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   );
 }
 
-function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0 }) {
+function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0, startIncrement = 0 }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
@@ -18194,7 +18210,10 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   // twice (30s → 25s → 20s), then the 3rd step adds a premise and resets
   // the round back to 30s (e.g. 2p 30s → 2p 25s → 2p 20s → 3p 30s → …).
   // Starts at 2p, tops out at 10p.
-  const [rrtIncrementCount, setRrtIncrementCount] = useState(0);
+  // Starts where they left off, not at 2p every time: the level reached is
+  // stored (and is what Home reads), so opening the exercise at the bottom
+  // of the ladder made the two disagree.
+  const [rrtIncrementCount, setRrtIncrementCount] = useState(startIncrement);
   const [correctStreak, setCorrectStreak] = useState(0);
   const [wrongStreak, setWrongStreak] = useState(0); // consecutive wrong/missed — mirrors correctStreak, drives forcing the difficulty back down
   const [downNotice, setDownNotice] = useState(false); // brief "eased back down" banner after a forced decrement
