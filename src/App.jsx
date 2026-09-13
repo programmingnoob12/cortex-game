@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 343;
+const BUILD_VERSION = 344;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13357,6 +13357,25 @@ function NBackSessionApp() {
                                 stat?.bestAccuracy || startingScoreValue(e) || level
                               )}
                         </div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full font-semibold uppercase ${
+                            compactHome
+                              ? "mt-1.5 px-2 py-0.5 text-[0.6rem]"
+                              : "mt-2.5 px-2.5 py-1 text-[0.65rem]"
+                          }`}
+                          style={{
+                            background: "rgba(0,0,0,0.34)",
+                            color: gemTierFor(bestLevel).color,
+                            letterSpacing: "0.08em",
+                            textShadow: "none",
+                          }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ background: gemTierFor(bestLevel).color }}
+                          />
+                          {gemTierFor(bestLevel).label}
+                        </span>
                       </div>
                       {/* The gem's own drop-shadow is tuned for the
                           near-black page and all but vanishes on a coloured
@@ -13597,9 +13616,13 @@ function NBackSessionApp() {
                 onClick={() => {
                   clearTutorialDismissals();
                   setHideTutorials(false);
+                  setBinauralHintSeen(false);
+                  setCustomDragHintOff(false);
                   try {
                     RRT_HINT_KEYS.forEach((k) => localStorage.removeItem(k));
                     localStorage.removeItem(RRT_ANSWERED_KEY);
+                    localStorage.removeItem(BINAURAL_HINT_KEY);
+                    localStorage.removeItem(CUSTOM_DRAG_HINT_KEY);
                   } catch {
                     /* nothing persisted to clear */
                   }
