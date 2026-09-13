@@ -1516,7 +1516,50 @@ function logClientError(context, error) {
 
 // Drop-in replacement for `window.storage.set(...).catch(() => {})` — same
 // fire-and-forget usage, but a failure gets logged instead of vanishing.
+// window.storage is a network read, so the first paint after a reload used
+// to show defaults — streak 0, the level below the one they are on — and
+// then snap to the real numbers a moment later. Every value written there is
+// also mirrored into localStorage, which IS readable synchronously, so the
+// first paint is already right and the network read just confirms it. Keyed
+// by user id so a second account on the same browser never sees the first
+// one's numbers.
+const MIRROR_PREFIX = "cortex.mirror.";
+function mirrorNamespace() {
+  try {
+    return readStoredSession()?.user?.id || "anon";
+  } catch {
+    return "anon";
+  }
+}
+function mirrorSet(key, value) {
+  try {
+    localStorage.setItem(`${MIRROR_PREFIX}${mirrorNamespace()}.${key}`, value);
+  } catch { /* no storage */ }
+}
+function mirrorGet(key) {
+  try {
+    return localStorage.getItem(`${MIRROR_PREFIX}${mirrorNamespace()}.${key}`);
+  } catch {
+    return null;
+  }
+}
+// { [exerciseKey]: parsed } for every exercise with a mirrored value.
+function mirroredByExercise(prefix) {
+  const out = {};
+  try {
+    Object.values(EXERCISE_LIBRARY).forEach((e) => {
+      const raw = mirrorGet(`${prefix}${e.key}`);
+      if (!raw) return;
+      try {
+        out[e.key] = JSON.parse(raw);
+      } catch { /* ignore a bad mirror entry */ }
+    });
+  } catch { /* library not ready */ }
+  return out;
+}
+
 function safeStorageSet(key, value, shared) {
+  if (!shared) mirrorSet(key, value);
   if (typeof window === "undefined" || !window.storage) return Promise.resolve(null);
   return window.storage.set(key, value, shared).catch((err) => {
     logClientError(`storage write failed: ${key}`, err);
@@ -3074,7 +3117,7 @@ const MOTIVATION_LINES = [
   { id: 14, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
   { id: 15, text: "Keep going. Your future self will thank you." },
   { id: 16, text: "Be proud of how smart you've become." },
-  { id: 17, text: "The best don't stop improving." },
+  { id: 17, text: "The best never stop improving." },
   { id: 18, text: "Become better than your old self." },
   {
     id: 19,
@@ -3128,7 +3171,6 @@ const MOTIVATION_LINES = [
   { id: 118, text: "Slow is fine. Stopping is not." },
   { id: 120, text: "Everything gets easier except this." },
   { id: 121, text: "You chose the hard version. Good." },
-  { id: 122, text: "Hold the thread." },
   { id: 123, text: "Push past where it gets uncomfortable." },
   { id: 126, text: "Show up again tomorrow." },
   { id: 127, text: "Your ceiling moves every session." },
@@ -3180,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 374;
+const BUILD_VERSION = 375;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9217,13 +9259,13 @@ function NBackSessionApp() {
 
   const [exerciseElapsedMs, setExerciseElapsedMs] = useState({}); // { [key]: ms }, updated once per finished/aborted session
   const exerciseElapsedMsRef = useRef({}); // mirrors the above for callbacks that need it synchronously
-  const [exerciseStats, setExerciseStats] = useState({}); // { [key]: { sessions, totalAccuracy, bestAccuracy, bestN, lastAccuracy } } — persisted long-term via window.storage
+  const [exerciseStats, setExerciseStats] = useState(() => mirroredByExercise("stats-")); // { [key]: { sessions, totalAccuracy, bestAccuracy, bestN, lastAccuracy } } — persisted long-term via window.storage
   const exerciseStatsRef = useRef({}); // mirrors exerciseStats, read synchronously to know the PRE-session bestN for "new PR" checks
   useEffect(() => {
     exerciseStatsRef.current = exerciseStats;
   }, [exerciseStats]);
-  const [exerciseHistory, setExerciseHistory] = useState({}); // { [key]: [{ ts, accuracy, n }] } — per-session log, persisted, feeds the graph
-  const [exerciseLevels, setExerciseLevels] = useState({}); // { [key]: n } — current level per exercise, persisted, feeds the homepage
+  const [exerciseHistory, setExerciseHistory] = useState(() => mirroredByExercise("history-")); // { [key]: [{ ts, accuracy, n }] } — per-session log, persisted, feeds the graph
+  const [exerciseLevels, setExerciseLevels] = useState(() => mirroredByExercise("level-")); // { [key]: n } — current level per exercise, persisted, feeds the homepage
   const exerciseLevelsRef = useRef({}); // mirrors exerciseLevels, read synchronously wherever a new exercise starts/resumes so it picks up the level actually reached, not the exercise's static defaultN
   useEffect(() => {
     exerciseLevelsRef.current = exerciseLevels;
@@ -9685,6 +9727,7 @@ function NBackSessionApp() {
                 return;
               }
             }
+            mirrorSet(`stats-${e.key}`, res.value);
             setExerciseStats((prev) => ({ ...prev, [e.key]: parsed }));
           }
         } catch (err) {
@@ -9696,6 +9739,7 @@ function NBackSessionApp() {
           const res = await window.storage.get(`history-${e.key}`, false);
           if (res && res.value) {
             const parsed = JSON.parse(res.value);
+            mirrorSet(`history-${e.key}`, res.value);
             setExerciseHistory((prev) => ({ ...prev, [e.key]: parsed }));
           }
         } catch (err) {
@@ -9707,6 +9751,7 @@ function NBackSessionApp() {
           const res = await window.storage.get(`level-${e.key}`, false);
           if (res && res.value) {
             const parsed = JSON.parse(res.value);
+            mirrorSet(`level-${e.key}`, res.value);
             setExerciseLevels((prev) => ({ ...prev, [e.key]: parsed }));
           }
         } catch (err) {
@@ -11686,6 +11731,41 @@ function NBackSessionApp() {
     const t = setTimeout(() => setRestorePending(false), 2500);
     return () => clearTimeout(t);
   }, [restorePending]);
+
+  // The synchronous boot above handles a built-in regime. A built one lives
+  // in customRegimes, which arrives a moment later, so the stored view is
+  // applied here once it has — otherwise someone training a regime they made
+  // lands on the picker every reload.
+  const lastViewRestoredRef = useRef(false);
+  useEffect(() => {
+    if (lastViewRestoredRef.current || CAME_FROM_CHECKOUT) return;
+    const last = loadLastView();
+    if (!last || last.view !== "app") {
+      lastViewRestoredRef.current = true;
+      return;
+    }
+    if (!last.regimeKey) {
+      lastViewRestoredRef.current = true;
+      setRestorePending(false);
+      return;
+    }
+    const regime = findRegime(last.regimeKey);
+    if (!regime) {
+      // A built regime that has not hydrated yet: wait for it.
+      if (last.regimeKey.startsWith("custom:") && !hasHydrated) return;
+      lastViewRestoredRef.current = true;
+      setRestorePending(false);
+      return;
+    }
+    lastViewRestoredRef.current = true;
+    setRestorePending(false);
+    if (!regimeKey) {
+      setRegimeKey(last.regimeKey);
+      setActiveExercises(buildRegimeExercises(regime));
+    }
+    setMainView((view) => (view === "regime" ? "app" : view));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasHydrated, customRegimes, regimeKey]);
 
   const snapshotRestoredRef = useRef(false);
   useEffect(() => {
@@ -15013,16 +15093,16 @@ function NBackSessionApp() {
                 <span className="underline underline-offset-2">hello@cortex.app</span>
               </span>
               <button
-                onClick={() => setMainView("privacy")}
-                className="no-lift hover:underline underline-offset-2"
-              >
-                Privacy Policy
-              </button>
-              <button
                 onClick={() => setMainView("terms")}
                 className="no-lift hover:underline underline-offset-2"
               >
                 Terms of Service
+              </button>
+              <button
+                onClick={() => setMainView("privacy")}
+                className="no-lift hover:underline underline-offset-2"
+              >
+                Privacy Policy
               </button>
             </div>
           </div>
@@ -15446,16 +15526,16 @@ function NBackSessionApp() {
                 <span className="underline underline-offset-2">hello@cortex.app</span>
               </span>
               <button
-                onClick={() => setMainView("privacy")}
-                className="no-lift hover:underline underline-offset-2"
-              >
-                Privacy Policy
-              </button>
-              <button
                 onClick={() => setMainView("terms")}
                 className="no-lift hover:underline underline-offset-2"
               >
                 Terms of Service
+              </button>
+              <button
+                onClick={() => setMainView("privacy")}
+                className="no-lift hover:underline underline-offset-2"
+              >
+                Privacy Policy
               </button>
             </div>
           </div>
