@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 363;
+const BUILD_VERSION = 364;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -15628,7 +15628,10 @@ function NBackSessionApp() {
                             </span>
                             <span
                               className={`font-semibold tabular-nums text-right whitespace-nowrap ${
-                                String(value).length > 10 ? "text-sm" : "text-base"
+                                // Only genuinely long values step down —
+                                // at 10, "7p 30s 2/20" shrank while
+                                // "QNB' 6.30" beside it did not.
+                                String(value).length > 13 ? "text-sm" : "text-base"
                               }`}
                               style={color ? { color } : undefined}
                             >
