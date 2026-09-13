@@ -3102,7 +3102,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 353;
+const BUILD_VERSION = 354;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12384,7 +12384,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-center justify-center px-2 md:px-4 pt-14 sm:py-6"
+          ? "items-center justify-center px-2 md:px-4 pt-12 pb-10 sm:py-6"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -15366,17 +15366,15 @@ function NBackSessionApp() {
                   stat,
                   isAccuracy,
                   avgVal,
-                  bestLabel: `${scoreWord || !isAccuracy ? "Best score" : "Best accuracy"}${
-                    todayOnly ? " today" : ""
-                  }`,
+                  bestLabel: scoreWord || !isAccuracy ? "Best score" : "Best accuracy",
                   // CCT has no meaningful average: the run of right answers
                   // is the second number worth reading.
                   avgLabel:
                     e.key === "cct"
                       ? "Best streak"
-                      : `${scoreWord || !isAccuracy ? "Avg score" : "Avg accuracy"}${
-                          todayOnly ? " today" : ""
-                        }`,
+                      : scoreWord || !isAccuracy
+                      ? "Avg score"
+                      : "Avg accuracy",
                   bestValue,
                   avgValue:
                     e.key === "cct"
@@ -15413,26 +15411,23 @@ function NBackSessionApp() {
                     color: EXERCISE_COLORS.rrt,
                   };
                 })(),
-                {
-                  label: overviewSource === "home" ? "Sessions" : "Rounds today",
-                  value:
-                    overviewSource === "home"
-                      ? String(achievementState.totalSessions)
-                      : String(
-                          Object.values(exerciseHistory)
-                            .flat()
-                            .filter(
-                              (h) =>
-                                typeof h.accuracy === "number" &&
-                                new Date(h.ts).toDateString() === new Date().toDateString()
-                            ).length
-                        ),
-                },
+                ...(overviewSource === "home"
+                  ? [{ label: "Sessions", value: String(achievementState.totalSessions) }]
+                  : []),
               ];
 
               return (
                 <div ref={statsBodyRef} className="space-y-6 flex-1 min-h-0">
-                  <div className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60">
+                  <div
+                    className="rounded-xl border border-slate-700/60 bg-slate-900 grid grid-cols-1 divide-y sm:divide-y-0 sm:divide-x divide-slate-700/60"
+                    /* One per row on a phone, one column each across from sm
+                       up — however many tiles this view has. */
+                    style={{
+                      gridTemplateColumns: isNarrow
+                        ? undefined
+                        : `repeat(${summary.length}, minmax(0, 1fr))`,
+                    }}
+                  >
                     {summary.map((s2) => (
                       <div key={s2.label} className="px-5 py-3.5 sm:px-6 sm:py-5">
                         <div className="text-slate-400 text-sm">{s2.label}</div>
@@ -16449,8 +16444,8 @@ function NBackSessionApp() {
               </div>
               {exercise.key !== "iqnb" && (
                 <div className="text-base text-slate-400 pt-1">
-                  {PASS_THRESHOLD}%+ moves you up a level. Under {DROP_THRESHOLD}%{" "}
-                  {DROP_AFTER_RUNS} rounds in a row moves you down.
+                  {PASS_THRESHOLD}% = Promotion · Below {DROP_THRESHOLD}%{" "}
+                  {DROP_AFTER_RUNS}x in a row = Demotion
                 </div>
               )}
             </div>

@@ -336,7 +336,7 @@ button.ex-card.ex-card-shine::after {
    move into columns either side, which costs width (about 26rem for both
    columns and the gaps) and almost no height. */
 .nback-stack {
-  width: min(92vw, calc(100dvh - 15rem), 34rem);
+  width: min(92vw, calc(100dvh - 17rem), 34rem);
 }
 .nback-box {
   width: 100%;
@@ -345,7 +345,7 @@ button.ex-card.ex-card-shine::after {
 /* Tablets still stack the buttons, but there is room for a bigger square. */
 @media (min-width: 700px) and (max-width: 1023px) {
   .nback-stack {
-    width: min(92vw, calc(100dvh - 16rem), 40rem);
+    width: min(92vw, calc(100dvh - 18rem), 40rem);
   }
 }
 
