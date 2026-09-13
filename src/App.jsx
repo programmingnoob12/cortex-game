@@ -3101,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 355;
+const BUILD_VERSION = 356;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7557,6 +7557,23 @@ const GEM_TIERS = {
 };
 const GEM_TIER_LEVELS = Object.keys(GEM_TIERS).map(Number);
 const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
+// A gem with its rank name under it, in that rank's own colour — the pair
+// the app shows everywhere a level is displayed.
+function RankedGem({ level, size, glowPulse, labelClass = "text-[0.65rem]" }) {
+  const tier = gemTierFor(level);
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <LevelGem level={level} size={size} glowPulse={glowPulse} />
+      <span
+        className={`font-semibold uppercase leading-none ${labelClass}`}
+        style={{ color: tier.color, letterSpacing: "0.1em", textShadow: "none" }}
+      >
+        {tier.label}
+      </span>
+    </div>
+  );
+}
+
 function gemTierFor(level) {
   return (
     GEM_TIERS[level] ||
@@ -9150,6 +9167,8 @@ function NBackSessionApp() {
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
   const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
+  // How long one of those lines stays up, wherever it is triggered from.
+  const SESSION_START_MS = 2600;
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
   // { [exerciseKey]: true } once that exercise's session budget has run out.
@@ -10890,11 +10909,34 @@ function NBackSessionApp() {
 
   // What Continue does on the results screen: another round normally, or on
   // to the next exercise once the session's time is up.
+  // Two lines across a whole session, both between n-back rounds: one about
+  // a third of the way in, one about two thirds. Not a prompt to press
+  // anything — it holds for a beat and the next round begins behind it.
+  const MID_SESSION_MARKS = [0.34, 0.67];
+  const midSessionShownRef = useRef({}); // { [exerciseKey]: count }
+  const maybeMidSessionLine = (exerciseKey) => {
+    const budget = activeExercisesRef.current.find((e) => e.key === exerciseKey)
+      ?.sessionDurationMs;
+    if (!budget) return false;
+    const done = (exerciseElapsedMsRef.current[exerciseKey] || 0) / budget;
+    const shown = midSessionShownRef.current[exerciseKey] || 0;
+    if (shown >= MID_SESSION_MARKS.length) return false;
+    if (done < MID_SESSION_MARKS[shown]) return false;
+    midSessionShownRef.current[exerciseKey] = shown + 1;
+    setSessionStartLine(
+      MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text ||
+        null
+    );
+    setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+    return true;
+  };
+
   const continueFromResults = () => {
     if (sessionTimeUp[exercise.key]) {
       forceSwitchToNext(exerciseIndex);
       return;
     }
+    maybeMidSessionLine(exercise.key);
     startTask(exercise, n);
   };
 
@@ -11743,9 +11785,6 @@ function NBackSessionApp() {
     setScreen("setup");
   };
 
-  // One line, held for a beat, between pressing Start Training and the first
-  // exercise — the session starts on a thought rather than a setup screen.
-  const SESSION_START_MS = 2600;
   const proceedStartFromHome = () => {
     unlockLetterAudio();
     setSessionStartLine(
@@ -13473,7 +13512,7 @@ function NBackSessionApp() {
                           )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
                         }}
                       >
-                        <LevelGem level={bestLevel} size={compactHome ? 48 : 64} />
+                        <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
                       </span>
                     </div>
                   </button>
@@ -13921,7 +13960,7 @@ function NBackSessionApp() {
                           {tier.label}
                         </div>
                       </div>
-                      <LevelGem level={entry.level} size={32} />
+                      <RankedGem level={entry.level} size={32} labelClass="text-[0.55rem]" />
                     </div>
                   </button>
                 );
@@ -13999,7 +14038,7 @@ function NBackSessionApp() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 mt-3">
-                      <LevelGem level={stat.bestN} size={28} />
+                      <RankedGem level={stat.bestN} size={28} labelClass="text-[0.55rem]" />
                       <div className={`text-base font-medium ${acc.text}`}>
                         {scoreLabel}
                       </div>
@@ -16437,7 +16476,7 @@ function NBackSessionApp() {
 
             <div className={`${ACCENT_STYLES[exercise.accent].bg} border ${ACCENT_STYLES[exercise.accent].border} rounded-xl p-6 space-y-3`}>
               <div className="flex items-center gap-4">
-                <LevelGem
+                <RankedGem
                   level={exercise.key === "iqnb" ? Math.floor(qnbPrimeLevel) : n}
                   size={48}
                 />
@@ -21002,7 +21041,8 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           </div>
           <div
             className="text-2xl font-semibold tabular-nums leading-none mt-0.5"
-            style={{ color: EXERCISE_COLORS.motion3d || "#4CB9D8" }}
+            /* The tier the current speed sits in — same colour as its gem. */
+            style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP)).color }}
           >
             {speed.toFixed(2)}
           </div>
