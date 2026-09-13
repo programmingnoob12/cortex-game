@@ -532,6 +532,55 @@ if (typeof window !== "undefined") {
   }
 }
 
+// Where they were when the page last rendered. A reload should put someone
+// back on the screen they were looking at — Home on Home, Account on
+// Account, an exercise straight back into that exercise — rather than at
+// the regime picker every time. Kept separate from the session snapshot
+// above, because it is true whether or not a session is running.
+const LAST_VIEW_KEY = "cortex.lastView.v1";
+const LAST_VIEW_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+// Screens worth returning to. Left out: the picker itself (the fallback),
+// the tutorial and the post-session hypnosis page (both one-time passes
+// through), and the legal pages.
+const RESTORABLE_VIEWS = new Set([
+  "home",
+  "app",
+  "account",
+  "leaderboard",
+  "profile",
+  "achievements",
+  "notes",
+  "testing",
+  "membership",
+  "custom",
+]);
+
+function saveLastView(view, regimeKey) {
+  try {
+    if (!view || !RESTORABLE_VIEWS.has(view)) {
+      localStorage.removeItem(LAST_VIEW_KEY);
+      return;
+    }
+    localStorage.setItem(
+      LAST_VIEW_KEY,
+      JSON.stringify({ view, regimeKey: regimeKey || null, savedAt: Date.now() })
+    );
+  } catch { /* no storage */ }
+}
+
+function loadLastView() {
+  try {
+    const raw = localStorage.getItem(LAST_VIEW_KEY);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (!entry?.view || !RESTORABLE_VIEWS.has(entry.view)) return null;
+    if (!entry.savedAt || Date.now() - entry.savedAt > LAST_VIEW_MAX_AGE_MS) return null;
+    return entry;
+  } catch {
+    return null;
+  }
+}
+
 function saveSessionSnapshot(snap) {
   try {
     if (!snap) {
@@ -3131,7 +3180,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 373;
+const BUILD_VERSION = 374;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -8974,16 +9023,29 @@ function BadgeGrid({ state, onSeeAll, onSelectBadge, hideHeader }) {
 function bootSessionFromSnapshot() {
   if (CAME_FROM_CHECKOUT) return null;
   const snap = loadSessionSnapshot();
-  const key = snap?.regimeKey;
+  const last = loadLastView();
+  // Either source can name the regime: a session in flight, or simply the
+  // regime they were last on when they were sitting on Home.
+  const key = snap?.regimeKey || last?.regimeKey;
   if (!key || typeof key !== "string" || key.startsWith("custom:")) return null;
   const regime = REGIMES.find((r) => r.key === key);
   if (!regime || !regime.steps.length) return null;
-  return { key, regime, snap };
+  return { key, regime, snap: snap?.regimeKey === key ? snap : null };
+}
+
+// The screen the app opens on. A live session wins; otherwise whatever they
+// were last looking at; otherwise the picker.
+function bootViewFrom(boot) {
+  if (CAME_FROM_CHECKOUT) return "regime";
+  const last = loadLastView();
+  if (last?.view === "app") return boot ? "app" : "regime";
+  if (last?.view) return last.view;
+  return boot?.snap ? "app" : "regime";
 }
 
 function NBackSessionApp() {
   const [bootSession] = useState(bootSessionFromSnapshot);
-  const [mainView, setMainView] = useState(() => (bootSession ? "app" : "regime")); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
+  const [mainView, setMainView] = useState(() => bootViewFrom(bootSession)); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
   const [leaderboardTab, setLeaderboardTab] = useState("dual"); // "dual" | "quad" | "rrt"
   const [regimeKey, setRegimeKey] = useState(bootSession ? bootSession.key : null); // "low" | "medium" | "high" | "cct" | "custom"
   // A regime the person built themselves: [{ key, minutes }] in the order
@@ -11554,6 +11616,10 @@ function NBackSessionApp() {
       sessionOpenedRef.current = true;
     }
   }, [mainView, exercise.key]);
+  useEffect(() => {
+    saveLastView(mainView, regimeKey);
+  }, [mainView, regimeKey]);
+
   const sessionParked =
     !sessionInProgress &&
     sessionOpenedRef.current &&
@@ -11611,7 +11677,9 @@ function NBackSessionApp() {
   const [restorePending, setRestorePending] = useState(
     () =>
       !CAME_FROM_CHECKOUT &&
-      !!loadSessionSnapshot()?.regimeKey?.startsWith?.("custom:")
+      !!(
+        loadSessionSnapshot()?.regimeKey || loadLastView()?.regimeKey
+      )?.startsWith?.("custom:")
   );
   useEffect(() => {
     if (!restorePending) return;
@@ -20715,7 +20783,9 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       return undefined;
     }
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // A retina display would otherwise render this scene at 4x the pixels
+    // for no visible gain once the balls are antialiased.
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     // Real-time shadows are the biggest single fix for "two balls near the
     // same line of sight read as a flat overlap instead of one floating in
     // front of the other" — without them there's nothing on the balls
@@ -20723,13 +20793,11 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // the silhouette edge, which is easy to misread. With shadows on, a
     // ball passing near/in front of another visibly casts a shadow onto
     // it, which is a much stronger depth cue than occlusion alone.
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    // Soft shadows are the most expensive thing in the frame. They only
-    // change while the balls are moving, so the map is redrawn during the
-    // tracking phase and left alone the rest of the time.
-    renderer.shadowMap.autoUpdate = false;
-    renderer.shadowMap.needsUpdate = true;
+    // Shadows were by far the most expensive thing in the frame: a soft
+    // 1024px shadow pass over ten moving spheres, redrawn every frame, for
+    // shadows nothing in the scene actually lands on. Off entirely — the
+    // balls are lit and shaded the same, and the frame rate is the point.
+    renderer.shadowMap.enabled = false;
     // Clearing and appending against `mount` (a div that exists solely to
     // hold the canvas) instead of `host` — `host` also has the stage
     // label, restart button, and dev controls rendered into it by React,
@@ -20743,7 +20811,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.34);
     dirLight.position.set(4, 6, 8);
-    dirLight.castShadow = true;
+    dirLight.castShadow = false; // shadow map is off (see renderer setup)
     // Shadow camera frustum sized to just cover the cube the balls move
     // in — tight enough for crisp shadows, loose enough that a ball near
     // any wall still casts/receives correctly.
@@ -20785,7 +20853,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     let boundaryParts = buildBoundary(cubeHalfXRef.current);
     scene.add(boundaryParts.mesh);
 
-    const ballGeo = new THREE.SphereGeometry(MOT_BALL_RADIUS, 24, 18);
+    const ballGeo = new THREE.SphereGeometry(MOT_BALL_RADIUS, 20, 14);
     // Template for the latitude/longitude line overlay — cloned per ball
     // below (see buildBallLineTemplate for why this replaced an
     // EdgesGeometry-based approach).
@@ -20806,8 +20874,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         clearcoatRoughness: 0.15,
       });
       const mesh = new THREE.Mesh(ballGeo, mat);
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
       mesh.position.copy(motRandomPointInCube(MOT_BALL_RADIUS, cubeHalfXRef.current));
       const lines = ballLineTemplate.clone();
       mesh.add(lines);
@@ -20822,7 +20888,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         new THREE.MeshBasicMaterial({ visible: false })
       );
       const halo = new THREE.Mesh(
-        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.06, 28, 18),
+        new THREE.SphereGeometry(MOT_BALL_RADIUS * 1.06, 18, 12),
         new THREE.MeshBasicMaterial({
           color: MOT_HALO_COLOR,
           transparent: true,
@@ -21059,10 +21125,8 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
     const animate = () => {
       ctx.animFrame = requestAnimationFrame(animate);
-      let cameraMoved = false;
       if (cameraDirty) {
         cameraDirty = false;
-        cameraMoved = true;
         const [cw, ch] = hostSize();
         placeCamera(cw, ch);
       }
@@ -21142,7 +21206,6 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
         });
       }
 
-      if (moving || cameraMoved) ctx.renderer.shadowMap.needsUpdate = true;
       ctx.renderer.render(ctx.scene, ctx.camera);
     };
     animate();
