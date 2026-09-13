@@ -3038,9 +3038,7 @@ const MOTIVATION_LINES = [
     text: "The most important thing is to keep your streak going. Don't worry about scores for now. They'll come later.",
   },
   { id: 103, text: "Reps nobody sees. Results everybody does." },
-  { id: 104, text: "Hard is the point." },
   { id: 105, text: "You are not here to be entertained." },
-  { id: 106, text: "Attention is the whole game." },
   { id: 107, text: "Nobody is coming to do this for you." },
   { id: 108, text: "The work is boring. The edge is not." },
   { id: 109, text: "Strain is the signal." },
@@ -3063,7 +3061,6 @@ const MOTIVATION_LINES = [
   { id: 128, text: "Concentration is trainable. Prove it." },
   { id: 129, text: "Stay with it." },
   { id: 130, text: "You are building something invisible and real." },
-  { id: 131, text: "Effort compounds." },
   { id: 132, text: "Feel it working." },
   { id: 133, text: "Benefits get better as you train consistently." },
 ];
@@ -3110,7 +3107,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 368;
+const BUILD_VERSION = 369;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -20550,6 +20547,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
   // room and lose the plot entirely.
   const motYawRef = useRef(0);
   const motPitchRef = useRef(0);
+  const resetViewRef = useRef(null); // set by the scene effect; puts the camera back head-on
   const cubeHalfXRef = useRef(MOT_CUBE_HALF_X); // live current cube X half-extent — updated by onResize below (not just computed once at mount), so a screen that's wide from the start, or becomes wide later, actually gets a wider room instead of the room staying locked at whatever aspect ratio happened to be measured first
 
   useEffect(() => {
@@ -20862,6 +20860,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // Drag anywhere on the scene to look around it. A drag that moves more
     // than a few pixels also swallows the click it ends on, so looking round
     // a cluster never picks a ball by accident.
+    let cameraDirty = false;
     let dragging = false;
     let dragMoved = false;
     let lastX = 0;
@@ -20883,8 +20882,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       const clamp = (v, m) => Math.max(-m, Math.min(m, v));
       motYawRef.current = clamp(motYawRef.current + dx * 0.004, MOT_LOOK_MAX_YAW);
       motPitchRef.current = clamp(motPitchRef.current + dy * 0.004, MOT_LOOK_MAX_PITCH);
-      const [w, h] = hostSize();
-      placeCamera(w, h);
+      cameraDirty = true;
     };
     const onPointerUp = () => {
       dragging = false;
@@ -20898,13 +20896,13 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     window.addEventListener("pointerup", onPointerUp);
 
     // Double-click puts the view back where it started.
-    const onDoubleClick = () => {
+    const resetView = () => {
       motYawRef.current = 0;
       motPitchRef.current = 0;
-      const [w, h] = hostSize();
-      placeCamera(w, h);
+      cameraDirty = true;
     };
-    mount.addEventListener("dblclick", onDoubleClick);
+    resetViewRef.current = resetView;
+    mount.addEventListener("dblclick", resetView);
 
     // Scroll to zoom. Multiplicative so each notch feels the same at any
     // distance, clamped so the camera can neither end up inside the box nor
@@ -20922,6 +20920,11 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
     const animate = () => {
       ctx.animFrame = requestAnimationFrame(animate);
+      if (cameraDirty) {
+        cameraDirty = false;
+        const [cw, ch] = hostSize();
+        placeCamera(cw, ch);
+      }
       const dt = Math.min(ctx.clock.getDelta(), 0.05);
 
       if (stageRef.current === "track" && !pausedRef.current) {
@@ -20999,7 +21002,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           ctx.renderer.domElement.clientHeight
         );
         label.style.display = behindCamera ? "none" : "block";
-        label.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        label.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
       });
 
       ctx.renderer.render(ctx.scene, ctx.camera);
@@ -21010,7 +21013,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       mount.removeEventListener("click", handleClick);
       mount.removeEventListener("wheel", handleWheel);
       mount.removeEventListener("pointerdown", onPointerDown);
-      mount.removeEventListener("dblclick", onDoubleClick);
+      mount.removeEventListener("dblclick", resetView);
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
       resizeObserver.disconnect();
@@ -21061,6 +21064,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // and mashing Restart repeatedly can't be used to pad it.
     roundStartRef.current = Date.now();
 
+    resetViewRef.current?.(); // a fresh round starts from the head-on view
     ctx.balls.forEach((b) => {
       b.selected = false;
       b.isTarget = false;
@@ -21348,6 +21352,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             ref={(el) => (labelRefs.current[i] = el)}
             className="absolute top-0 left-0 pointer-events-none font-bold text-white select-none"
             style={{
+              willChange: "transform",
               fontSize: `${Math.round(canvasSize.h * 0.032)}px`,
               lineHeight: 1,
               // Lowercase now (was uppercase — read as too imposing/heavy
