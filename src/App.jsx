@@ -3222,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 376;
+const BUILD_VERSION = 377;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -18347,20 +18347,26 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   // mid-run takes effect on the very next number.
   const speakNext = useCallback(() => {
     if (!answeredRef.current) {
-      // The gap ran out with nothing entered: that counts as a miss.
-      answeredRef.current = true;
-      setFlash("wrong");
-      setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
-      setMarks((m) =>
-        m[m.length - 1] === false ? [...m, false].slice(-CCT_STREAK_TO_SLOW_DOWN) : [false]
-      );
-      playError();
-      streakRef.current = 0;
-      wrongStreakRef.current += 1;
-      if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
-        wrongStreakRef.current = 0;
-        setMarks([]);
-        setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+      const typed = (entryRef.current || "").replace(/\D/g, "");
+      if (typed) {
+        // Whatever is in the box when the gap ends is the answer they gave.
+        judge(typed);
+      } else {
+        // The gap ran out with nothing entered: that counts as a miss.
+        answeredRef.current = true;
+        setFlash("wrong");
+        setTally((t) => ({ ...t, wrong: t.wrong + 1 }));
+        setMarks((m) =>
+          m[m.length - 1] === false ? [...m, false].slice(-CCT_STREAK_TO_SLOW_DOWN) : [false]
+        );
+        playError();
+        streakRef.current = 0;
+        wrongStreakRef.current += 1;
+        if (wrongStreakRef.current >= CCT_STREAK_TO_SLOW_DOWN) {
+          wrongStreakRef.current = 0;
+          setMarks([]);
+          setIntervalMs((v) => Math.min(CCT_START_MS, v + CCT_STEP_MS));
+        }
       }
     }
     // The last answer stays visible right up to the next number, so a typed
@@ -18515,13 +18521,14 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
 
   // Sums run from 2 to 18, so only a leading 1 can be part of a two-digit
   // answer; every other first digit is already the whole answer.
+  // Typing is just typing: digits go in, backspace takes them out, and
+  // nothing is handed in until the gap runs out. Committing on the first
+  // digit that could be a whole answer meant a mistyped number was scored
+  // wrong before the person could correct it.
   const handleType = (raw) => {
     if (stage !== "running") return;
     if (spokenRef.current.length < 2 || answeredRef.current) return;
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    setEntry(digits);
-    if (!digits) return;
-    if (digits.length === 2 || digits !== "1") judge(digits);
+    setEntry(raw.replace(/\D/g, "").slice(0, 2));
   };
 
   // A real field, focused as the round begins, so it can be clicked or tapped
@@ -18609,34 +18616,38 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           </div>
         </div>
       )}
-      {/* Interval and time left are the two numbers worth watching, so they
-          are set at a size that can be read without looking for them. */}
-      <div className="grid grid-cols-3 items-end gap-4">
-        <div className="text-left">
-          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-            Interval
+      {/* Interval, accuracy and time left used to sit directly above the
+          answer box, where they pulled the eye off the only thing being
+          asked of you. They are still readable, but they live at the top of
+          the screen now, well clear of where you are typing. */}
+      <div className="fixed inset-x-0 top-0 z-20 px-4 sm:px-8 pt-3 sm:pt-5 pointer-events-none">
+        <div className="mx-auto max-w-3xl grid grid-cols-3 items-start gap-4">
+          <div className="text-left">
+            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+              Interval
+            </div>
+            <div className="text-lg font-medium tabular-nums leading-tight text-slate-400">
+              {intervalMs}
+              <span className="text-xs font-medium text-slate-600 ml-1">ms</span>
+            </div>
           </div>
-          <div className="text-3xl font-semibold tabular-nums leading-tight text-slate-100">
-            {intervalMs}
-            <span className="text-base font-medium text-slate-400 ml-1.5">ms</span>
-          </div>
-        </div>
 
-        <div className="text-center">
-          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-            Accuracy
+          <div className="text-center">
+            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+              Accuracy
+            </div>
+            <div className="text-lg font-medium tabular-nums text-slate-400 leading-tight">
+              {score(tally.correct, tally.wrong)}%
+            </div>
           </div>
-          <div className="text-3xl font-semibold tabular-nums text-slate-300 leading-tight">
-            {score(tally.correct, tally.wrong)}%
-          </div>
-        </div>
 
-        <div className="text-right">
-          <div className="text-xs uppercase tracking-[0.16em] text-slate-500">
-            Time left
-          </div>
-          <div className="text-3xl font-semibold tabular-nums text-slate-100 leading-tight">
-            {msLeft == null ? "\u2014" : formatClock(msLeft)}
+          <div className="text-right">
+            <div className="text-[0.6rem] uppercase tracking-[0.16em] text-slate-600">
+              Time left
+            </div>
+            <div className="text-lg font-medium tabular-nums text-slate-400 leading-tight">
+              {msLeft == null ? "\u2014" : formatClock(msLeft)}
+            </div>
           </div>
         </div>
       </div>
