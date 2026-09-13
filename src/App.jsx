@@ -3222,7 +3222,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 375;
+const BUILD_VERSION = 376;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13637,7 +13637,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={compactHome ? "space-y-4" : "space-y-6"}>
+          <div className={`home-type ${compactHome ? "space-y-4" : "space-y-6"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">

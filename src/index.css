@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 
 /* ---------------------------------------------------------------------
    Typeface
@@ -21,6 +22,19 @@
 html,
 body {
   font-family: var(--font-sans);
+}
+
+/* ---------------------------------------------------------------------
+   Home is set in Inter instead of the system face. Inter is a real webfont,
+   so it looks the same on every device — unlike SF, which only Apple
+   hardware actually has — and its wider, more even figures line the tile
+   scores up better. Scoped to Home: everything else stays on SF. */
+.home-type,
+.home-type button,
+.home-type input,
+.home-type select,
+.home-type textarea {
+  font-family: "Inter", var(--font-sans);
 }
 
 /* ---------------------------------------------------------------------
