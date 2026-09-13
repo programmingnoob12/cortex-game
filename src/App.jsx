@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 347;
+const BUILD_VERSION = 348;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7554,49 +7554,6 @@ function gemTierFor(level) {
     GEM_TIERS[1]
   );
 }
-// How far through the CURRENT rank they are, as 0-1, per exercise's own
-// level-up rule — not "percent of a perfect score". An n-back levels up at
-// PASS_THRESHOLD, so 80% IS the top of the bar and anything above it is
-// already a level-up; QNB' carries its own 0.00-0.99 sub-level; RRT steps
-// 30s → 25s → 20s within a premise count; 3D MOT climbs 0.10 at a time
-// inside a tier; CCT walks a fixed ladder of accuracy-at-interval rungs.
-function rankProgressFor(exercise, stat, history, qnbLevel) {
-  const clamp = (v) => Math.max(0, Math.min(1, v));
-  if (!exercise) return 0;
-  switch (exercise.key) {
-    case "iqnb": {
-      const lvl = typeof qnbLevel === "number" ? qnbLevel : stat?.bestAccuracy || 0;
-      return clamp(lvl - Math.floor(lvl));
-    }
-    case "rrt": {
-      // Score is premises + round-seconds/100, and the round shortens
-      // 30 → 25 → 20 twice before the premise count goes up.
-      const score = stat?.bestAccuracy || 0;
-      const seconds = Math.round((score - Math.floor(score)) * 100);
-      if (!seconds) return 0;
-      return clamp((30 - seconds) / 15);
-    }
-    case "motion3d": {
-      const speed = stat?.bestAccuracy || 0;
-      return clamp((speed * 10) % 1);
-    }
-    case "cct": {
-      const rank = cctRankFor(stat?.bestByInterval);
-      const next = CCT_RANKS[rank]; // the rung above the one they hold
-      if (!next) return 1;
-      const held = stat?.bestByInterval?.[next.interval] || 0;
-      return clamp(held / next.accuracy);
-    }
-    default: {
-      // Dual and Quad: the last session's accuracy against the 80% that
-      // actually moves the level, so a full bar means "that run leveled up".
-      const last = (history || []).length ? history[history.length - 1] : null;
-      const acc = typeof last?.accuracy === "number" ? last.accuracy : 0;
-      return clamp(acc / PASS_THRESHOLD);
-    }
-  }
-}
-
 function rankNameFor(level) {
   return gemTierFor(level).label;
 }
@@ -13369,30 +13326,23 @@ function NBackSessionApp() {
                     onAnimationEnd={() => setShineCard(null)}
                     className={`ex-card rounded-xl ${
                       compactHome ? "px-5 py-3.5" : "p-5"
-                    } text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
+                    } text-white text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
                     style={{
-                      background: "#14161A",
-                      border: "1px solid #2C2F34",
-                      color: "#F7F8F8",
+                      backgroundImage: exerciseDeepFill(exColor),
+                      boxShadow:
+                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
+                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
                     }}
                   >
                     {/* Name and score stack on the left, gem sits opposite
                         it at the right edge and larger: it is the thing the
                         eye should land on first. */}
                     <div className="flex items-center justify-between gap-4">
-                      {/* flex-1 so the progress line spans the card rather
-                          than only the width of the exercise's name. */}
-                      <div className="flex-1 min-w-0">
+                      <div>
                         <div className={compactHome ? "text-lg font-semibold" : "text-xl font-semibold"}>
                           {e.title}
                         </div>
-                        <div
-                          className={
-                            compactHome
-                              ? "text-base font-semibold mt-1"
-                              : "text-lg font-semibold mt-1.5"
-                          }
-                        >
+                        <div className={compactHome ? "text-base font-medium mt-1" : "text-lg font-medium mt-2"}>
                           {/* CCT has no N level. Its score is the interval it
                               is being trained at and the best accuracy held
                               at that interval. */}
@@ -13407,56 +13357,6 @@ function NBackSessionApp() {
                                 stat?.bestAccuracy || startingScoreValue(e) || level
                               )}
                         </div>
-                        {/* How far through this rank they are, by the rule
-                            that actually levels the exercise up — 80% on an
-                            n-back, not 100% accuracy. */}
-                        {(() => {
-                          const tier = gemTierFor(bestLevel);
-                          const pct = Math.round(
-                            rankProgressFor(
-                              e,
-                              stat,
-                              exerciseHistory[e.key],
-                              e.key === "iqnb" ? qnbPrimeLevel : undefined
-                            ) * 100
-                          );
-                          const nextLabel =
-                            bestLevel >= MAX_GEM_TIER
-                              ? null
-                              : gemTierFor(bestLevel + 1).label;
-                          return (
-                            <div className={compactHome ? "mt-2.5" : "mt-3.5"}>
-                              {/* On a filled tile the labels stay white —
-                                  the rank's own colour against the exercise's
-                                  colour (pink on orange) was unreadable. The
-                                  bar is the only thing carrying rank colour,
-                                  on a light track so an empty bar still reads
-                                  as a bar. */}
-                              <div
-                                className="rounded-full overflow-hidden"
-                                style={{ height: 2, background: "#2C2F34" }}
-                              >
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${pct}%`, background: tier.color }}
-                                />
-                              </div>
-                              <div
-                                className="flex items-baseline justify-between gap-2 mt-2 font-semibold uppercase whitespace-nowrap"
-                                style={{
-                                  fontSize: compactHome ? "0.6rem" : "0.65rem",
-                                  letterSpacing: "0.1em",
-                                  color: "#6B7280",
-                                }}
-                              >
-                                <span>{tier.label}</span>
-                                <span className="truncate">
-                                  {nextLabel ? `${pct}% to ${nextLabel}` : "Max rank"}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })()}
                       </div>
                       {/* The gem's own drop-shadow is tuned for the
                           near-black page and all but vanishes on a coloured
@@ -13465,10 +13365,12 @@ function NBackSessionApp() {
                           dark disc behind it. */}
                       <span
                         className="inline-flex shrink-0"
-                        /* On a slate card the gem casts an ordinary dark
-                           shadow; the exercise-tinted one existed to survive
-                           a coloured fill. */
-                        style={{ filter: "drop-shadow(0 5px 9px rgba(0,0,0,0.55))" }}
+                        style={{
+                          filter: `drop-shadow(0 5px 7px ${exerciseShadowColor(
+                            exColor,
+                            0.85
+                          )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
+                        }}
                       >
                         <LevelGem level={bestLevel} size={compactHome ? 48 : 64} />
                       </span>
