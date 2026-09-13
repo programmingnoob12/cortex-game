@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 366;
+const BUILD_VERSION = 367;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -20225,6 +20225,8 @@ function motCubeHalfX(width, height) {
 }
 
 const MOT_ZOOM_MIN = 0.45;
+const MOT_LOOK_MAX_YAW = 0.42;   // ~24° left/right
+const MOT_LOOK_MAX_PITCH = 0.34; // ~19° up/down
 const MOT_ZOOM_MAX = 2.2;
 
 function computeMotionCameraDistance(width, height, fovDeg, cubeHalfX) {
@@ -20503,6 +20505,11 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
   // camera distance. A ref (not state) so the wheel handler and the resize
   // handler can both read/write it without re-running the scene effect.
   const motZoomRef = useRef(1);
+  // Drag-to-look. Small angles only — enough to see round a ball that is
+  // hiding behind another, not a free orbit that would let someone spin the
+  // room and lose the plot entirely.
+  const motYawRef = useRef(0);
+  const motPitchRef = useRef(0);
   const cubeHalfXRef = useRef(MOT_CUBE_HALF_X); // live current cube X half-extent — updated by onResize below (not just computed once at mount), so a screen that's wide from the start, or becomes wide later, actually gets a wider room instead of the room staying locked at whatever aspect ratio happened to be measured first
 
   useEffect(() => {
@@ -20697,6 +20704,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
 
     const handleClick = (e) => {
       if (stageRef.current !== "select") return;
+      if (swallowClickAfterDrag()) return; // that click was a look-around
       const rect = renderer.domElement.getBoundingClientRect();
       ctx.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
       ctx.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -20764,13 +20772,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
       // than left at whatever distance happened to be right for the
       // aspect ratio at mount, which is exactly how this ended up clipping
       // on some screen shapes but not others before.
-      camera.position.set(
-        0,
-        0,
-        computeMotionCameraDistance(w, h, MOT_CAMERA_FOV, cubeHalfXRef.current) *
-          motZoomRef.current
-      );
-      camera.lookAt(0, 0, 0);
+      placeCamera(w, h);
       camera.updateProjectionMatrix();
       setCanvasSize({ w, h });
     };
@@ -20794,12 +20796,75 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     // for the containment math — then scaled by the scroll-wheel zoom factor.
     // Recomputed on every resize too (see onResize above), so it stays
     // correct across aspect ratios instead of being tuned for one window shape.
-    const applyCameraDistance = (w, h) => {
+    // The camera always sits on a sphere around the centre of the room: the
+    // radius is the computed framing distance times the zoom, and the two
+    // angles come from dragging. At yaw 0 / pitch 0 this is exactly the old
+    // head-on view.
+    const placeCamera = (w, h) => {
       const base = computeMotionCameraDistance(w, h, MOT_CAMERA_FOV, cubeHalfXRef.current);
-      camera.position.set(0, 0, base * motZoomRef.current);
+      const r = base * motZoomRef.current;
+      const yaw = motYawRef.current;
+      const pitch = motPitchRef.current;
+      camera.position.set(
+        r * Math.cos(pitch) * Math.sin(yaw),
+        r * Math.sin(pitch),
+        r * Math.cos(pitch) * Math.cos(yaw)
+      );
       camera.lookAt(0, 0, 0);
     };
-    applyCameraDistance(width, height);
+    const applyCameraDistance = (w, h) => placeCamera(w, h);
+    const hostSize = () => [
+      Math.max(MOT_MIN_CANVAS_DIM, host.clientWidth || MOT_MIN_CANVAS_DIM),
+      Math.max(MOT_MIN_CANVAS_DIM, host.clientHeight || MOT_MIN_CANVAS_DIM),
+    ];
+    placeCamera(width, height);
+
+    // Drag anywhere on the scene to look around it. A drag that moves more
+    // than a few pixels also swallows the click it ends on, so looking round
+    // a cluster never picks a ball by accident.
+    let dragging = false;
+    let dragMoved = false;
+    let lastX = 0;
+    let lastY = 0;
+    const onPointerDown = (e) => {
+      if (e.button != null && e.button !== 0) return;
+      dragging = true;
+      dragMoved = false;
+      lastX = e.clientX;
+      lastY = e.clientY;
+    };
+    const onPointerMove = (e) => {
+      if (!dragging) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (Math.abs(dx) + Math.abs(dy) > 2) dragMoved = true;
+      const clamp = (v, m) => Math.max(-m, Math.min(m, v));
+      motYawRef.current = clamp(motYawRef.current + dx * 0.004, MOT_LOOK_MAX_YAW);
+      motPitchRef.current = clamp(motPitchRef.current + dy * 0.004, MOT_LOOK_MAX_PITCH);
+      const [w, h] = hostSize();
+      placeCamera(w, h);
+    };
+    const onPointerUp = () => {
+      dragging = false;
+      // Cleared on the next frame, after the click event this release
+      // produces has been through the click handler below.
+      if (dragMoved) setTimeout(() => (dragMoved = false), 0);
+    };
+    const swallowClickAfterDrag = () => dragMoved;
+    mount.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+
+    // Double-click puts the view back where it started.
+    const onDoubleClick = () => {
+      motYawRef.current = 0;
+      motPitchRef.current = 0;
+      const [w, h] = hostSize();
+      placeCamera(w, h);
+    };
+    mount.addEventListener("dblclick", onDoubleClick);
 
     // Scroll to zoom. Multiplicative so each notch feels the same at any
     // distance, clamped so the camera can neither end up inside the box nor
@@ -20904,6 +20969,10 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
     return () => {
       mount.removeEventListener("click", handleClick);
       mount.removeEventListener("wheel", handleWheel);
+      mount.removeEventListener("pointerdown", onPointerDown);
+      mount.removeEventListener("dblclick", onDoubleClick);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
       resizeObserver.disconnect();
       cancelAnimationFrame(ctx.animFrame);
       ballGeo.dispose();
@@ -21172,14 +21241,43 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           component's layout had to change. */}
       {sessionDone && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-8">
-          <div className="max-w-sm w-full space-y-6 text-center">
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Session complete
-            </h2>
-            <p className="text-slate-400 text-lg leading-relaxed">
-              That's {exercise.title} done. Look over your numbers for as long
-              as you like.
-            </p>
+          <div className="max-w-sm w-full space-y-6">
+            <div className="text-center">
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Session complete
+              </h2>
+              <div className="text-slate-400 text-lg mt-2">
+                {exercise.title} · {Math.round(trainedMsRef.current / 60000)} min
+              </div>
+            </div>
+
+            {/* The numbers the card used to send them off to look for, on
+                the card itself — there is nothing behind this overlay but
+                the balls. */}
+            <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-6 space-y-3">
+              <div className="text-lg text-slate-300">
+                Rounds:{" "}
+                <span className="text-slate-100 font-medium">
+                  {tally.correct + tally.wrong}
+                </span>
+              </div>
+              <div className="text-lg text-slate-300">
+                All five:{" "}
+                <span className="text-slate-100 font-medium">
+                  {tally.correct}/{Math.max(1, tally.correct + tally.wrong)}
+                </span>
+              </div>
+              <div className="text-lg text-slate-300">
+                Speed reached:{" "}
+                <span
+                  className="font-medium"
+                  style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP)).color }}
+                >
+                  {speed.toFixed(2)}
+                </span>
+              </div>
+            </div>
+
             <button
               onClick={onFinish}
               style={{ "--ex": EXERCISE_COLORS[exercise.key] || "#4CB9D8" }}
