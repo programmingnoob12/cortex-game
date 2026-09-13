@@ -2110,6 +2110,8 @@ const CUSTOM_CARD_GAP = 16;
 // How long the dropped card takes to settle into its slot.
 const CUSTOM_DROP_MS = 190;
 const CUSTOM_DRAG_HINT_KEY = "cortex.customDragHint";
+// Points at the Account button once, to say what is behind it.
+const BINAURAL_HINT_KEY = "cortex.binauralHint";
 
 function buildRegimeExercises(regime) {
   const steps = regime.steps.map((step) => ({
@@ -3094,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 340;
+const BUILD_VERSION = 341;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -10966,6 +10968,20 @@ function NBackSessionApp() {
   // they allow it, the 6pm reminder is on from then on, and if they don't,
   // it is never asked again from here (the browser would refuse anyway —
   // it has to be changed in the site's settings after a block).
+  const [binauralHintSeen, setBinauralHintSeen] = useState(() => {
+    try {
+      return localStorage.getItem(BINAURAL_HINT_KEY) === "1";
+    } catch {
+      return true; // without storage there is no way to stop showing it, so never start
+    }
+  });
+  const retireBinauralHint = () => {
+    setBinauralHintSeen(true);
+    try {
+      localStorage.setItem(BINAURAL_HINT_KEY, "1");
+    } catch { /* nothing to persist to */ }
+  };
+
   const [remindersOn, setRemindersOn] = useState(
     () => notificationsSupported() && Notification.permission === "granted"
   );
@@ -13175,7 +13191,13 @@ function NBackSessionApp() {
                       },
                     ]
                   : []),
-                { label: "Account", onClick: () => setMainView("account") },
+                {
+                  label: "Account",
+                  onClick: () => {
+                    retireBinauralHint();
+                    setMainView("account");
+                  },
+                },
                 {
                   label: "💬 Feedback",
                   onClick: () => {
@@ -17376,20 +17398,51 @@ function NBackSessionApp() {
           onClick={() => setMainView("achievements")}
           /* Top right while the Leaderboard is hidden. When that comes back it
              takes this corner and Achievements returns to the left. */
-          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-1.5 sm:gap-2.5 bg-cyan-500/10 border border-cyan-400 text-cyan-300 transition-all duration-200 hover:scale-105 rounded-full py-2 px-3 sm:py-3 sm:px-6 text-sm sm:text-base font-medium shadow-lg shadow-black/40 hover:shadow-xl"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
         >
           <span className="text-lg">🏅</span>
           <span className="hidden sm:inline">Achievements</span>
-          <span className="text-xs font-semibold bg-cyan-500/10 text-cyan-300 rounded-full px-2 py-0.5">
+          <span className="text-xs font-semibold text-slate-400 tabular-nums">
             {ACHIEVEMENTS_CATALOG.filter((a) => isAchievementUnlocked(a, achievementState)).length}/
             {ACHIEVEMENTS_CATALOG.length}
           </span>
         </button>
       )}
 
+      {/* Says what is behind Account, once. Goes for good the first time they
+          open it. Desktop only — on a phone Account is a chip in the page. */}
+      {mainView === "home" && !binauralHintSeen && (
+        <div className="hidden sm:block fixed bottom-[5.5rem] right-6 z-30 w-60">
+          <div
+            className="rounded-lg px-4 py-3 border text-sm"
+            style={{
+              borderColor: "#3A3E46",
+              background: "#0F1115",
+              color: "#F7F8F8",
+            }}
+          >
+            Turn binaural beats off / on
+          </div>
+          <svg
+            width="30"
+            height="30"
+            viewBox="0 0 30 30"
+            fill="none"
+            className="absolute right-8 top-full pointer-events-none"
+            aria-hidden="true"
+          >
+            <path d="M8 2C8 2 24 6 22 24" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" />
+            <path d="M15 18 22 26 28 17" stroke="#6B7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+
       {mainView === "home" && (
         <button
-          onClick={() => setMainView("account")}
+          onClick={() => {
+            retireBinauralHint();
+            setMainView("account");
+          }}
           className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
           {SHOW_PROFILE_IDENTITY_EDIT && (
