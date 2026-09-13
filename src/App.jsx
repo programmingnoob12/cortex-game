@@ -3101,7 +3101,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 359;
+const BUILD_VERSION = 360;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13528,7 +13528,7 @@ function NBackSessionApp() {
                           card. A second shadow on the wrapper follows the
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
-                      <span className="inline-flex shrink-0">
+                      <span className="inline-flex shrink-0 mr-3 sm:mr-5">
                         <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
                       </span>
                     </div>
@@ -18960,7 +18960,6 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   if (stage === "setup") {
     return (
       <div className="space-y-6">
-        {homeLink}
         <div>
           <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{exercise.title}</h1>
         </div>
