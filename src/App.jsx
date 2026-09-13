@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 349;
+const BUILD_VERSION = 350;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13990,11 +13990,10 @@ function NBackSessionApp() {
                     // appeared again after a single tick somewhere else.
                     setTutorialDismissed(tutorialStepExercise.key, true);
                   }
-                  // Straight into the round. The setup screen only exists for
-                  // people who did not just read the tutorial. RRT runs its
-                  // own setup stage, so it gets a nudge rather than startTask.
+                  // Its own setup screen, same as the other exercises: it
+                  // is where the level and the round length are read before
+                  // anything starts.
                   setMainView("app");
-                  setRrtAutoStart((v) => v + 1);
                 }}
               />
             ) : tutorialStepExercise.key === "cct" ? (
@@ -18204,6 +18203,11 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   const [reachedQuestion, setReachedQuestion] = useState(false);
   // Read inside triggerFlash, which is defined above the hint state below.
   const hideTimerHintRef = useRef(false);
+  // A whole round running out with the person never once pressing Next is
+  // not training, it is an empty chair — so the next round does not arm
+  // itself and the checkbox has to be ticked again.
+  const touchedRoundRef = useRef(false);
+  const afkRef = useRef(false);
 
   // Difficulty progression: every 20 correct answers in a row, RRT steps up
   // once. Each premise-count tier has 3 steps — the round length drops 5s
@@ -18366,6 +18370,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       setMaxPremiseSeen(0);
       setReachedQuestion(false);
       setMsLeft(rm);
+      touchedRoundRef.current = false;
       setTimerRunning(keepTimerRunning);
       setFlash(null);
       setStage("premises");
@@ -18405,7 +18410,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
     // While the timer pointer is still on screen, the next round does not
     // arm itself: the person has to use the checkbox, which is the thing the
     // pointer is teaching. Once it is ticked away, rounds run on.
-    const keepTimerRunning = timerRunning && hideTimerHintRef.current;
+    const keepTimerRunning =
+      timerRunning && hideTimerHintRef.current && !afkRef.current;
+    afkRef.current = false;
     const totalElapsedMs = elapsedMs + Math.max(0, ROUND_MS - msLeft);
     setElapsedMs(totalElapsedMs);
     setFlash(kind);
@@ -18476,6 +18483,9 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
   useEffect(() => {
     if (timerRunning && !paused && msLeft <= 0 && !flash && (stage === "premises" || stage === "question")) {
       missTimeoutRef.current = setTimeout(() => {
+        // Nothing touched for the whole round — treat it as away from the
+        // screen and hold the next one until the timer is ticked again.
+        if (!touchedRoundRef.current) afkRef.current = true;
         setTally((t) => ({ ...t, missed: t.missed + 1 }));
         pushRoundHistory(null, false);
         setCorrectStreak(0);
@@ -18545,6 +18555,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
 
   const answer = (value) => {
     if (flash) return;
+    touchedRoundRef.current = true;
     const correct = puzzle.conclusion.answer === value;
     pushRoundHistory(value, correct);
     setTally((t) => ({
@@ -19500,16 +19511,26 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
                 </div>
               </div>
 
-              <div
-                className="flex items-center justify-center gap-3.5 py-5 px-1 flex-wrap text-center"
-                style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
-              >
-                <RrtItemTile item={premise.subject} size={46} />
-                <span className="text-slate-100 text-2xl font-medium">
-                  {rrtRelationPhrase(premise.relation)}
-                </span>
-                <RrtItemTile item={premise.object} size={46} />
-              </div>
+              {(() => {
+                const phrase = rrtRelationPhrase(premise.relation);
+                const long = phrase.length > 12;
+                return (
+                  <div
+                    className="flex items-center justify-center gap-2.5 py-5 px-1 flex-nowrap text-center"
+                    style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
+                  >
+                    <RrtItemTile item={premise.subject} size={long ? 40 : 46} />
+                    <span
+                      className={`text-slate-100 font-medium whitespace-nowrap ${
+                        long ? "text-xl" : "text-2xl"
+                      }`}
+                    >
+                      {phrase}
+                    </span>
+                    <RrtItemTile item={premise.object} size={long ? 40 : 46} />
+                  </div>
+                );
+              })()}
             </div>
 
             <div
@@ -19527,6 +19548,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
                 </button>
                 <button
                   onClick={() => {
+                    touchedRoundRef.current = true;
                     if (isLast) {
                       setReachedQuestion(true);
                       setStage("question");
@@ -19574,17 +19596,34 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
               </div>
             </div>
 
-            <div
-              className="flex items-center justify-center gap-3.5 py-5 px-1 flex-wrap text-center"
-              style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
-            >
-              <RrtItemTile item={conclusion.subject} size={46} />
-              <span className="text-slate-100 text-2xl font-medium">
-                {rrtRelationPhrase(conclusion.relation)}
-              </span>
-              <RrtItemTile item={conclusion.object} size={46} />
-              <span className="text-slate-100 text-2xl font-medium">?</span>
-            </div>
+            {(() => {
+              const phrase = rrtRelationPhrase(conclusion.relation);
+              // Two tiles, a phrase and a "?" have to fit one line inside a
+              // 24rem card, so the long relations step down a size rather
+              // than wrapping.
+              const long = phrase.length > 12;
+              return (
+                <div
+                  className="flex items-center justify-center gap-2.5 py-5 px-1 flex-nowrap text-center"
+                  style={{ minHeight: RRT_PROPOSITION_MIN_HEIGHT }}
+                >
+                  <RrtItemTile item={conclusion.subject} size={long ? 40 : 46} />
+                  <span
+                    className={`text-slate-100 font-medium whitespace-nowrap ${
+                      long ? "text-xl" : "text-2xl"
+                    }`}
+                  >
+                    {phrase}
+                  </span>
+                  <RrtItemTile item={conclusion.object} size={long ? 40 : 46} />
+                  <span
+                    className={`text-slate-100 font-medium ${long ? "text-xl" : "text-2xl"}`}
+                  >
+                    ?
+                  </span>
+                </div>
+              );
+            })()}
           </div>
 
           <div
