@@ -3110,7 +3110,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 364;
+const BUILD_VERSION = 365;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13318,18 +13318,12 @@ function NBackSessionApp() {
                       return (
                         <div
                           key={a.id}
-                          className={`rounded-xl p-6 border transition-colors ${
-                            isUnlocked
-                              ? `${groupAccent.bg} ${groupAccent.border}`
-                              : "bg-slate-900 border-slate-800"
-                          }`}
+                          className="rounded-xl p-6 border bg-slate-900 border-slate-800"
                         >
                           <div className="flex items-center gap-6">
                             <div
-                              className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center text-3xl ${
-                                isUnlocked
-                                  ? `bg-gradient-to-br ${groupAccent.grad} shadow-lg shadow-black/30`
-                                  : "bg-slate-800 grayscale opacity-50"
+                              className={`w-14 h-14 shrink-0 rounded-full flex items-center justify-center text-3xl bg-slate-800 ${
+                                isUnlocked ? "" : "grayscale opacity-50"
                               }`}
                             >
                               {a.icon}
@@ -13351,7 +13345,11 @@ function NBackSessionApp() {
                             </div>
                             {isUnlocked && (
                               <div className="shrink-0 text-right">
-                                <div className={`text-base font-semibold ${groupAccent.text}`}>
+                                {/* Same green as the progress bar above. */}
+                                <div
+                                  className="text-base font-semibold"
+                                  style={{ color: "#1E982B" }}
+                                >
                                   ✓ Achieved
                                 </div>
                                 {achievedOn && (
