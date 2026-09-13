@@ -316,18 +316,27 @@ button.ex-card.ex-card-shine::after {
 /* The N-back grid. Two regimes: beside its answer buttons on a wide screen,
    where height is the binding constraint, and above them on a narrow one,
    where the buttons need roughly a quarter of the viewport underneath. */
+/* The lattice is square, so its size is whichever runs out first — the width
+   beside it or the height above and below it. Both are in the rule, so no
+   screen shape can leave it tiny (a phone) or run it off the bottom (a short
+   wide screen like a Nest Hub).
+
+   Under lg the answer buttons sit UNDER the grid: two rows of them plus the
+   title and padding is about 15rem of vertical chrome. From lg they sit in
+   columns either side, which costs width (about 26rem for both columns and
+   the gaps) and almost no height. */
 .nback-box {
-  width: max(240px, min(100%, 1400px, calc(100vh - 140px)));
+  width: min(92vw, calc(100dvh - 15rem), 34rem);
 }
-@media (max-width: 767px) {
-  /* The columns either side leave the grid the rest of the row, and it is
-     square, so its height is what has to fit — not a fixed sum of the old
-     stacked layout's parts. */
+/* Tablets still stack the buttons, but there is room for a bigger square. */
+@media (min-width: 700px) and (max-width: 1023px) {
   .nback-box {
-    /* Width comes from the flex row (the two answer columns take theirs
-       first); this only stops the square growing taller than the screen. */
-    width: auto;
-    max-width: calc(100vh - 150px);
+    width: min(92vw, calc(100dvh - 16rem), 40rem);
+  }
+}
+@media (min-width: 1024px) {
+  .nback-box {
+    width: min(calc(100vw - 26rem), calc(100dvh - 9rem), 46rem);
   }
 }
 

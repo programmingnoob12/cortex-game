@@ -3088,14 +3088,15 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 337;
+const BUILD_VERSION = 338;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
 // One short line each, replaced wholesale every version — this is a "what
 // am I looking at" note, not a history.
 const BUILD_NOTES = [
-  "San Francisco set as the app's typeface",
+  "N-back grid sized off width AND height, every screen shape",
+  "Answer buttons under the grid below 1024px",
 ];
 
 // A short synthesized "clink" for button presses. Generated with WebAudio
@@ -12178,12 +12179,12 @@ function NBackSessionApp() {
           onClick={() => handlePress(m)}
           disabled={!armed}
           style={toneStyle}
-          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 md:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
+          className={`w-full flex-1 transition-colors duration-150 rounded-xl px-2 flex flex-col items-center justify-center gap-0.5 lg:gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed ${cls}`}
         >
-          <span className="text-[0.6rem] sm:text-xs md:text-sm font-medium uppercase tracking-wide opacity-70">
+          <span className="text-[0.65rem] sm:text-xs lg:text-sm font-medium uppercase tracking-wide opacity-70">
             {meta.label}
           </span>
-          <span className="text-2xl sm:text-3xl md:text-4xl font-semibold leading-none">
+          <span className="text-2xl sm:text-3xl lg:text-4xl font-semibold leading-none">
             {MODALITY_KEY_LABEL[m]}
           </span>
         </button>
@@ -12192,7 +12193,7 @@ function NBackSessionApp() {
     const spaced = (list) =>
       list.map((el, i) => (
         <Fragment key={el.key}>
-          {i > 0 && <div className="h-3 md:h-6 lg:h-10 shrink-0" />}
+          {i > 0 && <div className="hidden lg:block lg:h-8 xl:h-10 shrink-0" />}
           {el}
         </Fragment>
       ));
@@ -12258,7 +12259,7 @@ function NBackSessionApp() {
           // The running screen is the one view that has to fit a square grid
           // plus its answer buttons inside the viewport, so it gets much
           // tighter vertical padding than the scrollable screens.
-          ? "items-center sm:items-start justify-center px-2 md:px-4 pt-14 sm:pt-2 pb-2"
+          ? "items-center justify-center px-2 md:px-4 pt-14 sm:pt-6 pb-3"
           : "items-center justify-center p-5 sm:p-8 lg:p-12"
       }`}
     >
@@ -16295,19 +16296,16 @@ function NBackSessionApp() {
                 That buys the lattice the vertical space the button row used
                 to take, so the stimulus is bigger on the same screen, and it
                 puts the two hands' targets where the hands already are. */}
-            {/* A column of answers down each side at every width, so both
-                thumbs sit on their own targets and the grid keeps the
-                vertical space a button row underneath would have taken. */}
-            <div className="flex flex-row items-center justify-between gap-2 sm:gap-2.5 w-full">
-            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[18vw] min-w-[3.9rem] max-w-28 lg:max-w-36 shrink-0">
+            {/* Columns either side where there is room for them; under the
+                grid on anything narrower, where a column each side costs the
+                lattice half the screen. */}
+            <div className="flex flex-col lg:flex-row items-center lg:items-stretch justify-center lg:justify-between gap-2.5 w-full">
+            <div className="order-2 lg:order-1 flex lg:flex-col justify-between gap-2.5 lg:gap-0 h-16 lg:h-auto w-full lg:w-32 xl:w-36 shrink-0">
               {nbackSideButtons.left}
             </div>
             <div
-              className="nback-box"
+              className="nback-box order-1 lg:order-2"
               style={{
-                flex: "1 1 0%",
-                minWidth: 0,
-                alignSelf: "center",
                 aspectRatio: "1 / 1",
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
@@ -16356,7 +16354,7 @@ function NBackSessionApp() {
                 );
               })}
             </div>
-            <div className="flex flex-col justify-between gap-2 md:gap-0 w-[18vw] min-w-[3.9rem] max-w-28 lg:max-w-36 shrink-0">
+            <div className="order-3 flex lg:flex-col justify-between gap-2.5 lg:gap-0 h-16 lg:h-auto w-full lg:w-32 xl:w-36 shrink-0">
               {nbackSideButtons.right}
             </div>
             </div>
