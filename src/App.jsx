@@ -3096,7 +3096,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 346;
+const BUILD_VERSION = 347;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13369,12 +13369,11 @@ function NBackSessionApp() {
                     onAnimationEnd={() => setShineCard(null)}
                     className={`ex-card rounded-xl ${
                       compactHome ? "px-5 py-3.5" : "p-5"
-                    } text-white text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
+                    } text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
                     style={{
-                      backgroundImage: exerciseDeepFill(exColor),
-                      boxShadow:
-                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                      background: "#14161A",
+                      border: "1px solid #2C2F34",
+                      color: "#F7F8F8",
                     }}
                   >
                     {/* Name and score stack on the left, gem sits opposite
@@ -13387,7 +13386,13 @@ function NBackSessionApp() {
                         <div className={compactHome ? "text-lg font-semibold" : "text-xl font-semibold"}>
                           {e.title}
                         </div>
-                        <div className={compactHome ? "text-base font-medium mt-1" : "text-lg font-medium mt-2"}>
+                        <div
+                          className={
+                            compactHome
+                              ? "text-base font-semibold mt-1"
+                              : "text-lg font-semibold mt-1.5"
+                          }
+                        >
                           {/* CCT has no N level. Its score is the interval it
                               is being trained at and the best accuracy held
                               at that interval. */}
@@ -13429,33 +13434,24 @@ function NBackSessionApp() {
                                   as a bar. */}
                               <div
                                 className="rounded-full overflow-hidden"
-                                style={{ height: 3, background: "rgba(255,255,255,0.22)" }}
+                                style={{ height: 2, background: "#2C2F34" }}
                               >
                                 <div
                                   className="h-full rounded-full"
-                                  style={{
-                                    width: `${Math.max(pct, 1.5)}%`,
-                                    background: tier.color,
-                                    boxShadow: `0 0 6px ${tier.color}`,
-                                  }}
+                                  style={{ width: `${pct}%`, background: tier.color }}
                                 />
                               </div>
                               <div
                                 className="flex items-baseline justify-between gap-2 mt-2 font-semibold uppercase whitespace-nowrap"
                                 style={{
-                                  fontSize: compactHome ? "0.58rem" : "0.62rem",
-                                  letterSpacing: "0.09em",
-                                  textShadow: "none",
+                                  fontSize: compactHome ? "0.6rem" : "0.65rem",
+                                  letterSpacing: "0.1em",
+                                  color: "#6B7280",
                                 }}
                               >
-                                <span style={{ color: "rgba(255,255,255,0.92)" }}>
-                                  {tier.label}
-                                </span>
-                                <span
-                                  className="truncate"
-                                  style={{ color: "rgba(255,255,255,0.6)" }}
-                                >
-                                  {nextLabel ? `${pct}% \u2192 ${nextLabel}` : "Max rank"}
+                                <span>{tier.label}</span>
+                                <span className="truncate">
+                                  {nextLabel ? `${pct}% to ${nextLabel}` : "Max rank"}
                                 </span>
                               </div>
                             </div>
@@ -13469,12 +13465,10 @@ function NBackSessionApp() {
                           dark disc behind it. */}
                       <span
                         className="inline-flex shrink-0"
-                        style={{
-                          filter: `drop-shadow(0 5px 7px ${exerciseShadowColor(
-                            exColor,
-                            0.85
-                          )}) drop-shadow(0 1px 3px ${exerciseShadowColor(exColor, 0.7)})`,
-                        }}
+                        /* On a slate card the gem casts an ordinary dark
+                           shadow; the exercise-tinted one existed to survive
+                           a coloured fill. */
+                        style={{ filter: "drop-shadow(0 5px 9px rgba(0,0,0,0.55))" }}
                       >
                         <LevelGem level={bestLevel} size={compactHome ? 48 : 64} />
                       </span>
