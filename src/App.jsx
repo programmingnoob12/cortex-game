@@ -2261,13 +2261,26 @@ function regimeFullMinutes(regime) {
 // five more per session finished. Null once the cap covers the longest
 // exercise in the regime — at that point nothing is being shortened and the
 // ramp is over.
+// A built regime carries its own step: 0 turns the ease-in off entirely,
+// anything else is both the first session's cap and how much each finished
+// session adds. The ready-made regimes have no step of their own and use
+// the default five.
+const RAMP_STEP_CHOICES = [0, 5, 10, 15];
+
+function rampStepFor(regime) {
+  const step = regime?.rampStep;
+  return step === undefined || step === null ? RAMP_STEP_MINUTES : step;
+}
+
 function rampMinutesFor(regime, sessionsDone) {
+  const step = rampStepFor(regime);
+  if (!step) return null; // eased in off for this regime
   const longest = (regime?.steps || []).reduce(
-    (max, step) => Math.max(max, step.minutes || 0),
+    (max, s) => Math.max(max, s.minutes || 0),
     0
   );
-  if (!longest || longest <= RAMP_FIRST_MINUTES) return null;
-  const cap = RAMP_FIRST_MINUTES + (sessionsDone || 0) * RAMP_STEP_MINUTES;
+  if (!longest || longest <= step) return null;
+  const cap = step + (sessionsDone || 0) * step;
   if (cap >= longest) return null;
   return cap;
 }
@@ -3251,7 +3264,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 383;
+const BUILD_VERSION = 384;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9155,6 +9168,7 @@ function NBackSessionApp() {
   const [customName, setCustomName] = useState(""); // its name, in the builder
   const [deleteRegimeConfirm, setDeleteRegimeConfirm] = useState(null); // { id, name } of the built regime awaiting a yes
   const [customEditId, setCustomEditId] = useState(null); // which one is being edited, null = a new one
+  const [customRampStep, setCustomRampStep] = useState(RAMP_STEP_MINUTES); // minutes added per session, 0 = no ease-in
   // Reordering is a pointer drag, not HTML5 drag-and-drop: the native one
   // drew nothing while dragging (so it read as a guess), and a draggable
   // card also swallows the pointer from the minutes slider inside it, which
@@ -11307,6 +11321,7 @@ function NBackSessionApp() {
     accent: "indigo",
     custom: true,
     steps: entry.steps,
+    rampStep: entry.rampStep,
   });
   // Every regime lookup goes through here, since built regimes aren't in
   // REGIMES.
@@ -12273,9 +12288,9 @@ function NBackSessionApp() {
 
   const startRegime = (key) => startRegimeWithSteps(key, null);
 
-  const startRegimeWithSteps = (key, stepsOverride) => {
+  const startRegimeWithSteps = (key, stepsOverride, rampStepOverride) => {
     const regime = stepsOverride
-      ? { key, title: "Custom", steps: stepsOverride }
+      ? { key, title: "Custom", steps: stepsOverride, rampStep: rampStepOverride }
       : findRegime(key);
     if (!regime || !regime.steps.length) return;
     const built = buildRegimeExercises(regime, rampMinutesForKey(key, regime));
@@ -12450,6 +12465,7 @@ function NBackSessionApp() {
     setCustomEditId(entry ? entry.id : null);
     setCustomName(entry ? entry.name : "");
     setCustomDraft(entry ? entry.steps.map((s) => ({ ...s })) : []);
+    setCustomRampStep(entry ? rampStepFor(entry) : RAMP_STEP_MINUTES);
     setMainView("custom");
   };
 
@@ -12572,7 +12588,7 @@ function NBackSessionApp() {
     const name =
       customName.trim() ||
       `Custom ${customRegimes.length + (customEditId ? 0 : 1)}`.trim();
-    const entry = { id, name, steps };
+    const entry = { id, name, steps, rampStep: customRampStep };
     setCustomRegimes(
       customEditId
         ? customRegimes.map((r) => (r.id === id ? entry : r))
@@ -12580,7 +12596,7 @@ function NBackSessionApp() {
     );
     // findRegime reads customRegimes, which this render has not updated
     // yet, so the steps are handed over directly.
-    startRegimeWithSteps(`custom:${id}`, steps);
+    startRegimeWithSteps(`custom:${id}`, steps, customRampStep);
   };
 
   const chooseRegime = (key) => {
@@ -13309,6 +13325,36 @@ function NBackSessionApp() {
                 maxLength={28}
                 className="mt-5 w-full bg-slate-900 border border-slate-700/70 focus:border-slate-500 outline-none rounded-lg px-5 py-3.5 text-xl font-medium text-slate-100 placeholder-slate-600"
               />
+
+              {/* How hard this regime starts. Off means it runs at full
+                  length from the very first session. */}
+              <div className="mt-5">
+                <div className="text-base text-slate-300">Ease in</div>
+                <div className="mt-2 inline-flex rounded-lg border border-slate-700/60 bg-slate-800 p-1 gap-1">
+                  {RAMP_STEP_CHOICES.map((choice) => {
+                    const on = customRampStep === choice;
+                    return (
+                      <button
+                        key={choice}
+                        onClick={() => setCustomRampStep(choice)}
+                        aria-pressed={on}
+                        className={`rounded-md px-4 py-2 text-base transition-colors ${
+                          on
+                            ? "bg-slate-700 text-slate-100"
+                            : "text-slate-400 hover:text-slate-100"
+                        }`}
+                      >
+                        {choice === 0 ? "Off" : `${choice} min`}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-slate-500 text-sm mt-2">
+                  {customRampStep === 0
+                    ? "Every exercise runs its full length from the first session."
+                    : `Every exercise starts at ${customRampStep} minutes and adds ${customRampStep} more each session you finish, until it is at full length.`}
+                </p>
+              </div>
             </div>
 
             {/* Only worth saying once there is something to reorder. */}
