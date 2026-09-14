@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 388;
+const BUILD_VERSION = 389;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9169,19 +9169,10 @@ function NBackSessionApp() {
       return {};
     }
   });
-  // Which regimes have already had the ease-in screen. Separate from the
-  // ramp count so an unfinished first session does not mean it plays again.
-  const rampIntroSeenRef = useRef(
-    (() => {
-      try {
-        const raw = mirrorGet("ramp-intro-seen");
-        const parsed = raw ? JSON.parse(raw) : null;
-        return parsed && typeof parsed === "object" ? parsed : {};
-      } catch {
-        return {};
-      }
-    })()
-  );
+  // The regime the ease-in screen last played for. It plays again whenever
+  // that changes — moving to a different regime is the thing worth
+  // explaining, and moving back is a change too.
+  const rampIntroRegimeRef = useRef(mirrorGet("ramp-intro-regime") || null);
   const regimeRampRef = useRef(regimeRamp);
   useEffect(() => { regimeRampRef.current = regimeRamp; }, [regimeRamp]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
@@ -9923,13 +9914,10 @@ function NBackSessionApp() {
         // no saved per-exercise tutorial dismissals yet
       }
       try {
-        const res = await window.storage.get("ramp-intro-seen", false);
-        if (res && res.value) {
-          const parsed = JSON.parse(res.value);
-          if (parsed && typeof parsed === "object") {
-            mirrorSet("ramp-intro-seen", res.value);
-            rampIntroSeenRef.current = { ...parsed, ...rampIntroSeenRef.current };
-          }
+        const res = await window.storage.get("ramp-intro-regime", false);
+        if (res && res.value && !rampIntroRegimeRef.current) {
+          mirrorSet("ramp-intro-regime", res.value);
+          rampIntroRegimeRef.current = res.value;
         }
       } catch (err) {
         // never shown on this account yet
@@ -12238,30 +12226,29 @@ function NBackSessionApp() {
 
   const proceedStartFromHome = () => {
     unlockLetterAudio();
-    // First time on this regime, the opening line is not a motivation line:
-    // it is the explanation for why today is shorter than the regime says.
+    // Moving to a regime they were not on last time they trained, and that
+    // regime eases in: explain it before anything else happens. The screen
+    // holds the session back entirely — it is dismissed by its button, and
+    // only then does the exercise open, so the setup screen is never seen
+    // underneath it.
     const key = regimeKeyRef.current || regimeKey;
     const ramp = rampMinutesForKey(key);
-    // Shown the first time they train a regime they have moved to, and not
-    // again — the ramp count only moves on a finished session, so it cannot
-    // be the thing that decides this.
-    const firstEver = !!ramp && !rampIntroSeenRef.current[key];
-    if (firstEver) {
-      rampIntroSeenRef.current = { ...rampIntroSeenRef.current, [key]: true };
-      const json = JSON.stringify(rampIntroSeenRef.current);
-      mirrorSet("ramp-intro-seen", json);
-      if (window.storage) safeStorageSet("ramp-intro-seen", json, false);
+    if (ramp && rampIntroRegimeRef.current !== key) {
+      rampIntroRegimeRef.current = key;
+      mirrorSet("ramp-intro-regime", key);
+      if (window.storage) safeStorageSet("ramp-intro-regime", key, false);
+      setRampIntro({ minutes: ramp, then: openSessionFromHome });
+      return;
     }
-    if (firstEver) {
-      // Held until they dismiss it: this one is information, not a mood, so
-      // it waits rather than timing out while they are still reading.
-      setRampIntro({ minutes: ramp });
-    } else {
-      setSessionStartLine(
-        MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
-      );
-      setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
-    }
+    setSessionStartLine(
+      MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
+    );
+    setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+    openSessionFromHome();
+  };
+
+  // Everything Start Training does once any opening screen is out of the way.
+  const openSessionFromHome = () => {
     // If we're currently parked on the overview "exercise" (e.g. from a
     // previous visit), land on the first exercise in the regime instead of it
     // — restoring whatever level they'd actually reached there, not always
@@ -17969,7 +17956,7 @@ function NBackSessionApp() {
                 "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.18) 0%, rgba(76,185,216,0.06) 46%, transparent 72%)",
             }}
           />
-          <div className="relative max-w-xl text-center space-y-6">
+          <div className="relative max-w-xl text-center space-y-10">
             <div
               className="text-2xl sm:text-3xl font-semibold tracking-tight"
               style={{ animation: "rampIntroRise 0.7s 0.15s ease-out both" }}
@@ -17977,17 +17964,18 @@ function NBackSessionApp() {
               Easing you in.
             </div>
             <div
-              className="text-lg sm:text-xl font-medium text-slate-100 space-y-2"
+              className="text-lg sm:text-xl font-medium text-slate-100 space-y-4"
               style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.5s ease-out both" }}
             >
-              <div>Today is {rampIntro.minutes} minutes per exercise.</div>
-              <div>
-                Every session adds {rampIntro.minutes} minutes until you're doing the
-                full regime.
-              </div>
+              <div>Every exercise starts at {rampIntro.minutes} minutes.</div>
+              <div>{rampIntro.minutes} mins are added each session.</div>
             </div>
             <button
-              onClick={() => setRampIntro(null)}
+              onClick={() => {
+                const then = rampIntro.then;
+                setRampIntro(null);
+                then?.();
+              }}
               style={{ animation: "rampIntroRise 0.7s 1s ease-out both" }}
               className="mx-auto block rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors px-8 py-3 text-lg font-medium"
             >
