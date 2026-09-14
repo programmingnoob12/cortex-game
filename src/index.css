@@ -24,6 +24,17 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Below this the app is not readable at any layout: the cards would be a
+   column of single words and the buttons would wrap into stacks. Rather than
+   letting it reflow into that, the page stops shrinking at 360px and the app
+   simply gets clipped at the window edge (the root element hides horizontal
+   overflow), which is what a narrow desktop drag should look like — the
+   layout intact, just partly out of view. Every real phone is 360px or
+   wider, so nothing in normal use ever meets this floor. */
+body {
+  min-width: 360px;
+}
+
 /* ---------------------------------------------------------------------
    Home is set in Inter instead of the system face. Inter is a real webfont,
    so it looks the same on every device — unlike SF, which only Apple
