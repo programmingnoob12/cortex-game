@@ -29,9 +29,14 @@ export default withBillingHandler(async (req) => {
     throw err;
   }
 
-  // Anchor the resume date to calendar months rather than 30-day blocks, so
-  // "pause for 2 months" lands on the same day of the month.
-  const resumes = new Date();
+  // The pause begins when the period they have already paid for runs out,
+  // not the moment they press the button: that period is theirs either way,
+  // so counting it as pause time would charge them for it twice over. A
+  // one-month pause on a subscription renewing the 12th therefore resumes on
+  // the 12th of the month after. Calendar months rather than 30-day blocks,
+  // so "pause for 2 months" lands on the same day of the month.
+  const periodEnd = subscription.current_period_end;
+  const resumes = new Date((periodEnd ? periodEnd * 1000 : Date.now()));
   resumes.setMonth(resumes.getMonth() + months);
   const resumesAt = Math.floor(resumes.getTime() / 1000);
 

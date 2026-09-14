@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 389;
+const BUILD_VERSION = 390;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9675,29 +9675,45 @@ function NBackSessionApp() {
     setPreviewTargetPlan(null);
   };
 
+  // Pause and resume answer on screen straight away and reconcile with the
+  // real state when it lands. The first press used to sit on a spinner for
+  // seconds — a cold serverless function plus a Stripe round trip — while
+  // every press after it felt instant, because the function was warm. The
+  // outcome is known locally, so there is no reason to wait for it; if the
+  // call fails the state goes back and the error is shown.
   const handlePause = async (months = 1) => {
-    setActionLoading(true);
+    const before = billingState;
+    // The pause starts when the period they have already paid for runs out,
+    // so a one-month pause resumes a month after the renewal date.
+    const base = billingState?.currentPeriodEnd
+      ? new Date(billingState.currentPeriodEnd * 1000)
+      : new Date();
+    base.setMonth(base.getMonth() + months);
+    applyBillingState({
+      ...billingState,
+      pausedUntil: Math.floor(base.getTime() / 1000),
+      cancelAtPeriodEnd: false,
+    });
     setActionError("");
     try {
       const data = await callBillingApi("pause", { months });
       applyBillingState(data);
     } catch (err) {
+      applyBillingState(before);
       setActionError(err.message);
-    } finally {
-      setActionLoading(false);
     }
   };
 
   const handleResume = async () => {
-    setActionLoading(true);
+    const before = billingState;
+    applyBillingState({ ...billingState, pausedUntil: null });
     setActionError("");
     try {
       const data = await callBillingApi("resume");
       applyBillingState(data);
     } catch (err) {
+      applyBillingState(before);
       setActionError(err.message);
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -15678,8 +15694,7 @@ function NBackSessionApp() {
                   <p className="text-slate-500 text-sm">
                     You keep access until{" "}
                     {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}. Your
-                    streak and scores are saved, so you can pick up where you left off if you
-                    come back.
+                    streak and scores will be saved.
                   </p>
                   </div>
                 ) : (
@@ -17956,7 +17971,7 @@ function NBackSessionApp() {
                 "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.18) 0%, rgba(76,185,216,0.06) 46%, transparent 72%)",
             }}
           />
-          <div className="relative max-w-xl text-center space-y-10">
+          <div className="relative max-w-xl text-center space-y-14">
             <div
               className="text-2xl sm:text-3xl font-semibold tracking-tight"
               style={{ animation: "rampIntroRise 0.7s 0.15s ease-out both" }}
@@ -17964,7 +17979,7 @@ function NBackSessionApp() {
               Easing you in.
             </div>
             <div
-              className="text-lg sm:text-xl font-medium text-slate-100 space-y-4"
+              className="text-lg sm:text-xl font-medium text-slate-100 space-y-7"
               style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.5s ease-out both" }}
             >
               <div>Every exercise starts at {rampIntro.minutes} minutes.</div>
