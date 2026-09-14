@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 415;
+const BUILD_VERSION = 416;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9358,6 +9358,9 @@ function NBackSessionApp() {
   const [streakReward, setStreakReward] = useState(null);
   const [streakCardOpen, setStreakCardOpen] = useState(false); // home screen's 🔥 streak badge — opens a small popup with the week view
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // True while walking the screens from the Pages list, so every screen
+  // carries a way back to it. Testing only.
+  const [pagesMode, setPagesMode] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [errorLog, setErrorLog] = useState([]); // loaded fresh whenever Account opens — see Diagnostics card below
@@ -14088,10 +14091,9 @@ function NBackSessionApp() {
               })}
             </div>
 
-            {/* Sized to what it holds, not to the page: it is two short
-                lines, so stretching it the full width left it mostly empty. */}
+            {/* One card wide, lined up with the grid above it. */}
             <div
-              className={`w-fit bg-slate-900 border border-slate-700/70 rounded-xl ${
+              className={`w-full sm:w-[calc(50%-0.5rem)] bg-slate-900 border border-slate-700/70 rounded-xl ${
                 compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
@@ -14215,8 +14217,18 @@ function NBackSessionApp() {
                 </button>
                 <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Pages</h1>
                 <div className="text-slate-500 text-base mt-2">
-                  Every screen, one button each
+                  Every screen, one button each. Each one leaves a "&lsaquo; Pages"
+                  button on screen to come back with.
                 </div>
+                <button
+                  onClick={() => {
+                    setPagesMode(false);
+                    setMainView("home");
+                  }}
+                  className="mt-4 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg px-4 py-2 text-sm font-medium"
+                >
+                  Done walking
+                </button>
               </div>
 
               {group("Main", [
@@ -14342,6 +14354,14 @@ function NBackSessionApp() {
               {group("Account", [
                 go("Account", () => setMainView("account")),
                 go("Membership", () => setMainView("membership")),
+                go("Cancel membership form", () => {
+                  setShowCancelForm(true);
+                  setMainView("membership");
+                }),
+                go("Feedback", () => {
+                  setFeedbackOpen(true);
+                  setMainView("home");
+                }),
                 go("Notes", () => setMainView("notes")),
                 go("Testing station", () => setMainView("testing")),
                 go("Terms of Service", () => setMainView("terms")),
@@ -18547,9 +18567,22 @@ function NBackSessionApp() {
         </button>
       )}
 
-      {mainView === "home" && (
+      {/* Back to the Pages list, from whatever screen the list opened. */}
+      {pagesMode && mainView !== "pages" && (
         <button
           onClick={() => setMainView("pages")}
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 border border-dashed border-slate-500 text-slate-300 hover:text-slate-100 hover:border-slate-300 bg-slate-900/95 backdrop-blur transition-colors rounded-full py-2 px-5 text-sm font-medium shadow-lg"
+        >
+          &lsaquo; Pages
+        </button>
+      )}
+
+      {mainView === "home" && (
+        <button
+          onClick={() => {
+            setPagesMode(true);
+            setMainView("pages");
+          }}
           /* Under Notes, same treatment. Opens the list of every screen in
              the app, for walking the responsive checklist. */
           className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[8rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
