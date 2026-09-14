@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 414;
+const BUILD_VERSION = 415;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14245,6 +14245,74 @@ function NBackSessionApp() {
                 go("RRT tutorial", openTutorial("rrt")),
                 go("3D MOT tutorial", openTutorial("motion3d")),
                 go("CCT tutorial", openTutorial("cct")),
+              ])}
+
+              {group("Popups and overlays", [
+                go("Ease in screen", () =>
+                  setRampIntro({ minutes: rampStepFor(currentRegime) || 5, then: null })
+                ),
+                go("Motivation line", () => {
+                  setSessionStartLine(
+                    MOTIVATION_ANYTIME[
+                      Math.floor(Math.random() * MOTIVATION_ANYTIME.length)
+                    ]?.text || null
+                  );
+                  setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+                }),
+                go("Session complete animation", () => {
+                  setSessionCompleteAnim(true);
+                  setTimeout(() => setSessionCompleteAnim(false), 5500);
+                }),
+                go("Level up celebration", () =>
+                  setUnlockInfo({
+                    exerciseKey: "dual",
+                    level: Math.min(EXERCISE_LIBRARY.dual.maxN, (exerciseLevels.dual ?? 2) + 1),
+                    title: "Dual N-Back",
+                    isNewPR: true,
+                  })
+                ),
+                go("Level down notice", () => {
+                  jumpToExercise("dual");
+                  setLevelChangeNotice({ direction: "down" });
+                }),
+                go("Achievement celebration", () =>
+                  setAchievementCelebrationQueue([ACHIEVEMENTS_CATALOG[0]])
+                ),
+                go("Achievement detail", () =>
+                  setBadgeDetail({
+                    achievement: ACHIEVEMENTS_CATALOG[0],
+                    state: achievementState,
+                  })
+                ),
+                go("Streak popup", () => setStreakCardOpen(true)),
+                go("Rest day / switch dialog", () =>
+                  setRestDayConfirm({
+                    regimeKey: regimeKey || FREE_REGIME_KEY,
+                    streak: 3,
+                    action: () => {},
+                    reason: "train",
+                  })
+                ),
+                go("Delete regime confirm", () =>
+                  setDeleteRegimeConfirm({
+                    id: customRegimes[0]?.id || "demo",
+                    name: customRegimes[0]?.name || "Custom",
+                  })
+                ),
+                go("Home notice cards", () => {
+                  setFreeMonthNoticeDismissed(false);
+                  setCustomRegimeNoticeDismissed(false);
+                  setMainView("home");
+                }),
+                go("Arrow hints", () => {
+                  setHintDismissed(false);
+                  setHintForced(true);
+                  setMainView("home");
+                }),
+                go("Free account view (toggle)", () => {
+                  setSimulateFree((v) => !v);
+                  setMainView("regime");
+                }),
               ])}
 
               {group("Results", [
