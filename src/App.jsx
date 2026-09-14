@@ -3289,7 +3289,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 400;
+const BUILD_VERSION = 401;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14097,7 +14097,10 @@ function NBackSessionApp() {
               )}
             </div>
 
-            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
+            {/* One row, each button only as wide as its words, instead of
+                three full-width slabs stacked down the page. Wraps to a
+                second line when the column is too narrow for all three. */}
+            <div className={`flex flex-wrap items-center ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
@@ -14115,8 +14118,8 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
-                className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                className={`deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
+                  compactHome ? "py-3 px-6 text-base" : "py-3.5 px-7 text-lg"
                 }`}
               >
                 {sessionInProgress
@@ -14130,8 +14133,8 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={goToOverview}
-                className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                className={`bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                  compactHome ? "py-3 px-5 text-base" : "py-3.5 px-6 text-lg"
                 }`}
               >
                 Stats
@@ -14143,8 +14146,8 @@ function NBackSessionApp() {
                     setHypnosisAfterSession(false);
                     setMainView("hypnosis");
                   }}
-                  className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                    compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                  className={`bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                    compactHome ? "py-3 px-5 text-base" : "py-3.5 px-6 text-lg"
                   }`}
                 >
                   Motivation
