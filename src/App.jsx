@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 418;
+const BUILD_VERSION = 419;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13218,7 +13218,15 @@ function NBackSessionApp() {
                 // As a flex item this column could be widened by its own
                 // min-content size, which is what made the Overview grow a
                 // little with each extra exercise column.
-                minWidth: 0,
+                //
+                // The floor: the layout stops shrinking at 360px and the
+                // window edge simply covers what does not fit, instead of
+                // the cards reflowing into a column of single words. It sits
+                // on this element rather than on body deliberately — a body
+                // wider than the viewport makes the browser zoom the whole
+                // page out to fit, while an inner element wider than its
+                // parent is just clipped by the parent's overflow-x: hidden.
+                minWidth: "360px",
                 // The running screen carries a column of answer buttons on
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
