@@ -652,7 +652,6 @@ const FREE_REGIME_KEY = "cct";
 // them read as a feature to be got through rather than something someone
 // said to you in passing.
 const HOME_HINTS = [
-  "You don't have to do the session in one sitting. Some days just get it done even if it's broken up into small pieces whatever it takes to keep the streak going.",
 ];
 
 // Which hint today gets, or null for a day with none. Derived from the date
@@ -3290,7 +3289,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 399;
+const BUILD_VERSION = 400;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13213,7 +13212,11 @@ function NBackSessionApp() {
                     ? // The summary lays its exercises out in columns, so it
                       // needs more than the reading width the other screens use.
                       "76rem"
-                    : "42rem",
+                    : // A tablet in portrait (an iPad Pro, a Surface) is far
+                      // taller and wider than the reading width, so the page
+                      // sat as a small island in a lot of empty dark. It is
+                      // given more of the room it actually has there.
+                      "min(52rem, 88vw)",
               }
         }
       >
@@ -13245,7 +13248,7 @@ function NBackSessionApp() {
                 Choose your regime
               </h1>
               <p className="text-slate-400 text-base mt-3">
-                You'll start with just a few minutes a day.
+                You'll start with 5 mins per exercise.
               </p>
             </div>
 
@@ -17612,7 +17615,7 @@ function NBackSessionApp() {
                 ACCENT_STYLES.indigo.grad
               } hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
             >
-              Nice!
+              Accept
             </button>
           </div>
         </div>
@@ -17777,7 +17780,7 @@ function NBackSessionApp() {
                 }}
                 className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
               >
-                Nice!
+                Accept
               </button>
             </div>
           </div>
