@@ -3251,7 +3251,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 381;
+const BUILD_VERSION = 382;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9423,6 +9423,9 @@ function NBackSessionApp() {
   const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
   // How long one of those lines stays up, wherever it is triggered from.
   const SESSION_START_MS = 2600;
+  // The ease-in explanation is two lines of real information rather than one
+  // line to feel, so it is held long enough to read twice.
+  const RAMP_INTRO_MS = 5200;
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
   // { [exerciseKey]: true } once that exercise's session budget has run out.
@@ -11316,12 +11319,6 @@ function NBackSessionApp() {
   };
 
   const currentRegime = findRegime(regimeKey) || REGIMES[0];
-  // Non-null while this regime is still ramping up: the minutes this
-  // session runs, against the regime's full length.
-  const rampMinutesNow = regimeKey
-    ? rampMinutesFor(currentRegime, regimeRamp[regimeKey] || 0)
-    : null;
-  const regimeFullMinutesNow = regimeFullMinutes(currentRegime);
   const leaderboardTabs = Object.values(EXERCISE_LIBRARY).map((e) => ({
     key: e.key,
     label: e.title,
@@ -12187,10 +12184,28 @@ function NBackSessionApp() {
 
   const proceedStartFromHome = () => {
     unlockLetterAudio();
-    setSessionStartLine(
-      MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
-    );
-    setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+    // First time on this regime, the opening line is not a motivation line:
+    // it is the explanation for why today is shorter than the regime says.
+    const key = regimeKeyRef.current || regimeKey;
+    const ramp = rampMinutesForKey(key);
+    const firstEver = !!ramp && !(regimeRampRef.current[key] || 0);
+    if (firstEver) {
+      setSessionStartLine(
+        <span className="block space-y-4">
+          <span className="block">Easing you in.</span>
+          <span className="block text-lg sm:text-xl font-medium text-slate-300">
+            Today is {ramp} minutes. Every session you finish adds 5, until you are
+            training the full {regimeFullMinutes(findRegime(key) || currentRegime)}.
+          </span>
+        </span>
+      );
+      setTimeout(() => setSessionStartLine(null), RAMP_INTRO_MS);
+    } else {
+      setSessionStartLine(
+        MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
+      );
+      setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+    }
     // If we're currently parked on the overview "exercise" (e.g. from a
     // previous visit), land on the first exercise in the regime instead of it
     // — restoring whatever level they'd actually reached there, not always
@@ -13933,13 +13948,6 @@ function NBackSessionApp() {
                   }`}
                 >
                   {trainedToday ? "Tomorrow" : "Today"}
-                </div>
-              )}
-              {/* Still working up to the full regime. Said plainly, so a
-                  shorter session reads as the plan rather than a bug. */}
-              {rampMinutesNow && (
-                <div className="text-sm mt-2 text-slate-400">
-                  Easing in · {rampMinutesNow} of {regimeFullMinutesNow} min
                 </div>
               )}
             </div>
@@ -17851,12 +17859,19 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
-              animation: "sessionStartWash 2.6s ease-out forwards",
+              animation: `sessionStartWash ${
+                typeof sessionStartLine === "string" ? "2.6s" : "5.2s"
+              } ease-out forwards`,
             }}
           />
           <div
             className="relative text-center text-2xl sm:text-3xl font-semibold tracking-tight max-w-xl"
-            style={{ animation: "sessionStartText 2.6s ease-out forwards", textWrap: "balance" }}
+            style={{
+              animation: `sessionStartText ${
+                typeof sessionStartLine === "string" ? "2.6s" : "5.2s"
+              } ease-out forwards`,
+              textWrap: "balance",
+            }}
           >
             {sessionStartLine}
           </div>
