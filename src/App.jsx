@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 391;
+const BUILD_VERSION = 392;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12249,6 +12249,18 @@ function NBackSessionApp() {
     setScreen("setup");
   };
 
+  // True if the ease-in screen was shown. `then` runs when it is dismissed,
+  // or immediately when there is nothing to show.
+  const showRampIntroIfOwed = (key, then) => {
+    const ramp = rampMinutesForKey(key);
+    if (!ramp || rampIntroRegimeRef.current === key) return false;
+    rampIntroRegimeRef.current = key;
+    mirrorSet("ramp-intro-regime", key);
+    if (window.storage) safeStorageSet("ramp-intro-regime", key, false);
+    setRampIntro({ minutes: ramp, then });
+    return true;
+  };
+
   const proceedStartFromHome = () => {
     unlockLetterAudio();
     // Moving to a regime they were not on last time they trained, and that
@@ -12257,14 +12269,7 @@ function NBackSessionApp() {
     // only then does the exercise open, so the setup screen is never seen
     // underneath it.
     const key = regimeKeyRef.current || regimeKey;
-    const ramp = rampMinutesForKey(key);
-    if (ramp && rampIntroRegimeRef.current !== key) {
-      rampIntroRegimeRef.current = key;
-      mirrorSet("ramp-intro-regime", key);
-      if (window.storage) safeStorageSet("ramp-intro-regime", key, false);
-      setRampIntro({ minutes: ramp, then: openSessionFromHome });
-      return;
-    }
+    if (showRampIntroIfOwed(key, openSessionFromHome)) return;
     setSessionStartLine(
       MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
     );
@@ -12377,6 +12382,9 @@ function NBackSessionApp() {
     setSessionPRs({});
     setOverviewPRSeen({});
     setMainView("home");
+    // Changing regime is the moment the ease-in is worth explaining, so it
+    // plays here rather than waiting for the first Start Training.
+    showRampIntroIfOwed(key, null);
   };
 
   // Dev/test-only: zeroes the streak back to 0. Severs it at today (same
@@ -15682,7 +15690,7 @@ function NBackSessionApp() {
                       <p className="text-slate-500 text-sm">
                         You keep your scores and history while you are away. Access ends{" "}
                         {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()} and
-                        comes back when the pause ends{" "}
+                        resumes{" "}
                         {(() => {
                           const back = new Date(billingState.currentPeriodEnd * 1000);
                           back.setMonth(back.getMonth() + 1);
