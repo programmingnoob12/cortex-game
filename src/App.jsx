@@ -1802,6 +1802,8 @@ function formatDuration(ms) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   if (minutes === 0) return `${seconds} sec`;
+  // "20 min 0 sec" is just "20 min" — the trailing zero reads as noise.
+  if (seconds === 0) return `${minutes} min`;
   return `${minutes} min ${seconds} sec`;
 }
 
@@ -2279,24 +2281,41 @@ function rampStepFor(regime) {
   return step === undefined || step === null ? RAMP_STEP_MINUTES : step;
 }
 
-function rampMinutesFor(regime, sessionsDone) {
+// The minutes each exercise runs for, given how many sessions of this
+// regime are already finished. Every exercise opens at one step (5 minutes
+// by default) and each finished session adds a step to ONE exercise — the
+// first, then the second, then the third, and back round again — until they
+// are all at their full length. Raising one exercise per session rather than
+// all of them keeps the jump between sessions small.
+// Returns null when there is nothing being shortened.
+function rampCapsFor(regime, sessionsDone) {
   const step = rampStepFor(regime);
-  if (!step) return null; // eased in off for this regime
-  const longest = (regime?.steps || []).reduce(
-    (max, s) => Math.max(max, s.minutes || 0),
-    0
-  );
-  if (!longest || longest <= step) return null;
-  const cap = step + (sessionsDone || 0) * step;
-  if (cap >= longest) return null;
-  return cap;
+  const steps = regime?.steps || [];
+  if (!step || !steps.length) return null;
+  const full = steps.map((s) => s.minutes || 0);
+  const caps = full.map((mins) => Math.min(step, mins));
+  let remaining = sessionsDone || 0;
+  let i = 0;
+  // Each pass hands one step to the next exercise still short of its full
+  // length; an exercise already there is skipped rather than wasting a turn.
+  while (remaining > 0 && caps.some((cap, idx) => cap < full[idx])) {
+    if (caps[i] < full[i]) {
+      caps[i] = Math.min(full[i], caps[i] + step);
+      remaining -= 1;
+    }
+    i = (i + 1) % caps.length;
+  }
+  if (caps.every((cap, idx) => cap >= full[idx])) return null;
+  return caps;
 }
 
-function buildRegimeExercises(regime, rampMinutes = null) {
-  const steps = regime.steps.map((step) => ({
+function buildRegimeExercises(regime, rampCaps = null) {
+  const steps = regime.steps.map((step, idx) => ({
     ...EXERCISE_LIBRARY[step.key],
     sessionDurationMs:
-      (rampMinutes ? Math.min(step.minutes, rampMinutes) : step.minutes) * 60 * 1000,
+      (rampCaps ? Math.min(step.minutes, rampCaps[idx] ?? step.minutes) : step.minutes) *
+      60 *
+      1000,
   }));
   return [...steps, OVERVIEW_EXERCISE];
 }
@@ -3271,7 +3290,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 398;
+const BUILD_VERSION = 399;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9199,7 +9218,7 @@ function NBackSessionApp() {
     bootSession
       ? buildRegimeExercises(
           bootSession.regime,
-          rampMinutesFor(bootSession.regime, bootRampSessions(bootSession.key))
+          rampCapsFor(bootSession.regime, bootRampSessions(bootSession.key))
         )
       : buildRegimeExercises(REGIMES[0])
   );
@@ -10649,10 +10668,11 @@ function NBackSessionApp() {
   // than once in the same day). Called when the person reaches the Session
   // Overview screen having gone through every step of their regime.
   // The ease-in length for a given regime right now, or null at full length.
+  // The per-exercise caps for this regime right now, or null at full length.
   const rampMinutesForKey = (key, regime) => {
     const r = regime || findRegime(key);
     if (!r) return null;
-    return rampMinutesFor(r, regimeRampRef.current[key] || 0);
+    return rampCapsFor(r, regimeRampRef.current[key] || 0);
   };
 
   // One more session of this regime is in the books, so the next one is five
@@ -12252,12 +12272,12 @@ function NBackSessionApp() {
   // True if the ease-in screen was shown. `then` runs when it is dismissed,
   // or immediately when there is nothing to show.
   const showRampIntroIfOwed = (key, then) => {
-    const ramp = rampMinutesForKey(key);
-    if (!ramp || rampIntroRegimeRef.current === key) return false;
+    const caps = rampMinutesForKey(key);
+    if (!caps || rampIntroRegimeRef.current === key) return false;
     rampIntroRegimeRef.current = key;
     mirrorSet("ramp-intro-regime", key);
     if (window.storage) safeStorageSet("ramp-intro-regime", key, false);
-    setRampIntro({ minutes: ramp, then });
+    setRampIntro({ minutes: rampStepFor(findRegime(key)), then });
     return true;
   };
 
@@ -18012,7 +18032,7 @@ function NBackSessionApp() {
               className="text-xl sm:text-2xl font-medium text-slate-100 space-y-7"
               style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.35s ease-out both" }}
             >
-              <div>Every exercise starts at {rampIntro.minutes} minutes.</div>
+              <div>Every exercise starts at {rampIntro.minutes} mins.</div>
               <div>{rampIntro.minutes} mins are added each session.</div>
             </div>
             <button
