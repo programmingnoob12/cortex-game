@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 410;
+const BUILD_VERSION = 411;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7786,17 +7786,16 @@ function rankBoundsFor(exerciseKey) {
 // ranks immediately below Enlightened in their normal order — so the ranks
 // that get cut on a short ladder are the low ones nobody would linger on,
 // never the top ones and never Novice.
-// The ranks run in their normal order, one per level, starting at Novice on
-// the exercise's first level. The last level anyone can reach is always
-// Enlightened; the ranks that do not fit in between are the ones cut.
-// Quad (levels 2-8): Novice, Proficient, Adept, Bright, Radiant, Illuminated,
-// Enlightened — Brilliant, Elite and Transcendent are the three dropped.
+// The ranks are aligned to the TOP of each exercise's ladder: its last level
+// is Enlightened, the one below is Transcendent, then Elite, and so on down.
+// An exercise with fewer levels than there are ranks simply never shows the
+// earliest ranks — the top of the list is identical for every exercise.
+// Quad (levels 2-8) therefore opens on Bright and ends on Enlightened;
+// Novice, Proficient and Adept are the three that do not fit.
 function tierIndexFor(level, exerciseKey) {
-  const { start, top } = rankBoundsFor(exerciseKey);
-  const value = Math.round(level);
-  if (value >= top) return MAX_GEM_TIER;
-  const index = value - start + 1;
-  return Math.max(1, Math.min(MAX_GEM_TIER - 1, index));
+  const { top } = rankBoundsFor(exerciseKey);
+  const index = MAX_GEM_TIER - (top - Math.round(level));
+  return Math.max(1, Math.min(MAX_GEM_TIER, index));
 }
 // A gem with its rank name under it, in that rank's own colour — the pair
 // the app shows everywhere a level is displayed.
