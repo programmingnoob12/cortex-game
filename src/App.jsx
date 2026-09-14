@@ -3289,7 +3289,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 404;
+const BUILD_VERSION = 405;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13206,22 +13206,17 @@ function NBackSessionApp() {
                 // each side of the grid, so it needs more room than the
                 // reading-width screens.
                 maxWidth:
-                  mainView === "home"
-                    ? // Narrower than the reading width the other screens
-                      // use: the cards, the Next session box and the buttons
-                      // are all shorter, and the space between them is what
-                      // fills the page instead of the boxes themselves.
-                      "34rem"
-                    : mainView === "app" && screen === "running"
+                  mainView === "app" && screen === "running"
                     ? "100%"
                     : mainView === "app" && exercise.key === "overview"
                     ? // The summary lays its exercises out in columns, so it
                       // needs more than the reading width the other screens use.
                       "76rem"
-                    : // Back to the reading width. Widening this for tablets
-                      // stretched every card on every screen, which is what
-                      // made the cards and the whole column read as too long.
-                      "42rem",
+                    : // A tablet in portrait (an iPad Pro, a Surface) is far
+                      // taller and wider than the reading width, so the page
+                      // sat as a small island in a lot of empty dark. It is
+                      // given more of the room it actually has there.
+                      "min(52rem, 88vw)",
               }
         }
       >
@@ -13906,7 +13901,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`home-type ${compactHome ? "space-y-8" : "space-y-10"}`}>
+          <div className={`home-type ${compactHome ? "space-y-4" : "space-y-6"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
@@ -14001,7 +13996,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-5" : "gap-6"}`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3" : "gap-4"}`}>
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -14070,7 +14065,7 @@ function NBackSessionApp() {
                           card. A second shadow on the wrapper follows the
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
-                      <span className="inline-flex shrink-0 mr-2 sm:mr-3">
+                      <span className="inline-flex shrink-0 mr-5 sm:mr-8">
                         <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
                       </span>
                     </div>
@@ -14105,13 +14100,10 @@ function NBackSessionApp() {
             {/* One row, each button only as wide as its words, instead of
                 three full-width slabs stacked down the page. Wraps to a
                 second line when the column is too narrow for all three. */}
-            {/* Three equal columns across the full width of the page: one
-                row, every button the same size, nothing bunched to one
-                side. */}
-            <div className={`flex items-stretch ${compactHome ? "gap-3" : "gap-4"}`}>
+            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
-              <div className="relative group flex-1">
+              <div className="relative group">
               {trainedToday && !sessionInProgress && !sessionParked && (
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-11 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-3 py-2 border text-sm whitespace-nowrap z-10"
                   style={{
@@ -14127,7 +14119,7 @@ function NBackSessionApp() {
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
                 className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  compactHome ? "py-3 px-4 text-base" : "py-3.5 px-5 text-lg"
+                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
                 }`}
               >
                 {sessionInProgress
@@ -14141,8 +14133,8 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={goToOverview}
-                className={`flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                  compactHome ? "py-3 px-4 text-base" : "py-3.5 px-5 text-lg"
+                className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
                 }`}
               >
                 Stats
@@ -14154,8 +14146,8 @@ function NBackSessionApp() {
                     setHypnosisAfterSession(false);
                     setMainView("hypnosis");
                   }}
-                  className={`flex-1 bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                    compactHome ? "py-3 px-4 text-base" : "py-3.5 px-5 text-lg"
+                  className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                    compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
                   }`}
                 >
                   Motivation
