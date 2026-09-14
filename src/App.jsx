@@ -2250,33 +2250,33 @@ const BINAURAL_HINT_KEY = "cortex.binauralHint";
 // at its full length. The whole regime is still trained every session: the
 // exercises keep their proportions and simply run shorter, so nothing is
 // missed on the way up.
-const RAMP_FIRST_MINUTES = 15;
+const RAMP_FIRST_MINUTES = 5;
 const RAMP_STEP_MINUTES = 5;
-const RAMP_MIN_EXERCISE_MS = 60 * 1000; // no exercise is ever shorter than a minute
 
 function regimeFullMinutes(regime) {
   return (regime?.steps || []).reduce((sum, step) => sum + (step.minutes || 0), 0);
 }
 
-// How long this session should run, given how many sessions of this regime
-// they have already finished. Null once they are at full length.
+// The cap on any one exercise this session: five minutes each to begin with,
+// five more per session finished. Null once the cap covers the longest
+// exercise in the regime — at that point nothing is being shortened and the
+// ramp is over.
 function rampMinutesFor(regime, sessionsDone) {
-  const full = regimeFullMinutes(regime);
-  if (!full || full <= RAMP_FIRST_MINUTES) return null;
-  const target = RAMP_FIRST_MINUTES + (sessionsDone || 0) * RAMP_STEP_MINUTES;
-  if (target >= full) return null;
-  return target;
+  const longest = (regime?.steps || []).reduce(
+    (max, step) => Math.max(max, step.minutes || 0),
+    0
+  );
+  if (!longest || longest <= RAMP_FIRST_MINUTES) return null;
+  const cap = RAMP_FIRST_MINUTES + (sessionsDone || 0) * RAMP_STEP_MINUTES;
+  if (cap >= longest) return null;
+  return cap;
 }
 
 function buildRegimeExercises(regime, rampMinutes = null) {
-  const full = regimeFullMinutes(regime);
-  const factor = rampMinutes && full ? rampMinutes / full : 1;
   const steps = regime.steps.map((step) => ({
     ...EXERCISE_LIBRARY[step.key],
-    sessionDurationMs: Math.max(
-      RAMP_MIN_EXERCISE_MS,
-      Math.round((step.minutes * 60 * 1000 * factor) / 30000) * 30000
-    ),
+    sessionDurationMs:
+      (rampMinutes ? Math.min(step.minutes, rampMinutes) : step.minutes) * 60 * 1000,
   }));
   return [...steps, OVERVIEW_EXERCISE];
 }
@@ -3251,7 +3251,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 382;
+const BUILD_VERSION = 383;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12194,8 +12194,8 @@ function NBackSessionApp() {
         <span className="block space-y-4">
           <span className="block">Easing you in.</span>
           <span className="block text-lg sm:text-xl font-medium text-slate-300">
-            Today is {ramp} minutes. Every session you finish adds 5, until you are
-            training the full {regimeFullMinutes(findRegime(key) || currentRegime)}.
+            Today is {ramp} minutes per exercise. Every session you finish adds 5
+            minutes until you're doing the full regime.
           </span>
         </span>
       );
@@ -16814,6 +16814,7 @@ function NBackSessionApp() {
             branchingEnabled={true}
             autoStart={rrtAutoStart}
             startIncrement={rrtStartIncrement}
+            ramping={!!rampMinutesForKey(regimeKey)}
           />
         )}
 
@@ -18849,7 +18850,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   );
 }
 
-function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0, startIncrement = 0 }) {
+function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0, startIncrement = 0, ramping = false }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
@@ -19440,6 +19441,21 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
           <p className="text-slate-400 text-base">
             20 in a row = level up. 30s, 25s, 20s, +1 premise.
           </p>
+          <div className="text-lg text-slate-400">
+            Today:{" "}
+            <span className="text-slate-200 font-medium">
+              {Math.round((exercise.sessionDurationMs || 0) / 60000)} min
+            </span>
+          </div>
+          {/* Only while the regime is still being eased into — once it is at
+              full length there is nothing to explain. */}
+          {ramping && (
+            <p className="text-slate-400 text-base">
+              Today is {Math.round((exercise.sessionDurationMs || 0) / 60000)} minutes
+              per exercise. Every session you finish adds 5 minutes until you're doing
+              the full regime.
+            </p>
+          )}
         </div>
 
         <button
