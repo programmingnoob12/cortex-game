@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 419;
+const BUILD_VERSION = 420;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12948,7 +12948,7 @@ function NBackSessionApp() {
           ? { paddingBottom: "1.125rem" }
           : null),
       }}
-      className={`relative w-full text-slate-100 flex overflow-x-hidden ${
+      className={`relative w-full text-slate-100 flex safe-center overflow-x-hidden ${
         /* Home and Account are laid out to fit exactly one screen, so they
            are pinned to the viewport height instead of min-height: with
            min-h-screen the page could still be a few pixels taller than the
@@ -18437,7 +18437,7 @@ function NBackSessionApp() {
           days. Sits directly above the free-month card and reads the same
           way, so the two rewards are one column. */}
       {mainView === "home" && !customRegimeNoticeDismissed && !customRegimeEarned && (
-        <div className="fixed z-40 inset-x-4 bottom-32 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+9.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-32 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+9.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
@@ -18482,7 +18482,7 @@ function NBackSessionApp() {
       )}
 
       {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
-        <div className="fixed z-40 inset-x-4 bottom-4 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-4 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
@@ -18536,7 +18536,7 @@ function NBackSessionApp() {
       {/* Bottom left, the one corner Home leaves free — Notes and Testing
           are top left, Achievements top right, Account bottom right. */}
       {mainView === "home" && !hintDismissed && (hintForced || todaysHint) && (
-        <div className="fixed z-40 inset-x-4 bottom-4 sm:inset-x-auto sm:left-6 sm:bottom-6 sm:w-[min(24rem,calc(100vw-3rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-4 min-w-[20rem] sm:inset-x-auto sm:left-6 sm:bottom-6 sm:w-[min(24rem,calc(100vw-3rem))]">
           <div
             className="flex items-start gap-4 rounded-xl pl-0 pr-3 py-4 overflow-hidden"
             style={{

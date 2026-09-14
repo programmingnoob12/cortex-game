@@ -24,6 +24,14 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Centred normally, but anchored to the left the moment the content is wider
+   than the window — which is what happens below the 360px floor. Without the
+   `safe` keyword a centred flex child overflows equally on both sides, so the
+   left and right edges are cut and only the middle of the page is visible. */
+.safe-center {
+  justify-content: safe center;
+}
+
 /* ---------------------------------------------------------------------
    Home is set in Inter instead of the system face. Inter is a real webfont,
    so it looks the same on every device — unlike SF, which only Apple
