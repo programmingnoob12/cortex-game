@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 390;
+const BUILD_VERSION = 391;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9681,8 +9681,11 @@ function NBackSessionApp() {
   // every press after it felt instant, because the function was warm. The
   // outcome is known locally, so there is no reason to wait for it; if the
   // call fails the state goes back and the error is shown.
+  const billingRequestRef = useRef(0);
+
   const handlePause = async (months = 1) => {
     const before = billingState;
+    const ticket = ++billingRequestRef.current;
     // The pause starts when the period they have already paid for runs out,
     // so a one-month pause resumes a month after the renewal date.
     const base = billingState?.currentPeriodEnd
@@ -9697,8 +9700,11 @@ function NBackSessionApp() {
     setActionError("");
     try {
       const data = await callBillingApi("pause", { months });
+      // A later press has already changed the answer — that one wins.
+      if (billingRequestRef.current !== ticket) return;
       applyBillingState(data);
     } catch (err) {
+      if (billingRequestRef.current !== ticket) return;
       applyBillingState(before);
       setActionError(err.message);
     }
@@ -9706,12 +9712,15 @@ function NBackSessionApp() {
 
   const handleResume = async () => {
     const before = billingState;
+    const ticket = ++billingRequestRef.current;
     applyBillingState({ ...billingState, pausedUntil: null });
     setActionError("");
     try {
       const data = await callBillingApi("resume");
+      if (billingRequestRef.current !== ticket) return;
       applyBillingState(data);
     } catch (err) {
+      if (billingRequestRef.current !== ticket) return;
       applyBillingState(before);
       setActionError(err.message);
     }
@@ -15641,13 +15650,18 @@ function NBackSessionApp() {
 
                 {!billingState.cancelAtPeriodEnd &&
                   (billingState.pausedUntil ? (
-                    <button
-                      onClick={handleResume}
-                      disabled={actionLoading}
-                      className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
-                    >
-                      Resume membership
-                    </button>
+                    <div className="space-y-3">
+                      <button
+                        onClick={handleResume}
+                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                      >
+                        Resume membership
+                      </button>
+                      <p className="text-slate-500 text-sm">
+                        Billing restarts{" "}
+                        {new Date(billingState.pausedUntil * 1000).toLocaleDateString()}.
+                      </p>
+                    </div>
                   ) : billingState.plan === "annual" ? null : (
                     <div className="space-y-3">
                       <div className="text-slate-400 text-base">Pause billing for</div>
@@ -15666,7 +15680,15 @@ function NBackSessionApp() {
                         ))}
                       </div>
                       <p className="text-slate-500 text-sm">
-                        You keep your streak and history while you are away.
+                        You keep your scores and history while you are away. Access ends{" "}
+                        {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()} and
+                        comes back when the pause ends{" "}
+                        {(() => {
+                          const back = new Date(billingState.currentPeriodEnd * 1000);
+                          back.setMonth(back.getMonth() + 1);
+                          return back.toLocaleDateString();
+                        })()}
+                        .
                       </p>
                     </div>
                   ))}
@@ -15694,7 +15716,7 @@ function NBackSessionApp() {
                   <p className="text-slate-500 text-sm">
                     You keep access until{" "}
                     {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}. Your
-                    streak and scores will be saved.
+                    scores and history will be saved.
                   </p>
                   </div>
                 ) : (
