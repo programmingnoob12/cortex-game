@@ -3289,7 +3289,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 402;
+const BUILD_VERSION = 403;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13900,7 +13900,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`home-type ${compactHome ? "space-y-4" : "space-y-6"}`}>
+          <div className={`home-type ${compactHome ? "space-y-6" : "space-y-8"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
@@ -13995,7 +13995,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3" : "gap-4"}`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-4" : "gap-5"}`}>
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -14099,7 +14099,11 @@ function NBackSessionApp() {
             {/* One row, each button only as wide as its words, instead of
                 three full-width slabs stacked down the page. Wraps to a
                 second line when the column is too narrow for all three. */}
-            <div className={`flex flex-wrap items-center ${compactHome ? "gap-2.5" : "gap-3"}`}>
+            <div
+              className={`flex flex-wrap items-center justify-between ${
+                compactHome ? "gap-3" : "gap-4"
+              }`}
+            >
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
