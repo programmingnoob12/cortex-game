@@ -2072,7 +2072,10 @@ const EXERCISE_LIBRARY = {
     abbrev: "Q",
     accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
-    maxN: 10,
+    // Quad 8-Back is as far as anyone realistically gets, so that is the
+    // top of its ladder — see RANK_TOP_LEVEL for how the ranks are mapped
+    // onto it.
+    maxN: 8,
     defaultN: 2,
     stimMs: 3000,
     scoreType: "accuracy",
@@ -2085,7 +2088,7 @@ const EXERCISE_LIBRARY = {
     abbrev: "R",
     accent: "indigo",
     modalities: [],
-    maxN: 10, // level = premise count, so level 10 = 10p — the ceiling for RRT's own achievements/gem tiers
+    maxN: 7, // level = premiseCount - 1, so level 7 is 8p — the ceiling for RRT
     defaultN: 1, // level 1 IS 2p — see the RRT achievement block: premiseCount = level + 1
     stimMs: 0,
     comingSoon: false,
@@ -2113,7 +2116,7 @@ const EXERCISE_LIBRARY = {
     abbrev: "QNB'",
     accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
-    maxN: 10,
+    maxN: 9,
     defaultN: 2,
     stimMs: 2500, // overridden per-run from qnbPrimeSettingsFor once a session starts
     comingSoon: false,
@@ -3289,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 406;
+const BUILD_VERSION = 407;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7765,10 +7768,26 @@ const GEM_TIERS = {
 };
 const GEM_TIER_LEVELS = Object.keys(GEM_TIERS).map(Number);
 const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
+
+// Ranks are counted DOWN from the top of each exercise's own ladder, so the
+// last level anyone can reach is always Enlightened and nobody is shown a
+// rank they could never get to. An exercise with fewer levels than there are
+// ranks simply starts higher up the list — the earliest ranks are skipped
+// rather than the top ones being unreachable. Anything without a ceiling of
+// its own (3D MOT, CCT) keeps the plain 1-10 mapping.
+function rankTopLevelFor(exerciseKey) {
+  const max = exerciseKey ? EXERCISE_LIBRARY?.[exerciseKey]?.maxN : null;
+  return typeof max === "number" && max > 0 ? max : MAX_GEM_TIER;
+}
+function tierIndexFor(level, exerciseKey) {
+  const top = rankTopLevelFor(exerciseKey);
+  const index = MAX_GEM_TIER - (top - Math.round(level));
+  return Math.max(1, Math.min(MAX_GEM_TIER, index));
+}
 // A gem with its rank name under it, in that rank's own colour — the pair
 // the app shows everywhere a level is displayed.
-function RankedGem({ level, size, glowPulse, labelClass = "text-[0.65rem]" }) {
-  const tier = gemTierFor(level);
+function RankedGem({ level, size, glowPulse, exerciseKey, labelClass = "text-[0.65rem]" }) {
+  const tier = gemTierFor(level, exerciseKey);
   // The block is exactly the gem's width and the name is centred UNDER it
   // rather than in the flow — otherwise "Illuminated" makes a wider block
   // than "Radiant" and the gems stop lining up from one card to the next.
@@ -7777,7 +7796,7 @@ function RankedGem({ level, size, glowPulse, labelClass = "text-[0.65rem]" }) {
       className="relative flex flex-col items-center"
       style={{ width: size, paddingBottom: "1.05rem" }}
     >
-      <LevelGem level={level} size={size} glowPulse={glowPulse} />
+      <LevelGem level={level} size={size} glowPulse={glowPulse} exerciseKey={exerciseKey} />
       <span
         className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-semibold uppercase leading-none ${labelClass}`}
         style={{
@@ -7794,15 +7813,11 @@ function RankedGem({ level, size, glowPulse, labelClass = "text-[0.65rem]" }) {
   );
 }
 
-function gemTierFor(level) {
-  return (
-    GEM_TIERS[level] ||
-    GEM_TIERS[Math.max(1, Math.min(MAX_GEM_TIER, level))] ||
-    GEM_TIERS[1]
-  );
+function gemTierFor(level, exerciseKey) {
+  return GEM_TIERS[tierIndexFor(level, exerciseKey)] || GEM_TIERS[1];
 }
-function rankNameFor(level) {
-  return gemTierFor(level).label;
+function rankNameFor(level, exerciseKey) {
+  return gemTierFor(level, exerciseKey).label;
 }
 
 // ---------------------------------------------------------------------
@@ -8069,8 +8084,8 @@ function LegalPage({ doc, onBack }) {
   );
 }
 
-function LevelGem({ level, size = 40, glowPulse = false }) {
-  const tier = gemTierFor(level);
+function LevelGem({ level, size = 40, glowPulse = false, exerciseKey }) {
+  const tier = gemTierFor(level, exerciseKey);
   // Static everywhere by default — glow (a drop-shadow) and the top-right
   // sparkle accent still show on glow-tier gems, but the pulsing/floating
   // animation is opt-in via the prop, reserved for the level-up celebration
@@ -8684,11 +8699,11 @@ function nBackLevelAchievement(exerciseKey, level, overrides = {}) {
     exercise: exerciseKey,
     // The rank in the title is the same rank the leaderboard shows, so it
     // carries the same colour there as it does here.
-    tierColor: gemTierFor(level).color,
-    tierLabel: gemTierFor(level).label,
+    tierColor: gemTierFor(level, exerciseKey).color,
+    tierLabel: gemTierFor(level, exerciseKey).label,
     group: "Performance",
     icon: exerciseKey === "dual" ? "🧠" : "🧩",
-    title: `${tierTitle} ${gemTierFor(level).label}`,
+    title: `${tierTitle} ${gemTierFor(level, exerciseKey).label}`,
     description: `Reach ${levelTitle} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats[exerciseKey]?.bestN || 0) >= level,
@@ -8724,9 +8739,9 @@ function qnbPrimeLevelAchievement(level, overrides = {}) {
     exercise: "iqnb",
     group: "Performance",
     icon: "🌀",
-    tierColor: gemTierFor(level).color,
-    tierLabel: gemTierFor(level).label,
-    title: `QNB' ${level}.00 ${gemTierFor(level).label}`,
+    tierColor: gemTierFor(level, "iqnb").color,
+    tierLabel: gemTierFor(level, "iqnb").label,
+    title: `QNB' ${level}.00 ${gemTierFor(level, "iqnb").label}`,
     description: `Reach QNB' ${level}.00 for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.iqnb?.bestN || 0) >= level,
@@ -8760,9 +8775,9 @@ function rrtLevelAchievement(level, overrides = {}) {
     exercise: "rrt",
     group: "Performance",
     icon: "🔗",
-    tierColor: gemTierFor(level).color,
-    tierLabel: gemTierFor(level).label,
-    title: `RRT ${premiseCount}p ${gemTierFor(level).label}`,
+    tierColor: gemTierFor(level, "rrt").color,
+    tierLabel: gemTierFor(level, "rrt").label,
+    title: `RRT ${premiseCount}p ${gemTierFor(level, "rrt").label}`,
     description: `Reach RRT ${premiseCount}p for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.rrt?.bestN || 0) >= level,
@@ -8800,9 +8815,9 @@ function motion3dLevelAchievement(level, overrides = {}) {
     exercise: "motion3d",
     group: "Performance",
     icon: "👁️",
-    tierColor: gemTierFor(level).color,
-    tierLabel: gemTierFor(level).label,
-    title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} ${gemTierFor(level).label}`,
+    tierColor: gemTierFor(level, "motion3d").color,
+    tierLabel: gemTierFor(level, "motion3d").label,
+    title: `3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} ${gemTierFor(level, "motion3d").label}`,
     description: `Reach 3D MOT ${(level * MOT_TIER_STEP).toFixed(2)} for the first time.`,
     reward: isMax ? "New personal-best badge · max level" : "New personal-best badge",
     unlocked: (s) => (s.exerciseStats.motion3d?.bestN || 0) >= level,
@@ -8831,9 +8846,9 @@ function cctRankAchievement(level, overrides = {}) {
     exercise: "cct",
     group: "Performance",
     icon: "🧮",
-    tierColor: gemTierFor(level).color,
-    tierLabel: gemTierFor(level).label,
-    title: `CCT ${step.accuracy}% at ${step.interval}ms ${gemTierFor(level).label}`,
+    tierColor: gemTierFor(level, "cct").color,
+    tierLabel: gemTierFor(level, "cct").label,
+    title: `CCT ${step.accuracy}% at ${step.interval}ms ${gemTierFor(level, "cct").label}`,
     description: `Finish a CCT session at ${step.accuracy}% accuracy or better on a ${step.interval}ms interval.`,
     reward: isMax ? "New personal-best badge · max rank" : "New personal-best badge",
     unlocked: (s) => cctRankFor(s.exerciseStats.cct?.bestByInterval) >= level,
@@ -14062,7 +14077,11 @@ function NBackSessionApp() {
                           gem's actual silhouette, rather than sitting a
                           dark disc behind it. */}
                       <span className="inline-flex shrink-0 mr-5 sm:mr-8">
-                        <RankedGem level={bestLevel} size={compactHome ? 44 : 60} />
+                        <RankedGem
+                          level={bestLevel}
+                          size={compactHome ? 44 : 60}
+                          exerciseKey={e.key}
+                        />
                       </span>
                     </div>
                   </button>
@@ -14464,7 +14483,7 @@ function NBackSessionApp() {
                 // is untouched.
                 const isAccuracy = tabExercise?.scoreType === "accuracy";
                 const avatarId = isYou ? selectedAvatarId : PLACEHOLDER_AVATARS[entry.name];
-                const tier = gemTierFor(entry.level);
+                const tier = gemTierFor(entry.level, activeLeaderboardTab);
                 const entryFrameTier = isYou ? ownAvatarFrameTier : avatarFrameTier(entryState);
                 const entryHasGlow = hasLeaderboardGlow(entryState);
                 return (
@@ -14510,7 +14529,12 @@ function NBackSessionApp() {
                           {tier.label}
                         </div>
                       </div>
-                      <RankedGem level={entry.level} size={32} labelClass="text-[0.55rem]" />
+                      <RankedGem
+                        level={entry.level}
+                        size={32}
+                        exerciseKey={activeLeaderboardTab}
+                        labelClass="text-[0.55rem]"
+                      />
                     </div>
                   </button>
                 );
@@ -14588,7 +14612,12 @@ function NBackSessionApp() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 mt-3">
-                      <RankedGem level={stat.bestN} size={28} labelClass="text-[0.55rem]" />
+                      <RankedGem
+                        level={stat.bestN}
+                        size={28}
+                        exerciseKey={key}
+                        labelClass="text-[0.55rem]"
+                      />
                       <div className={`text-base font-medium ${acc.text}`}>
                         {scoreLabel}
                       </div>
@@ -15885,7 +15914,7 @@ function NBackSessionApp() {
 
         {!switchNotice && levelChangeNotice && (
           <div className="text-base rounded-lg px-5 py-2 mb-6 border text-amber-400 bg-amber-950/40 border-amber-800">
-            Level dropped to {n} / {rankNameFor(n)}
+            Level dropped to {n} / {rankNameFor(n, exercise.key)}
           </div>
         )}
 
@@ -17051,6 +17080,7 @@ function NBackSessionApp() {
                 <RankedGem
                   level={exercise.key === "iqnb" ? Math.floor(qnbPrimeLevel) : n}
                   size={56}
+                  exerciseKey={exercise.key}
                 />
                 <div>
                   <div className="text-lg text-slate-300">
@@ -17571,7 +17601,12 @@ function NBackSessionApp() {
             )}
 
             <div className="relative" style={{ animation: "gemPop 0.7s cubic-bezier(0.34,1.56,0.64,1)" }}>
-              <LevelGem level={unlockInfo.level} size={168} glowPulse={gemTierFor(unlockInfo.level).glow} />
+              <LevelGem
+                level={unlockInfo.level}
+                size={168}
+                exerciseKey={unlockInfo.exerciseKey}
+                glowPulse={gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).glow}
+              />
             </div>
 
             <div className="space-y-2">
@@ -17581,9 +17616,9 @@ function NBackSessionApp() {
               {unlockInfo.isNewPR && (
                 <div
                   className="text-lg font-semibold tracking-wide"
-                  style={{ color: gemTierFor(unlockInfo.level).color }}
+                  style={{ color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color }}
                 >
-                  {gemTierFor(unlockInfo.level).label} tier unlocked
+                  {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
                 </div>
               )}
             </div>
@@ -21952,7 +21987,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           <div
             className="text-6xl font-semibold tabular-nums leading-none mt-1"
             /* The tier the current speed sits in — same colour as its gem. */
-            style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP)).color }}
+            style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP), "motion3d").color }}
           >
             {speed.toFixed(2)}
           </div>
@@ -21994,7 +22029,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
                 Speed reached:{" "}
                 <span
                   className="font-medium"
-                  style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP)).color }}
+                  style={{ color: gemTierFor(Math.floor(speed / MOT_TIER_STEP), "motion3d").color }}
                 >
                   {speed.toFixed(2)}
                 </span>
