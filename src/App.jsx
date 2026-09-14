@@ -3269,7 +3269,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 385;
+const BUILD_VERSION = 386;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12268,7 +12268,14 @@ function NBackSessionApp() {
     // active AND there's an actual streak at stake, confirm before letting
     // them train through it. With no streak (0 days) there's nothing to
     // reset, so skip the warning entirely.
-    if (regimeKey && isRegimeRestDay(regimeKey, regimeTrainingDates[regimeKey] || [], new Date())) {
+    // Nobody is told to rest from a regime they have only just started —
+    // while it is still easing in, the schedule has nothing to protect yet.
+    const easingIn = !!rampMinutesForKey(regimeKey);
+    if (
+      regimeKey &&
+      !easingIn &&
+      isRegimeRestDay(regimeKey, regimeTrainingDates[regimeKey] || [], new Date())
+    ) {
       const activeStreak = currentScheduledRegimeStreak(
         regimeKey,
         regimeTrainingDates[regimeKey] || [],
@@ -17900,14 +17907,15 @@ function NBackSessionApp() {
           is missed. */}
       {rampIntro && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm px-8">
+          {/* A still wash, not an animated one — this screen waits for a
+              button, so anything that plays would either loop or finish long
+              before they are done reading. */}
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
-              animation: "sessionStartWash 1.2s ease-out forwards",
-              animationFillMode: "none",
+                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.18) 0%, rgba(76,185,216,0.06) 46%, transparent 72%)",
             }}
           />
           <div className="relative max-w-xl text-center space-y-6">
@@ -17915,12 +17923,14 @@ function NBackSessionApp() {
               Easing you in.
             </div>
             <div
-              className="text-lg sm:text-xl font-medium text-slate-300"
+              className="text-lg sm:text-xl font-medium text-slate-100 space-y-2"
               style={{ textWrap: "balance" }}
             >
-              Today is {rampIntro.minutes} minutes per exercise. Every session you
-              finish adds {rampIntro.minutes} minutes until you're doing the full
-              regime.
+              <div>Today is {rampIntro.minutes} minutes per exercise.</div>
+              <div>
+                Every session you finish adds {rampIntro.minutes} minutes until you're
+                doing the full regime.
+              </div>
             </div>
             <button
               onClick={() => setRampIntro(null)}
