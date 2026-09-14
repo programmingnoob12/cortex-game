@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 392;
+const BUILD_VERSION = 393;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12381,10 +12381,10 @@ function NBackSessionApp() {
     // New session, so last session's PR highlights are done with.
     setSessionPRs({});
     setOverviewPRSeen({});
+    // The ease-in screen is NOT shown here. Changing regime is what makes it
+    // owed, but Home is not where it belongs — it plays on the first Start
+    // Training after the change, holding the session back until it is read.
     setMainView("home");
-    // Changing regime is the moment the ease-in is worth explaining, so it
-    // plays here rather than waiting for the first Start Training.
-    showRampIntroIfOwed(key, null);
   };
 
   // Dev/test-only: zeroes the streak back to 0. Severs it at today (same
@@ -15688,7 +15688,7 @@ function NBackSessionApp() {
                         ))}
                       </div>
                       <p className="text-slate-500 text-sm">
-                        You keep your scores and history while you are away. Access ends{" "}
+                        You keep your scores and history while you're away. Access ends{" "}
                         {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()} and
                         resumes{" "}
                         {(() => {
