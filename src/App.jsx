@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 397;
+const BUILD_VERSION = 398;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -18003,7 +18003,7 @@ function NBackSessionApp() {
           />
           <div className="relative max-w-xl text-center space-y-14">
             <div
-              className="text-sm uppercase tracking-[0.22em] font-semibold text-slate-400"
+              className="text-xl sm:text-2xl font-medium text-slate-100"
               style={{ animation: "rampIntroRise 0.7s 0.1s ease-out both" }}
             >
               Ease In:
