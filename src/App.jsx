@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 413;
+const BUILD_VERSION = 414;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14088,8 +14088,10 @@ function NBackSessionApp() {
               })}
             </div>
 
+            {/* Sized to what it holds, not to the page: it is two short
+                lines, so stretching it the full width left it mostly empty. */}
             <div
-              className={`bg-slate-900 border border-slate-700/70 rounded-xl ${
+              className={`w-fit bg-slate-900 border border-slate-700/70 rounded-xl ${
                 compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
