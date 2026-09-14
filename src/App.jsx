@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 387;
+const BUILD_VERSION = 388;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -12970,6 +12970,14 @@ function NBackSessionApp() {
           74% { opacity: 1; transform: translateY(0); filter: blur(0); }
           100% { opacity: 0; transform: translateY(-10px); filter: blur(4px); }
         }
+        @keyframes rampIntroIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes rampIntroRise {
+          from { opacity: 0; transform: translateY(14px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         @keyframes sessionStartWash {
           0% { opacity: 0; }
           25% { opacity: 1; }
@@ -13399,8 +13407,8 @@ function NBackSessionApp() {
                 </div>
                 <p className="text-slate-500 text-sm mt-2">
                   {customRampStep === 0
-                    ? "Every exercise runs its full length from the first session."
-                    : `Every exercise starts at ${customRampStep} minutes and adds ${customRampStep} more every session, until it is at full length.`}
+                    ? "Start with the full regime."
+                    : `Every exercise starts at ${customRampStep} minutes. ${customRampStep} mins are added each session.`}
                 </p>
               </div>
             </div>
@@ -13972,14 +13980,10 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card relative overflow-hidden rounded-xl ${
+                    className={`ex-card relative overflow-hidden rounded-xl bg-slate-900 border border-slate-700/60 ${
                       compactHome ? "pl-6 pr-5 py-3.5" : "pl-7 pr-5 p-5"
                     } text-white text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
-                    style={{
-                      background: "#131519",
-                      border: "1px solid #262A30",
-                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
-                    }}
+                    style={{ boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)" }}
                   >
                     {/* The exercise colour, spent on one edge instead of the
                         whole face: the card is the same slate as everything
@@ -14037,10 +14041,7 @@ function NBackSessionApp() {
               </div>
               {sessionInProgress || sessionParked ? (
                 <div className="text-lg mt-2 font-medium" style={{ color: PR_YELLOW }}>
-                  In progress
-                  {sessionInProgress
-                    ? ` · ${formatDuration(totalSessionTimeRemainingMs())} left`
-                    : ""}
+                  In progress · {formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div
@@ -17953,7 +17954,10 @@ function NBackSessionApp() {
           gone. Pointer events off so it can never swallow a tap if the timer
           is missed. */}
       {rampIntro && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm px-8">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm px-8"
+          style={{ animation: "rampIntroIn 0.5s ease-out both" }}
+        >
           {/* A still wash, not an animated one — this screen waits for a
               button, so anything that plays would either loop or finish long
               before they are done reading. */}
@@ -17966,12 +17970,15 @@ function NBackSessionApp() {
             }}
           />
           <div className="relative max-w-xl text-center space-y-6">
-            <div className="text-2xl sm:text-3xl font-semibold tracking-tight">
+            <div
+              className="text-2xl sm:text-3xl font-semibold tracking-tight"
+              style={{ animation: "rampIntroRise 0.7s 0.15s ease-out both" }}
+            >
               Easing you in.
             </div>
             <div
               className="text-lg sm:text-xl font-medium text-slate-100 space-y-2"
-              style={{ textWrap: "balance" }}
+              style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.5s ease-out both" }}
             >
               <div>Today is {rampIntro.minutes} minutes per exercise.</div>
               <div>
@@ -17981,6 +17988,7 @@ function NBackSessionApp() {
             </div>
             <button
               onClick={() => setRampIntro(null)}
+              style={{ animation: "rampIntroRise 0.7s 1s ease-out both" }}
               className="mx-auto block rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors px-8 py-3 text-lg font-medium"
             >
               Got it
@@ -18133,7 +18141,7 @@ function NBackSessionApp() {
           days. Sits directly above the free-month card and reads the same
           way, so the two rewards are one column. */}
       {mainView === "home" && !customRegimeNoticeDismissed && !customRegimeEarned && (
-        <div className="fixed z-40 inset-x-4 bottom-28 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+7.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
+        <div className="fixed z-40 inset-x-4 bottom-32 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+9.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
             className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
@@ -18149,7 +18157,7 @@ function NBackSessionApp() {
             <span className="text-3xl shrink-0">🛠️</span>
             <div className="flex-1 min-w-0">
               <div className="text-lg font-semibold text-slate-100 leading-snug">
-                Build your own regime
+                Unlock custom regime
               </div>
               <div className="text-base text-slate-400 mt-1">
                 Train {CUSTOM_REGIME_DAYS} days in a row.
