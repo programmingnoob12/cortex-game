@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 396;
+const BUILD_VERSION = 397;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -19665,12 +19665,13 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
               {Math.round((exercise.sessionDurationMs || 0) / 60000)} min
             </span>
           </div>
-          <p className="text-slate-400 text-base">
-            20 in a row = level up
-          </p>
-          <p className="text-slate-400 text-base">
-            Level = 30s, 25s, 20s, +1 premise
-          </p>
+          <div className="text-lg text-slate-400">
+            20 in a row = <span className="text-slate-200 font-medium">level up</span>
+          </div>
+          <div className="text-lg text-slate-400">
+            Level ={" "}
+            <span className="text-slate-200 font-medium">30s, 25s, 20s, +1 premise</span>
+          </div>
         </div>
 
         <button
