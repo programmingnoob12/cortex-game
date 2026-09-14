@@ -2075,7 +2075,7 @@ const EXERCISE_LIBRARY = {
     // Quad 8-Back is as far as anyone realistically gets, so that is the
     // top of its ladder — see RANK_TOP_LEVEL for how the ranks are mapped
     // onto it.
-    maxN: 8,
+    maxN: 10,
     defaultN: 2,
     stimMs: 3000,
     scoreType: "accuracy",
@@ -2088,7 +2088,7 @@ const EXERCISE_LIBRARY = {
     abbrev: "R",
     accent: "indigo",
     modalities: [],
-    maxN: 7, // level = premiseCount - 1, so level 7 is 8p — the ceiling for RRT
+    maxN: 10, // level = premise count ceiling for RRT's own achievements/gem tiers
     defaultN: 1, // level 1 IS 2p — see the RRT achievement block: premiseCount = level + 1
     stimMs: 0,
     comingSoon: false,
@@ -2116,7 +2116,7 @@ const EXERCISE_LIBRARY = {
     abbrev: "QNB'",
     accent: "indigo",
     modalities: ["pos", "audio", "color", "shape"],
-    maxN: 9,
+    maxN: 10,
     defaultN: 2,
     stimMs: 2500, // overridden per-run from qnbPrimeSettingsFor once a session starts
     comingSoon: false,
@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 411;
+const BUILD_VERSION = 412;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7775,27 +7775,13 @@ const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
 // is shown a rank they could never reach, and nobody starts above Novice.
 // An exercise whose ceiling already matches the number of ranks (10) keeps
 // the plain level = rank mapping it has always had.
-function rankBoundsFor(exerciseKey) {
-  const ex = exerciseKey ? EXERCISE_LIBRARY?.[exerciseKey] : null;
-  const top = typeof ex?.maxN === "number" && ex.maxN > 0 ? ex.maxN : MAX_GEM_TIER;
-  const start = typeof ex?.defaultN === "number" && ex.defaultN > 0 ? ex.defaultN : 1;
-  return { start: Math.min(start, top), top };
-}
-// The rank list itself never changes order or colour. The starting level is
-// Novice, the top level is Enlightened, and the levels in between take the
-// ranks immediately below Enlightened in their normal order — so the ranks
-// that get cut on a short ladder are the low ones nobody would linger on,
-// never the top ones and never Novice.
-// The ranks are aligned to the TOP of each exercise's ladder: its last level
-// is Enlightened, the one below is Transcendent, then Elite, and so on down.
-// An exercise with fewer levels than there are ranks simply never shows the
-// earliest ranks — the top of the list is identical for every exercise.
-// Quad (levels 2-8) therefore opens on Bright and ends on Enlightened;
-// Novice, Proficient and Adept are the three that do not fit.
+// One rank per level, the same for every exercise: level 1 is Novice and
+// level 10 is Enlightened, so "D6B" and "Q6B" carry the same name. The
+// exerciseKey the callers pass is accepted and ignored — it is there so a
+// per-exercise mapping can be put back without touching every call site.
+// eslint-disable-next-line no-unused-vars
 function tierIndexFor(level, exerciseKey) {
-  const { top } = rankBoundsFor(exerciseKey);
-  const index = MAX_GEM_TIER - (top - Math.round(level));
-  return Math.max(1, Math.min(MAX_GEM_TIER, index));
+  return Math.max(1, Math.min(MAX_GEM_TIER, Math.round(level)));
 }
 // A gem with its rank name under it, in that rank's own colour — the pair
 // the app shows everywhere a level is displayed.
