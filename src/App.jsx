@@ -3271,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 393;
+const BUILD_VERSION = 394;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -15687,7 +15687,7 @@ function NBackSessionApp() {
                           </button>
                         ))}
                       </div>
-                      <p className="text-slate-500 text-sm">
+                      <p className="text-slate-500 text-sm pb-4">
                         You keep your scores and history while you're away. Access ends{" "}
                         {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()} and
                         resumes{" "}
@@ -15710,7 +15710,7 @@ function NBackSessionApp() {
                     Reactivate membership
                   </button>
                 ) : !showCancelForm ? (
-                  <div className="space-y-3">
+                  <div className="space-y-3 pt-2">
                   <button
                     onClick={() => setShowCancelForm(true)}
                     disabled={actionLoading}
@@ -15721,7 +15721,7 @@ function NBackSessionApp() {
                   >
                     Cancel membership
                   </button>
-                  <p className="text-slate-500 text-sm">
+                  <p className="text-slate-500 text-sm pb-2">
                     You keep access until{" "}
                     {new Date(billingState.currentPeriodEnd * 1000).toLocaleDateString()}. Your
                     scores and history will be saved.
@@ -18003,14 +18003,8 @@ function NBackSessionApp() {
           />
           <div className="relative max-w-xl text-center space-y-14">
             <div
-              className="text-2xl sm:text-3xl font-semibold tracking-tight"
-              style={{ animation: "rampIntroRise 0.7s 0.15s ease-out both" }}
-            >
-              Easing you in.
-            </div>
-            <div
-              className="text-lg sm:text-xl font-medium text-slate-100 space-y-7"
-              style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.5s ease-out both" }}
+              className="text-xl sm:text-2xl font-medium text-slate-100 space-y-7"
+              style={{ textWrap: "balance", animation: "rampIntroRise 0.7s 0.15s ease-out both" }}
             >
               <div>Every exercise starts at {rampIntro.minutes} minutes.</div>
               <div>{rampIntro.minutes} mins are added each session.</div>
@@ -18021,7 +18015,7 @@ function NBackSessionApp() {
                 setRampIntro(null);
                 then?.();
               }}
-              style={{ animation: "rampIntroRise 0.7s 1s ease-out both" }}
+              style={{ animation: "rampIntroRise 0.7s 0.65s ease-out both" }}
               className="mx-auto block rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors px-8 py-3 text-lg font-medium"
             >
               Got it
