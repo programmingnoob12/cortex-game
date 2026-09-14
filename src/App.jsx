@@ -555,7 +555,7 @@ const RESTORABLE_VIEWS = new Set([
   "custom",
 ]);
 
-function saveLastView(view, regimeKey) {
+function saveLastView(view, regimeKey, exerciseIndex) {
   try {
     if (!view || !RESTORABLE_VIEWS.has(view)) {
       localStorage.removeItem(LAST_VIEW_KEY);
@@ -563,7 +563,12 @@ function saveLastView(view, regimeKey) {
     }
     localStorage.setItem(
       LAST_VIEW_KEY,
-      JSON.stringify({ view, regimeKey: regimeKey || null, savedAt: Date.now() })
+      JSON.stringify({
+        view,
+        regimeKey: regimeKey || null,
+        exerciseIndex: typeof exerciseIndex === "number" ? exerciseIndex : null,
+        savedAt: Date.now(),
+      })
     );
   } catch { /* no storage */ }
 }
@@ -3264,7 +3269,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 384;
+const BUILD_VERSION = 385;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9197,11 +9202,13 @@ function NBackSessionApp() {
     activeExercisesRef.current = activeExercises;
   }, [activeExercises]);
 
-  const [exerciseIndex, setExerciseIndex] = useState(() =>
-    typeof bootSession?.snap?.exerciseIndex === "number"
-      ? bootSession.snap.exerciseIndex
-      : 0
-  );
+  const [exerciseIndex, setExerciseIndex] = useState(() => {
+    if (typeof bootSession?.snap?.exerciseIndex === "number") {
+      return bootSession.snap.exerciseIndex;
+    }
+    const last = loadLastView();
+    return typeof last?.exerciseIndex === "number" ? last.exerciseIndex : 0;
+  });
   const exercise = activeExercises[exerciseIndex] || activeExercises[0];
   const exerciseIndexRef = useRef(0);
   useEffect(() => {
@@ -9435,11 +9442,9 @@ function NBackSessionApp() {
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
   const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
+  const [rampIntro, setRampIntro] = useState(null); // { minutes } — the ease-in explanation, dismissed by its own button
   // How long one of those lines stays up, wherever it is triggered from.
   const SESSION_START_MS = 2600;
-  // The ease-in explanation is two lines of real information rather than one
-  // line to feel, so it is held long enough to read twice.
-  const RAMP_INTRO_MS = 5200;
   // Set only by the preview buttons; null means "work it out from the data".
   const [nudgeIdOverride, setNudgeIdOverride] = useState(null);
   // { [exerciseKey]: true } once that exercise's session budget has run out.
@@ -11774,8 +11779,8 @@ function NBackSessionApp() {
     }
   }, [mainView, exercise.key]);
   useEffect(() => {
-    saveLastView(mainView, regimeKey);
-  }, [mainView, regimeKey]);
+    saveLastView(mainView, regimeKey, exerciseIndex);
+  }, [mainView, regimeKey, exerciseIndex]);
 
   const sessionParked =
     !sessionInProgress &&
@@ -11877,6 +11882,7 @@ function NBackSessionApp() {
         buildRegimeExercises(regime, rampMinutesForKey(last.regimeKey, regime))
       );
     }
+    if (typeof last.exerciseIndex === "number") setExerciseIndex(last.exerciseIndex);
     setMainView((view) => (view === "regime" ? "app" : view));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHydrated, customRegimes, regimeKey]);
@@ -11920,7 +11926,9 @@ function NBackSessionApp() {
         buildRegimeExercises(regime, rampMinutesForKey(snap.regimeKey, regime))
       );
       setScreen("setup");
-      setMainView("app");
+      // Only take them into the exercise if that is where they actually
+      // were. Someone who reloaded on Home stays on Home.
+      if ((loadLastView()?.view || "app") === "app") setMainView("app");
     }
     sessionStartedRef.current = { ...(snap.started || {}) };
     sessionTimerStartRef.current = { ...(snap.timerStart || {}) };
@@ -12205,16 +12213,9 @@ function NBackSessionApp() {
     const ramp = rampMinutesForKey(key);
     const firstEver = !!ramp && !(regimeRampRef.current[key] || 0);
     if (firstEver) {
-      setSessionStartLine(
-        <span className="block space-y-4">
-          <span className="block">Easing you in.</span>
-          <span className="block text-lg sm:text-xl font-medium text-slate-300">
-            Today is {ramp} minutes per exercise. Every session you finish adds 5
-            minutes until you're doing the full regime.
-          </span>
-        </span>
-      );
-      setTimeout(() => setSessionStartLine(null), RAMP_INTRO_MS);
+      // Held until they dismiss it: this one is information, not a mood, so
+      // it waits rather than timing out while they are still reading.
+      setRampIntro({ minutes: ramp });
     } else {
       setSessionStartLine(
         MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
@@ -16860,7 +16861,6 @@ function NBackSessionApp() {
             branchingEnabled={true}
             autoStart={rrtAutoStart}
             startIncrement={rrtStartIncrement}
-            ramping={!!rampMinutesForKey(regimeKey)}
           />
         )}
 
@@ -17898,6 +17898,40 @@ function NBackSessionApp() {
       {/* Between Start Training and the first exercise: one line, held, then
           gone. Pointer events off so it can never swallow a tap if the timer
           is missed. */}
+      {rampIntro && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm px-8">
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
+              animation: "sessionStartWash 1.2s ease-out forwards",
+              animationFillMode: "none",
+            }}
+          />
+          <div className="relative max-w-xl text-center space-y-6">
+            <div className="text-2xl sm:text-3xl font-semibold tracking-tight">
+              Easing you in.
+            </div>
+            <div
+              className="text-lg sm:text-xl font-medium text-slate-300"
+              style={{ textWrap: "balance" }}
+            >
+              Today is {rampIntro.minutes} minutes per exercise. Every session you
+              finish adds {rampIntro.minutes} minutes until you're doing the full
+              regime.
+            </div>
+            <button
+              onClick={() => setRampIntro(null)}
+              className="mx-auto block rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors px-8 py-3 text-lg font-medium"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
       {sessionStartLine && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm pointer-events-none px-8">
           <div
@@ -17906,19 +17940,12 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
-              animation: `sessionStartWash ${
-                typeof sessionStartLine === "string" ? "2.6s" : "5.2s"
-              } ease-out forwards`,
+              animation: "sessionStartWash 2.6s ease-out forwards",
             }}
           />
           <div
             className="relative text-center text-2xl sm:text-3xl font-semibold tracking-tight max-w-xl"
-            style={{
-              animation: `sessionStartText ${
-                typeof sessionStartLine === "string" ? "2.6s" : "5.2s"
-              } ease-out forwards`,
-              textWrap: "balance",
-            }}
+            style={{ animation: "sessionStartText 2.6s ease-out forwards", textWrap: "balance" }}
           >
             {sessionStartLine}
           </div>
@@ -18896,7 +18923,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
   );
 }
 
-function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0, startIncrement = 0, ramping = false }) {
+function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onSessionEnd, paused, scrambleFactor = 0, branchingEnabled = true, autoStart = 0, startIncrement = 0 }) {
   const accent = ACCENT_STYLES[exercise.accent];
   const [stage, setStage] = useState("setup"); // setup | premises | question
   const [puzzle, setPuzzle] = useState(null);
@@ -19484,24 +19511,17 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
           <div className="text-lg text-slate-400">
             Round length: <span className="text-slate-200 font-medium">{ROUND_MS / 1000} sec</span>
           </div>
-          <p className="text-slate-400 text-base">
-            20 in a row = level up. 30s, 25s, 20s, +1 premise.
-          </p>
+          {/* However long this exercise runs today — the eased-in length
+              while a regime is ramping up, its full length after that. */}
           <div className="text-lg text-slate-400">
-            Today:{" "}
+            Duration:{" "}
             <span className="text-slate-200 font-medium">
               {Math.round((exercise.sessionDurationMs || 0) / 60000)} min
             </span>
           </div>
-          {/* Only while the regime is still being eased into — once it is at
-              full length there is nothing to explain. */}
-          {ramping && (
-            <p className="text-slate-400 text-base">
-              Today is {Math.round((exercise.sessionDurationMs || 0) / 60000)} minutes
-              per exercise. Every session you finish adds 5 minutes until you're doing
-              the full regime.
-            </p>
-          )}
+          <p className="text-slate-400 text-base">
+            20 in a row = level up. 30s, 25s, 20s, +1 premise.
+          </p>
         </div>
 
         <button
