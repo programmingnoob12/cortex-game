@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 407;
+const BUILD_VERSION = 408;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -7769,19 +7769,26 @@ const GEM_TIERS = {
 const GEM_TIER_LEVELS = Object.keys(GEM_TIERS).map(Number);
 const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
 
-// Ranks are counted DOWN from the top of each exercise's own ladder, so the
-// last level anyone can reach is always Enlightened and nobody is shown a
-// rank they could never get to. An exercise with fewer levels than there are
-// ranks simply starts higher up the list — the earliest ranks are skipped
-// rather than the top ones being unreachable. Anything without a ceiling of
-// its own (3D MOT, CCT) keeps the plain 1-10 mapping.
-function rankTopLevelFor(exerciseKey) {
-  const max = exerciseKey ? EXERCISE_LIBRARY?.[exerciseKey]?.maxN : null;
-  return typeof max === "number" && max > 0 ? max : MAX_GEM_TIER;
+// Each exercise's ladder is stretched across the ranks: its starting level is
+// always Novice and its last attainable level is always Enlightened, with the
+// ranks in between skipped where there are more ranks than levels. So nobody
+// is shown a rank they could never reach, and nobody starts above Novice.
+// An exercise whose ceiling already matches the number of ranks (10) keeps
+// the plain level = rank mapping it has always had.
+function rankBoundsFor(exerciseKey) {
+  const ex = exerciseKey ? EXERCISE_LIBRARY?.[exerciseKey] : null;
+  const top = typeof ex?.maxN === "number" && ex.maxN > 0 ? ex.maxN : MAX_GEM_TIER;
+  const start = typeof ex?.defaultN === "number" && ex.defaultN > 0 ? ex.defaultN : 1;
+  return { start: Math.min(start, top), top };
 }
 function tierIndexFor(level, exerciseKey) {
-  const top = rankTopLevelFor(exerciseKey);
-  const index = MAX_GEM_TIER - (top - Math.round(level));
+  const { start, top } = rankBoundsFor(exerciseKey);
+  const value = Math.round(level);
+  if (top >= MAX_GEM_TIER || top <= start) {
+    return Math.max(1, Math.min(MAX_GEM_TIER, value));
+  }
+  const share = (value - start) / (top - start);
+  const index = 1 + Math.round(share * (MAX_GEM_TIER - 1));
   return Math.max(1, Math.min(MAX_GEM_TIER, index));
 }
 // A gem with its rank name under it, in that rank's own colour — the pair
