@@ -3292,7 +3292,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 412;
+const BUILD_VERSION = 413;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14090,19 +14090,19 @@ function NBackSessionApp() {
 
             <div
               className={`bg-slate-900 border border-slate-700/70 rounded-xl ${
-                compactHome ? "px-4 py-3" : "p-4"
+                compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
               <div className={`font-semibold text-slate-100 ${compactHome ? "text-lg" : "text-xl"}`}>
                 Next session
               </div>
               {sessionInProgress || sessionParked ? (
-                <div className="text-lg mt-2 font-medium" style={{ color: PR_YELLOW }}>
+                <div className={`mt-1 font-medium ${compactHome ? "text-base" : "text-lg"}`} style={{ color: PR_YELLOW }}>
                   In progress · {formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div
-                  className={`text-lg mt-2 ${
+                  className={`mt-1 ${compactHome ? "text-base" : "text-lg"} ${
                     trainedToday ? "text-slate-500" : "text-emerald-400"
                   }`}
                 >
@@ -14171,6 +14171,115 @@ function NBackSessionApp() {
 
           </div>
         )}
+
+        {/* Every screen in the app, one button each — the walking route for
+            the responsive checklist. Testing only; it navigates, it never
+            changes any state beyond which screen is open. */}
+        {mainView === "pages" && (() => {
+          const go = (label, action) => (
+            <button
+              key={label}
+              onClick={action}
+              className="bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-colors rounded-lg px-4 py-3 text-base font-medium text-left"
+            >
+              {label}
+            </button>
+          );
+          // jumpToExercise opens the exercise's own setup screen directly,
+          // so the tutorial is not in the way and nothing about the person's
+          // tutorial settings has to be touched.
+          const openExercise = (key) => () => jumpToExercise(key);
+          const openTutorial = (key) => () => {
+            jumpToExercise(key);
+            setTutorialDontShowAgain(false);
+            setMainView("tutorial");
+          };
+          const group = (title, buttons) => (
+            <div key={title} className="space-y-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                {title}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">{buttons}</div>
+            </div>
+          );
+          return (
+            <div className="space-y-8">
+              <div>
+                <button
+                  onClick={() => setMainView("home")}
+                  className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium mb-6"
+                >
+                  &lsaquo; Back
+                </button>
+                <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Pages</h1>
+                <div className="text-slate-500 text-base mt-2">
+                  Every screen, one button each
+                </div>
+              </div>
+
+              {group("Main", [
+                go("Home", () => setMainView("home")),
+                go("Regime picker", () => setMainView("regime")),
+                go("Build your regime", () => openCustomBuilder(null)),
+                go("Motivation", () => {
+                  setHypnosisAfterSession(false);
+                  setMainView("hypnosis");
+                }),
+              ])}
+
+              {group("Exercises", [
+                go("Dual N-Back", openExercise("dual")),
+                go("Quad N-Back", openExercise("quad")),
+                go("QNB'", openExercise("iqnb")),
+                go("RRT", openExercise("rrt")),
+                go("3D MOT", openExercise("motion3d")),
+                go("CCT", openExercise("cct")),
+              ])}
+
+              {group("Tutorials", [
+                go("Dual N-Back tutorial", openTutorial("dual")),
+                go("Quad N-Back tutorial", openTutorial("quad")),
+                go("QNB' tutorial", openTutorial("iqnb")),
+                go("RRT tutorial", openTutorial("rrt")),
+                go("3D MOT tutorial", openTutorial("motion3d")),
+                go("CCT tutorial", openTutorial("cct")),
+              ])}
+
+              {group("Results", [
+                go("Stats — summary", () => {
+                  setOverviewSource("home");
+                  setOverviewView("summary");
+                  goToOverview();
+                }),
+                go("Stats — graph", () => {
+                  setOverviewSource("home");
+                  setOverviewView("graph");
+                  goToOverview();
+                }),
+                go("Stats Today — summary", () => {
+                  setOverviewSource("training");
+                  setOverviewView("summary");
+                  goToOverview();
+                }),
+                go("Achievements", () => setMainView("achievements")),
+                go("Leaderboard", () => setMainView("leaderboard")),
+                go("Profile", () => {
+                  setProfileTarget("you");
+                  setMainView("profile");
+                }),
+              ])}
+
+              {group("Account", [
+                go("Account", () => setMainView("account")),
+                go("Membership", () => setMainView("membership")),
+                go("Notes", () => setMainView("notes")),
+                go("Testing station", () => setMainView("testing")),
+                go("Terms of Service", () => setMainView("terms")),
+                go("Privacy Policy", () => setMainView("privacy")),
+              ])}
+            </div>
+          );
+        })()}
 
         {mainView === "notes" && (
           <div className="space-y-8">
@@ -18365,6 +18474,17 @@ function NBackSessionApp() {
           className="hidden sm:flex fixed top-14 left-3 sm:top-[4.5rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           Notes
+        </button>
+      )}
+
+      {mainView === "home" && (
+        <button
+          onClick={() => setMainView("pages")}
+          /* Under Notes, same treatment. Opens the list of every screen in
+             the app, for walking the responsive checklist. */
+          className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[8rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+        >
+          📐 Pages
         </button>
       )}
 
