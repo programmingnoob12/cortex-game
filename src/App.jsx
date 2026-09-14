@@ -670,6 +670,8 @@ function hintForToday(dateString) {
   return HOME_HINTS[h % HOME_HINTS.length];
 }
 
+// Days of unbroken daily training that unlock building your own regime.
+const CUSTOM_REGIME_DAYS = 30;
 // Days of unbroken daily training that earn one free month. Claimable once
 // per member, ever — the claim is recorded on the Stripe subscription by
 // api/billing/streak-reward.js, which is the only durable record of it.
@@ -3269,7 +3271,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 386;
+const BUILD_VERSION = 387;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9167,6 +9169,19 @@ function NBackSessionApp() {
       return {};
     }
   });
+  // Which regimes have already had the ease-in screen. Separate from the
+  // ramp count so an unfinished first session does not mean it plays again.
+  const rampIntroSeenRef = useRef(
+    (() => {
+      try {
+        const raw = mirrorGet("ramp-intro-seen");
+        const parsed = raw ? JSON.parse(raw) : null;
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch {
+        return {};
+      }
+    })()
+  );
   const regimeRampRef = useRef(regimeRamp);
   useEffect(() => { regimeRampRef.current = regimeRamp; }, [regimeRamp]);
   const [customDraft, setCustomDraft] = useState([]); // the builder screen's working copy
@@ -9405,6 +9420,7 @@ function NBackSessionApp() {
   // see the free experience without cancelling anything.
   // Dismissed for this visit only: it is a nudge, not a task list.
   const [freeMonthNoticeDismissed, setFreeMonthNoticeDismissed] = useState(false);
+  const [customRegimeNoticeDismissed, setCustomRegimeNoticeDismissed] = useState(false);
   // Today's hint, dismissed for this visit only. `forced` is the Testing
   // station's way to see one on a day that did not draw one.
   const [hintDismissed, setHintDismissed] = useState(false);
@@ -9905,6 +9921,18 @@ function NBackSessionApp() {
         }
       } catch (err) {
         // no saved per-exercise tutorial dismissals yet
+      }
+      try {
+        const res = await window.storage.get("ramp-intro-seen", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          if (parsed && typeof parsed === "object") {
+            mirrorSet("ramp-intro-seen", res.value);
+            rampIntroSeenRef.current = { ...parsed, ...rampIntroSeenRef.current };
+          }
+        }
+      } catch (err) {
+        // never shown on this account yet
       }
       try {
         const res = await window.storage.get("regime-ramp", false);
@@ -11628,6 +11656,9 @@ function NBackSessionApp() {
 
   const freeMonthDays = Math.min(7, achievementState.regimeStreak || 0);
   const freeMonthEarned = freeMonthDays >= 7;
+  // The 30-day streak that unlocks building your own regime.
+  const customRegimeDays = Math.min(CUSTOM_REGIME_DAYS, achievementState.streak || 0);
+  const customRegimeEarned = customRegimeDays >= CUSTOM_REGIME_DAYS;
   // The one line the session-complete screen shows. Chosen once when the
   // screen opens rather than on every render: the pick is random, so
   // recomputing it mid-animation swapped the line out under the reader.
@@ -12211,7 +12242,16 @@ function NBackSessionApp() {
     // it is the explanation for why today is shorter than the regime says.
     const key = regimeKeyRef.current || regimeKey;
     const ramp = rampMinutesForKey(key);
-    const firstEver = !!ramp && !(regimeRampRef.current[key] || 0);
+    // Shown the first time they train a regime they have moved to, and not
+    // again — the ramp count only moves on a finished session, so it cannot
+    // be the thing that decides this.
+    const firstEver = !!ramp && !rampIntroSeenRef.current[key];
+    if (firstEver) {
+      rampIntroSeenRef.current = { ...rampIntroSeenRef.current, [key]: true };
+      const json = JSON.stringify(rampIntroSeenRef.current);
+      mirrorSet("ramp-intro-seen", json);
+      if (window.storage) safeStorageSet("ramp-intro-seen", json, false);
+    }
     if (firstEver) {
       // Held until they dismiss it: this one is information, not a mood, so
       // it waits rather than timing out while they are still reading.
@@ -13360,7 +13400,7 @@ function NBackSessionApp() {
                 <p className="text-slate-500 text-sm mt-2">
                   {customRampStep === 0
                     ? "Every exercise runs its full length from the first session."
-                    : `Every exercise starts at ${customRampStep} minutes and adds ${customRampStep} more each session you finish, until it is at full length.`}
+                    : `Every exercise starts at ${customRampStep} minutes and adds ${customRampStep} more every session, until it is at full length.`}
                 </p>
               </div>
             </div>
@@ -13932,16 +13972,23 @@ function NBackSessionApp() {
                       setShineCard(e.key);
                     }}
                     onAnimationEnd={() => setShineCard(null)}
-                    className={`ex-card rounded-xl ${
-                      compactHome ? "px-5 py-3.5" : "p-5"
+                    className={`ex-card relative overflow-hidden rounded-xl ${
+                      compactHome ? "pl-6 pr-5 py-3.5" : "pl-7 pr-5 p-5"
                     } text-white text-left${shineCard === e.key ? " ex-card-shine" : ""}`}
                     style={{
-                      backgroundImage: exerciseDeepFill(exColor),
-                      boxShadow:
-                        "inset 0 1px rgba(255,255,255,0.16), inset 0 -1px rgba(0,0,0,0.25), 0 10px 15px -3px rgba(0,0,0,0.3)",
-                      textShadow: "0 1px 2px rgba(0,0,0,0.35)",
+                      background: "#131519",
+                      border: "1px solid #262A30",
+                      boxShadow: "0 10px 15px -3px rgba(0,0,0,0.3)",
                     }}
                   >
+                    {/* The exercise colour, spent on one edge instead of the
+                        whole face: the card is the same slate as everything
+                        else and the rail is what tells the exercises apart. */}
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0"
+                      style={{ width: 5, background: exColor }}
+                    />
                     {/* Name and score stack on the left, gem sits opposite
                         it at the right edge and larger: it is the thing the
                         eye should land on first. */}
@@ -17928,8 +17975,8 @@ function NBackSessionApp() {
             >
               <div>Today is {rampIntro.minutes} minutes per exercise.</div>
               <div>
-                Every session you finish adds {rampIntro.minutes} minutes until you're
-                doing the full regime.
+                Every session adds {rampIntro.minutes} minutes until you're doing the
+                full regime.
               </div>
             </div>
             <button
@@ -18082,6 +18129,54 @@ function NBackSessionApp() {
           one screen exactly, and a row in the flow would push the footer
           off. Solid card with a green rail, not the tinted-panel treatment
           the rest of the app uses for inline notes. */}
+      {/* The other thing a streak is worth: building your own regime, at 30
+          days. Sits directly above the free-month card and reads the same
+          way, so the two rewards are one column. */}
+      {mainView === "home" && !customRegimeNoticeDismissed && !customRegimeEarned && (
+        <div className="fixed z-40 inset-x-4 bottom-28 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+7.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
+          <div
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
+            style={{
+              background: "#1B1D20",
+              border: "1px solid #2C2F34",
+              boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
+            }}
+          >
+            <span
+              className="self-stretch shrink-0"
+              style={{ width: 5, background: REGIME_COLORS.custom }}
+            />
+            <span className="text-3xl shrink-0">🛠️</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-lg font-semibold text-slate-100 leading-snug">
+                Build your own regime
+              </div>
+              <div className="text-base text-slate-400 mt-1">
+                Train {CUSTOM_REGIME_DAYS} days in a row.
+              </div>
+              <div className="mt-3 h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(customRegimeDays / CUSTOM_REGIME_DAYS) * 100}%`,
+                    background: `linear-gradient(to right, ${REGIME_COLORS.custom}99, ${REGIME_COLORS.custom})`,
+                    transition: "width 0.3s ease-out",
+                  }}
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setCustomRegimeNoticeDismissed(true)}
+              aria-label="Dismiss"
+              className="no-lift shrink-0 self-start text-slate-500 hover:text-slate-200 transition-colors leading-none px-2 py-1"
+              style={{ fontSize: "1.75rem" }}
+            >
+              ×
+            </button>
+          </div>
+        </div>
+      )}
+
       {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
         <div className="fixed z-40 inset-x-4 bottom-4 sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
