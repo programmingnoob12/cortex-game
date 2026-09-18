@@ -603,6 +603,7 @@ const NOTE_GROUPS = [
   {
     title: "To fix",
     items: [
+      "Create the sky is falling and I'm missing out feeling for this app.",
       "Fix the problem with how they view all of their stats.",
       "One of the pages has its text off-centre, unlike the others.",
       "Make the 3D MOT balls look better.",
@@ -3248,6 +3249,18 @@ const MOTIVATION_LINES = [
   { id: 129, text: "Stay with it." },
   { id: 130, text: "You are building something invisible and real." },
   { id: 133, text: "Benefits get better as you train consistently." },
+  {
+    id: 134,
+    text: "Consistency is the most important thing. Do whatever it takes to keep your streak going.",
+  },
+  {
+    id: 135,
+    text: "Session feeling hard today? Put some good music on in the background to help you get it done.",
+  },
+  {
+    id: 136,
+    text: "Session feeling hard today? Break it up into small pieces throughout the day. Just keep your streak going.",
+  },
 ];
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
 // usual random transition line. Not in MOTIVATION_LINES, because it must
@@ -3292,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 420;
+const BUILD_VERSION = 421;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
