@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 426;
+const BUILD_VERSION = 427;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -14462,6 +14462,33 @@ function NBackSessionApp() {
                   🧪 Reset streak
                 </button>
               </div>
+              {/* Straight to full length on whatever regime is selected:
+                  banks enough finished sessions for the ramp to be over, and
+                  rebuilds the current session at its full minutes. */}
+              <button
+                onClick={() => {
+                  const key = regimeKeyRef.current || regimeKey;
+                  const regime = findRegime(key);
+                  if (!key || !regime) return;
+                  const done = (regime.steps || []).reduce(
+                    (n, step) => n + Math.ceil((step.minutes || 0) / (rampStepFor(regime) || 5)),
+                    0
+                  );
+                  setRegimeRampState((prev) => {
+                    const next = { ...prev, [key]: done + regime.steps.length };
+                    const json = JSON.stringify(next);
+                    mirrorSet("regime-ramp", json);
+                    if (window.storage) safeStorageSet("regime-ramp", json, false);
+                    regimeRampRef.current = next;
+                    return next;
+                  });
+                  setActiveExercises(buildRegimeExercises(regime, null));
+                }}
+                className="w-full border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors rounded-lg py-3 text-sm"
+              >
+                🧪 Skip ease in to full regime
+              </button>
+
               {/* The free month, in three pieces: reach the threshold for
                   real (which calls Stripe), see the celebration on its own,
                   and clear this browser's claim flag so the grant can be
