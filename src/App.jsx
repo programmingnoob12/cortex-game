@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 425;
+const BUILD_VERSION = 426;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13286,7 +13286,7 @@ function NBackSessionApp() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-6">
               {/* On a free account the one regime they can actually train
                   leads, the offer sits directly under it, and the locked
                   ones follow. */}
@@ -13304,11 +13304,11 @@ function NBackSessionApp() {
                       key="upgrade"
                       onClick={goToCheckout}
                       style={{ "--ex": "#1E982B" }}
-                      className="w-full deep-fill rounded-xl px-5 py-4 shadow-lg shadow-black/30 text-left"
+                      className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
                     >
                       <div className="flex items-center justify-between gap-6">
-                        <div className="text-xl font-semibold">Get membership</div>
-                        <div className="text-base font-medium">Unlock all regimes ›</div>
+                        <div className="text-2xl font-semibold">Get membership</div>
+                        <div className="text-lg font-medium">Unlock all regimes ›</div>
                       </div>
                       <div className="text-base font-medium mt-1">
                         Plus the motivation module.
@@ -13333,13 +13333,13 @@ function NBackSessionApp() {
                     /* A locked regime keeps its own colour but sits dimmed:
                        it is something to buy, not something broken, so it
                        still looks like the thing it starts. */
-                    className={`w-full text-left deep-fill rounded-xl px-5 py-4 shadow-lg shadow-black/30${
+                    className={`w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30${
                       locked ? " opacity-45" : ""
                     }`}
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <div className="text-xl font-semibold">
+                        <div className="text-2xl font-semibold">
                           {locked ? "🔒 " : ""}
                           {r.title}
                         </div>
@@ -13354,9 +13354,9 @@ function NBackSessionApp() {
                           </span>
                         )}
                       </div>
-                      <div className="text-base font-medium">{r.subtitle}</div>
+                      <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-sm font-medium mt-1">
+                    <div className="text-base font-medium mt-1">
                       {locked ? "Membership required" : r.summary}
                     </div>
                   </button>
@@ -13376,7 +13376,7 @@ function NBackSessionApp() {
                         <button
                           onClick={() => chooseRegime(r.key)}
                           style={{ "--ex": REGIME_COLORS.custom }}
-                          className="w-full text-left deep-fill rounded-xl pl-5 pr-12 py-4 shadow-lg shadow-black/30"
+                          className="w-full text-left deep-fill rounded-xl pl-7 pr-14 py-6 shadow-lg shadow-black/30"
                         >
                           <div className="flex items-center justify-between gap-6">
                             <div className="text-2xl font-semibold">{r.title}</div>
@@ -14139,7 +14139,7 @@ function NBackSessionApp() {
             {/* One row, each button only as wide as its words, instead of
                 three full-width slabs stacked down the page. Wraps to a
                 second line when the column is too narrow for all three. */}
-            <div className={`flex flex-col max-w-md mx-auto w-full ${compactHome ? "gap-2.5" : "gap-3"}`}>
+            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
