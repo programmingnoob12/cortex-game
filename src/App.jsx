@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 427;
+const BUILD_VERSION = 428;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -9518,7 +9518,17 @@ function NBackSessionApp() {
   const [selectedColorId, setSelectedColorIdState] = useState("indigo"); // persisted — profile accent color theme
   const [selectedBackgroundId, setSelectedBackgroundIdState] = useState("none"); // persisted — profile banner background
   const [featuredBadgeId, setFeaturedBadgeIdState] = useState(null); // persisted — one badge pinned front-and-center on the profile
-  const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(true); // persisted — on by default, switched off from the Account page
+  // On by default, but read from the local mirror first: the stored value
+  // used to arrive a few seconds after the exercise opened, so someone who
+  // had switched it off still heard the first few seconds of the track.
+  const [binauralBeatsEnabled, setBinauralBeatsEnabledState] = useState(() => {
+    try {
+      const raw = mirrorGet("binaural-beats-enabled");
+      return raw == null ? true : JSON.parse(raw) !== false;
+    } catch {
+      return true;
+    }
+  });
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
@@ -10066,6 +10076,7 @@ function NBackSessionApp() {
       try {
         const res = await window.storage.get("binaural-beats-enabled", false);
         if (res && res.value) {
+          mirrorSet("binaural-beats-enabled", res.value);
           setBinauralBeatsEnabledState(JSON.parse(res.value));
         }
       } catch (err) {
@@ -10335,7 +10346,9 @@ function NBackSessionApp() {
     // The hand-off between exercises is still "in an exercise" as far as the
     // track is concerned; stopping it there made the audio cut out every few
     // minutes. A tutorial leaves mainView === "app", so that still stops it.
-    binauralBeatsEnabled && mainView === "app" && exercise.key !== "overview"
+    // Nothing plays until the stored settings have landed, so an account
+    // with it switched off never hears the opening seconds.
+    hasHydrated && binauralBeatsEnabled && mainView === "app" && exercise.key !== "overview"
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -14123,7 +14136,7 @@ function NBackSessionApp() {
               </div>
               {sessionInProgress || sessionParked ? (
                 <div className={`mt-1 font-medium ${compactHome ? "text-base" : "text-lg"}`} style={{ color: PR_YELLOW }}>
-                  In progress · {formatDuration(totalSessionTimeRemainingMs())} left
+                  In progress: {formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div
