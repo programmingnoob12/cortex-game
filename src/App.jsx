@@ -989,8 +989,8 @@ function AuthGate({ children }) {
   // set a new one before they can do anything else in the app.
   if (mode === "recovery") {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full space-y-5">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+        <div className="auth-card max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Set a new password</h1>
           <form onSubmit={handleSetNewPassword} className="space-y-3">
             <input
@@ -1018,8 +1018,8 @@ function AuthGate({ children }) {
   if (!session) {
     if (mode === "forgotSent") {
       return (
-        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-          <div className="max-w-sm w-full space-y-4 text-center">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+          <div className="auth-card max-w-sm w-full space-y-4 text-center">
             <h1 className="text-2xl font-semibold">Check your email</h1>
             <p className="text-slate-300 text-base">
               We've sent a password reset link to <span className="font-medium">{email}</span>.
@@ -1037,8 +1037,8 @@ function AuthGate({ children }) {
 
     if (mode === "forgot") {
       return (
-        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-          <div className="max-w-sm w-full space-y-5">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+          <div className="auth-card max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Reset your password</h1>
             <form onSubmit={handleForgotPassword} className="space-y-3">
               <input
@@ -1070,8 +1070,8 @@ function AuthGate({ children }) {
 
     if (mode === "password") {
       return (
-        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-          <div className="max-w-sm w-full space-y-5">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+          <div className="auth-card max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Sign in</h1>
             <form onSubmit={handlePasswordLogin} className="space-y-3">
               <input
@@ -1118,8 +1118,8 @@ function AuthGate({ children }) {
     // no marketing. Somebody who arrives here has already decided.
     if (mode === "signup") {
       return (
-        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-          <div className="max-w-sm w-full space-y-5">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+          <div className="auth-card max-w-sm w-full space-y-5">
             <h1 className="text-2xl font-semibold text-center">Create your account</h1>
             {linkSent ? (
               <p className="text-slate-300 text-center text-base">
@@ -1238,8 +1238,8 @@ function AuthGate({ children }) {
 
     // Default: magic-link sign in
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full space-y-5">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+        <div className="auth-card max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Sign in</h1>
           {linkSent ? (
             <p className="text-slate-300 text-center text-base">
@@ -1390,8 +1390,8 @@ function AuthGate({ children }) {
     };
 
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full space-y-3 text-center">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+        <div className="auth-card max-w-sm w-full space-y-3 text-center">
           <h1 className="text-xl font-semibold">{state.title}</h1>
           <p className="text-slate-400 text-base">{state.body}</p>
           {recoverError && <p className="text-red-400 text-sm">{recoverError}</p>}
@@ -1440,8 +1440,8 @@ function AuthGate({ children }) {
   // nothing about their account or data.
   if (passwordPrompt) {
     return (
-      <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-sm w-full space-y-5">
+      <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+        <div className="auth-card max-w-sm w-full space-y-5">
           <h1 className="text-2xl font-semibold text-center">Set a password?</h1>
           <p className="text-slate-400 text-sm text-center">
             Optional. Lets you sign in directly next time instead of waiting on an email link.
@@ -1600,8 +1600,8 @@ class AppErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen text-slate-100 flex items-center justify-center p-6">
-          <div className="max-w-sm w-full space-y-5 text-center">
+        <div className="min-h-screen text-slate-100 flex items-center justify-center px-6 py-10 sm:py-6">
+          <div className="auth-card max-w-sm w-full space-y-5 text-center">
             <div className="text-5xl">⚠️</div>
             <h1 className="text-2xl font-semibold">Something went wrong</h1>
             <p className="text-slate-400 text-base">
@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 421;
+const BUILD_VERSION = 422;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -19245,7 +19245,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
           component's layout had to change. */}
       {sessionDone && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-8">
-          <div className="max-w-sm w-full space-y-6 text-center">
+          <div className="auth-card max-w-sm w-full space-y-6 text-center">
             <h2 className="text-3xl font-semibold tracking-tight">
               Session complete
             </h2>
@@ -22242,7 +22242,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           component's layout had to change. */}
       {sessionDone && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-8">
-          <div className="max-w-sm w-full space-y-6">
+          <div className="auth-card max-w-sm w-full space-y-6">
             <div className="text-center">
               <h2 className="text-3xl font-semibold tracking-tight">
                 Session complete

@@ -32,6 +32,26 @@ body {
   justify-content: safe center;
 }
 
+/* The sign-in / sign-up / password screens are a short card in the middle of
+   a tall phone screen, which left a third of the display empty top and
+   bottom. On a phone the card takes the room it has: bigger heading, taller
+   fields and buttons, more space between them. Nothing changes from the
+   small breakpoint up, where the card is meant to be a card. */
+@media (max-width: 639px) {
+  .auth-card h1 {
+    font-size: 1.85rem;
+    line-height: 1.15;
+  }
+  .auth-card input,
+  .auth-card button[type="submit"] {
+    padding-block: 1.05rem;
+    font-size: 1.05rem;
+  }
+  .auth-card p {
+    font-size: 1rem;
+  }
+}
+
 /* ---------------------------------------------------------------------
    Home is set in Inter instead of the system face. Inter is a real webfont,
    so it looks the same on every device — unlike SF, which only Apple
