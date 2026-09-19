@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 423;
+const BUILD_VERSION = 424;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -13286,7 +13286,7 @@ function NBackSessionApp() {
               </p>
             </div>
 
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 max-w-md">
               {/* On a free account the one regime they can actually train
                   leads, the offer sits directly under it, and the locked
                   ones follow. */}
@@ -14139,7 +14139,7 @@ function NBackSessionApp() {
             {/* One row, each button only as wide as its words, instead of
                 three full-width slabs stacked down the page. Wraps to a
                 second line when the column is too narrow for all three. */}
-            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
+            <div className={`flex flex-col max-w-md ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
               <div className="relative group">
