@@ -3305,7 +3305,7 @@ function AchievementTitle({ achievement, className, baseColor = "#F7F8F8" }) {
 // screen so it is obvious at a glance whether the deploy actually carries
 // the latest code, rather than guessing from whether a change "looks"
 // applied.
-const BUILD_VERSION = 422;
+const BUILD_VERSION = 423;
 // Local NZ time this version was pushed, set by hand alongside the number.
 const BUILD_TIME = "10:05 AM";
 // What changed in this version, shown under the stamp on the regime screen.
@@ -6267,7 +6267,7 @@ function WisdomQuiz({ onBack }) {
 
         <button
           onClick={() => setStarted(true)}
-          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
         >
           Start quiz
         </button>
@@ -7000,14 +7000,14 @@ function NBackTutorial({ exercise, onDone, level }) {
       <button
         onClick={() => setStep((v) => Math.max(0, v - 1))}
         disabled={step === 0}
-        className="flex-1 sm:flex-none sm:w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-4 font-medium text-xl"
+        className="flex-1 sm:flex-none sm:w-36 shrink-0 bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-lg py-3 font-medium text-lg"
       >
         Back
       </button>
       <button
         onClick={onClick}
         style={{ "--ex": accent }}
-        className="flex-1 sm:flex-none sm:w-36 shrink-0 deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+        className="flex-1 sm:flex-none sm:w-36 shrink-0 deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
       >
         {label}
       </button>
@@ -13304,11 +13304,11 @@ function NBackSessionApp() {
                       key="upgrade"
                       onClick={goToCheckout}
                       style={{ "--ex": "#1E982B" }}
-                      className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
+                      className="w-full deep-fill rounded-xl px-5 py-4 shadow-lg shadow-black/30 text-left"
                     >
                       <div className="flex items-center justify-between gap-6">
-                        <div className="text-2xl font-semibold">Get membership</div>
-                        <div className="text-lg font-medium">Unlock all regimes ›</div>
+                        <div className="text-xl font-semibold">Get membership</div>
+                        <div className="text-base font-medium">Unlock all regimes ›</div>
                       </div>
                       <div className="text-base font-medium mt-1">
                         Plus the motivation module.
@@ -13333,13 +13333,13 @@ function NBackSessionApp() {
                     /* A locked regime keeps its own colour but sits dimmed:
                        it is something to buy, not something broken, so it
                        still looks like the thing it starts. */
-                    className={`w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30${
+                    className={`w-full text-left deep-fill rounded-xl px-5 py-4 shadow-lg shadow-black/30${
                       locked ? " opacity-45" : ""
                     }`}
                   >
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
-                        <div className="text-2xl font-semibold">
+                        <div className="text-xl font-semibold">
                           {locked ? "🔒 " : ""}
                           {r.title}
                         </div>
@@ -13354,9 +13354,9 @@ function NBackSessionApp() {
                           </span>
                         )}
                       </div>
-                      <div className="text-lg font-medium">{r.subtitle}</div>
+                      <div className="text-base font-medium">{r.subtitle}</div>
                     </div>
-                    <div className="text-base font-medium mt-1">
+                    <div className="text-sm font-medium mt-1">
                       {locked ? "Membership required" : r.summary}
                     </div>
                   </button>
@@ -13376,7 +13376,7 @@ function NBackSessionApp() {
                         <button
                           onClick={() => chooseRegime(r.key)}
                           style={{ "--ex": REGIME_COLORS.custom }}
-                          className="w-full text-left deep-fill rounded-xl pl-7 pr-14 py-6 shadow-lg shadow-black/30"
+                          className="w-full text-left deep-fill rounded-xl pl-5 pr-12 py-4 shadow-lg shadow-black/30"
                         >
                           <div className="flex items-center justify-between gap-6">
                             <div className="text-2xl font-semibold">{r.title}</div>
@@ -13722,7 +13722,7 @@ function NBackSessionApp() {
                 onClick={saveCustomRegime}
                 disabled={!customDraft.length}
                 style={{ "--ex": REGIME_COLORS.custom }}
-                className="w-full deep-fill disabled:opacity-40 rounded-xl py-5 text-xl font-medium shadow-lg shadow-black/30"
+                className="w-full deep-fill disabled:opacity-40 rounded-xl py-3.5 text-lg font-medium shadow-lg shadow-black/30"
               >
                 Create
               </button>
@@ -14158,7 +14158,7 @@ function NBackSessionApp() {
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
                 className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                  compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
                 }`}
               >
                 {sessionInProgress
@@ -14173,7 +14173,7 @@ function NBackSessionApp() {
               <button
                 onClick={goToOverview}
                 className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                  compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                  compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
                 }`}
               >
                 Stats
@@ -14186,7 +14186,7 @@ function NBackSessionApp() {
                     setMainView("hypnosis");
                   }}
                   className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                    compactHome ? "py-3.5 text-lg" : "py-5 text-xl"
+                    compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
                   }`}
                 >
                   Motivation
@@ -14849,7 +14849,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setProfileBadgesExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Badges</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -15000,7 +15000,7 @@ function NBackSessionApp() {
                   }
                   setMainView("app");
                 }}
-                className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
+                className="w-full bg-gradient-to-r from-indigo-500 to-violet-500 hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30"
               >
                 Next
               </button>
@@ -15211,7 +15211,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setCustomizeExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Customize profile</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -15458,7 +15458,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setBadgesExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Badges</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -15496,7 +15496,7 @@ function NBackSessionApp() {
             <button
               onClick={() => setMainView("regime")}
               style={{ marginTop: "2rem" }}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
               <span className="text-slate-500 text-base font-normal">
@@ -15555,7 +15555,7 @@ function NBackSessionApp() {
                 the way in to buying one rather than a settings page. */}
             <button
               onClick={() => (isMember ? setMainView("membership") : goToCheckout())}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-5 text-xl font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Membership</span>
               <span className="text-slate-500 text-base font-normal capitalize">
@@ -15763,7 +15763,7 @@ function NBackSessionApp() {
                       <button
                         onClick={() => handlePreviewSwitch("annual")}
                         disabled={previewLoading || actionLoading}
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
                       >
                         Switch to annual
                       </button>
@@ -15772,7 +15772,7 @@ function NBackSessionApp() {
                       <button
                         onClick={() => handlePreviewSwitch("monthly")}
                         disabled={previewLoading || actionLoading}
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
                       >
                         Switch to monthly
                       </button>
@@ -15931,7 +15931,7 @@ function NBackSessionApp() {
                     <div className="space-y-3">
                       <button
                         onClick={handleResume}
-                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
                       >
                         Resume membership
                       </button>
@@ -15951,7 +15951,7 @@ function NBackSessionApp() {
                             key={m}
                             onClick={() => handlePause(m)}
                             disabled={actionLoading}
-                            className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-5 text-xl font-medium"
+                            className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
                           >
                             {m} month{m > 1 ? "s" : ""}
                           </button>
@@ -15975,7 +15975,7 @@ function NBackSessionApp() {
                   <button
                     onClick={handleReactivate}
                     disabled={actionLoading}
-                    className="w-full bg-emerald-950/40 hover:bg-emerald-950/60 disabled:opacity-50 border border-emerald-800 text-emerald-400 transition-colors rounded-lg py-5 text-xl font-medium"
+                    className="w-full bg-emerald-950/40 hover:bg-emerald-950/60 disabled:opacity-50 border border-emerald-800 text-emerald-400 transition-colors rounded-lg py-3.5 text-lg font-medium"
                   >
                     Reactivate membership
                   </button>
@@ -15987,7 +15987,7 @@ function NBackSessionApp() {
                     /* bg-none opts out of the global white sheen on
                        hover, which washed the red out to a dirty pink.
                        Hover deepens the red and brightens the text instead. */
-                    className="w-full bg-none bg-red-950/40 hover:bg-red-900/50 disabled:opacity-50 border border-red-900 hover:border-red-700 text-red-400 hover:text-red-300 transition-colors rounded-lg py-5 text-xl font-medium"
+                    className="w-full bg-none bg-red-950/40 hover:bg-red-900/50 disabled:opacity-50 border border-red-900 hover:border-red-700 text-red-400 hover:text-red-300 transition-colors rounded-lg py-3.5 text-lg font-medium"
                   >
                     Cancel membership
                   </button>
@@ -17271,7 +17271,7 @@ function NBackSessionApp() {
 
             <button
               onClick={() => forceSwitchToNext(exerciseIndex)}
-              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
             >
               Continue
             </button>
@@ -17340,7 +17340,7 @@ function NBackSessionApp() {
                 }
                 startTask(exercise, n);
               }}
-              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
             >
               {sessionTimeUp[exercise.key] ? "Next exercise" : "Start"}
             </button>
@@ -17612,7 +17612,7 @@ function NBackSessionApp() {
 
             <button
               onClick={continueFromResults}
-              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30`}
+              className={`w-full bg-gradient-to-r ${ACCENT_STYLES[exercise.accent].grad} rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30`}
             >
               Continue <span className="text-base font-normal opacity-70">(space)</span>
             </button>
@@ -17866,7 +17866,7 @@ function NBackSessionApp() {
               className={`w-full max-w-xs bg-gradient-to-r ${
                 ACCENT_STYLES[EXERCISE_LIBRARY[unlockInfo.exerciseKey]?.accent]?.grad ||
                 ACCENT_STYLES.indigo.grad
-              } hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+              } hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
             >
               Accept
             </button>
@@ -18031,7 +18031,7 @@ function NBackSessionApp() {
                   playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));
                 }}
-                className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30`}
+                className={`w-full max-w-xs bg-gradient-to-r ${groupAccent.grad} hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
               >
                 Accept
               </button>
@@ -19216,7 +19216,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         <button
           onClick={begin}
           style={{ "--ex": accent }}
-          className="w-full deep-fill rounded-lg py-5 font-medium text-xl shadow-lg shadow-black/30"
+          className="w-full deep-fill rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30"
         >
           Start
         </button>
@@ -19256,7 +19256,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             <button
               onClick={onFinish}
               style={{ "--ex": EXERCISE_COLORS[exercise.key] || "#4CB9D8" }}
-              className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+              className="w-full deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
             >
               Continue
             </button>
@@ -19976,7 +19976,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
 
         <button
           onClick={() => beginRound(false)}
-          className={`w-full bg-gradient-to-r ${accent.grad} hover:opacity-90 transition-opacity rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30`}
+          className={`w-full bg-gradient-to-r ${accent.grad} hover:opacity-90 transition-opacity rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30`}
         >
           Start
         </button>
@@ -20758,7 +20758,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         <button
           onClick={onFinish}
           style={{ "--ex": EXERCISE_COLORS.rrt }}
-          className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+          className="w-full deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
         >
           Continue
         </button>
@@ -21437,7 +21437,7 @@ function HypnosisScreen({ onDone, afterSession }) {
       {afterSession && (
         <button
           onClick={onDone}
-          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-5 text-xl font-medium"
+          className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3.5 text-lg font-medium"
         >
           Skip
         </button>
@@ -22282,7 +22282,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
             <button
               onClick={onFinish}
               style={{ "--ex": EXERCISE_COLORS[exercise.key] || "#4CB9D8" }}
-              className="w-full deep-fill rounded-lg py-4 font-medium text-xl shadow-lg shadow-black/30"
+              className="w-full deep-fill rounded-lg py-3 font-medium text-lg shadow-lg shadow-black/30"
             >
               Continue
             </button>
