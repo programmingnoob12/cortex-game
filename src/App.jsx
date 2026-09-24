@@ -7773,9 +7773,9 @@ const GEM_TIERS = {
   3: { color: "#38bdf8", glow: true, label: "Adept" },
   4: { color: "#818CF8", glow: true, label: "Bright" },
   5: { color: "#22d3ee", glow: true, label: "Radiant" },
-  6: { color: "#fb7185", glow: true, label: "Illuminated" },
-  7: { color: "#c084fc", glow: true, label: "Brilliant" },
-  8: { color: "#f59e0b", glow: true, label: "Elite" },
+  6: { color: "#c084fc", glow: true, label: "Brilliant" },
+  7: { color: "#f59e0b", glow: true, label: "Elite" },
+  8: { color: "#fb7185", glow: true, label: "Illuminated" },
   9: { color: "#fde047", glow: true, label: "Transcendent" },
   10: { color: "#ef4444", glow: true, label: "Enlightened" },
 };
@@ -13953,7 +13953,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`home-type ${compactHome ? "space-y-4 sm:space-y-5" : "space-y-6 sm:space-y-7"}`}>
+          <div className={`home-type ${compactHome ? "space-y-4" : "space-y-6 sm:space-y-5"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
@@ -13998,7 +13998,9 @@ function NBackSessionApp() {
               ))}
             </div>
 
-            <div className="flex items-center justify-between gap-4 sm:gap-6">
+            {/* Extra room under the header on a wide screen, so the day and
+                streak read as a title rather than the first row of cards. */}
+            <div className="flex items-center justify-between gap-4 sm:gap-6 sm:pb-5">
               <div className="flex-1 min-w-0 flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
                   <AvatarFrame tier={ownAvatarFrameTier}>
@@ -14135,7 +14137,7 @@ function NBackSessionApp() {
                 the box, then the buttons stacked. */}
             <div
               className={`grid grid-cols-1 sm:grid-cols-2 ${
-                compactHome ? "gap-y-2.5 sm:gap-y-3" : "gap-y-3 sm:gap-y-4"
+                compactHome ? "gap-y-2.5 sm:gap-y-4" : "gap-y-3 sm:gap-y-5"
               } sm:gap-x-5`}
             >
             <div
@@ -15266,7 +15268,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setCustomizeExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Customize profile</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -15513,7 +15515,7 @@ function NBackSessionApp() {
             <div>
               <button
                 onClick={() => setBadgesExpanded((v) => !v)}
-                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
+                className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 sm:py-[15px] text-lg font-medium text-left px-7 flex items-center justify-between"
               >
                 <span>Badges</span>
                 <span className="text-slate-500 text-base font-normal">
@@ -15551,7 +15553,7 @@ function NBackSessionApp() {
             <button
               onClick={() => setMainView("regime")}
               style={{ marginTop: "2rem" }}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 sm:py-[15px] text-lg font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
               <span className="text-slate-500 text-base font-normal">
@@ -15610,7 +15612,7 @@ function NBackSessionApp() {
                 the way in to buying one rather than a settings page. */}
             <button
               onClick={() => (isMember ? setMainView("membership") : goToCheckout())}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 text-lg font-medium text-left px-7 flex items-center justify-between"
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 sm:py-[15px] text-lg font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Membership</span>
               <span className="text-slate-500 text-base font-normal capitalize">
@@ -15818,7 +15820,7 @@ function NBackSessionApp() {
                       <button
                         onClick={() => handlePreviewSwitch("annual")}
                         disabled={previewLoading || actionLoading}
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                       >
                         Switch to annual
                       </button>
@@ -15827,7 +15829,7 @@ function NBackSessionApp() {
                       <button
                         onClick={() => handlePreviewSwitch("monthly")}
                         disabled={previewLoading || actionLoading}
-                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                       >
                         Switch to monthly
                       </button>
@@ -15951,7 +15953,7 @@ function NBackSessionApp() {
                     <button
                       onClick={handleStartCardUpdate}
                       disabled={setupLoading}
-                      className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-4 text-base font-medium"
+                      className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                     >
                       {setupLoading ? "Loading…" : "Update payment method"}
                     </button>
@@ -15986,7 +15988,7 @@ function NBackSessionApp() {
                     <div className="space-y-3">
                       <button
                         onClick={handleResume}
-                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                        className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                       >
                         Resume membership
                       </button>
@@ -16006,7 +16008,7 @@ function NBackSessionApp() {
                             key={m}
                             onClick={() => handlePause(m)}
                             disabled={actionLoading}
-                            className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                            className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 border border-slate-700/70 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                           >
                             {m} month{m > 1 ? "s" : ""}
                           </button>
@@ -16030,7 +16032,7 @@ function NBackSessionApp() {
                   <button
                     onClick={handleReactivate}
                     disabled={actionLoading}
-                    className="w-full bg-emerald-950/40 hover:bg-emerald-950/60 disabled:opacity-50 border border-emerald-800 text-emerald-400 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                    className="w-full bg-emerald-950/40 hover:bg-emerald-950/60 disabled:opacity-50 border border-emerald-800 text-emerald-400 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                   >
                     Reactivate membership
                   </button>
@@ -16042,7 +16044,7 @@ function NBackSessionApp() {
                     /* bg-none opts out of the global white sheen on
                        hover, which washed the red out to a dirty pink.
                        Hover deepens the red and brightens the text instead. */
-                    className="w-full bg-none bg-red-950/40 hover:bg-red-900/50 disabled:opacity-50 border border-red-900 hover:border-red-700 text-red-400 hover:text-red-300 transition-colors rounded-lg py-3.5 text-lg font-medium"
+                    className="w-full bg-none bg-red-950/40 hover:bg-red-900/50 disabled:opacity-50 border border-red-900 hover:border-red-700 text-red-400 hover:text-red-300 transition-colors rounded-lg py-3.5 sm:py-[15px] text-lg font-medium"
                   >
                     Cancel membership
                   </button>
