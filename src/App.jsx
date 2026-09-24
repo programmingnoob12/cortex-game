@@ -6395,6 +6395,224 @@ function WisdomQuiz({ onBack }) {
   );
 }
 
+// ---------------------------------------------------------------------
+// PROVERBS
+// ---------------------------------------------------------------------
+// Finish the verse: the first half of a proverb, four endings to choose from.
+// Text is the King James Version (public domain), split where the verse
+// itself turns, usually at its colon or semicolon.
+const PROVERBS = [
+  { ref: "Proverbs 1:5", start: "A wise man will hear, and will increase learning;", end: "and a man of understanding shall attain unto wise counsels." },
+  { ref: "Proverbs 1:7", start: "The fear of the LORD is the beginning of knowledge:", end: "but fools despise wisdom and instruction." },
+  { ref: "Proverbs 3:5", start: "Trust in the LORD with all thine heart;", end: "and lean not unto thine own understanding." },
+  { ref: "Proverbs 3:6", start: "In all thy ways acknowledge him,", end: "and he shall direct thy paths." },
+  { ref: "Proverbs 3:13", start: "Happy is the man that findeth wisdom,", end: "and the man that getteth understanding." },
+  { ref: "Proverbs 4:7", start: "Wisdom is the principal thing; therefore get wisdom:", end: "and with all thy getting get understanding." },
+  { ref: "Proverbs 4:23", start: "Keep thy heart with all diligence;", end: "for out of it are the issues of life." },
+  { ref: "Proverbs 6:6", start: "Go to the ant, thou sluggard;", end: "consider her ways, and be wise." },
+  { ref: "Proverbs 9:10", start: "The fear of the LORD is the beginning of wisdom:", end: "and the knowledge of the holy is understanding." },
+  { ref: "Proverbs 10:4", start: "He becometh poor that dealeth with a slack hand:", end: "but the hand of the diligent maketh rich." },
+  { ref: "Proverbs 11:2", start: "When pride cometh, then cometh shame:", end: "but with the lowly is wisdom." },
+  { ref: "Proverbs 12:1", start: "Whoso loveth instruction loveth knowledge:", end: "but he that hateth reproof is brutish." },
+  { ref: "Proverbs 13:20", start: "He that walketh with wise men shall be wise:", end: "but a companion of fools shall be destroyed." },
+  { ref: "Proverbs 15:1", start: "A soft answer turneth away wrath:", end: "but grievous words stir up anger." },
+  { ref: "Proverbs 16:3", start: "Commit thy works unto the LORD,", end: "and thy thoughts shall be established." },
+  { ref: "Proverbs 16:9", start: "A man's heart deviseth his way:", end: "but the LORD directeth his steps." },
+  { ref: "Proverbs 16:16", start: "How much better is it to get wisdom than gold!", end: "and to get understanding rather to be chosen than silver!" },
+  { ref: "Proverbs 16:18", start: "Pride goeth before destruction,", end: "and an haughty spirit before a fall." },
+  { ref: "Proverbs 17:22", start: "A merry heart doeth good like a medicine:", end: "but a broken spirit drieth the bones." },
+  { ref: "Proverbs 17:28", start: "Even a fool, when he holdeth his peace, is counted wise:", end: "and he that shutteth his lips is esteemed a man of understanding." },
+  { ref: "Proverbs 18:21", start: "Death and life are in the power of the tongue:", end: "and they that love it shall eat the fruit thereof." },
+  { ref: "Proverbs 22:6", start: "Train up a child in the way he should go:", end: "and when he is old, he will not depart from it." },
+  { ref: "Proverbs 26:11", start: "As a dog returneth to his vomit,", end: "so a fool returneth to his folly." },
+  { ref: "Proverbs 27:17", start: "Iron sharpeneth iron;", end: "so a man sharpeneth the countenance of his friend." },
+  { ref: "Proverbs 29:18", start: "Where there is no vision, the people perish:", end: "but he that keepeth the law, happy is he." },
+];
+const PROVERBS_ROUND = 10;
+const PROVERBS_BEST_KEY = "cortex.proverbsBest.v1";
+
+// Ten verses, each with its true ending and three endings borrowed from
+// other verses, in a fresh order every round.
+function buildProverbsRound() {
+  return shuffled(PROVERBS)
+    .slice(0, PROVERBS_ROUND)
+    .map((v) => {
+      const decoys = shuffled(PROVERBS.filter((o) => o.ref !== v.ref))
+        .slice(0, 3)
+        .map((o) => o.end);
+      const options = shuffled([v.end, ...decoys]);
+      return { ...v, options, answer: options.indexOf(v.end) };
+    });
+}
+function loadProverbsBest() {
+  try {
+    return Number(localStorage.getItem(PROVERBS_BEST_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+function ProverbsQuiz({ onBack }) {
+  const [round, setRound] = useState(null);
+  const [index, setIndex] = useState(0);
+  const [picked, setPicked] = useState(null);
+  const [correct, setCorrect] = useState(0);
+  const [done, setDone] = useState(false);
+  const [best, setBest] = useState(loadProverbsBest);
+
+  const start = () => {
+    setRound(buildProverbsRound());
+    setIndex(0);
+    setPicked(null);
+    setCorrect(0);
+    setDone(false);
+  };
+
+  const backLink = (
+    <button
+      onClick={onBack}
+      className="text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium no-lift"
+    >
+      &lsaquo; Back
+    </button>
+  );
+
+  if (!round) {
+    return (
+      <div className="space-y-10 w-full" style={{ maxWidth: "42rem" }}>
+        <div>
+          {backLink}
+          <h1 className="text-4xl font-semibold tracking-tight mt-6">Proverbs</h1>
+          <div className="text-slate-500 text-base mt-2">The Book of Proverbs, King James Version</div>
+        </div>
+        <p className="text-slate-100 text-lg leading-relaxed">
+          Finish the verse. Each question gives the first half of a proverb; choose how it ends.
+        </p>
+        {best > 0 && (
+          <div className="text-slate-400 text-base">
+            Best: <span className="text-slate-100 font-medium tabular-nums">{best} of {PROVERBS_ROUND}</span>
+          </div>
+        )}
+        <button
+          onClick={start}
+          style={{ "--ex": "#7537E2" }}
+          className="w-full deep-fill rounded-lg py-4 text-lg font-medium shadow-lg shadow-black/30"
+        >
+          Begin
+        </button>
+      </div>
+    );
+  }
+
+  const q = round[index];
+  const isLast = index === round.length - 1;
+
+  if (done) {
+    return (
+      <div className="space-y-6 w-full" style={{ maxWidth: "42rem" }}>
+        {backLink}
+        <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-8 space-y-5 text-center">
+          <div className="text-sm uppercase tracking-[0.18em] text-slate-500">Finished</div>
+          <div className="text-4xl font-semibold tabular-nums text-slate-100">
+            {correct} of {round.length}
+          </div>
+          {correct >= best && correct > 0 && (
+            <div className="text-base font-medium" style={{ color: "#B9A0F5" }}>
+              {correct === best ? "Matches your best" : "New best"}
+            </div>
+          )}
+          <button
+            onClick={start}
+            className="bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 px-8 text-lg font-medium"
+          >
+            Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const choose = (i) => {
+    if (picked !== null) return;
+    setPicked(i);
+    if (i === q.answer) setCorrect((c) => c + 1);
+  };
+  const next = () => {
+    if (isLast) {
+      const finalScore = correct;
+      if (finalScore > best) {
+        setBest(finalScore);
+        try {
+          localStorage.setItem(PROVERBS_BEST_KEY, String(finalScore));
+        } catch {
+          /* private mode: the best just is not kept */
+        }
+      }
+      setDone(true);
+      return;
+    }
+    setIndex((v) => v + 1);
+    setPicked(null);
+  };
+
+  return (
+    <div className="space-y-6 w-full" style={{ maxWidth: "42rem" }}>
+      {backLink}
+      <div className="bg-slate-900 border border-slate-700/70 rounded-xl p-7 space-y-5">
+        <div className="flex items-baseline justify-between gap-4">
+          <span className="text-sm uppercase tracking-[0.18em] text-slate-500">
+            {index + 1} of {round.length}
+          </span>
+          {picked !== null && <span className="text-sm text-slate-500">{q.ref}</span>}
+        </div>
+
+        <div className="text-xl font-medium text-slate-100 leading-snug">{q.start} …</div>
+
+        <div className="space-y-3">
+          {q.options.map((opt, i) => {
+            const revealed = picked !== null;
+            const isAnswer = i === q.answer;
+            const isPicked = i === picked;
+            const border = !revealed ? "#23252A" : isAnswer ? "#4CB782" : isPicked ? "#EB5757" : "#23252A";
+            const background = !revealed
+              ? "transparent"
+              : isAnswer
+              ? "rgba(76,183,130,0.10)"
+              : isPicked
+              ? "rgba(235,87,87,0.10)"
+              : "transparent";
+            return (
+              <button
+                key={opt}
+                onClick={() => choose(i)}
+                disabled={revealed}
+                className="w-full text-left rounded-lg border px-5 py-3 text-lg text-slate-100 transition-colors disabled:cursor-default"
+                style={{ borderColor: border, background }}
+              >
+                {opt}
+              </button>
+            );
+          })}
+        </div>
+
+        {picked !== null && (
+          <>
+            <p className="text-slate-300 text-base leading-relaxed italic">
+              {q.start} {q.end}
+            </p>
+            <button
+              onClick={next}
+              className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-lg font-medium"
+            >
+              {isLast ? "Finish" : "Next"}
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CctTutorialDemo() {
   const accent = EXERCISE_COLORS.cct;
   const seq = [5, 3, 3, 7, 2];
@@ -13595,7 +13813,7 @@ function NBackSessionApp() {
           to { opacity: 1; transform: translateY(0); }
         }
         /* Short windows: the constellation would run into the corner pills. */
-        @media (max-height: 759px) { .home-constellation { display: none !important; } }
+        @media (max-height: 799px) { .home-constellation { display: none !important; } }
         @keyframes ssIn { from { opacity: 0; } to { opacity: 1; } }
         @keyframes ssOut { from { opacity: 1; } to { opacity: 0; } }
         @keyframes ssBeat {
@@ -14508,6 +14726,10 @@ function NBackSessionApp() {
           </div>
         )}
 
+        {mainView === "proverbs" && (
+          <ProverbsQuiz onBack={() => setMainView("home")} />
+        )}
+
         {mainView === "wisdom" && (
           <WisdomQuiz onBack={() => setMainView("home")} />
         )}
@@ -14542,6 +14764,7 @@ function NBackSessionApp() {
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
               {[
+                { label: "Proverbs", onClick: () => setMainView("proverbs") },
                 { label: "🧪 Testing", onClick: () => setMainView("testing") },
                 { label: "Notes", onClick: () => setMainView("notes") },
                 ...(isMember
@@ -19276,7 +19499,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("notes")}
           /* Under the Testing station pill, same treatment. */
-          className="hidden sm:flex fixed top-14 left-3 sm:top-[4.5rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-14 left-3 sm:top-[8.125rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           Notes
         </button>
@@ -19300,9 +19523,20 @@ function NBackSessionApp() {
           }}
           /* Under Notes, same treatment. Opens the list of every screen in
              the app, for walking the responsive checklist. */
-          className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[8rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[10.875rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           📐 Pages
+        </button>
+      )}
+
+      {/* Top left: the Book of Proverbs quiz. Same pill as Achievements
+          opposite it. */}
+      {mainView === "home" && (
+        <button
+          onClick={() => setMainView("proverbs")}
+          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
+        >
+          Proverbs
         </button>
       )}
 
@@ -19310,7 +19544,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("testing")}
           /* Top left, opposite Achievements. */
-          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 left-3 sm:top-[5.375rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           🧪 Testing station
         </button>
