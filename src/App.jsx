@@ -620,6 +620,7 @@ const NOTE_GROUPS = [
       "Add TikTok hard songs and mix up when they're played.",
       "The goal isn't just a brain training app. It is psychological solutions that make it feel better and easier, a pseudo motivation mindset coach on top of the exercises.",
       "Guide their mind and provide psychological solutions so training feels easier and they see the vision.",
+      "Create a hot zealous feeling like a religious trance ritual experience in the worship of wisdom.",
     ],
   },
   {
@@ -3284,14 +3285,13 @@ const MOTIVATION_LINES = [
   },
   { id: 137, text: "Wisdom is the principal thing; therefore get wisdom: and with all your getting get understanding." },
 ];
-// Held on its own at the close of every session, after the complete
-// animation and before anything else.
+// Opens every session (Start Training), and is in the pool of lines
+// between exercises.
 const WISDOM_VERSE =
   "Wisdom is the principal thing; therefore get wisdom: and with all your getting get understanding.";
-// The entry moment: one slow breath before a session opens.
-const ENTRY_MOMENT_MS = 8000;
-// The closing moment: the verse, held in stillness.
-const CLOSING_MOMENT_MS = 7000;
+// The verse opens every session. It is long, so it is held longer than the
+// ordinary two-and-a-half-second line.
+const VERSE_START_MS = 5200;
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
 // usual random transition line. Not in MOTIVATION_LINES, because it must
 // never come up in the ordinary rotation.
@@ -9277,6 +9277,13 @@ function brainPlaces(count) {
   return out;
 }
 const BRAIN_LINK_MAX = 30;
+// A repeatable 0-1 value per star, for its twinkle timing and size.
+function brainNoise(i, salt) {
+  let h = (i + 1) * 374761393 + salt * 668265263;
+  h = (h ^ (h >>> 13)) * 1274126177;
+  h ^= h >>> 16;
+  return ((h >>> 0) % 10000) / 10000;
+}
 function HomeConstellation({ days }) {
   const { places, links } = useMemo(() => {
     const total = Math.max(365, days + 120);
@@ -9292,62 +9299,142 @@ function HomeConstellation({ days }) {
           link = j;
         }
       }
-      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) ln.push([link, i]);
+      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) ln.push([link, i, Math.sqrt(best)]);
     }
     return { places: pl, links: ln };
   }, [days]);
+  // The entrance: lit stars appear one after another, the whole sky inside
+  // about a second and a half however many there are.
+  const stepMs = days > 0 ? Math.min(40, 1500 / days) : 0;
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="constellation flex flex-col items-center gap-5 w-full">
       <svg
-        width="280"
-        height="216"
-        viewBox={`-6 -6 ${BRAIN_W + 12} ${BRAIN_H + 12}`}
+        viewBox={`-8 -8 ${BRAIN_W + 16} ${BRAIN_H + 16}`}
+        className="w-full h-auto"
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
-        style={{ overflow: "visible" }}
+        style={{ overflow: "visible", animation: "brainFloat 9s ease-in-out infinite" }}
       >
         <defs>
-          <radialGradient id="star-glow">
-            <stop offset="0%" stopColor="#B9A0F5" stopOpacity="0.55" />
+          <radialGradient id="brain-nebula" cx="50%" cy="46%" r="55%">
+            <stop offset="0%" stopColor="#7537E2" stopOpacity="0.30" />
+            <stop offset="55%" stopColor="#7537E2" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
           </radialGradient>
+          <radialGradient id="star-glow">
+            <stop offset="0%" stopColor="#D9C8FF" stopOpacity="0.7" />
+            <stop offset="45%" stopColor="#9A6CF0" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
+          </radialGradient>
+          <filter id="star-bloom" x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur stdDeviation="1.1" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
+
+        {/* A slow purple nebula behind the whole brain. */}
+        <ellipse
+          cx={BRAIN_W / 2}
+          cy={BRAIN_H * 0.46}
+          rx={BRAIN_W * 0.62}
+          ry={BRAIN_H * 0.6}
+          fill="url(#brain-nebula)"
+          style={{ animation: "nebulaBreath 10s ease-in-out infinite", transformOrigin: "center" }}
+        />
+
         {/* Every place still to come, faint, so the shape shows. */}
         {places.map((pt, i) =>
           i < days ? null : (
-            <circle key={`f${i}`} cx={pt.x} cy={pt.y} r="0.9" fill="#B9A0F5" opacity="0.28" />
+            <circle
+              key={`f${i}`}
+              cx={pt.x}
+              cy={pt.y}
+              r="0.8"
+              fill="#B9A0F5"
+              style={{
+                opacity: 0.26,
+                animation: `dotTwinkle ${5 + brainNoise(i, 4) * 6}s ease-in-out ${-brainNoise(i, 5) * 10}s infinite`,
+              }}
+            />
           )
         )}
-        {links.map(([from, to]) => (
+
+        {/* The wiring between lit stars, drawn in after the stars land. */}
+        {links.map(([from, to, len]) => (
           <line
             key={`l${to}`}
             x1={places[from].x}
             y1={places[from].y}
             x2={places[to].x}
             y2={places[to].y}
-            stroke="rgba(185,160,245,0.28)"
-            strokeWidth="0.6"
+            stroke="rgba(185,160,245,0.30)"
+            strokeWidth="0.55"
+            strokeLinecap="round"
+            strokeDasharray={len}
+            style={{
+              "--len": len,
+              animation: `linkDraw 1.2s ease-out ${to * stepMs + 400}ms both`,
+            }}
           />
         ))}
+        {/* Now and then a pulse runs along a connection, like a signal. */}
+        {links
+          .filter(([, to]) => brainNoise(to, 6) < 0.35)
+          .map(([from, to, len]) => (
+            <line
+              key={`p${to}`}
+              x1={places[from].x}
+              y1={places[from].y}
+              x2={places[to].x}
+              y2={places[to].y}
+              stroke="#E4D6FF"
+              strokeWidth="0.9"
+              strokeLinecap="round"
+              strokeDasharray={`3 ${len + 3}`}
+              style={{
+                "--len": len + 6,
+                opacity: 0,
+                animation: `linkPulse ${6 + brainNoise(to, 7) * 8}s linear ${2 + brainNoise(to, 8) * 9}s infinite`,
+              }}
+            />
+          ))}
+
         {places.slice(0, days).map((pt, i) => {
           const newest = i === days - 1;
+          const r = newest ? 2 : 1.05 + brainNoise(i, 3) * 0.55;
           return (
-            <g key={`s${i}`}>
-              {newest && <circle cx={pt.x} cy={pt.y} r="7" fill="url(#star-glow)" />}
+            <g
+              key={`s${i}`}
+              style={{ animation: `starIn 0.9s cubic-bezier(0.2,0.8,0.3,1) ${i * stepMs}ms both` }}
+            >
+              {newest && (
+                <circle
+                  cx={pt.x}
+                  cy={pt.y}
+                  r="9"
+                  fill="url(#star-glow)"
+                  style={{ animation: "starHalo 4s ease-in-out infinite", transformOrigin: `${pt.x}px ${pt.y}px` }}
+                />
+              )}
               <circle
                 cx={pt.x}
                 cy={pt.y}
-                r={newest ? 1.9 : 1.25}
+                r={r}
                 fill="#F7F8F8"
-                opacity={newest ? 1 : 0.9}
-                style={newest ? { animation: "starNewest 4s ease-in-out infinite" } : undefined}
+                filter="url(#star-bloom)"
+                style={{
+                  animation: `starTwinkle ${3 + brainNoise(i, 1) * 4}s ease-in-out ${-brainNoise(i, 2) * 6}s infinite`,
+                }}
               />
             </g>
           );
         })}
       </svg>
       <div className="text-center">
-        <div className="text-base font-medium text-slate-200">
+        <div className="text-lg font-semibold text-slate-100 tabular-nums">
           {days} {days === 1 ? "star" : "stars"}
         </div>
         <div className="text-sm text-slate-500 mt-1">
@@ -9697,10 +9784,8 @@ function NBackSessionApp() {
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
-  // The still moments either side of a session: a breath before it opens,
-  // and the verse after it closes.
-  const [entryMoment, setEntryMoment] = useState(false);
-  const [closingMoment, setClosingMoment] = useState(false);
+  // How long the current session-start line is held (the verse is longer).
+  const [sessionStartMs, setSessionStartMs] = useState(2600);
   const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
   const [rampIntro, setRampIntro] = useState(null); // { minutes } — the ease-in explanation, dismissed by its own button
   // How long one of those lines stays up, wherever it is triggered from.
@@ -11563,6 +11648,7 @@ function NBackSessionApp() {
     // it is two animations at once.
     if (unlockInfo || achievementCelebrationQueue.length > 0) return false;
     midSessionShownRef.current[exerciseKey] = shown + 1;
+    setSessionStartMs(SESSION_START_MS);
     setSessionStartLine(
       MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text ||
         null
@@ -11896,15 +11982,10 @@ function NBackSessionApp() {
     setSessionCompleteAnim(true);
     playLevelUp();
     setTimeout(() => {
+      sessionEndingRef.current = false;
       setSessionCompleteAnim(false);
-      // Stillness and the verse, before moving on.
-      setClosingMoment(true);
-      setTimeout(() => {
-        sessionEndingRef.current = false;
-        setClosingMoment(false);
-        setHypnosisAfterSession(true);
-        setMainView("hypnosis");
-      }, CLOSING_MOMENT_MS);
+      setHypnosisAfterSession(true);
+      setMainView("hypnosis");
     }, 5500);
   };
 
@@ -12561,10 +12642,9 @@ function NBackSessionApp() {
     // underneath it.
     const key = regimeKeyRef.current || regimeKey;
     if (showRampIntroIfOwed(key, openSessionFromHome)) return;
-    // A breath before the practice: leaving ordinary life and entering
-    // the session. The first exercise sits ready underneath it.
-    setEntryMoment(true);
-    setTimeout(() => setEntryMoment(false), ENTRY_MOMENT_MS);
+    setSessionStartMs(VERSE_START_MS);
+    setSessionStartLine(WISDOM_VERSE);
+    setTimeout(() => setSessionStartLine(null), VERSE_START_MS);
     openSessionFromHome();
   };
 
@@ -13290,46 +13370,46 @@ function NBackSessionApp() {
           from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        @keyframes entryFade {
-          0% { opacity: 0; }
-          10% { opacity: 1; }
-          90% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        /* One breath: in for about three and a half seconds, out for the same. */
-        @keyframes entryBreath {
-          0%, 8% { transform: scale(0.55); opacity: 0.35; }
-          48%, 54% { transform: scale(1); opacity: 0.9; }
-          94%, 100% { transform: scale(0.55); opacity: 0.35; }
-        }
-        @keyframes entryWordIn {
-          0%, 10% { opacity: 0; }
-          18%, 42% { opacity: 1; }
-          50%, 100% { opacity: 0; }
-        }
-        @keyframes entryWordOut {
-          0%, 52% { opacity: 0; }
-          60%, 84% { opacity: 1; }
-          92%, 100% { opacity: 0; }
-        }
-        @keyframes closingFade {
-          0% { opacity: 0; }
-          12% { opacity: 1; }
-          88% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        @keyframes closingLine {
-          0%, 10% { opacity: 0; transform: translateY(10px); filter: blur(6px); }
-          26%, 86% { opacity: 1; transform: translateY(0); filter: blur(0); }
-          100% { opacity: 0; filter: blur(0); }
-        }
-        @keyframes closingSource {
-          0%, 30% { opacity: 0; }
-          42%, 86% { opacity: 1; }
-          100% { opacity: 0; }
-        }
         /* Short windows: the constellation would run into the corner pills. */
         @media (max-height: 759px) { .home-constellation { display: none !important; } }
+        @keyframes brainFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes nebulaBreath {
+          0%, 100% { opacity: 0.75; transform: scale(0.97); }
+          50% { opacity: 1; transform: scale(1.03); }
+        }
+        @keyframes dotTwinkle {
+          0%, 100% { opacity: 0.16; }
+          50% { opacity: 0.36; }
+        }
+        @keyframes starTwinkle {
+          0%, 100% { opacity: 0.72; }
+          50% { opacity: 1; }
+        }
+        @keyframes starIn {
+          0% { opacity: 0; transform: scale(0.2); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes starHalo {
+          0%, 100% { opacity: 0.7; transform: scale(0.9); }
+          50% { opacity: 1; transform: scale(1.15); }
+        }
+        @keyframes linkDraw {
+          0% { stroke-dashoffset: var(--len); }
+          100% { stroke-dashoffset: 0; }
+        }
+        @keyframes linkPulse {
+          0% { stroke-dashoffset: var(--len); opacity: 0; }
+          6% { opacity: 1; }
+          22% { stroke-dashoffset: 0; opacity: 1; }
+          26%, 100% { stroke-dashoffset: 0; opacity: 0; }
+        }
+        .constellation g { transform-box: fill-box; transform-origin: center; }
+        @media (prefers-reduced-motion: reduce) {
+          .constellation *, .constellation { animation: none !important; }
+        }
         @keyframes starNewest {
           0%, 100% { opacity: 0.75; }
           50% { opacity: 1; }
@@ -14404,6 +14484,7 @@ function NBackSessionApp() {
                           level={bestLevel}
                           size={compactHome ? 44 : 60}
                           exerciseKey={e.key}
+                          labelClass={compactHome ? "text-[0.7rem]" : "text-[0.76rem]"}
                         />
                       </span>
                     </div>
@@ -14597,6 +14678,7 @@ function NBackSessionApp() {
                   setRampIntro({ minutes: rampStepFor(currentRegime) || 5, then: null })
                 ),
                 go("Motivation line", () => {
+                  setSessionStartMs(SESSION_START_MS);
                   setSessionStartLine(
                     MOTIVATION_ANYTIME[
                       Math.floor(Math.random() * MOTIVATION_ANYTIME.length)
@@ -14606,19 +14688,7 @@ function NBackSessionApp() {
                 }),
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
-                  setTimeout(() => {
-                    setSessionCompleteAnim(false);
-                    setClosingMoment(true);
-                    setTimeout(() => setClosingMoment(false), CLOSING_MOMENT_MS);
-                  }, 5500);
-                }),
-                go("Entry moment", () => {
-                  setEntryMoment(true);
-                  setTimeout(() => setEntryMoment(false), ENTRY_MOMENT_MS);
-                }),
-                go("Closing moment", () => {
-                  setClosingMoment(true);
-                  setTimeout(() => setClosingMoment(false), CLOSING_MOMENT_MS);
+                  setTimeout(() => setSessionCompleteAnim(false), 5500);
                 }),
                 go("Level up celebration", () =>
                   setUnlockInfo({
@@ -15232,7 +15302,7 @@ function NBackSessionApp() {
             {/* Held back while the session's opening line is still on screen:
                 the demos start playing sound the moment they mount, and they
                 were talking over the transition. */}
-            {sessionStartLine || entryMoment ? (
+            {sessionStartLine ? (
               <div style={{ minHeight: "24rem" }} />
             ) : ["dual", "quad", "iqnb"].includes(tutorialStepExercise.key) ? (
               <NBackTutorial
@@ -16467,15 +16537,6 @@ function NBackSessionApp() {
              the running screen and the others, which is why this landed in
              the middle after one exercise and near the top after another. */
           <div className="fixed inset-0 z-40 flex flex-col items-center justify-center text-center gap-8 px-6 bg-slate-950">
-            {/* The same soft purple glow the closing verse sits on. */}
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background:
-                  "radial-gradient(40% 32% at 50% 48%, rgba(117,55,226,0.14) 0%, rgba(117,55,226,0.04) 50%, transparent 74%)",
-              }}
-            />
             <h1
               className="relative text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
               style={{ animation: "switchIn 0.9s 0.18s cubic-bezier(0.16,0.8,0.24,1) both", textWrap: "balance" }}
@@ -18676,83 +18737,14 @@ function NBackSessionApp() {
             style={{
               background:
                 "radial-gradient(46% 36% at 50% 50%, rgba(117,55,226,0.22) 0%, rgba(117,55,226,0.07) 46%, transparent 72%)",
-              animation: "sessionStartWash 2.6s ease-out forwards",
+              animation: `sessionStartWash ${sessionStartMs}ms ease-out forwards`,
             }}
           />
           <div
             className="relative text-center text-2xl sm:text-3xl font-semibold tracking-tight max-w-xl"
-            style={{ animation: "sessionStartText 2.6s ease-out forwards", textWrap: "balance" }}
+            style={{ animation: `sessionStartText ${sessionStartMs}ms ease-out forwards`, textWrap: "balance" }}
           >
             {sessionStartLine}
-          </div>
-        </div>
-      )}
-
-      {/* The entry moment. Opaque and still: nothing moves but the breath,
-          and it takes the clicks so nothing starts underneath it. */}
-      {entryMoment && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 px-8"
-          style={{ animation: `entryFade ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
-        >
-          <div className="relative w-44 h-44 flex items-center justify-center">
-            <div
-              aria-hidden="true"
-              className="absolute inset-0 rounded-full"
-              style={{
-                background:
-                  "radial-gradient(circle, rgba(135,83,234,0.45) 0%, rgba(117,55,226,0.16) 55%, transparent 72%)",
-                animation: `entryBreath ${ENTRY_MOMENT_MS}ms ease-in-out forwards`,
-              }}
-            />
-            <div
-              aria-hidden="true"
-              className="absolute w-20 h-20 rounded-full border"
-              style={{
-                borderColor: "rgba(185,160,245,0.35)",
-                animation: `entryBreath ${ENTRY_MOMENT_MS}ms ease-in-out forwards`,
-              }}
-            />
-          </div>
-          <div className="relative mt-10 h-8 w-full text-center text-xl text-slate-300 tracking-wide">
-            <span
-              className="absolute inset-0"
-              style={{ animation: `entryWordIn ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
-            >
-              Breathe in
-            </span>
-            <span
-              className="absolute inset-0"
-              style={{ animation: `entryWordOut ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
-            >
-              Breathe out
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* The closing moment: the verse, held on its own before anything else. */}
-      {closingMoment && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 px-8 pointer-events-none"
-          style={{ animation: `closingFade ${CLOSING_MOMENT_MS}ms ease-in-out forwards` }}
-        >
-          <div
-            aria-hidden="true"
-            className="absolute inset-0"
-            style={{
-              background:
-                "radial-gradient(40% 32% at 50% 48%, rgba(117,55,226,0.14) 0%, rgba(117,55,226,0.04) 50%, transparent 74%)",
-            }}
-          />
-          <div
-            className="relative text-center text-2xl sm:text-3xl font-medium leading-snug max-w-xl text-slate-100"
-            style={{
-              animation: `closingLine ${CLOSING_MOMENT_MS}ms ease-out forwards`,
-              textWrap: "balance",
-            }}
-          >
-            {WISDOM_VERSE}
           </div>
         </div>
       )}
@@ -19015,7 +19007,10 @@ function NBackSessionApp() {
           the column for it. */}
       {mainView === "home" && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ left: "calc((100vw - 42.25rem) / 4 - 140px)" }}
+          style={{
+            width: "min(460px, calc((100vw - 42.25rem) / 2 - 56px))",
+            left: "calc(((100vw - 42.25rem) / 2 - min(460px, calc((100vw - 42.25rem) / 2 - 56px))) / 2)",
+          }}
         >
           <HomeConstellation days={trainedDayCount} />
         </div>
@@ -21252,7 +21247,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
         {rrtPanels}
         {flashOverlay}
         {homeLink && (
-          <div className="absolute -top-9 left-0">{homeLink}</div>
+          <div className="absolute -top-14 left-0">{homeLink}</div>
         )}
         <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
           <div className="p-6 flex flex-col">
@@ -21340,7 +21335,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
       {rrtPanels}
       {flashOverlay}
       {homeLink && (
-          <div className="absolute -top-9 left-0">{homeLink}</div>
+          <div className="absolute -top-14 left-0">{homeLink}</div>
         )}
       <div className="rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 overflow-hidden">
         <div className="p-6 flex flex-col">
@@ -22803,7 +22798,7 @@ function Motion3DExercise({ exercise, onFinish, onForceOverview, onStageChange, 
           }}
           className="absolute top-3 right-3 text-2xl font-semibold text-slate-200 bg-slate-800/80 backdrop-blur-sm rounded-xl px-6 py-3"
         >
-          Restart Game
+          Restart Round
         </button>
       </div>
     </div>
