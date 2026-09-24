@@ -38,7 +38,7 @@ const CHECKOUT_URL = "https://cortex-app-beryl.vercel.app/";
 const THEME_CSS = `
 :root{--bg:#08090A;--surface:#101112;--surface-raised:#18191B;--border:#23252A;
 --text:#F7F8F8;--text-muted:#8A8F98;--text-dim:#6E7178;
---primary:#4CB9D8;--primary-hover:#5FC5E0;--primary-text:#8FD8EC;
+--primary:#7537E2;--primary-hover:#8753EA;--primary-text:#B9A0F5;
 --green:#4CB782;--red:#EB5757;--yellow:#F2C94C;--cyan:#4CB9D8;--violet:#8B7FE8;--lime:#68CC58;
 color-scheme:dark;}
 html{background-color:#08090A;}
@@ -70,7 +70,7 @@ radial-gradient(30rem 30rem at calc(100% + 4rem) calc(100% + 4rem), rgba(139,127
 .bg-indigo-400{background-color:var(--ex) !important}
 .bg-indigo-500{background-color:var(--ex) !important}
 .bg-indigo-500\\/10{background-color:color-mix(in srgb, var(--ex) 10%, transparent) !important}
-.bg-indigo-600\\/20{background-color:rgba(76,185,216,0.2) !important}
+.bg-indigo-600\\/20{background-color:rgba(117,55,226,0.2) !important}
 .bg-indigo-950\\/40{background-color:rgba(16,35,42,0.4) !important}
 .bg-lime-400{background-color:#68CC58 !important}
 .bg-lime-500\\/10{background-color:rgba(104,204,88,0.1) !important}
@@ -244,7 +244,7 @@ radial-gradient(30rem 30rem at calc(100% + 4rem) calc(100% + 4rem), rgba(139,127
 .to-teal-500{--tw-gradient-to:var(--ex) !important}
 .via-orange-500\\/40{--tw-gradient-via:rgba(176,141,52,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(176,141,52,0.4), var(--tw-gradient-to) !important}
 .via-purple-700\\/40{--tw-gradient-via:rgba(139,127,232,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(139,127,232,0.4), var(--tw-gradient-to) !important}
-.via-sky-600\\/40{--tw-gradient-via:rgba(76,185,216,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(76,185,216,0.4), var(--tw-gradient-to) !important}
+.via-sky-600\\/40{--tw-gradient-via:rgba(117,55,226,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(117,55,226,0.4), var(--tw-gradient-to) !important}
 .via-violet-600\\/40{--tw-gradient-via:rgba(139,127,232,0.4) !important;--tw-gradient-stops:var(--tw-gradient-from), rgba(139,127,232,0.4), var(--tw-gradient-to) !important}
 .rrt-flash{animation:rrtFlashIn .18s ease-out}
 @keyframes rrtFlashIn{from{opacity:0}to{opacity:1}}
@@ -254,7 +254,7 @@ radial-gradient(30rem 30rem at calc(100% + 4rem) calc(100% + 4rem), rgba(139,127
 @media (prefers-reduced-motion:reduce){.rank-glow::after{animation:none;opacity:.7}}
 .nback-stimulus{width:80%;height:80%;display:flex;align-items:center;justify-content:center}
 .nback-stimulus>svg{width:100% !important;height:100% !important}
-.to-violet-500{--tw-gradient-to:#5FC5E0 !important}
+.to-violet-500{--tw-gradient-to:#8753EA !important}
 `;
 if (typeof document !== "undefined" && !document.getElementById("app-theme-override")) {
   const el = document.createElement("style");
@@ -1741,6 +1741,22 @@ function playLetterSample(letter, onstart) {
 const NUMBER_AUDIO_BASE = "/audio/numbers/";
 const CCT_MAX_NUMBER = 18;
 const numberAudioBuffers = new Map();
+// Where each recording's voice actually starts and stops, in seconds. The
+// files carry about 60-110ms of silence before the number and about 300ms
+// after it, so timing the gap from the end of the file made a "500ms"
+// interval closer to 850ms of real silence.
+const numberAudioBounds = new Map();
+const NUMBER_SILENCE_THRESHOLD = 0.01; // about -40 dB
+
+function audibleBounds(buffer) {
+  const data = buffer.getChannelData(0);
+  let first = 0;
+  while (first < data.length && Math.abs(data[first]) < NUMBER_SILENCE_THRESHOLD) first += 1;
+  let last = data.length - 1;
+  while (last > first && Math.abs(data[last]) < NUMBER_SILENCE_THRESHOLD) last -= 1;
+  if (first >= last) return { start: 0, end: buffer.duration };
+  return { start: first / buffer.sampleRate, end: (last + 1) / buffer.sampleRate };
+}
 
 async function preloadNumberAudio() {
   const ctx = letterAudioContext();
@@ -1751,7 +1767,9 @@ async function preloadNumberAudio() {
       try {
         const res = await fetch(`${NUMBER_AUDIO_BASE}${n}.mp3`);
         if (!res.ok) return;
-        numberAudioBuffers.set(n, await ctx.decodeAudioData(await res.arrayBuffer()));
+        const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
+        numberAudioBounds.set(n, audibleBounds(decoded));
+        numberAudioBuffers.set(n, decoded);
       } catch {
         // Missing or unplayable file: speech synthesis covers it below.
       }
@@ -1774,11 +1792,14 @@ function speakNumber(n) {
   const buffer = numberAudioBuffers.get(n);
   const ctx = letterAudioCtx;
   if (buffer && ctx && ctx.state === "running") {
+    const bounds = numberAudioBounds.get(n) || { start: 0, end: buffer.duration };
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(letterAudioGain);
-    source.start();
-    return Math.round(buffer.duration * 1000);
+    // Skip the lead-in silence and report only the spoken part, so the
+    // interval that follows is the real gap between two voices.
+    source.start(0, bounds.start, bounds.end - bounds.start);
+    return Math.round((bounds.end - bounds.start) * 1000);
   }
   if (!("speechSynthesis" in window)) return NUMBER_SPOKEN_FALLBACK_MS;
   const u = new SpeechSynthesisUtterance(String(n));
@@ -8673,7 +8694,7 @@ const GROUP_ACCENTS = {
 // need an actual CSS color value (inline conic-gradients, box-shadow glows
 // via a --glow-color custom property, etc.) rather than a class name.
 const ACCENT_HEX = {
-  indigo: "#4CB9D8",
+  indigo: "#7537E2",
   violet: "#8B7FE8",
   amber: "#D9B65A",
   cyan: "#4CB9D8",
@@ -12954,12 +12975,13 @@ function NBackSessionApp() {
 
   // Drives --ex, which every accent button reads from. Only set while an
   // exercise is actually on screen; the Overview step and every screen
-  // outside training stay on the app's cyan so the colour means "you are
+  // outside training stay on the app's purple so the colour means "you are
   // in this exercise" rather than being decoration.
+  const APP_THEME = "#7537E2";
   const themeColor =
     mainView === "app" && exercise.key !== "overview"
-      ? EXERCISE_COLORS[exercise.key] || "#4CB9D8"
-      : "#4CB9D8";
+      ? EXERCISE_COLORS[exercise.key] || APP_THEME
+      : APP_THEME;
 
   return (
     <div
@@ -14115,7 +14137,7 @@ function NBackSessionApp() {
                               is being trained at and the best accuracy held
                               at that interval. */}
                           {e.key === "cct"
-                            ? `${stat?.intervalMs ?? CCT_MIN_MS}ms \u00B7 ${
+                            ? `${stat?.intervalMs ?? CCT_MIN_MS}ms\u00A0\u00A0${
                                 stat?.bestAtInterval ?? 0
                               }%`
                             : isAccuracy
@@ -14949,7 +14971,12 @@ function NBackSessionApp() {
               </h1>
             </div>
 
-            {["dual", "quad", "iqnb"].includes(tutorialStepExercise.key) ? (
+            {/* Held back while the session's opening line is still on screen:
+                the demos start playing sound the moment they mount, and they
+                were talking over the transition. */}
+            {sessionStartLine ? (
+              <div style={{ minHeight: "24rem" }} />
+            ) : ["dual", "quad", "iqnb"].includes(tutorialStepExercise.key) ? (
               <NBackTutorial
                 exercise={tutorialStepExercise}
                 level={
@@ -18649,6 +18676,31 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {/* Testing: plays the first-time personal record celebration for the
+          exercise on screen, one level above its best, without training. */}
+      {mainView === "app" &&
+        exercise.key !== "overview" &&
+        screen === "setup" &&
+        (exercise.key !== "cct" || cctStage === "setup") &&
+        (exercise.key !== "rrt" || rrtStage === "setup") &&
+        (exercise.key !== "motion3d" || motion3dStage === "setup") &&
+        !unlockInfo && (
+        <button
+          onClick={() => {
+            const best = exerciseStats[exercise.key]?.bestN || exerciseLevels[exercise.key] || 1;
+            setUnlockInfo({
+              exerciseKey: exercise.key,
+              level: Math.min(exercise.maxN || 10, Math.floor(best) + 1),
+              title: exercise.title,
+              isNewPR: true,
+            });
+          }}
+          className="fixed bottom-6 left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+        >
+          🧪 Test PR animation
+        </button>
+      )}
+
       {mainView === "home" && (
         <button
           onClick={() => setMainView("notes")}
@@ -19370,33 +19422,12 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-xs rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 text-center">
-        {/* The answer lands in a box of its own, so there is somewhere for it
-            to appear whether it was typed or tapped. */}
-        <div
-          className="relative mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
-          style={{
-            height: "5.5rem",
-            borderColor: `${accent}66`,
-            background: "#0F1115",
-          }}
-        >
-          {/* The browser's own caret blinks, which is the last thing you want
-              pulsing at you while you are counting. It is hidden (caret-color
-              below) and this still bar stands in for it, showing where the
-              digits will land. It goes the moment anything is typed. */}
-          {!entry && (
-            <span
-              aria-hidden="true"
-              className="absolute rounded-full"
-              style={{ width: "2px", height: "3rem", background: "#6A6F78" }}
-            />
-          )}
-          {/* Three squares: how close this run is to the next speed-up, and
-              what the last few answers were. Tucked into the corner of the
-              box rather than sitting under the digits, where they pulled the
-              eye down every time a verdict landed. */}
-          <div className="absolute top-2 right-2 flex items-center gap-1">
+      <div className="relative mx-auto w-full max-w-xs rounded-2xl border border-slate-700/60 bg-slate-900/70 shadow-xl shadow-black/40 p-6 text-center">
+        {/* Three squares: how close this run is to the next speed-up, and
+            what the last few answers were. Outside the card, above its top
+            right corner, so they can be glanced at without sitting inside
+            the box being watched. */}
+        <div className="absolute bottom-full right-0 mb-2 flex items-center gap-1">
             {Array.from({ length: CCT_STREAK_TO_SPEED_UP }).map((_, i) => {
               const mark = marks[i];
               return (
@@ -19419,6 +19450,28 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
               );
             })}
           </div>
+
+        {/* The answer lands in a box of its own, so there is somewhere for it
+            to appear whether it was typed or tapped. */}
+        <div
+          className="relative mx-auto w-40 rounded-xl border-2 flex items-center justify-center"
+          style={{
+            height: "5.5rem",
+            borderColor: `${accent}66`,
+            background: "#0F1115",
+          }}
+        >
+          {/* The browser's own caret blinks, which is the last thing you want
+              pulsing at you while you are counting. It is hidden (caret-color
+              below) and this still bar stands in for it, showing where the
+              digits will land. It goes the moment anything is typed. */}
+          {!entry && (
+            <span
+              aria-hidden="true"
+              className="absolute rounded-full"
+              style={{ width: "2px", height: "3rem", background: "#6A6F78" }}
+            />
+          )}
           <input
             ref={inputRef}
             value={entry}
@@ -20016,7 +20069,7 @@ function RRTExercise({ exercise, onFinish, onHome, onStageChange, onLevelUp, onS
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{exercise.title}</h1>
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">Relational Reasoning Training</h1>
         </div>
 
         {/* Exactly the construction the N-back setup card uses — the
