@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, useContext, createContext, Fragment, Component } from "react";
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo, useContext, createContext, Fragment, Component, memo } from "react";
 import * as THREE from "three";
 import {
   AreaChart,
@@ -9284,7 +9284,7 @@ function brainNoise(i, salt) {
   h ^= h >>> 16;
   return ((h >>> 0) % 10000) / 10000;
 }
-function HomeConstellation({ days }) {
+function HomeConstellationInner({ days }) {
   const { places, links } = useMemo(() => {
     const total = Math.max(365, days + 120);
     const pl = brainPlaces(total);
@@ -9313,7 +9313,7 @@ function HomeConstellation({ days }) {
         className="w-full h-auto"
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
-        style={{ overflow: "visible", animation: "brainFloat 9s ease-in-out infinite" }}
+        style={{ overflow: "visible" }}
       >
         <defs>
           <radialGradient id="brain-nebula" cx="50%" cy="46%" r="55%">
@@ -9326,23 +9326,15 @@ function HomeConstellation({ days }) {
             <stop offset="45%" stopColor="#9A6CF0" stopOpacity="0.25" />
             <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
           </radialGradient>
-          <filter id="star-bloom" x="-200%" y="-200%" width="500%" height="500%">
-            <feGaussianBlur stdDeviation="1.1" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
 
-        {/* A slow purple nebula behind the whole brain. */}
+        {/* A still purple nebula behind the whole brain. */}
         <ellipse
           cx={BRAIN_W / 2}
           cy={BRAIN_H * 0.46}
           rx={BRAIN_W * 0.62}
           ry={BRAIN_H * 0.6}
           fill="url(#brain-nebula)"
-          style={{ animation: "nebulaBreath 10s ease-in-out infinite", transformOrigin: "center" }}
         />
 
         {/* Every place still to come, faint, so the shape shows. */}
@@ -9354,10 +9346,7 @@ function HomeConstellation({ days }) {
               cy={pt.y}
               r="0.8"
               fill="#B9A0F5"
-              style={{
-                opacity: 0.26,
-                animation: `dotTwinkle ${5 + brainNoise(i, 4) * 6}s ease-in-out ${-brainNoise(i, 5) * 10}s infinite`,
-              }}
+              opacity="0.26"
             />
           )
         )}
@@ -9380,27 +9369,6 @@ function HomeConstellation({ days }) {
             }}
           />
         ))}
-        {/* Now and then a pulse runs along a connection, like a signal. */}
-        {links
-          .filter(([, to]) => brainNoise(to, 6) < 0.35)
-          .map(([from, to, len]) => (
-            <line
-              key={`p${to}`}
-              x1={places[from].x}
-              y1={places[from].y}
-              x2={places[to].x}
-              y2={places[to].y}
-              stroke="#E4D6FF"
-              strokeWidth="0.9"
-              strokeLinecap="round"
-              strokeDasharray={`3 ${len + 3}`}
-              style={{
-                "--len": len + 6,
-                opacity: 0,
-                animation: `linkPulse ${6 + brainNoise(to, 7) * 8}s linear ${2 + brainNoise(to, 8) * 9}s infinite`,
-              }}
-            />
-          ))}
 
         {places.slice(0, days).map((pt, i) => {
           const newest = i === days - 1;
@@ -9408,27 +9376,12 @@ function HomeConstellation({ days }) {
           return (
             <g
               key={`s${i}`}
-              style={{ animation: `starIn 0.9s cubic-bezier(0.2,0.8,0.3,1) ${i * stepMs}ms both` }}
+              style={{ animation: `starIn 0.8s ease-out ${i * stepMs}ms both` }}
             >
-              {newest && (
-                <circle
-                  cx={pt.x}
-                  cy={pt.y}
-                  r="9"
-                  fill="url(#star-glow)"
-                  style={{ animation: "starHalo 4s ease-in-out infinite", transformOrigin: `${pt.x}px ${pt.y}px` }}
-                />
-              )}
-              <circle
-                cx={pt.x}
-                cy={pt.y}
-                r={r}
-                fill="#F7F8F8"
-                filter="url(#star-bloom)"
-                style={{
-                  animation: `starTwinkle ${3 + brainNoise(i, 1) * 4}s ease-in-out ${-brainNoise(i, 2) * 6}s infinite`,
-                }}
-              />
+              {/* A soft halo from a gradient rather than a blur filter:
+                  a filter on every star is what made the entrance stutter. */}
+              <circle cx={pt.x} cy={pt.y} r={newest ? 9 : r * 3} fill="url(#star-glow)" opacity={newest ? 1 : 0.55} />
+              <circle cx={pt.x} cy={pt.y} r={r} fill="#F7F8F8" opacity="0.92" />
             </g>
           );
         })}
@@ -9444,8 +9397,11 @@ function HomeConstellation({ days }) {
     </div>
   );
 }
+// Memoised: Home re-renders often (its clock, timers), and redrawing a few
+// hundred SVG stars each time is what made the page feel heavy.
+const HomeConstellation = memo(HomeConstellationInner);
 
-// "Thursday 24 Sep 8:05pm". Its own component with its own
+// "Thursday 8:05pm". Its own component with its own
 // minute tick, so keeping the clock current never re-renders the rest of
 // the app.
 const HOME_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -9471,9 +9427,6 @@ function HomeDateLine() {
   return (
     <h1 className="text-3xl font-semibold text-white flex flex-wrap items-baseline gap-x-4">
       <span>{HOME_DAYS[now.getDay()]}</span>
-      <span>
-        {now.getDate()} {HOME_MONTHS[now.getMonth()]}
-      </span>
       <span>{time}</span>
     </h1>
   );
@@ -13372,41 +13325,15 @@ function NBackSessionApp() {
         }
         /* Short windows: the constellation would run into the corner pills. */
         @media (max-height: 759px) { .home-constellation { display: none !important; } }
-        @keyframes brainFloat {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-4px); }
-        }
-        @keyframes nebulaBreath {
-          0%, 100% { opacity: 0.75; transform: scale(0.97); }
-          50% { opacity: 1; transform: scale(1.03); }
-        }
-        @keyframes dotTwinkle {
-          0%, 100% { opacity: 0.16; }
-          50% { opacity: 0.36; }
-        }
-        @keyframes starTwinkle {
-          0%, 100% { opacity: 0.72; }
-          50% { opacity: 1; }
-        }
+        /* The constellation's entrance only: stars fade in, lines draw in. */
         @keyframes starIn {
-          0% { opacity: 0; transform: scale(0.2); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-        @keyframes starHalo {
-          0%, 100% { opacity: 0.7; transform: scale(0.9); }
-          50% { opacity: 1; transform: scale(1.15); }
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
         @keyframes linkDraw {
           0% { stroke-dashoffset: var(--len); }
           100% { stroke-dashoffset: 0; }
         }
-        @keyframes linkPulse {
-          0% { stroke-dashoffset: var(--len); opacity: 0; }
-          6% { opacity: 1; }
-          22% { stroke-dashoffset: 0; opacity: 1; }
-          26%, 100% { stroke-dashoffset: 0; opacity: 0; }
-        }
-        .constellation g { transform-box: fill-box; transform-origin: center; }
         @media (prefers-reduced-motion: reduce) {
           .constellation *, .constellation { animation: none !important; }
         }
@@ -14484,7 +14411,7 @@ function NBackSessionApp() {
                           level={bestLevel}
                           size={compactHome ? 44 : 60}
                           exerciseKey={e.key}
-                          labelClass={compactHome ? "text-[0.7rem]" : "text-[0.76rem]"}
+                          labelClass={compactHome ? "text-[0.66rem]" : "text-[0.7rem]"}
                         />
                       </span>
                     </div>
