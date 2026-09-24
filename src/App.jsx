@@ -9527,23 +9527,39 @@ const BRAIN_HOVER_R = 30;
 // Each part of the brain carries one exercise's colour: reasoning (RRT) at
 // the front, Dual N-Back across the top, Quad N-Back through the middle,
 // 3D MOT at the back where vision sits, QNB' along the temporal lobe, CCT in
-// the cerebellum and stem. Lifted a little from the exercise colours so the
-// darker ones (Quad's maroon, 3D MOT's green) still read as light on black.
-const BRAIN_REGION_RGB = {
-  rrt: [244, 162, 58],
-  dual: [77, 143, 245],
-  quad: [200, 64, 112],
-  motion3d: [52, 190, 90],
-  iqnb: [99, 203, 232],
-  cct: [240, 80, 106],
-};
+// the cerebellum and stem. These are the exercises' own colours, read
+// straight from EXERCISE_COLORS so the brain always matches the cards.
+function hexRgb(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+const BRAIN_REGION_RGB = Object.fromEntries(
+  ["rrt", "dual", "quad", "motion3d", "iqnb", "cct"].map((k) => [k, hexRgb(EXERCISE_COLORS[k])])
+);
+// Each part is the area nearest its anchor. Straight dividing lines read as
+// a grid laid over the brain, so the borders are made organic: each star is
+// placed by a slightly jittered position, and the parts interleave where
+// they meet.
+const BRAIN_ANCHORS = [
+  ["rrt", 36, 62],
+  ["dual", 104, 26],
+  ["quad", 102, 68],
+  ["motion3d", 166, 58],
+  ["iqnb", 70, 102],
+  ["cct", 140, 112],
+];
 function brainRegion(x, y) {
-  if (y >= 84 && x < 110) return "iqnb";
-  if (y >= 84) return "cct";
-  if (x < 62) return "rrt";
-  if (x >= 140) return "motion3d";
-  if (y < 52) return "dual";
-  return "quad";
+  let best = Infinity;
+  let key = "quad";
+  for (let k = 0; k < BRAIN_ANCHORS.length; k += 1) {
+    const [name, ax, ay] = BRAIN_ANCHORS[k];
+    const d = (x - ax) ** 2 + ((y - ay) * 1.15) ** 2;
+    if (d < best) {
+      best = d;
+      key = name;
+    }
+  }
+  return key;
 }
 
 function makeGlowSprite(rgb = [185, 160, 245]) {
@@ -9552,9 +9568,13 @@ function makeGlowSprite(rgb = [185, 160, 245]) {
   c.height = 64;
   const g = c.getContext("2d");
   const [r, gr, bl] = rgb;
+  // A near-gaussian falloff, so a halo has no edge you can see as a disc.
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, `rgba(${Math.round((r + 255 * 2) / 3)},${Math.round((gr + 255 * 2) / 3)},${Math.round((bl + 255 * 2) / 3)},0.8)`);
-  grad.addColorStop(0.45, `rgba(${r},${gr},${bl},0.3)`);
+  const hot = `${Math.round((r + 255) / 2)},${Math.round((gr + 255) / 2)},${Math.round((bl + 255) / 2)}`;
+  grad.addColorStop(0, `rgba(${hot},0.7)`);
+  grad.addColorStop(0.15, `rgba(${r},${gr},${bl},0.42)`);
+  grad.addColorStop(0.35, `rgba(${r},${gr},${bl},0.16)`);
+  grad.addColorStop(0.6, `rgba(${r},${gr},${bl},0.04)`);
   grad.addColorStop(1, `rgba(${r},${gr},${bl},0)`);
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
@@ -9581,7 +9601,9 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) links.push([link, i]);
     }
     const sizes = places.map((_, i) => 1.05 + brainNoise(i, 3) * 0.55);
-    const regions = places.map((pt) => brainRegion(pt.x, pt.y));
+    const regions = places.map((pt, i) =>
+      brainRegion(pt.x + (brainNoise(i, 11) - 0.5) * 22, pt.y + (brainNoise(i, 12) - 0.5) * 22)
+    );
     return { places, links, sizes, regions };
   }, [days]);
 
@@ -9632,43 +9654,20 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       base.height = Math.round(H * dpr);
       const b = base.getContext("2d");
       b.scale(dpr, dpr);
-      const cx = px(BRAIN_W / 2);
-      const cy = py(BRAIN_H * 0.46);
-      const rx = (BRAIN_VB.w / 2 - 2) * scale;
-      const ry = (BRAIN_VB.h / 2 - 2) * scale;
-      b.save();
-      b.translate(cx, cy);
-      b.scale(1, ry / rx);
-      const neb = b.createRadialGradient(0, 0, 0, 0, 0, rx);
-      neb.addColorStop(0, "rgba(117,55,226,0.30)");
-      neb.addColorStop(0.55, "rgba(117,55,226,0.08)");
-      neb.addColorStop(1, "rgba(117,55,226,0)");
-      b.fillStyle = neb;
-      b.beginPath();
-      b.arc(0, 0, rx, 0, Math.PI * 2);
-      b.fill();
-      b.restore();
-      // A faint wash of each region's colour over its part of the brain.
-      const sums = {};
-      places.forEach((pt, i) => {
-        const k = regions[i];
-        const e = sums[k] || (sums[k] = { x: 0, y: 0, n: 0 });
-        e.x += pt.x;
-        e.y += pt.y;
-        e.n += 1;
-      });
-      Object.entries(sums).forEach(([k, e]) => {
-        const gx = px(e.x / e.n);
-        const gy = py(e.y / e.n);
-        const gr = 46 * scale;
-        const wash = b.createRadialGradient(gx, gy, 0, gx, gy, gr);
-        wash.addColorStop(0, rgba(k, 0.12));
-        wash.addColorStop(1, rgba(k, 0));
-        b.fillStyle = wash;
-        b.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
-      });
+      // The glow is built from the brain itself: a very faint, wide halo
+      // at every place a star can go, in that part's colour. Where the
+      // places are, it glows; everywhere else it fades to nothing, so the
+      // glow takes the brain's own outline rather than an oval's.
+      for (let i = 0; i < places.length; i += 1) {
+        const gx = px(places[i].x);
+        const gy = py(places[i].y);
+        const gr = 22 * scale;
+        b.globalAlpha = 0.09;
+        b.drawImage(sprites[regions[i]], gx - gr, gy - gr, gr * 2, gr * 2);
+      }
+      b.globalAlpha = 1;
       for (let i = days; i < places.length; i += 1) {
-        b.fillStyle = rgba(regions[i], 0.3, 0.2);
+        b.fillStyle = rgba(regions[i], 0.32, 0.15);
         b.beginPath();
         b.arc(px(places[i].x), py(places[i].y), 0.8 * scale, 0, Math.PI * 2);
         b.fill();
@@ -9764,13 +9763,13 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const newest = i === days - 1;
         const h = near(pt.x, pt.y);
         const r = (newest ? 2 : sizes[i]) * (1 + 0.7 * h);
-        const glow = (newest ? 9 : r * 3) * (1 + 0.9 * h);
+        const glow = (newest ? 7 : r * 2.4) * (1 + 0.9 * h);
         const x = px(pt.x);
         const y = py(pt.y);
-        ctx.globalAlpha = a * (newest ? 1 : 0.55 + 0.45 * h);
+        ctx.globalAlpha = a * (newest ? 0.9 : 0.45 + 0.45 * h);
         ctx.drawImage(sprites[regions[i]], x - glow * scale, y - glow * scale, glow * 2 * scale, glow * 2 * scale);
         ctx.globalAlpha = a * 0.95;
-        ctx.fillStyle = rgba(regions[i], 1, 0.62 + 0.3 * h);
+        ctx.fillStyle = rgba(regions[i], 1, 0.35 + 0.4 * h);
         ctx.beginPath();
         ctx.arc(x, y, r * scale, 0, Math.PI * 2);
         ctx.fill();
@@ -9860,7 +9859,13 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
         className="block w-full"
-        style={{ pointerEvents: interactive ? "auto" : "none" }}
+        style={{
+          pointerEvents: interactive ? "auto" : "none",
+          // Fades the canvas out towards its edges, so no box can ever show
+          // against the page behind it.
+          WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
+          maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
+        }}
       />
     </div>
   );
@@ -9941,7 +9946,9 @@ if (typeof window !== "undefined") preloadOpeningTrack();
 const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
 const SS_VOLUME = 0.45;
 // How long the track takes to fade out once Home is coming in.
-const SS_FADE_OUT_MS = 2200;
+const SS_FADE_OUT_MS = 4000;
+// How long the picture takes to dissolve into Home.
+const SS_DISSOLVE_MS = 1600;
 const SS_SCENES = [
   { kind: "word", text: "The mind", beats: 2 },
   { kind: "word", text: "is the weapon.", accent: true, beats: 2 },
@@ -9998,6 +10005,15 @@ function IdleScreensaver({ onExit }) {
   const clockRef = useRef(null); // () => ms into the edit
   const soundRef = useRef(null); // { ctx, gain, source }
   const startSoundRef = useRef(null);
+  useEffect(() => {
+    if (!leaving) return;
+    const snd = soundRef.current;
+    if (!snd) return;
+    const t = snd.ctx.currentTime;
+    snd.gain.gain.cancelScheduledValues(t);
+    snd.gain.gain.setValueAtTime(snd.gain.gain.value, t);
+    snd.gain.gain.linearRampToValueAtTime(SS_VOLUME * 0.55, t + SS_DISSOLVE_MS / 1000);
+  }, [leaving]);
 
   useEffect(() => {
     let cancelled = false;
@@ -10086,7 +10102,7 @@ function IdleScreensaver({ onExit }) {
         if (!done) {
           done = true;
           setLeaving(true);
-          setTimeout(() => exitRef.current(), 380);
+          setTimeout(() => exitRef.current(), SS_DISSOLVE_MS);
         }
         return;
       }
@@ -10123,7 +10139,7 @@ function IdleScreensaver({ onExit }) {
       if (!armed) return;
       armed = false;
       setLeaving(true);
-      setTimeout(() => exitRef.current(), 380);
+      setTimeout(() => exitRef.current(), SS_DISSOLVE_MS);
     };
     const events = ["mousedown", "keydown", "touchstart"];
     events.forEach((ev) => window.addEventListener(ev, onInput, { passive: true }));
@@ -10144,7 +10160,7 @@ function IdleScreensaver({ onExit }) {
   return (
     <div
       className="fixed inset-0 z-[70] overflow-hidden bg-black flex items-center justify-center text-center px-8 select-none"
-      style={{ animation: leaving ? "ssOut 0.38s ease-in forwards" : "ssIn 0.9s ease-out both", cursor: "none" }}
+      style={{ animation: leaving ? `ssOut ${SS_DISSOLVE_MS}ms cubic-bezier(0.4,0,0.2,1) forwards` : "ssIn 0.9s ease-out both", cursor: "none" }}
     >
       {/* The glow that kicks on every beat. */}
       {phase === "play" && <div
@@ -10157,6 +10173,8 @@ function IdleScreensaver({ onExit }) {
           willChange: "transform, opacity",
         }}
       />}
+      {/* Faint dust of stars drifting slowly past, for depth. */}
+      <div aria-hidden="true" className="ss-stars absolute pointer-events-none" />
       {/* A slow light leak drifting across the frame. */}
       <div
         aria-hidden="true"
@@ -10192,18 +10210,30 @@ function IdleScreensaver({ onExit }) {
             className="font-black uppercase tracking-tight ss-split"
             style={
               scene.accent
-                ? {
-                    ...bigWord,
-                    background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 40%, #9A6CF0 100%)",
-                    WebkitBackgroundClip: "text",
-                    backgroundClip: "text",
-                    color: "transparent",
-                    filter: "drop-shadow(0 0 30px rgba(117,55,226,0.55))",
-                  }
+                ? { ...bigWord, filter: "drop-shadow(0 0 30px rgba(117,55,226,0.55))" }
                 : { ...bigWord, color: "#FFFFFF" }
             }
           >
-            {scene.text}
+            {scene.text.split(" ").map((w, wi) => (
+              <span
+                key={wi}
+                className="inline-block"
+                style={{
+                  marginRight: "0.28em",
+                  animation: `ssWordIn 0.62s cubic-bezier(0.16,1,0.3,1) ${wi * 90}ms both`,
+                  ...(scene.accent
+                    ? {
+                        background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 40%, #9A6CF0 100%)",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        color: "transparent",
+                      }
+                    : null),
+                }}
+              >
+                {w}
+              </span>
+            ))}
           </div>
         )}
         {scene.kind === "gem" && <SsGemLadder />}
@@ -10269,6 +10299,39 @@ function IdleScreensaver({ onExit }) {
         aria-hidden="true"
         className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
         style={{ height: "9vh", animation: "ssBarBottom 1.2s cubic-bezier(0.2,0.8,0.2,1) both" }}
+      />
+
+      {/* An anamorphic streak across the frame on every cut. */}
+      {phase === "play" && (
+        <div
+          key={`a${cut}`}
+          aria-hidden="true"
+          className="absolute left-0 right-0 pointer-events-none"
+          style={{
+            top: "50%",
+            height: "2px",
+            marginTop: "-1px",
+            background:
+              "linear-gradient(90deg, transparent 0%, rgba(154,108,240,0.0) 10%, rgba(217,200,255,0.85) 50%, rgba(154,108,240,0.0) 90%, transparent 100%)",
+            boxShadow: "0 0 18px 4px rgba(154,108,240,0.35)",
+            animation: "ssFlare 0.55s ease-out both",
+            willChange: "transform, opacity",
+          }}
+        />
+      )}
+
+      {/* Opening: a single line of light opens the frame, like a projector
+          warming up, before the first cut. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 pointer-events-none"
+        style={{
+          top: "50%",
+          height: "1px",
+          background: "linear-gradient(90deg, transparent, #FFFFFF 50%, transparent)",
+          boxShadow: "0 0 24px 6px rgba(217,200,255,0.4)",
+          animation: "ssProjector 1.1s cubic-bezier(0.2,0.8,0.2,1) both",
+        }}
       />
 
       {/* A white flash on every cut. */}
@@ -14260,6 +14323,40 @@ function NBackSessionApp() {
           0% { transform: translate(-4%, -2%) rotate(0deg); }
           100% { transform: translate(5%, 3%) rotate(8deg); }
         }
+        @keyframes ssWordIn {
+          0% { opacity: 0; transform: translateY(0.35em) scale(1.06); filter: blur(10px); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+        }
+        @keyframes ssFlare {
+          0% { opacity: 0; transform: scaleX(0.2); }
+          18% { opacity: 1; transform: scaleX(1); }
+          100% { opacity: 0; transform: scaleX(1.3); }
+        }
+        @keyframes ssProjector {
+          0% { opacity: 0; transform: scaleX(0); }
+          45% { opacity: 1; transform: scaleX(1); }
+          100% { opacity: 0; transform: scaleX(1) scaleY(40); }
+        }
+        .ss-stars {
+          inset: -10%;
+          opacity: 0.5;
+          background-image:
+            radial-gradient(1px 1px at 12% 22%, rgba(255,255,255,0.7), transparent),
+            radial-gradient(1px 1px at 68% 14%, rgba(255,255,255,0.5), transparent),
+            radial-gradient(1.5px 1.5px at 34% 72%, rgba(217,200,255,0.6), transparent),
+            radial-gradient(1px 1px at 82% 58%, rgba(255,255,255,0.5), transparent),
+            radial-gradient(1px 1px at 52% 40%, rgba(255,255,255,0.35), transparent),
+            radial-gradient(1.5px 1.5px at 90% 86%, rgba(217,200,255,0.5), transparent),
+            radial-gradient(1px 1px at 22% 90%, rgba(255,255,255,0.4), transparent),
+            radial-gradient(1px 1px at 6% 50%, rgba(255,255,255,0.45), transparent);
+          background-size: 420px 420px;
+          animation: ssStarsDrift 40s linear infinite;
+          will-change: transform;
+        }
+        @keyframes ssStarsDrift {
+          from { transform: translate3d(0, 0, 0); }
+          to { transform: translate3d(-420px, -140px, 0); }
+        }
         @keyframes ssBarTop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
         @keyframes ssBarBottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
         @keyframes ssTrack {
@@ -14287,7 +14384,7 @@ function NBackSessionApp() {
           100% { transform: scale(1); opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"], [style*="ssSweep"], [style*="ssLeak"], .ss-grain, .ss-split { animation: none !important; }
+          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"], [style*="ssSweep"], [style*="ssLeak"], [style*="ssWordIn"], [style*="ssFlare"], [style*="ssProjector"], .ss-grain, .ss-split, .ss-stars { animation: none !important; }
         }
         /* The constellation's entrance only: stars fade in, lines draw in. */
         @keyframes starIn {
