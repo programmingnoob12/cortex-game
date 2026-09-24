@@ -9216,23 +9216,32 @@ function bootViewFrom(boot) {
   return boot?.snap ? "app" : "regime";
 }
 
-// "Thursday 24 Sep" and the hour, "8pm". Its own component with its own
+// "Thursday 24 Sep 8:05pm". Its own component with its own
 // minute tick, so keeping the clock current never re-renders the rest of
 // the app.
 const HOME_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const HOME_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function HomeDateLine() {
   const [now, setNow] = useState(() => new Date());
+  // Wakes exactly as each minute turns over, so the clock changes when the
+  // real one does rather than up to a minute late.
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(id);
+    let id;
+    const tick = () => {
+      const d = new Date();
+      setNow(d);
+      id = setTimeout(tick, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 20);
+    };
+    const d = new Date();
+    id = setTimeout(tick, 60000 - (d.getSeconds() * 1000 + d.getMilliseconds()) + 20);
+    return () => clearTimeout(id);
   }, []);
   const h = now.getHours();
-  const hour = `${h % 12 || 12}${h < 12 ? "am" : "pm"}`;
+  const m = String(now.getMinutes()).padStart(2, "0");
+  const time = `${h % 12 || 12}:${m}${h < 12 ? "am" : "pm"}`;
   return (
     <h1 className="text-3xl font-semibold tracking-tight text-white">
-      {HOME_DAYS[now.getDay()]} {now.getDate()} {HOME_MONTHS[now.getMonth()]}{" "}
-      <span className="font-medium text-slate-400">{hour}</span>
+      {HOME_DAYS[now.getDay()]} {now.getDate()} {HOME_MONTHS[now.getMonth()]} {time}
     </h1>
   );
 }
@@ -17413,11 +17422,6 @@ function NBackSessionApp() {
 
             <div className={`${ACCENT_STYLES[exercise.accent].bg} border ${ACCENT_STYLES[exercise.accent].border} rounded-xl p-6 space-y-3`}>
               <div className="flex items-center gap-7">
-                <RankedGem
-                  level={exercise.key === "iqnb" ? Math.floor(qnbPrimeLevel) : n}
-                  size={56}
-                  exerciseKey={exercise.key}
-                />
                 <div>
                   <div className="text-lg text-slate-300">
                     Level:{" "}
@@ -17947,7 +17951,9 @@ function NBackSessionApp() {
 
             <div className="space-y-2">
               <div className="text-3xl font-semibold tracking-tight">
-                {unlockInfo.title}
+                {/* Always the level reached ("Quad 5-Back"), never the bare
+                    exercise name. */}
+                {unlockInfo.title.replace("N-Back", `${unlockInfo.level}-Back`)}
               </div>
               {unlockInfo.isNewPR && (
                 <div
@@ -18391,7 +18397,7 @@ function NBackSessionApp() {
             className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.18) 0%, rgba(76,185,216,0.06) 46%, transparent 72%)",
+                "radial-gradient(46% 36% at 50% 50%, rgba(117,55,226,0.18) 0%, rgba(117,55,226,0.06) 46%, transparent 72%)",
             }}
           />
           <div className="relative max-w-xl text-center space-y-14">
@@ -18430,7 +18436,7 @@ function NBackSessionApp() {
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(46% 36% at 50% 50%, rgba(76,185,216,0.22) 0%, rgba(76,185,216,0.07) 46%, transparent 72%)",
+                "radial-gradient(46% 36% at 50% 50%, rgba(117,55,226,0.22) 0%, rgba(117,55,226,0.07) 46%, transparent 72%)",
               animation: "sessionStartWash 2.6s ease-out forwards",
             }}
           />
@@ -18452,7 +18458,7 @@ function NBackSessionApp() {
             className="absolute inset-0"
             style={{
               background:
-                "radial-gradient(42% 34% at 50% 44%, rgba(76,185,216,0.30) 0%, rgba(76,185,216,0.10) 45%, transparent 72%)",
+                "radial-gradient(42% 34% at 50% 44%, rgba(117,55,226,0.30) 0%, rgba(117,55,226,0.10) 45%, transparent 72%)",
               animation: "sessionDoneWash 5.5s cubic-bezier(0.2,0.7,0.3,1) forwards",
             }}
           />
@@ -18492,7 +18498,7 @@ function NBackSessionApp() {
                 cy="56"
                 r="48"
                 fill="none"
-                stroke="#4CB9D8"
+                stroke="#7537E2"
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeDasharray="302"
@@ -18707,12 +18713,17 @@ function NBackSessionApp() {
         <button
           onClick={() => {
             const best = exerciseStats[exercise.key]?.bestN || exerciseLevels[exercise.key] || 1;
-            setUnlockInfo({
-              exerciseKey: exercise.key,
-              level: Math.min(exercise.maxN || 10, Math.floor(best) + 1),
-              title: exercise.title,
-              isNewPR: true,
-            });
+            const level = Math.min(exercise.maxN || 10, Math.floor(best) + 1);
+            // Named the way the real celebration names it.
+            const title =
+              exercise.key === "iqnb"
+                ? `${exercise.title} ${level.toFixed(2)}`
+                : exercise.key === "rrt"
+                ? `${exercise.title} ${level + 1}p`
+                : exercise.key === "motion3d"
+                ? `${exercise.title} ${(level * MOT_TIER_STEP).toFixed(2)}`
+                : exercise.title.replace("N-Back", `${level}-Back`);
+            setUnlockInfo({ exerciseKey: exercise.key, level, title, isNewPR: true });
           }}
           className="fixed bottom-6 left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
