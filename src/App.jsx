@@ -3282,7 +3282,17 @@ const MOTIVATION_LINES = [
     id: 136,
     text: "Session feeling hard today? Break it up into small pieces throughout the day. Just keep your streak going.",
   },
+  { id: 137, text: "Wisdom is the principal thing; therefore get wisdom. And with all your getting, get understanding." },
 ];
+// Held on its own at the close of every session, after the complete
+// animation and before anything else.
+const WISDOM_VERSE =
+  "Wisdom is the principal thing; therefore get wisdom. And with all your getting, get understanding.";
+const WISDOM_VERSE_SOURCE = "Proverbs 4:7";
+// The entry moment: one slow breath before a session opens.
+const ENTRY_MOMENT_MS = 8000;
+// The closing moment: the verse, held in stillness.
+const CLOSING_MOMENT_MS = 7000;
 // Shown once, the first time Quad N-Back reaches 5 back, in place of the
 // usual random transition line. Not in MOTIVATION_LINES, because it must
 // never come up in the ordinary rotation.
@@ -9216,6 +9226,115 @@ function bootViewFrom(boot) {
   return boot?.snap ? "app" : "regime";
 }
 
+// The constellation on Home: one star for every day they have trained, for
+// good. It is not the streak — it never resets and a missed day costs it
+// nothing; it only ever grows.
+//
+// Each star's place is fixed by its number alone (a golden-angle spiral with
+// a little seeded wobble), so star 12 is always where star 12 was and the
+// sky never rearranges itself as it fills. Each new star is joined to the
+// nearest one already there, which draws the figure. When it outgrows the
+// panel the whole sky zooms out rather than moving anything.
+function starNoise(i, salt) {
+  let h = (i + 1) * 374761393 + salt * 668265263;
+  h = (h ^ (h >>> 13)) * 1274126177;
+  h ^= h >>> 16;
+  return ((h >>> 0) % 10000) / 10000;
+}
+function constellationStars(count) {
+  const stars = [];
+  for (let i = 0; i < count; i += 1) {
+    const angle = i * 2.39996323 + (starNoise(i, 1) - 0.5) * 0.9;
+    const r = 15 * Math.sqrt(i + 0.35) * (0.82 + starNoise(i, 2) * 0.36);
+    const x = Math.cos(angle) * r;
+    const y = Math.sin(angle) * r * 1.35;
+    let link = -1;
+    let best = Infinity;
+    for (let j = 0; j < i; j += 1) {
+      const d = (stars[j].x - x) ** 2 + (stars[j].y - y) ** 2;
+      if (d < best) {
+        best = d;
+        link = j;
+      }
+    }
+    stars.push({ x, y, link, size: 0.8 + starNoise(i, 3) * 0.7 });
+  }
+  return stars;
+}
+function HomeConstellation({ days }) {
+  const stars = useMemo(() => constellationStars(days), [days]);
+  // The sky's half-width: never smaller than the starting frame, so the first
+  // few stars sit in open space rather than filling the panel.
+  const extent = Math.max(
+    90,
+    ...stars.map((st) => Math.max(Math.abs(st.x), Math.abs(st.y) / 1.5) + 18)
+  );
+  const w = extent * 2;
+  const h = extent * 3;
+  const unit = extent / 90;
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <svg
+        width="240"
+        height="360"
+        viewBox={`${-extent} ${-extent * 1.5} ${w} ${h}`}
+        role="img"
+        aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
+        style={{ overflow: "visible" }}
+      >
+        <defs>
+          <radialGradient id="star-glow">
+            <stop offset="0%" stopColor="#B9A0F5" stopOpacity="0.55" />
+            <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
+          </radialGradient>
+        </defs>
+        {stars.map((st, i) =>
+          st.link < 0 ? null : (
+            <line
+              key={`l${i}`}
+              x1={stars[st.link].x}
+              y1={stars[st.link].y}
+              x2={st.x}
+              y2={st.y}
+              stroke="rgba(185,160,245,0.22)"
+              strokeWidth={0.8 * unit}
+            />
+          )
+        )}
+        {stars.map((st, i) => {
+          const newest = i === stars.length - 1;
+          return (
+            <g key={`s${i}`}>
+              {newest && (
+                <circle cx={st.x} cy={st.y} r={9 * unit} fill="url(#star-glow)" />
+              )}
+              <circle
+                cx={st.x}
+                cy={st.y}
+                r={(newest ? 2.2 : 1.5 * st.size) * unit}
+                fill="#F7F8F8"
+                opacity={newest ? 1 : 0.8}
+                style={newest ? { animation: "starNewest 4s ease-in-out infinite" } : undefined}
+              />
+            </g>
+          );
+        })}
+        {days === 0 && (
+          <circle cx="0" cy="0" r="1.6" fill="#F7F8F8" opacity="0.25" />
+        )}
+      </svg>
+      <div className="text-center">
+        <div className="text-base font-medium text-slate-200">
+          {days} {days === 1 ? "star" : "stars"}
+        </div>
+        <div className="text-sm text-slate-500 mt-1">
+          {days === 0 ? "Your first appears when you train" : "One for every day you've trained"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // "Thursday 24 Sep 8:05pm". Its own component with its own
 // minute tick, so keeping the clock current never re-renders the rest of
 // the app.
@@ -9555,6 +9674,10 @@ function NBackSessionApp() {
   // Plays for a beat between finishing a regime and landing on Motivation,
   // so the end of a session registers as an event rather than a page change.
   const [sessionCompleteAnim, setSessionCompleteAnim] = useState(false);
+  // The still moments either side of a session: a breath before it opens,
+  // and the verse after it closes.
+  const [entryMoment, setEntryMoment] = useState(false);
+  const [closingMoment, setClosingMoment] = useState(false);
   const [sessionStartLine, setSessionStartLine] = useState(null); // the line held on screen between Start Training and the first exercise
   const [rampIntro, setRampIntro] = useState(null); // { minutes } — the ease-in explanation, dismissed by its own button
   // How long one of those lines stays up, wherever it is triggered from.
@@ -11520,6 +11643,19 @@ function NBackSessionApp() {
   // order they appear in that regime's step list (e.g. Dual N-Back is
   // exercise 1 of 4 in one regime but 3rd in another — the overview should
   // match whichever position it actually runs in).
+  // Every calendar day with any training recorded, across all exercises
+  // and regimes — one star each in the Home constellation.
+  const trainedDayCount = useMemo(() => {
+    const days = new Set();
+    Object.entries(exerciseHistory).forEach(([key, entries]) => {
+      if (key.startsWith("_") || !Array.isArray(entries)) return;
+      entries.forEach((en) => {
+        if (en && en.ts) days.add(new Date(en.ts).toDateString());
+      });
+    });
+    return days.size;
+  }, [exerciseHistory]);
+
   const overviewExercises = Array.from(
     new Set(currentRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
@@ -11737,10 +11873,15 @@ function NBackSessionApp() {
     setSessionCompleteAnim(true);
     playLevelUp();
     setTimeout(() => {
-      sessionEndingRef.current = false;
       setSessionCompleteAnim(false);
-      setHypnosisAfterSession(true);
-      setMainView("hypnosis");
+      // Stillness and the verse, before moving on.
+      setClosingMoment(true);
+      setTimeout(() => {
+        sessionEndingRef.current = false;
+        setClosingMoment(false);
+        setHypnosisAfterSession(true);
+        setMainView("hypnosis");
+      }, CLOSING_MOMENT_MS);
     }, 5500);
   };
 
@@ -12397,10 +12538,10 @@ function NBackSessionApp() {
     // underneath it.
     const key = regimeKeyRef.current || regimeKey;
     if (showRampIntroIfOwed(key, openSessionFromHome)) return;
-    setSessionStartLine(
-      MOTIVATION_ANYTIME[Math.floor(Math.random() * MOTIVATION_ANYTIME.length)]?.text || null
-    );
-    setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+    // A breath before the practice: leaving ordinary life and entering
+    // the session. The first exercise sits ready underneath it.
+    setEntryMoment(true);
+    setTimeout(() => setEntryMoment(false), ENTRY_MOMENT_MS);
     openSessionFromHome();
   };
 
@@ -13125,6 +13266,50 @@ function NBackSessionApp() {
         @keyframes rampIntroRise {
           from { opacity: 0; transform: translateY(14px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes entryFade {
+          0% { opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        /* One breath: in for about three and a half seconds, out for the same. */
+        @keyframes entryBreath {
+          0%, 8% { transform: scale(0.55); opacity: 0.35; }
+          48%, 54% { transform: scale(1); opacity: 0.9; }
+          94%, 100% { transform: scale(0.55); opacity: 0.35; }
+        }
+        @keyframes entryWordIn {
+          0%, 10% { opacity: 0; }
+          18%, 42% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        @keyframes entryWordOut {
+          0%, 52% { opacity: 0; }
+          60%, 84% { opacity: 1; }
+          92%, 100% { opacity: 0; }
+        }
+        @keyframes closingFade {
+          0% { opacity: 0; }
+          12% { opacity: 1; }
+          88% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes closingLine {
+          0%, 10% { opacity: 0; transform: translateY(10px); filter: blur(6px); }
+          26%, 86% { opacity: 1; transform: translateY(0); filter: blur(0); }
+          100% { opacity: 0; filter: blur(0); }
+        }
+        @keyframes closingSource {
+          0%, 30% { opacity: 0; }
+          42%, 86% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        /* Short windows: the constellation would run into the corner pills. */
+        @media (max-height: 759px) { .home-constellation { display: none !important; } }
+        @keyframes starNewest {
+          0%, 100% { opacity: 0.75; }
+          50% { opacity: 1; }
         }
         @keyframes sessionStartWash {
           0% { opacity: 0; }
@@ -14398,7 +14583,19 @@ function NBackSessionApp() {
                 }),
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
-                  setTimeout(() => setSessionCompleteAnim(false), 5500);
+                  setTimeout(() => {
+                    setSessionCompleteAnim(false);
+                    setClosingMoment(true);
+                    setTimeout(() => setClosingMoment(false), CLOSING_MOMENT_MS);
+                  }, 5500);
+                }),
+                go("Entry moment", () => {
+                  setEntryMoment(true);
+                  setTimeout(() => setEntryMoment(false), ENTRY_MOMENT_MS);
+                }),
+                go("Closing moment", () => {
+                  setClosingMoment(true);
+                  setTimeout(() => setClosingMoment(false), CLOSING_MOMENT_MS);
                 }),
                 go("Level up celebration", () =>
                   setUnlockInfo({
@@ -15012,7 +15209,7 @@ function NBackSessionApp() {
             {/* Held back while the session's opening line is still on screen:
                 the demos start playing sound the moment they mount, and they
                 were talking over the transition. */}
-            {sessionStartLine ? (
+            {sessionStartLine || entryMoment ? (
               <div style={{ minHeight: "24rem" }} />
             ) : ["dual", "quad", "iqnb"].includes(tutorialStepExercise.key) ? (
               <NBackTutorial
@@ -18459,6 +18656,81 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {/* The entry moment. Opaque and still: nothing moves but the breath,
+          and it takes the clicks so nothing starts underneath it. */}
+      {entryMoment && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 px-8"
+          style={{ animation: `entryFade ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
+        >
+          <div className="relative w-44 h-44 flex items-center justify-center">
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 rounded-full"
+              style={{
+                background:
+                  "radial-gradient(circle, rgba(135,83,234,0.45) 0%, rgba(117,55,226,0.16) 55%, transparent 72%)",
+                animation: `entryBreath ${ENTRY_MOMENT_MS}ms ease-in-out forwards`,
+              }}
+            />
+            <div
+              aria-hidden="true"
+              className="absolute w-20 h-20 rounded-full border"
+              style={{
+                borderColor: "rgba(185,160,245,0.35)",
+                animation: `entryBreath ${ENTRY_MOMENT_MS}ms ease-in-out forwards`,
+              }}
+            />
+          </div>
+          <div className="relative mt-10 h-8 w-full text-center text-xl text-slate-300 tracking-wide">
+            <span
+              className="absolute inset-0"
+              style={{ animation: `entryWordIn ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
+            >
+              Breathe in
+            </span>
+            <span
+              className="absolute inset-0"
+              style={{ animation: `entryWordOut ${ENTRY_MOMENT_MS}ms ease-in-out forwards` }}
+            >
+              Breathe out
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* The closing moment: the verse, held on its own before anything else. */}
+      {closingMoment && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950 px-8 pointer-events-none"
+          style={{ animation: `closingFade ${CLOSING_MOMENT_MS}ms ease-in-out forwards` }}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(40% 32% at 50% 48%, rgba(117,55,226,0.14) 0%, rgba(117,55,226,0.04) 50%, transparent 74%)",
+            }}
+          />
+          <div
+            className="relative text-center text-2xl sm:text-3xl font-medium leading-snug max-w-xl text-slate-100"
+            style={{
+              animation: `closingLine ${CLOSING_MOMENT_MS}ms ease-out forwards`,
+              textWrap: "balance",
+            }}
+          >
+            {WISDOM_VERSE}
+          </div>
+          <div
+            className="relative mt-6 text-sm uppercase tracking-[0.2em] text-slate-500"
+            style={{ animation: `closingSource ${CLOSING_MOMENT_MS}ms ease-out forwards` }}
+          >
+            {WISDOM_VERSE_SOURCE}
+          </div>
+        </div>
+      )}
+
       {sessionCompleteAnim && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-sm pointer-events-none overflow-hidden">
           {/* A wash of light behind everything, so the screen brightens
@@ -18709,6 +18981,17 @@ function NBackSessionApp() {
               ×
             </button>
           </div>
+        </div>
+      )}
+
+      {/* The constellation, in the empty space to the left of Home's column.
+          Wide screens only: narrower than this and there is no space beside
+          the column for it. */}
+      {mainView === "home" && (
+        <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
+          style={{ left: "calc((100vw - 42.25rem) / 4 - 120px)" }}
+        >
+          <HomeConstellation days={trainedDayCount} />
         </div>
       )}
 
