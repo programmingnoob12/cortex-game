@@ -14005,15 +14005,28 @@ function NBackSessionApp() {
                     <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
                   </AvatarFrame>
                 )}
-                {/* The regime being trained and its total length, where the
-                    greeting used to be. */}
-                <div className="flex items-baseline gap-3">
-                  <h1 className="text-3xl font-semibold tracking-tight">
-                    {currentRegime.title}
-                  </h1>
-                  <span className="text-lg text-slate-400">
-                    {currentRegime.steps.reduce((sum, st) => sum + (st.minutes || 0), 0)} min
-                  </span>
+                {/* The session at a glance, where the greeting used to be:
+                    one coloured bar per exercise, as long as its share of
+                    the session, with its name and minutes underneath. */}
+                <div className="w-72 sm:w-96 max-w-full flex gap-1.5">
+                  {currentRegime.steps.map((st, i) => (
+                    <div
+                      key={`${st.key}-${i}`}
+                      className="min-w-0 flex flex-col gap-2"
+                      style={{ flexGrow: st.minutes || 1, flexBasis: 0 }}
+                    >
+                      <div
+                        className="h-1.5 rounded-full"
+                        style={{ background: EXERCISE_COLORS[st.key] || "#4CB9D8" }}
+                      />
+                      <div className="text-sm truncate">
+                        <span className="font-medium text-slate-100">
+                          {EXERCISE_LIBRARY[st.key]?.title || st.key}
+                        </span>{" "}
+                        <span className="text-slate-400">{st.minutes}m</span>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
