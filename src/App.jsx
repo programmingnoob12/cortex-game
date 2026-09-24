@@ -6563,10 +6563,16 @@ function ProverbsQuiz({ onBack }) {
           <span className="text-sm uppercase tracking-[0.18em] text-slate-500">
             {index + 1} of {round.length}
           </span>
-          {picked !== null && <span className="text-sm text-slate-500">{q.ref}</span>}
+          <span className="text-sm text-slate-500" style={{ visibility: picked !== null ? "visible" : "hidden" }}>
+            {q.ref}
+          </span>
         </div>
 
-        <div className="text-xl font-medium text-slate-100 leading-snug">{q.start} …</div>
+        {/* Every part of the card keeps a fixed height, so moving between
+            questions, or revealing the answer, never shifts anything. */}
+        <div className="text-xl font-medium text-slate-100 leading-snug min-h-[3.5rem] flex items-center">
+          {q.start} …
+        </div>
 
         <div className="space-y-3">
           {q.options.map((opt, i) => {
@@ -6586,7 +6592,7 @@ function ProverbsQuiz({ onBack }) {
                 key={opt}
                 onClick={() => choose(i)}
                 disabled={revealed}
-                className="w-full text-left rounded-lg border px-5 py-3 text-lg text-slate-100 transition-colors disabled:cursor-default"
+                className="w-full text-left rounded-lg border px-5 py-2 text-base sm:text-lg leading-snug text-slate-100 transition-colors disabled:cursor-default min-h-[4.25rem] flex items-center"
                 style={{ borderColor: border, background }}
               >
                 {opt}
@@ -6595,19 +6601,20 @@ function ProverbsQuiz({ onBack }) {
           })}
         </div>
 
-        {picked !== null && (
-          <>
-            <p className="text-slate-300 text-base leading-relaxed italic">
-              {q.start} {q.end}
-            </p>
-            <button
-              onClick={next}
-              className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-lg font-medium"
-            >
-              {isLast ? "Finish" : "Next"}
-            </button>
-          </>
-        )}
+        {/* Held in place before an answer (just invisible), so revealing it
+            does not push the card taller. */}
+        <div style={{ visibility: picked !== null ? "visible" : "hidden" }} className="space-y-5">
+          <p className="text-slate-300 text-base leading-relaxed italic min-h-[3.25rem]">
+            {q.start} {q.end}
+          </p>
+          <button
+            onClick={next}
+            disabled={picked === null}
+            className="w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg py-3 text-lg font-medium"
+          >
+            {isLast ? "Finish" : "Next"}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -9502,121 +9509,272 @@ function brainNoise(i, salt) {
   h ^= h >>> 16;
   return ((h >>> 0) % 10000) / 10000;
 }
-function HomeConstellationInner({ days }) {
-  const { places, links } = useMemo(() => {
+// Drawn on a canvas, not as SVG. A few hundred SVG circles and lines, each
+// with its own CSS animation, meant the browser repainted the whole picture
+// every frame of the entrance, which is where the stutter came from. The
+// canvas draws only while something is moving (the entrance, or a hover
+// fading in or out) and sits completely idle otherwise.
+//
+// Hovering lights the brain up around the pointer: nearby stars swell and
+// glow, the wiring between them brightens, and the unlit places close by
+// show faintly, like a preview of what is still to come.
+const BRAIN_VB = { x: -8, y: -8, w: BRAIN_W + 16, h: BRAIN_H + 16 };
+const BRAIN_HOVER_R = 30;
+
+function makeGlowSprite() {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext("2d");
+  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, "rgba(217,200,255,0.75)");
+  grad.addColorStop(0.45, "rgba(154,108,240,0.26)");
+  grad.addColorStop(1, "rgba(117,55,226,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 64, 64);
+  return c;
+}
+
+function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
+  const wrapRef = useRef(null);
+  const canvasRef = useRef(null);
+  const data = useMemo(() => {
     const total = Math.max(365, days + 120);
-    const pl = brainPlaces(total);
-    const ln = [];
+    const places = brainPlaces(total);
+    const links = [];
     for (let i = 1; i < days; i += 1) {
       let best = Infinity;
       let link = -1;
       for (let j = 0; j < i; j += 1) {
-        const d = (pl[j].x - pl[i].x) ** 2 + (pl[j].y - pl[i].y) ** 2;
+        const d = (places[j].x - places[i].x) ** 2 + (places[j].y - places[i].y) ** 2;
         if (d < best) {
           best = d;
           link = j;
         }
       }
-      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) ln.push([link, i, Math.sqrt(best)]);
+      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) links.push([link, i]);
     }
-    return { places: pl, links: ln };
+    const sizes = places.map((_, i) => 1.05 + brainNoise(i, 3) * 0.55);
+    return { places, links, sizes };
   }, [days]);
-  // The entrance: lit stars appear one after another, the whole sky inside
-  // about a second and a half however many there are.
-  const stepMs = days > 0 ? Math.min(40, 1500 / days) : 0;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const wrap = wrapRef.current;
+    if (!canvas || !wrap) return undefined;
+    const ctx = canvas.getContext("2d");
+    const sprite = makeGlowSprite();
+    const reduce =
+      typeof window !== "undefined" &&
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const { places, links, sizes } = data;
+    const step = days > 0 ? Math.min(40, (reduce ? 0 : entranceMs) / days) : 0;
+    const entranceEnd = reduce ? 0 : (days - 1) * step + 1400;
+    const start = performance.now();
+
+    let W = 0;
+    let H = 0;
+    let dpr = 1;
+    let scale = 1;
+    let base = null; // nebula and the unlit places, drawn once per size
+    let raf = 0;
+    let mouse = null;
+    let hover = 0;
+    let hoverTarget = 0;
+
+    const px = (x) => (x - BRAIN_VB.x) * scale;
+    const py = (y) => (y - BRAIN_VB.y) * scale;
+
+    const buildBase = () => {
+      base = document.createElement("canvas");
+      base.width = Math.round(W * dpr);
+      base.height = Math.round(H * dpr);
+      const b = base.getContext("2d");
+      b.scale(dpr, dpr);
+      const cx = px(BRAIN_W / 2);
+      const cy = py(BRAIN_H * 0.46);
+      const rx = BRAIN_W * 0.62 * scale;
+      const ry = BRAIN_H * 0.6 * scale;
+      b.save();
+      b.translate(cx, cy);
+      b.scale(1, ry / rx);
+      const neb = b.createRadialGradient(0, 0, 0, 0, 0, rx);
+      neb.addColorStop(0, "rgba(117,55,226,0.30)");
+      neb.addColorStop(0.55, "rgba(117,55,226,0.08)");
+      neb.addColorStop(1, "rgba(117,55,226,0)");
+      b.fillStyle = neb;
+      b.beginPath();
+      b.arc(0, 0, rx, 0, Math.PI * 2);
+      b.fill();
+      b.restore();
+      b.fillStyle = "rgba(185,160,245,0.26)";
+      for (let i = days; i < places.length; i += 1) {
+        b.beginPath();
+        b.arc(px(places[i].x), py(places[i].y), 0.8 * scale, 0, Math.PI * 2);
+        b.fill();
+      }
+    };
+
+    const resize = () => {
+      const rect = wrap.getBoundingClientRect();
+      W = rect.width;
+      H = (W * BRAIN_VB.h) / BRAIN_VB.w;
+      dpr = Math.min(2, window.devicePixelRatio || 1);
+      scale = W / BRAIN_VB.w;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      canvas.style.height = `${H}px`;
+      buildBase();
+      kick();
+    };
+
+    const near = (x, y) => {
+      if (!mouse || hover < 0.01) return 0;
+      const d2 = (x - mouse.x) ** 2 + (y - mouse.y) ** 2;
+      return hover * Math.exp(-d2 / (BRAIN_HOVER_R * BRAIN_HOVER_R));
+    };
+
+    const draw = (now) => {
+      raf = 0;
+      hover += (hoverTarget - hover) * 0.14;
+      if (Math.abs(hoverTarget - hover) < 0.004) hover = hoverTarget;
+      const elapsed = now - start;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      if (base) ctx.drawImage(base, 0, 0, W, H);
+
+      // Unlit places near the pointer show what is still to come.
+      if (hover > 0.01 && mouse) {
+        for (let i = days; i < places.length; i += 1) {
+          const h = near(places[i].x, places[i].y);
+          if (h < 0.05) continue;
+          ctx.fillStyle = `rgba(217,200,255,${0.5 * h})`;
+          ctx.beginPath();
+          ctx.arc(px(places[i].x), py(places[i].y), 1.05 * scale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Wiring.
+      ctx.lineCap = "round";
+      for (let k = 0; k < links.length; k += 1) {
+        const [from, to] = links[k];
+        let t = step ? (elapsed - (to * step + 400)) / 1200 : 1;
+        if (t <= 0) continue;
+        if (t > 1) t = 1;
+        t = 1 - (1 - t) ** 3;
+        const a = places[from];
+        const b = places[to];
+        const h = near((a.x + b.x) / 2, (a.y + b.y) / 2);
+        ctx.strokeStyle = `rgba(${185 + 40 * h},${160 + 60 * h},245,${0.3 + 0.55 * h})`;
+        ctx.lineWidth = (0.55 + 0.6 * h) * scale;
+        ctx.beginPath();
+        ctx.moveTo(px(a.x), py(a.y));
+        ctx.lineTo(px(a.x + (b.x - a.x) * t), py(a.y + (b.y - a.y) * t));
+        ctx.stroke();
+      }
+
+      // Stars.
+      for (let i = 0; i < days; i += 1) {
+        let a = step ? (elapsed - i * step) / 800 : 1;
+        if (a <= 0) continue;
+        if (a > 1) a = 1;
+        const pt = places[i];
+        const newest = i === days - 1;
+        const h = near(pt.x, pt.y);
+        const r = (newest ? 2 : sizes[i]) * (1 + 0.7 * h);
+        const glow = (newest ? 9 : r * 3) * (1 + 0.9 * h);
+        const x = px(pt.x);
+        const y = py(pt.y);
+        ctx.globalAlpha = a * (newest ? 1 : 0.55 + 0.45 * h);
+        ctx.drawImage(sprite, x - glow * scale, y - glow * scale, glow * 2 * scale, glow * 2 * scale);
+        ctx.globalAlpha = a * 0.92;
+        ctx.fillStyle = "#F7F8F8";
+        ctx.beginPath();
+        ctx.arc(x, y, r * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // A soft light under the pointer.
+      if (hover > 0.01 && mouse) {
+        const g = 34 * scale;
+        ctx.globalAlpha = 0.35 * hover;
+        ctx.drawImage(sprite, px(mouse.x) - g, py(mouse.y) - g, g * 2, g * 2);
+        ctx.globalAlpha = 1;
+      }
+
+      if (elapsed < entranceEnd || hover !== hoverTarget) raf = requestAnimationFrame(draw);
+    };
+
+    function kick() {
+      if (!raf) raf = requestAnimationFrame(draw);
+    }
+
+    const onMove = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      mouse = {
+        x: ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x,
+        y: ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y,
+      };
+      hoverTarget = 1;
+      // While the pointer moves, draw every frame so the light follows it.
+      if (!raf) raf = requestAnimationFrame(draw);
+    };
+    const onLeave = () => {
+      hoverTarget = 0;
+      kick();
+    };
+
+    const ro = new ResizeObserver(resize);
+    ro.observe(wrap);
+    resize();
+    if (interactive) {
+      canvas.addEventListener("pointermove", onMove);
+      canvas.addEventListener("pointerleave", onLeave);
+    }
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      canvas.removeEventListener("pointermove", onMove);
+      canvas.removeEventListener("pointerleave", onLeave);
+    };
+  }, [data, days, interactive, entranceMs]);
+
   return (
-    <div className="constellation flex flex-col items-center gap-5 w-full">
-      <svg
-        viewBox={`-8 -8 ${BRAIN_W + 16} ${BRAIN_H + 16}`}
-        className="w-full h-auto"
+    <div ref={wrapRef} className="w-full">
+      <canvas
+        ref={canvasRef}
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
-        style={{ overflow: "visible" }}
-      >
-        <defs>
-          <radialGradient id="brain-nebula" cx="50%" cy="46%" r="55%">
-            <stop offset="0%" stopColor="#7537E2" stopOpacity="0.30" />
-            <stop offset="55%" stopColor="#7537E2" stopOpacity="0.08" />
-            <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
-          </radialGradient>
-          <radialGradient id="star-glow">
-            <stop offset="0%" stopColor="#D9C8FF" stopOpacity="0.7" />
-            <stop offset="45%" stopColor="#9A6CF0" stopOpacity="0.25" />
-            <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
-          </radialGradient>
-        </defs>
-
-        {/* A still purple nebula behind the whole brain. */}
-        <ellipse
-          cx={BRAIN_W / 2}
-          cy={BRAIN_H * 0.46}
-          rx={BRAIN_W * 0.62}
-          ry={BRAIN_H * 0.6}
-          fill="url(#brain-nebula)"
-        />
-
-        {/* Every place still to come, faint, so the shape shows. */}
-        {places.map((pt, i) =>
-          i < days ? null : (
-            <circle
-              key={`f${i}`}
-              cx={pt.x}
-              cy={pt.y}
-              r="0.8"
-              fill="#B9A0F5"
-              opacity="0.26"
-            />
-          )
-        )}
-
-        {/* The wiring between lit stars, drawn in after the stars land. */}
-        {links.map(([from, to, len]) => (
-          <line
-            key={`l${to}`}
-            x1={places[from].x}
-            y1={places[from].y}
-            x2={places[to].x}
-            y2={places[to].y}
-            stroke="rgba(185,160,245,0.30)"
-            strokeWidth="0.55"
-            strokeLinecap="round"
-            strokeDasharray={len}
-            style={{
-              "--len": len,
-              animation: `linkDraw 1.2s ease-out ${to * stepMs + 400}ms both`,
-            }}
-          />
-        ))}
-
-        {places.slice(0, days).map((pt, i) => {
-          const newest = i === days - 1;
-          const r = newest ? 2 : 1.05 + brainNoise(i, 3) * 0.55;
-          return (
-            <g
-              key={`s${i}`}
-              style={{ animation: `starIn 0.8s ease-out ${i * stepMs}ms both` }}
-            >
-              {/* A soft halo from a gradient rather than a blur filter:
-                  a filter on every star is what made the entrance stutter. */}
-              <circle cx={pt.x} cy={pt.y} r={newest ? 9 : r * 3} fill="url(#star-glow)" opacity={newest ? 1 : 0.55} />
-              <circle cx={pt.x} cy={pt.y} r={r} fill="#F7F8F8" opacity="0.92" />
-            </g>
-          );
-        })}
-      </svg>
-      <div className="text-center">
-        <div className="text-lg font-semibold text-slate-100 tabular-nums">
-          {days} {days === 1 ? "star" : "stars"}
-        </div>
-        <div className="text-sm text-slate-500 mt-1">
-          {days === 0 ? "Your first appears when you train" : "One for every day you've trained"}
-        </div>
-      </div>
+        className="block w-full"
+        style={{ pointerEvents: interactive ? "auto" : "none", cursor: interactive ? "crosshair" : undefined }}
+      />
     </div>
   );
 }
-// Memoised: Home re-renders often (its clock, timers), and redrawing a few
-// hundred SVG stars each time is what made the page feel heavy.
+
+function HomeConstellationInner({ days, showCaption = true, interactive = true }) {
+  return (
+    <div className="constellation flex flex-col items-center gap-5 w-full">
+      <BrainCanvas days={days} interactive={interactive} />
+      {showCaption && (
+        <div className="text-center">
+          <div className="text-lg font-semibold text-slate-100 tabular-nums">
+            {days} {days === 1 ? "star" : "stars"}
+          </div>
+          <div className="text-sm text-slate-500 mt-1">
+            {days === 0 ? "Your first appears when you train" : "One for every day you've trained"}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+// Memoised: Home re-renders often (its clock, timers), and there is no
+// reason for that to touch the constellation.
 const HomeConstellation = memo(HomeConstellationInner);
 
 // ---------------------------------------------------------------------
@@ -9801,6 +9959,19 @@ function IdleScreensaver({ onExit }) {
           background:
             "radial-gradient(45% 40% at 50% 50%, rgba(117,55,226,0.38) 0%, rgba(117,55,226,0.1) 45%, transparent 72%)",
           animation: `ssBeat ${SS_BEAT_MS}ms ease-out infinite`,
+          willChange: "transform, opacity",
+        }}
+      />
+      {/* A slow light leak drifting across the frame. */}
+      <div
+        aria-hidden="true"
+        className="absolute pointer-events-none"
+        style={{
+          inset: "-20%",
+          background:
+            "radial-gradient(30% 40% at 30% 40%, rgba(154,108,240,0.18) 0%, transparent 70%), radial-gradient(25% 35% at 72% 62%, rgba(236,72,153,0.08) 0%, transparent 70%)",
+          animation: "ssLeak 14s ease-in-out infinite alternate",
+          willChange: "transform",
         }}
       />
       {/* Vignette, for the filmed look. */}
@@ -9813,11 +9984,16 @@ function IdleScreensaver({ onExit }) {
       <div
         key={cut}
         className="relative"
-        style={{ animation: `ssSlam ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both` }}
+        style={{
+          // The brain is a canvas; a blur over it on every frame is what
+          // made that scene drag, so it cuts in without the focus pull.
+          animation: `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+          willChange: "transform, opacity",
+        }}
       >
         {scene.kind === "word" && (
           <div
-            className="font-black uppercase tracking-tight"
+            className="font-black uppercase tracking-tight ss-split"
             style={
               scene.accent
                 ? {
@@ -9839,7 +10015,7 @@ function IdleScreensaver({ onExit }) {
         {scene.kind === "brain" && (
           <div className="flex flex-col items-center gap-2">
             <div style={{ width: "min(720px, 80vw)" }}>
-              <HomeConstellation days={220} />
+              <HomeConstellation days={220} showCaption={false} interactive={false} />
             </div>
             <div
               className="font-black uppercase tracking-tight -mt-10"
@@ -9853,7 +10029,13 @@ function IdleScreensaver({ onExit }) {
           <div className="flex flex-col items-center gap-5">
             <div
               className="font-black uppercase"
-              style={{ fontSize: "clamp(4rem, 12vw, 10rem)", letterSpacing: "0.18em", lineHeight: 1, color: "#FFFFFF" }}
+              style={{
+                fontSize: "clamp(4rem, 12vw, 10rem)",
+                lineHeight: 1,
+                color: "#FFFFFF",
+                animation: `ssTrack ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+                textShadow: "0 0 60px rgba(117,55,226,0.6)",
+              }}
             >
               Cortex
             </div>
@@ -9861,6 +10043,34 @@ function IdleScreensaver({ onExit }) {
           </div>
         )}
       </div>
+
+      {/* A band of light sweeping across each accent line. */}
+      {scene.kind === "word" && scene.accent && (
+        <div
+          key={`w${cut}`}
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.10) 50%, transparent 60%)",
+            animation: `ssSweep ${sceneMs}ms ease-out both`,
+            willChange: "transform",
+          }}
+        />
+      )}
+
+      {/* Film grain, and letterbox bars for the widescreen frame. */}
+      <div aria-hidden="true" className="ss-grain absolute pointer-events-none" />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-0 bg-black pointer-events-none"
+        style={{ height: "9vh", animation: "ssBarTop 1.2s cubic-bezier(0.2,0.8,0.2,1) both" }}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
+        style={{ height: "9vh", animation: "ssBarBottom 1.2s cubic-bezier(0.2,0.8,0.2,1) both" }}
+      />
 
       {/* A white flash on every cut. */}
       <div
@@ -9870,7 +10080,7 @@ function IdleScreensaver({ onExit }) {
         style={{ animation: "ssFlash 0.32s ease-out both" }}
       />
 
-      <div className="absolute bottom-6 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600">
+      <div className="absolute bottom-[3vh] inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600 z-10">
         Tap or press any key to skip
       </div>
     </div>
@@ -13824,17 +14034,61 @@ function NBackSessionApp() {
           0% { opacity: 0.22; }
           100% { opacity: 0; }
         }
+        /* Each cut: in out of focus with a jolt, then a slow push-in. */
         @keyframes ssSlam {
-          0% { opacity: 0; transform: scale(1.28); filter: blur(14px); }
-          9% { opacity: 1; transform: scale(1); filter: blur(0); }
-          100% { opacity: 1; transform: scale(1.07); filter: blur(0); }
+          0% { opacity: 0; transform: scale(1.28) translate(0, 0); filter: blur(14px); }
+          4% { transform: scale(1.02) translate(-7px, 3px); }
+          7% { transform: scale(1) translate(5px, -2px); }
+          10% { opacity: 1; transform: scale(1) translate(0, 0); filter: blur(0); }
+          100% { opacity: 1; transform: scale(1.07) translate(0, 0); filter: blur(0); }
+        }
+        @keyframes ssSlamSoft {
+          0% { opacity: 0; transform: scale(1.12); }
+          12% { opacity: 1; transform: scale(1); }
+          100% { opacity: 1; transform: scale(1.05); }
+        }
+        .ss-split { animation: ssSplit 0.5s ease-out both; }
+        @keyframes ssSplit {
+          0% { text-shadow: -6px 0 rgba(255,40,90,0.7), 6px 0 rgba(40,200,255,0.7); }
+          100% { text-shadow: 0 0 rgba(255,40,90,0), 0 0 rgba(40,200,255,0); }
+        }
+        @keyframes ssSweep {
+          0%, 8% { transform: translateX(-70%); opacity: 0; }
+          15% { opacity: 1; }
+          45%, 100% { transform: translateX(70%); opacity: 0; }
+        }
+        @keyframes ssLeak {
+          0% { transform: translate(-4%, -2%) rotate(0deg); }
+          100% { transform: translate(5%, 3%) rotate(8deg); }
+        }
+        @keyframes ssBarTop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+        @keyframes ssBarBottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes ssTrack {
+          0% { letter-spacing: 0.02em; opacity: 0; filter: blur(8px); }
+          18% { opacity: 1; filter: blur(0); }
+          100% { letter-spacing: 0.22em; opacity: 1; filter: blur(0); }
+        }
+        .ss-grain {
+          inset: -50%;
+          opacity: 0.07;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+          animation: ssGrain 0.9s steps(6) infinite;
+          will-change: transform;
+        }
+        @keyframes ssGrain {
+          0% { transform: translate(0, 0); }
+          20% { transform: translate(-3%, 2%); }
+          40% { transform: translate(2%, -3%); }
+          60% { transform: translate(-2%, -1%); }
+          80% { transform: translate(3%, 3%); }
+          100% { transform: translate(0, 0); }
         }
         @keyframes ssPop {
           0% { transform: scale(0.82); opacity: 0.4; }
           100% { transform: scale(1); opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"] { animation: none !important; }
+          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"], [style*="ssSweep"], [style*="ssLeak"], .ss-grain, .ss-split { animation: none !important; }
         }
         /* The constellation's entrance only: stars fade in, lines draw in. */
         @keyframes starIn {
@@ -15742,7 +15996,10 @@ function NBackSessionApp() {
           <div className="space-y-6">
             <div>
               <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">
-                {tutorialStepExercise.title} Tutorial
+                {tutorialStepExercise.key === "motion3d"
+                  ? "3-D Motion Object Tracking"
+                  : tutorialStepExercise.title}{" "}
+                Tutorial
               </h1>
             </div>
 
