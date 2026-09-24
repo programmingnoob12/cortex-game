@@ -13263,6 +13263,11 @@ function NBackSessionApp() {
                     ? // The summary lays its exercises out in columns, so it
                       // needs more than the reading width the other screens use.
                       "76rem"
+                    : mainView === "home"
+                    ? // 1rem wider than the reading width, which is exactly
+                      // the extra gap between the two card columns, so the
+                      // cards themselves stay the size they were.
+                      "43rem"
                     : "42rem",
               }
         }
@@ -13948,7 +13953,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`home-type ${compactHome ? "space-y-4" : "space-y-6"}`}>
+          <div className={`home-type ${compactHome ? "space-y-4 sm:space-y-6" : "space-y-6 sm:space-y-10"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
@@ -13993,18 +13998,22 @@ function NBackSessionApp() {
               ))}
             </div>
 
-            <div className="flex items-start justify-between gap-4 sm:gap-6">
+            <div className="flex items-center justify-between gap-4 sm:gap-6">
               <div className="flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
                   <AvatarFrame tier={ownAvatarFrameTier}>
                     <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
                   </AvatarFrame>
                 )}
-                <div>
-                  <div className="text-slate-400 text-base">Welcome back</div>
+                {/* The regime being trained and its total length, where the
+                    greeting used to be. */}
+                <div className="flex items-baseline gap-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
-                    {displayName}
+                    Regime: {currentRegime.title}
                   </h1>
+                  <span className="text-lg text-slate-400">
+                    {currentRegime.steps.reduce((sum, st) => sum + (st.minutes || 0), 0)} min
+                  </span>
                 </div>
               </div>
               <div className="shrink-0 flex items-center gap-2">
@@ -14043,7 +14052,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3" : "gap-4"}`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3 sm:gap-5" : "gap-4 sm:gap-8"}`}>
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -14125,9 +14134,18 @@ function NBackSessionApp() {
               })}
             </div>
 
-            {/* One card wide, lined up with the grid above it. */}
+            {/* Next session and the buttons share one grid, a column per
+                button, so the box ends exactly where Start Training ends and
+                the buttons fill the row between them. On a phone it is one
+                column: the box, then the buttons stacked. */}
             <div
-              className={`w-full sm:w-[calc(50%-0.5rem)] bg-slate-900 border border-slate-700/70 rounded-xl ${
+              className={`grid grid-cols-1 sm:grid-cols-[repeat(var(--home-cols),minmax(0,1fr))] ${
+                compactHome ? "gap-y-2.5 sm:gap-y-6" : "gap-y-3 sm:gap-y-8"
+              } sm:gap-x-5`}
+              style={{ "--home-cols": isMember ? 3 : 2 }}
+            >
+            <div
+              className={`w-full bg-slate-900 border border-slate-700/70 rounded-xl ${
                 compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
@@ -14149,13 +14167,13 @@ function NBackSessionApp() {
               )}
             </div>
 
-            {/* One row, each button only as wide as its words, instead of
-                three full-width slabs stacked down the page. Wraps to a
-                second line when the column is too narrow for all three. */}
-            <div className={`flex flex-col ${compactHome ? "gap-2.5" : "gap-3"}`}>
+            {/* One row on a wide screen, the buttons sharing the width
+                equally. `contents` lets them sit in the grid above as cells
+                of their own; on a phone this stays a stacked column. */}
+            <div className={`flex flex-col sm:contents ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
-              <div className="relative group">
+              <div className="relative group sm:col-start-1">
               {trainedToday && !sessionInProgress && !sessionParked && (
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-11 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-3 py-2 border text-sm whitespace-nowrap z-10"
                   style={{
@@ -14171,7 +14189,7 @@ function NBackSessionApp() {
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
                 className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
+                  compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
                 }`}
               >
                 {sessionInProgress
@@ -14186,7 +14204,7 @@ function NBackSessionApp() {
               <button
                 onClick={goToOverview}
                 className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                  compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
+                  compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
                 }`}
               >
                 Stats
@@ -14199,12 +14217,13 @@ function NBackSessionApp() {
                     setMainView("hypnosis");
                   }}
                   className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                    compactHome ? "py-3.5 text-lg" : "py-3.5 text-lg"
+                    compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
                   }`}
                 >
                   Motivation
                 </button>
               )}
+            </div>
             </div>
 
           </div>
