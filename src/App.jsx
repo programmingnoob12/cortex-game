@@ -9922,11 +9922,16 @@ const HomeConstellation = memo(HomeConstellationInner);
 // the picture cannot drift from the music. If the browser will not allow
 // sound yet, the edit runs on a plain timer and the first tap turns the
 // sound on at exactly the right point in the track, rather than skipping.
-const SS_TRACK_URL = "/audio/emotionless.mp3";
+// Just the part of the song the edit uses (46 seconds, faded at the end),
+// about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
+// by the time the edit opens rather than arriving seconds into it.
+const SS_TRACK_URL = "/audio/emotionless-edit.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
 const SS_TRACK_FIRST_BEAT_MS = 40;
-// Longest the edit will hold on black waiting for the track.
-const SS_TRACK_WAIT_MS = 1500;
+// Longest the edit will hold on black waiting for the track. Starting the
+// picture without it means the music joins part-way through, so it is worth
+// a short wait for the two to start together.
+const SS_TRACK_WAIT_MS = 4000;
 
 // Fetched the moment this file loads, decoded once a context exists.
 let ssTrackBytes = null;
@@ -10262,6 +10267,15 @@ function IdleScreensaver({ onExit }) {
     };
     waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
     Promise.all([preloadOpeningTrack(), preloadEditImages()]).then(go);
+    // If the track was still loading when the edit had to start, bring it
+    // in the moment it is ready, at the point the picture has reached.
+    // (Before, nothing retried, so the music only arrived on some later
+    // audio event, seconds in.)
+    preloadOpeningTrack().then(() => {
+      if (cancelled || soundRef.current || !clockRef.current) return;
+      if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
+      startSound(clockRef.current());
+    });
 
     return () => {
       cancelled = true;
