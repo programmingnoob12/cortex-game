@@ -9216,6 +9216,27 @@ function bootViewFrom(boot) {
   return boot?.snap ? "app" : "regime";
 }
 
+// "Thursday 24 Sep" and the hour, "8pm". Its own component with its own
+// minute tick, so keeping the clock current never re-renders the rest of
+// the app.
+const HOME_DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const HOME_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function HomeDateLine() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const h = now.getHours();
+  const hour = `${h % 12 || 12}${h < 12 ? "am" : "pm"}`;
+  return (
+    <h1 className="text-3xl font-semibold tracking-tight text-white">
+      {HOME_DAYS[now.getDay()]} {now.getDate()} {HOME_MONTHS[now.getMonth()]}{" "}
+      <span className="font-medium text-slate-400">{hour}</span>
+    </h1>
+  );
+}
+
 function NBackSessionApp() {
   const [bootSession] = useState(bootSessionFromSnapshot);
   const [mainView, setMainView] = useState(() => bootViewFrom(bootSession)); // "regime" | "home" | "app" | "leaderboard" | "profile" | "tutorial" | "achievements"
@@ -14036,17 +14057,15 @@ function NBackSessionApp() {
 
             {/* Extra room under the header on a wide screen, so the day and
                 streak read as a title rather than the first row of cards. */}
-            <div className="flex items-center justify-between gap-4 sm:gap-6 sm:pb-8">
+            <div className="flex items-center justify-between gap-4 sm:gap-6 sm:pb-12">
               <div className="flex-1 min-w-0 flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
                   <AvatarFrame tier={ownAvatarFrameTier}>
                     <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
                   </AvatarFrame>
                 )}
-                {/* Today's day of the week, where the greeting used to be. */}
-                <h1 className="text-3xl font-semibold tracking-tight text-white">
-                  {new Date().toLocaleDateString(undefined, { weekday: "long" })}
-                </h1>
+                {/* Today's date and the hour, where the greeting used to be. */}
+                <HomeDateLine />
               </div>
               <div className="shrink-0 flex items-center gap-2">
                 <button
@@ -14174,10 +14193,10 @@ function NBackSessionApp() {
             <div
               className={`grid grid-cols-1 sm:grid-cols-2 ${
                 compactHome ? "gap-y-2.5 sm:gap-y-4" : "gap-y-3 sm:gap-y-5"
-              } sm:gap-x-5 sm:pt-3`}
+              } sm:gap-x-5 sm:pt-7`}
             >
             <div
-              className={`w-full sm:mb-3 bg-slate-900 border border-slate-700/70 rounded-xl ${
+              className={`w-full sm:mb-7 bg-slate-900 border border-slate-700/70 rounded-xl ${
                 compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
