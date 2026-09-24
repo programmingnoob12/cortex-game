@@ -13264,10 +13264,10 @@ function NBackSessionApp() {
                       // needs more than the reading width the other screens use.
                       "76rem"
                     : mainView === "home"
-                    ? // 1rem wider than the reading width, which is exactly
-                      // the extra gap between the two card columns, so the
-                      // cards themselves stay the size they were.
-                      "43rem"
+                    ? // A quarter rem wider than the reading width, which is
+                      // exactly the extra gap between the two card columns,
+                      // so the cards themselves stay the size they were.
+                      "42.25rem"
                     : "42rem",
               }
         }
@@ -13953,7 +13953,7 @@ function NBackSessionApp() {
              included, is meant to sit on one screen with nothing to scroll
              to, using the height that is there rather than shrinking the
              controls. */
-          <div className={`home-type ${compactHome ? "space-y-4 sm:space-y-6" : "space-y-6 sm:space-y-10"}`}>
+          <div className={`home-type ${compactHome ? "space-y-4 sm:space-y-5" : "space-y-6 sm:space-y-7"}`}>
             {/* On a phone the corner pills would sit on top of the page, so
                 they run as a row inside it instead. */}
             <div className="sm:hidden flex flex-wrap gap-2">
@@ -13999,35 +13999,16 @@ function NBackSessionApp() {
             </div>
 
             <div className="flex items-center justify-between gap-4 sm:gap-6">
-              <div className="flex items-center gap-5">
+              <div className="flex-1 min-w-0 flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
                   <AvatarFrame tier={ownAvatarFrameTier}>
                     <Avatar avatarId={selectedAvatarId} imageUrl={customAvatarImage} size={44} />
                   </AvatarFrame>
                 )}
-                {/* The session at a glance, where the greeting used to be:
-                    one coloured bar per exercise, as long as its share of
-                    the session, with its name and minutes underneath. */}
-                <div className="w-72 sm:w-96 max-w-full flex gap-1.5">
-                  {currentRegime.steps.map((st, i) => (
-                    <div
-                      key={`${st.key}-${i}`}
-                      className="min-w-0 flex flex-col gap-2"
-                      style={{ flexGrow: st.minutes || 1, flexBasis: 0 }}
-                    >
-                      <div
-                        className="h-1.5 rounded-full"
-                        style={{ background: EXERCISE_COLORS[st.key] || "#4CB9D8" }}
-                      />
-                      <div className="text-sm truncate">
-                        <span className="font-medium text-slate-100">
-                          {EXERCISE_LIBRARY[st.key]?.title || st.key}
-                        </span>{" "}
-                        <span className="text-slate-400">{st.minutes}m</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                {/* Today's day of the week, where the greeting used to be. */}
+                <h1 className="text-3xl font-semibold tracking-tight text-white">
+                  {new Date().toLocaleDateString(undefined, { weekday: "long" })}
+                </h1>
               </div>
               <div className="shrink-0 flex items-center gap-2">
                 <button
@@ -14065,7 +14046,7 @@ function NBackSessionApp() {
               </div>
             </div>
 
-            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3 sm:gap-5" : "gap-4 sm:gap-8"}`}>
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${compactHome ? "gap-3 sm:gap-4" : "gap-4 sm:gap-5"}`}>
               {overviewExercises.map((e) => {
                 const level = exerciseLevels[e.key] ?? e.defaultN;
                 const isAccuracy = e.scoreType === "accuracy";
@@ -14147,15 +14128,15 @@ function NBackSessionApp() {
               })}
             </div>
 
-            {/* Next session and the buttons share one grid, a column per
-                button, so the box ends exactly where Start Training ends and
-                the buttons fill the row between them. On a phone it is one
-                column: the box, then the buttons stacked. */}
+            {/* Next session and the buttons share one two-column grid, the
+                same columns as the cards above: the box takes the left one,
+                Start Training runs the full width under it, and Stats and
+                Motivation split the row below. On a phone it is one column:
+                the box, then the buttons stacked. */}
             <div
-              className={`grid grid-cols-1 sm:grid-cols-[repeat(var(--home-cols),minmax(0,1fr))] ${
-                compactHome ? "gap-y-2.5 sm:gap-y-6" : "gap-y-3 sm:gap-y-8"
+              className={`grid grid-cols-1 sm:grid-cols-2 ${
+                compactHome ? "gap-y-2.5 sm:gap-y-3" : "gap-y-3 sm:gap-y-4"
               } sm:gap-x-5`}
-              style={{ "--home-cols": isMember ? 3 : 2 }}
             >
             <div
               className={`w-full bg-slate-900 border border-slate-700/70 rounded-xl ${
@@ -14180,13 +14161,12 @@ function NBackSessionApp() {
               )}
             </div>
 
-            {/* One row on a wide screen, the buttons sharing the width
-                equally. `contents` lets them sit in the grid above as cells
-                of their own; on a phone this stays a stacked column. */}
+            {/* `contents` lets the buttons sit in the grid above as cells of
+                their own; on a phone this stays a stacked column. */}
             <div className={`flex flex-col sm:contents ${compactHome ? "gap-2.5" : "gap-3"}`}>
               {/* Wrapper, because a disabled button fires no hover events of
                   its own — the note has to live on something around it. */}
-              <div className="relative group sm:col-start-1">
+              <div className="relative group sm:col-start-1 sm:col-span-2">
               {trainedToday && !sessionInProgress && !sessionParked && (
                 <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 -top-11 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg px-3 py-2 border text-sm whitespace-nowrap z-10"
                   style={{
@@ -14219,7 +14199,7 @@ function NBackSessionApp() {
               </div>
               <button
                 onClick={goToOverview}
-                className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
+                className={`w-full ${isMember ? "" : "sm:col-span-2 "}bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
                   compactHome ? "py-3.5 text-lg" : "py-3.5 sm:py-4 text-lg"
                 }`}
               >
