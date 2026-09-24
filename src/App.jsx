@@ -9518,7 +9518,10 @@ function brainNoise(i, salt) {
 // Hovering lights the brain up around the pointer: nearby stars swell and
 // glow, the wiring between them brightens, and the unlit places close by
 // show faintly, like a preview of what is still to come.
-const BRAIN_VB = { x: -8, y: -8, w: BRAIN_W + 16, h: BRAIN_H + 16 };
+// Generous margins: the nebula and the star halos must fade to nothing
+// inside the canvas. With a tight frame they were cut off at its edges,
+// which drew a faint square around the brain.
+const BRAIN_VB = { x: -34, y: -34, w: BRAIN_W + 68, h: BRAIN_H + 68 };
 const BRAIN_HOVER_R = 30;
 
 function makeGlowSprite() {
@@ -9582,6 +9585,11 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     let mouse = null;
     let hover = 0;
     let hoverTarget = 0;
+    // Click pings: a ring that runs out from the click and lights each star
+    // as it passes.
+    const pings = [];
+    const PING_MS = 1600;
+    const PING_R = 115;
 
     const px = (x) => (x - BRAIN_VB.x) * scale;
     const py = (y) => (y - BRAIN_VB.y) * scale;
@@ -9594,8 +9602,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       b.scale(dpr, dpr);
       const cx = px(BRAIN_W / 2);
       const cy = py(BRAIN_H * 0.46);
-      const rx = BRAIN_W * 0.62 * scale;
-      const ry = BRAIN_H * 0.6 * scale;
+      const rx = (BRAIN_VB.w / 2 - 2) * scale;
+      const ry = (BRAIN_VB.h / 2 - 2) * scale;
       b.save();
       b.translate(cx, cy);
       b.scale(1, ry / rx);
@@ -9629,14 +9637,34 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       kick();
     };
 
+    const pingAt = (x, y, now) => {
+      let v = 0;
+      for (let k = 0; k < pings.length; k += 1) {
+        const pg = pings[k];
+        const t = (now - pg.t0) / PING_MS;
+        if (t < 0 || t > 1) continue;
+        const r = PING_R * (1 - (1 - t) ** 2);
+        const d = Math.sqrt((x - pg.x) ** 2 + (y - pg.y) ** 2);
+        const band = Math.exp(-((d - r) ** 2) / 90);
+        v = Math.max(v, band * (1 - t));
+      }
+      return v;
+    };
+    let frameNow = 0;
     const near = (x, y) => {
-      if (!mouse || hover < 0.01) return 0;
-      const d2 = (x - mouse.x) ** 2 + (y - mouse.y) ** 2;
-      return hover * Math.exp(-d2 / (BRAIN_HOVER_R * BRAIN_HOVER_R));
+      let h = 0;
+      if (mouse && hover >= 0.01) {
+        const d2 = (x - mouse.x) ** 2 + (y - mouse.y) ** 2;
+        h = hover * Math.exp(-d2 / (BRAIN_HOVER_R * BRAIN_HOVER_R));
+      }
+      if (pings.length) h = Math.max(h, pingAt(x, y, frameNow));
+      return h;
     };
 
     const draw = (now) => {
       raf = 0;
+      frameNow = now;
+      while (pings.length && now - pings[0].t0 > PING_MS) pings.shift();
       hover += (hoverTarget - hover) * 0.14;
       if (Math.abs(hoverTarget - hover) < 0.004) hover = hoverTarget;
       const elapsed = now - start;
@@ -9646,7 +9674,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       if (base) ctx.drawImage(base, 0, 0, W, H);
 
       // Unlit places near the pointer show what is still to come.
-      if (hover > 0.01 && mouse) {
+      if ((hover > 0.01 && mouse) || pings.length) {
         for (let i = days; i < places.length; i += 1) {
           const h = near(places[i].x, places[i].y);
           if (h < 0.05) continue;
@@ -9706,7 +9734,26 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         ctx.globalAlpha = 1;
       }
 
-      if (elapsed < entranceEnd || hover !== hoverTarget) raf = requestAnimationFrame(draw);
+      // The ping rings themselves, and a flash where the click landed.
+      for (let k = 0; k < pings.length; k += 1) {
+        const pg = pings[k];
+        const t = (now - pg.t0) / PING_MS;
+        if (t < 0 || t > 1) continue;
+        const r = PING_R * (1 - (1 - t) ** 2);
+        ctx.strokeStyle = `rgba(217,200,255,${0.55 * (1 - t) ** 1.6})`;
+        ctx.lineWidth = (1.4 * (1 - t) + 0.3) * scale;
+        ctx.beginPath();
+        ctx.arc(px(pg.x), py(pg.y), r * scale, 0, Math.PI * 2);
+        ctx.stroke();
+        if (t < 0.35) {
+          const g = (10 + 30 * t) * scale;
+          ctx.globalAlpha = 0.9 * (1 - t / 0.35);
+          ctx.drawImage(sprite, px(pg.x) - g, py(pg.y) - g, g * 2, g * 2);
+          ctx.globalAlpha = 1;
+        }
+      }
+
+      if (elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
     };
 
     function kick() {
@@ -9727,6 +9774,16 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       hoverTarget = 0;
       kick();
     };
+    const onDown = (ev) => {
+      const rect = canvas.getBoundingClientRect();
+      pings.push({
+        x: ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x,
+        y: ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y,
+        t0: performance.now(),
+      });
+      if (pings.length > 6) pings.shift();
+      kick();
+    };
 
     const ro = new ResizeObserver(resize);
     ro.observe(wrap);
@@ -9734,12 +9791,14 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     if (interactive) {
       canvas.addEventListener("pointermove", onMove);
       canvas.addEventListener("pointerleave", onLeave);
+      canvas.addEventListener("pointerdown", onDown);
     }
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerleave", onLeave);
+      canvas.removeEventListener("pointerdown", onDown);
     };
   }, [data, days, interactive, entranceMs]);
 
@@ -9750,7 +9809,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
         className="block w-full"
-        style={{ pointerEvents: interactive ? "auto" : "none", cursor: interactive ? "crosshair" : undefined }}
+        style={{ pointerEvents: interactive ? "auto" : "none" }}
       />
     </div>
   );
@@ -9786,14 +9845,48 @@ const HomeConstellation = memo(HomeConstellationInner);
 // track fading out underneath as Home comes in. Any key, click or touch
 // skips it.
 //
-// The track measures at 128 BPM (a beat every 468.75ms) with its first beat
-// 23ms in. The edit counts in pairs of beats (937.5ms): a word gets two
-// pairs, a set piece four. Cuts are timed off the track's own clock while
-// it plays, so they stay on the beat even if playback starts late; if the
-// browser blocks the sound, a plain timer runs the same cuts.
+// The track is exactly 128 BPM (a beat every 468.75ms), with the kick on
+// the grid from 40ms in. The edit counts in pairs of beats (937.5ms): a word
+// gets two pairs, a set piece four.
+//
+// Sync: the track is fetched and decoded as soon as the app loads, and the
+// edit waits for it (briefly) so both start on the same instant. It plays
+// through Web Audio, and every cut is timed off the audio clock itself, so
+// the picture cannot drift from the music. If the browser will not allow
+// sound yet, the edit runs on a plain timer and the first tap turns the
+// sound on at exactly the right point in the track, rather than skipping.
 const SS_TRACK_URL = "/audio/emotionless.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
-const SS_TRACK_FIRST_BEAT_MS = 23;
+const SS_TRACK_FIRST_BEAT_MS = 40;
+// Longest the edit will hold on black waiting for the track.
+const SS_TRACK_WAIT_MS = 1500;
+
+// Fetched the moment this file loads, decoded once a context exists.
+let ssTrackBytes = null;
+let ssTrackBuffer = null;
+function preloadOpeningTrack() {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (ssTrackBuffer) return Promise.resolve(ssTrackBuffer);
+  if (!ssTrackBytes) {
+    ssTrackBytes = fetch(SS_TRACK_URL)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+  }
+  return ssTrackBytes.then((bytes) => {
+    if (!bytes || ssTrackBuffer) return ssTrackBuffer;
+    const ctx = letterAudioContext();
+    if (!ctx) return null;
+    // decodeAudioData detaches its input, so hand it a copy.
+    return ctx
+      .decodeAudioData(bytes.slice(0))
+      .then((buf) => {
+        ssTrackBuffer = buf;
+        return buf;
+      })
+      .catch(() => null);
+  });
+}
+if (typeof window !== "undefined") preloadOpeningTrack();
 const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
 const SS_VOLUME = 0.45;
 // How long the track takes to fade out once Home is coming in.
@@ -9875,61 +9968,95 @@ function IdleScreensaver({ onExit }) {
   const [index, setIndex] = useState(0);
   const [cut, setCut] = useState(0);
   const [leaving, setLeaving] = useState(false);
-  const audioRef = useRef(null);
+  // "wait" while the track loads, "play" once the edit is running.
+  const [phase, setPhase] = useState("wait");
+  // True when the browser has not allowed sound yet; the first tap turns it on.
+  const [needsTap, setNeedsTap] = useState(false);
+  const clockRef = useRef(null); // () => ms into the edit
+  const soundRef = useRef(null); // { ctx, gain, source }
+  const startSoundRef = useRef(null);
 
-  // The track: from the top, a quick fade up, and a long fade out that keeps
-  // going after the edit has gone, so it dies away under Home.
   useEffect(() => {
-    let raf;
-    const audio = new Audio(SS_TRACK_URL);
-    audioRef.current = audio;
-    audio.volume = 0;
-    audio.play().catch(() => {});
-    const start = performance.now();
-    const up = (now) => {
-      const t = Math.min(1, (now - start) / 600);
-      audio.volume = SS_VOLUME * t;
-      if (t < 1) raf = requestAnimationFrame(up);
+    let cancelled = false;
+    let waitTimer;
+    const ctx = letterAudioContext();
+
+    // Start the track at a given point in the edit, on the audio clock.
+    const startSound = (editMs) => {
+      if (!ctx || !ssTrackBuffer || soundRef.current || ctx.state !== "running") return false;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      const source = ctx.createBufferSource();
+      source.buffer = ssTrackBuffer;
+      source.connect(gain);
+      const offset = Math.max(0, (editMs + SS_TRACK_FIRST_BEAT_MS) / 1000);
+      const when = ctx.currentTime + 0.03;
+      gain.gain.setValueAtTime(0, when);
+      gain.gain.linearRampToValueAtTime(SS_VOLUME, when + (offset > 0.1 ? 0.25 : 0.12));
+      source.start(when, offset);
+      soundRef.current = { ctx, gain, source };
+      // From here the picture follows the music.
+      clockRef.current = () => (ctx.currentTime - when + offset) * 1000 - SS_TRACK_FIRST_BEAT_MS;
+      setNeedsTap(false);
+      return true;
     };
-    raf = requestAnimationFrame(up);
+    startSoundRef.current = startSound;
+
+    const begin = () => {
+      if (cancelled) return;
+      const opened = performance.now();
+      clockRef.current = () => performance.now() - opened;
+      setPhase("play");
+      if (!startSound(0)) setNeedsTap(!!ctx);
+    };
+
+    const go = () => {
+      if (cancelled) return;
+      clearTimeout(waitTimer);
+      if (ctx && ctx.state !== "running") {
+        // Allowed only if the page has already been interacted with.
+        ctx.resume().catch(() => {}).finally(begin);
+      } else {
+        begin();
+      }
+    };
+    waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
+    preloadOpeningTrack().then(go);
+
     return () => {
-      cancelAnimationFrame(raf);
-      const from = audio.volume;
-      const t0 = performance.now();
-      const down = (now) => {
-        const t = Math.min(1, (now - t0) / SS_FADE_OUT_MS);
-        // Eased, so it falls away gently rather than in a straight line.
-        audio.volume = from * (1 - t) * (1 - t);
-        if (t < 1) requestAnimationFrame(down);
-        else audio.pause();
-      };
-      requestAnimationFrame(down);
+      cancelled = true;
+      clearTimeout(waitTimer);
+      const snd = soundRef.current;
+      if (snd) {
+        // Fades out under Home as it comes in.
+        const t = snd.ctx.currentTime;
+        snd.gain.gain.cancelScheduledValues(t);
+        snd.gain.gain.setValueAtTime(snd.gain.gain.value, t);
+        snd.gain.gain.linearRampToValueAtTime(0, t + SS_FADE_OUT_MS / 1000);
+        try {
+          snd.source.stop(t + SS_FADE_OUT_MS / 1000 + 0.05);
+        } catch {
+          /* already stopped */
+        }
+      }
     };
   }, []);
 
-  // Cut to the next scene on the beat; after the last one, fade into Home.
-  // The clock is the track's own position once it is playing; until then
-  // (or if it never plays) it is wall time from when the edit opened.
+  // Cut to the next scene when the clock crosses its boundary; after the
+  // last one, fade into Home.
   useEffect(() => {
+    if (phase !== "play") return undefined;
     const bounds = [];
     let acc = 0;
     SS_SCENES.forEach((sc) => {
       acc += sc.beats * SS_BEAT_MS;
       bounds.push(acc);
     });
-    const opened = performance.now();
     let current = 0;
     let raf;
     let done = false;
-    const clock = () => {
-      const audio = audioRef.current;
-      if (audio && !audio.paused && audio.currentTime > 0) {
-        return audio.currentTime * 1000 - SS_TRACK_FIRST_BEAT_MS;
-      }
-      return performance.now() - opened;
-    };
     const tick = () => {
-      const t = clock();
+      const t = clockRef.current ? clockRef.current() : 0;
       let next = current;
       while (next < SS_SCENES.length && t >= bounds[next]) next += 1;
       if (next >= SS_SCENES.length) {
@@ -9949,28 +10076,39 @@ function IdleScreensaver({ onExit }) {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [phase]);
 
-  // Anything at all ends it. A short grace period first, so the motion that
-  // happens to land as it opens does not close it straight away.
+  // A tap, click or key skips it — except while the sound is still waiting
+  // for permission, when the first one turns the sound on instead.
   useEffect(() => {
     let armed = false;
     const arm = setTimeout(() => {
       armed = true;
-    }, 800);
-    const leave = () => {
+    }, 600);
+    const onInput = () => {
+      if (needsTap) {
+        const ctx = letterAudioContext();
+        if (ctx) {
+          ctx.resume().then(() => {
+            const at = clockRef.current ? clockRef.current() : 0;
+            if (startSoundRef.current) startSoundRef.current(at);
+          }).catch(() => {});
+        }
+        setNeedsTap(false);
+        return;
+      }
       if (!armed) return;
       armed = false;
       setLeaving(true);
-      setTimeout(onExit, 380);
+      setTimeout(() => exitRef.current(), 380);
     };
     const events = ["mousedown", "keydown", "touchstart"];
-    events.forEach((ev) => window.addEventListener(ev, leave, { passive: true }));
+    events.forEach((ev) => window.addEventListener(ev, onInput, { passive: true }));
     return () => {
       clearTimeout(arm);
-      events.forEach((ev) => window.removeEventListener(ev, leave));
+      events.forEach((ev) => window.removeEventListener(ev, onInput));
     };
-  }, [onExit]);
+  }, [needsTap]);
 
   const scene = SS_SCENES[index];
   const sceneMs = scene.beats * SS_BEAT_MS;
@@ -9986,7 +10124,7 @@ function IdleScreensaver({ onExit }) {
       style={{ animation: leaving ? "ssOut 0.38s ease-in forwards" : "ssIn 0.9s ease-out both", cursor: "none" }}
     >
       {/* The glow that kicks on every beat. */}
-      <div
+      {phase === "play" && <div
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -9995,7 +10133,7 @@ function IdleScreensaver({ onExit }) {
           animation: `ssBeat ${SS_TRACK_BEAT_MS}ms ease-out infinite`,
           willChange: "transform, opacity",
         }}
-      />
+      />}
       {/* A slow light leak drifting across the frame. */}
       <div
         aria-hidden="true"
@@ -10015,6 +10153,7 @@ function IdleScreensaver({ onExit }) {
         style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%)" }}
       />
 
+      {phase === "play" && (
       <div
         key={cut}
         className="relative"
@@ -10078,6 +10217,8 @@ function IdleScreensaver({ onExit }) {
         )}
       </div>
 
+      )}
+
       {/* A band of light sweeping across each accent line. */}
       {scene.kind === "word" && scene.accent && (
         <div
@@ -10115,7 +10256,7 @@ function IdleScreensaver({ onExit }) {
       />
 
       <div className="absolute bottom-[3vh] inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600 z-10">
-        Tap or press any key to skip
+        {needsTap ? "Tap for sound" : "Tap or press any key to skip"}
       </div>
     </div>
   );
@@ -19748,8 +19889,8 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
           style={{
-            width: "min(460px, calc((100vw - 42.25rem) / 2 - 56px))",
-            left: "calc(((100vw - 42.25rem) / 2 - min(460px, calc((100vw - 42.25rem) / 2 - 56px))) / 2)",
+            width: "min(560px, calc((100vw - 42.25rem) / 2 - 24px))",
+            left: "calc(((100vw - 42.25rem) / 2 - min(560px, calc((100vw - 42.25rem) / 2 - 24px))) / 2)",
           }}
         >
           <HomeConstellation days={trainedDayCount} />
