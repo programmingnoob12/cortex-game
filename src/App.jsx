@@ -9969,11 +9969,10 @@ const SS_SCENES = [
   { kind: "word", text: "you train.", accent: true, beats: 2 },
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
-  { kind: "brain", text: "Rewire.", beats: 4 },
+  { kind: "brain", text: "Rewire.", beats: 4, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
-  { kind: "word", text: "Every day.", beats: 2 },
-  { kind: "end", beats: 4 },
+  { kind: "end", beats: 8, dip: true },
 ];
 
 function SsGemLadder() {
@@ -10044,7 +10043,10 @@ function SsSmoke({ playing }) {
     const canvas = ref.current;
     if (!canvas) return undefined;
     const ctx = canvas.getContext("2d");
-    const RES = 0.5;
+    // A third of full resolution, and 30 frames a second: smoke has no fine
+    // detail and moves slowly, so neither shows, and together they cut the
+    // cost of the layer to a fraction.
+    const RES = 0.34;
     // Tinted puffs, made once.
     const puffs = [];
     for (let i = 0; i < 4; i += 1) {
@@ -10061,7 +10063,7 @@ function SsSmoke({ playing }) {
         puffs.push(t);
       });
     }
-    const clouds = Array.from({ length: 18 }, (_, i) => ({
+    const clouds = Array.from({ length: 12 }, (_, i) => ({
       img: puffs[i % puffs.length],
       x: brainNoise(i, 21),
       y: 0.15 + brainNoise(i, 22) * 0.7,
@@ -10070,7 +10072,7 @@ function SsSmoke({ playing }) {
       vy: (brainNoise(i, 25) - 0.5) * 0.006,
       rot: brainNoise(i, 26) * Math.PI * 2,
       vr: (brainNoise(i, 27) - 0.5) * 0.08,
-      alpha: 0.14 + brainNoise(i, 28) * 0.18,
+      alpha: 0.18 + brainNoise(i, 28) * 0.2,
       phase: brainNoise(i, 29) * Math.PI * 2,
     }));
     let W = 0;
@@ -10086,8 +10088,14 @@ function SsSmoke({ playing }) {
     let raf;
     let last = performance.now();
     const start = last;
+    let skip = false;
     const draw = (now) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      skip = !skip;
+      if (skip) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      const dt = Math.min(0.08, (now - last) / 1000);
       last = now;
       const t = (now - start) / 1000;
       ctx.globalCompositeOperation = "source-over";
@@ -10328,7 +10336,10 @@ function IdleScreensaver({ onExit }) {
         style={{
           // The brain is a canvas; a blur over it on every frame is what
           // made that scene drag, so it cuts in without the focus pull.
-          animation: `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+          animation:
+            scene.kind === "end"
+              ? `ssPushIn ${sceneMs}ms cubic-bezier(0.2,0.6,0.3,1) both`
+              : `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
           willChange: "transform, opacity",
         }}
       >
@@ -10342,6 +10353,7 @@ function IdleScreensaver({ onExit }) {
               color: "transparent",
               WebkitTextStroke: "1px rgba(217,200,255,0.10)",
               animation: `ssEcho ${sceneMs}ms linear both`,
+              willChange: "transform, opacity",
             }}
           >
             {scene.text}
@@ -10395,22 +10407,57 @@ function IdleScreensaver({ onExit }) {
           </div>
         )}
         {scene.kind === "end" && (
-          <div className="flex flex-col items-center gap-5">
-            <div
-              className="font-black uppercase"
-              style={{
-                fontSize: "clamp(4rem, 12vw, 10rem)",
-                lineHeight: 1,
-                color: "#FFFFFF",
-                animation: `ssTrack ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
-                textShadow: "0 0 60px rgba(117,55,226,0.6)",
-              }}
-            >
-              Cortex
+          /* The title, built up over eight beats: each letter surfaces from
+             the dark in turn, a glint of light runs across the word, the
+             line beneath it arrives, and the whole card slowly comes
+             closer. Transforms and opacity only, so it stays smooth. */
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div
+                className="font-black uppercase flex"
+                style={{
+                  fontSize: "clamp(4rem, 12vw, 10rem)",
+                  lineHeight: 1,
+                  letterSpacing: "0.2em",
+                  paddingLeft: "0.2em",
+                  color: "#FFFFFF",
+                  textShadow: "0 0 70px rgba(117,55,226,0.55)",
+                }}
+              >
+                {"Cortex".split("").map((ch, ci) => (
+                  <span
+                    key={ci}
+                    className="inline-block"
+                    style={{
+                      animation: `ssLetterIn 1.1s cubic-bezier(0.16,1,0.3,1) ${300 + ci * 190}ms both`,
+                      willChange: "transform, opacity",
+                    }}
+                  >
+                    {ch}
+                  </span>
+                ))}
+              </div>
+              {/* The glint: a narrow band of light crossing the letters. */}
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{ mixBlendMode: "screen" }}
+              >
+                <div
+                  className="absolute inset-y-0"
+                  style={{
+                    width: "30%",
+                    background:
+                      "linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.0) 30%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 70%, transparent 100%)",
+                    animation: `ssGlint 1.6s ease-in-out ${300 + 6 * 190 + 200}ms both`,
+                    willChange: "transform",
+                  }}
+                />
+              </div>
             </div>
             <div
               className="text-sm sm:text-lg uppercase tracking-[0.42em] text-slate-300"
-              style={{ animation: `ssTagline ${sceneMs}ms ease-out both` }}
+              style={{ animation: `ssTaglineIn 1.6s ease-out ${300 + 6 * 190 + 900}ms both` }}
             >
               Dedicated to the pursuit of personal excellence
             </div>
@@ -10480,6 +10527,17 @@ function IdleScreensaver({ onExit }) {
           animation: "ssProjector 1.1s cubic-bezier(0.2,0.8,0.2,1) both",
         }}
       />
+
+      {/* Before the big moments the frame drops to black for an instant, so
+          they land out of darkness instead of on top of the last shot. */}
+      {phase === "play" && scene.dip && (
+        <div
+          key={`d${cut}`}
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none bg-black"
+          style={{ animation: "ssDip 0.7s ease-out both" }}
+        />
+      )}
 
       {/* A white flash on every cut. */}
       <div
@@ -14445,11 +14503,11 @@ function NBackSessionApp() {
         }
         /* Each cut: in out of focus with a jolt, then a slow push-in. */
         @keyframes ssSlam {
-          0% { opacity: 0; transform: scale(1.28) translate(0, 0); filter: blur(14px); }
+          0% { opacity: 0; transform: scale(1.22) translate(0, 0); }
           4% { transform: scale(1.02) translate(-7px, 3px); }
           7% { transform: scale(1) translate(5px, -2px); }
-          10% { opacity: 1; transform: scale(1) translate(0, 0); filter: blur(0); }
-          100% { opacity: 1; transform: scale(1.07) translate(0, 0); filter: blur(0); }
+          10% { opacity: 1; transform: scale(1) translate(0, 0); }
+          100% { opacity: 1; transform: scale(1.07) translate(0, 0); }
         }
         @keyframes ssSlamSoft {
           0% { opacity: 0; transform: scale(1.12); }
@@ -14470,6 +14528,29 @@ function NBackSessionApp() {
           0% { transform: translate(-4%, -2%) rotate(0deg); }
           100% { transform: translate(5%, 3%) rotate(8deg); }
         }
+        @keyframes ssLetterIn {
+          0% { opacity: 0; transform: translateY(0.25em) scale(0.92); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes ssGlint {
+          0% { transform: translateX(-120%); opacity: 0; }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { transform: translateX(420%); opacity: 0; }
+        }
+        @keyframes ssTaglineIn {
+          0% { opacity: 0; transform: translateY(8px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes ssPushIn {
+          0% { opacity: 0; transform: scale(1.04); }
+          8% { opacity: 1; }
+          100% { opacity: 1; transform: scale(1.12); }
+        }
+        @keyframes ssDip {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
         @keyframes ssEcho {
           0% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
           15% { opacity: 1; }
@@ -14485,7 +14566,8 @@ function NBackSessionApp() {
           60%, 100% { opacity: 1; letter-spacing: 0.42em; filter: blur(0); }
         }
         @keyframes ssWordIn {
-          0% { opacity: 0; transform: translateY(0.35em) scale(1.06); filter: blur(10px); }
+          0% { opacity: 0; transform: translateY(0.35em) scale(1.06); filter: blur(8px); }
+          45% { filter: blur(0); }
           100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
         }
         @keyframes ssFlare {
@@ -14526,7 +14608,7 @@ function NBackSessionApp() {
           100% { letter-spacing: 0.22em; opacity: 1; filter: blur(0); }
         }
         .ss-grain {
-          inset: -50%;
+          inset: -6%;
           opacity: 0.07;
           background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
           animation: ssGrain 0.9s steps(6) infinite;
@@ -14545,7 +14627,7 @@ function NBackSessionApp() {
           100% { transform: scale(1); opacity: 1; }
         }
         @media (prefers-reduced-motion: reduce) {
-          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"], [style*="ssSweep"], [style*="ssLeak"], [style*="ssWordIn"], [style*="ssFlare"], [style*="ssProjector"], .ss-grain, .ss-split, .ss-stars { animation: none !important; }
+          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"], [style*="ssSweep"], [style*="ssLeak"], [style*="ssWordIn"], [style*="ssFlare"], [style*="ssProjector"], [style*="ssLetterIn"], [style*="ssGlint"], [style*="ssPushIn"], .ss-grain, .ss-split, .ss-stars { animation: none !important; }
         }
         /* The constellation's entrance only: stars fade in, lines draw in. */
         @keyframes starIn {
