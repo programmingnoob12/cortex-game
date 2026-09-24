@@ -9402,16 +9402,15 @@ function HomeConstellationInner({ days }) {
 const HomeConstellation = memo(HomeConstellationInner);
 
 // ---------------------------------------------------------------------
-// IDLE SCREENSAVER
+// OPENING EDIT
 // ---------------------------------------------------------------------
-// Left alone on Home for a while, the app plays an edit: hard cuts on the
-// beat of the celebration track, big words about the mind and wisdom, the
-// gem climbing its ranks, the brain filling with stars. Any movement, key or
-// touch ends it.
+// When the app opens, it plays an edit once through: hard cuts on the beat
+// of the celebration track, big words about the mind and wisdom, the gem
+// climbing its ranks, the brain filling with stars. Then it fades into Home.
+// Any key, click or touch skips it.
 //
 // The track measures at about 80.7 BPM (a beat every ~743ms), so every cut
 // lands on a beat: a word gets two beats, a set piece gets four.
-const IDLE_SCREENSAVER_MS = 90000;
 const SS_BEAT_MS = 743;
 const SS_VOLUME = 0.35;
 // Where the loud part of the track picks back up when it runs out.
@@ -9488,6 +9487,8 @@ function SsCount() {
 }
 
 function IdleScreensaver({ onExit }) {
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
   const [index, setIndex] = useState(0);
   const [cut, setCut] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -9526,10 +9527,15 @@ function IdleScreensaver({ onExit }) {
     };
   }, []);
 
-  // Cut to the next scene on the beat.
+  // Cut to the next scene on the beat; after the last one, fade into Home.
   useEffect(() => {
     const id = setTimeout(() => {
-      setIndex((i) => (i + 1) % SS_SCENES.length);
+      if (index === SS_SCENES.length - 1) {
+        setLeaving(true);
+        setTimeout(() => exitRef.current(), 380);
+        return;
+      }
+      setIndex((i) => i + 1);
       setCut((c) => c + 1);
     }, SS_SCENES[index].beats * SS_BEAT_MS);
     return () => clearTimeout(id);
@@ -9548,7 +9554,7 @@ function IdleScreensaver({ onExit }) {
       setLeaving(true);
       setTimeout(onExit, 380);
     };
-    const events = ["mousemove", "mousedown", "keydown", "touchstart", "wheel"];
+    const events = ["mousedown", "keydown", "touchstart"];
     events.forEach((ev) => window.addEventListener(ev, leave, { passive: true }));
     return () => {
       clearTimeout(arm);
@@ -9647,7 +9653,7 @@ function IdleScreensaver({ onExit }) {
       />
 
       <div className="absolute bottom-6 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600">
-        Move to continue
+        Tap or press any key to skip
       </div>
     </div>
   );
@@ -9864,7 +9870,7 @@ function NBackSessionApp() {
   const [streakReward, setStreakReward] = useState(null);
   const [streakCardOpen, setStreakCardOpen] = useState(false); // home screen's 🔥 streak badge — opens a small popup with the week view
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  // The idle screensaver on Home.
+  // The opening edit, played once as the app opens.
   const [screensaverOn, setScreensaverOn] = useState(false);
   // True while walking the screens from the Pages list, so every screen
   // carries a way back to it. Testing only.
@@ -11972,27 +11978,15 @@ function NBackSessionApp() {
     return days.size;
   }, [exerciseHistory]);
 
-  // Left alone on Home long enough, play the screensaver. Only on Home, and
-  // never over a popup, so it can't cover anything someone is in the middle
-  // of. Any input restarts the wait.
+  // Play the opening edit once per visit, when the app opens onto Home.
+  // Not over a restored screen elsewhere (a session they left mid-way), and
+  // never a second time until the app is opened again.
+  const openingPlayedRef = useRef(false);
   useEffect(() => {
-    if (mainView !== "home" || !hasHydrated || screensaverOn) return undefined;
-    if (feedbackOpen || streakCardOpen || unlockInfo) return undefined;
-    let id;
-    const reset = () => {
-      clearTimeout(id);
-      id = setTimeout(() => {
-        if (document.visibilityState === "visible") setScreensaverOn(true);
-      }, IDLE_SCREENSAVER_MS);
-    };
-    const events = ["mousemove", "mousedown", "keydown", "touchstart", "wheel", "scroll"];
-    events.forEach((ev) => window.addEventListener(ev, reset, { passive: true }));
-    reset();
-    return () => {
-      clearTimeout(id);
-      events.forEach((ev) => window.removeEventListener(ev, reset));
-    };
-  }, [mainView, hasHydrated, screensaverOn, feedbackOpen, streakCardOpen, unlockInfo]);
+    if (openingPlayedRef.current || !hasHydrated) return;
+    openingPlayedRef.current = true;
+    if (mainView === "home") setScreensaverOn(true);
+  }, [hasHydrated, mainView]);
   const exitScreensaver = useCallback(() => setScreensaverOn(false), []);
 
   const overviewExercises = Array.from(
@@ -14912,7 +14906,7 @@ function NBackSessionApp() {
                   );
                   setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
                 }),
-                go("Idle screensaver", () => {
+                go("Opening edit", () => {
                   setMainView("home");
                   setScreensaverOn(true);
                 }),
