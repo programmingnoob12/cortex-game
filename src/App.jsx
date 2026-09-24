@@ -3205,7 +3205,7 @@ const MOTIVATION_LINES = [
   { id: 10, text: "Another day, another win." },
   { id: 11, text: "Don't worry about being perfect. Just be consistent." },
   { id: 12, text: "Your future self will thank you." },
-  { id: 13, text: "You're getting smarter than the competition." },
+  { id: 13, text: "You're becoming smarter than the competition." },
   { id: 14, text: "14 days straight. Great job. You're nearly at a 30 day streak. Keep it up!", cond: "streak14" },
   { id: 15, text: "Keep going. Your future self will thank you." },
   { id: 16, text: "Be proud of how smart you've become." },
@@ -9240,8 +9240,12 @@ function HomeDateLine() {
   const m = String(now.getMinutes()).padStart(2, "0");
   const time = `${h % 12 || 12}:${m}${h < 12 ? "am" : "pm"}`;
   return (
-    <h1 className="text-3xl font-semibold tracking-tight text-white">
-      {HOME_DAYS[now.getDay()]} {now.getDate()} {HOME_MONTHS[now.getMonth()]} {time}
+    <h1 className="text-3xl font-semibold text-white flex flex-wrap items-baseline gap-x-4">
+      <span>{HOME_DAYS[now.getDay()]}</span>
+      <span>
+        {now.getDate()} {HOME_MONTHS[now.getMonth()]}
+      </span>
+      <span>{time}</span>
     </h1>
   );
 }
@@ -10403,7 +10407,13 @@ function NBackSessionApp() {
     // minutes. A tutorial leaves mainView === "app", so that still stops it.
     // Nothing plays until the stored settings have landed, so an account
     // with it switched off never hears the opening seconds.
-    hasHydrated && binauralBeatsEnabled && mainView === "app" && exercise.key !== "overview"
+    // The level-up celebration has its own track, so the beats fade out
+    // under it and come back once it is dismissed.
+    hasHydrated &&
+      binauralBeatsEnabled &&
+      mainView === "app" &&
+      exercise.key !== "overview" &&
+      !unlockInfo
   );
 
   const setQnbPrimeLevel = useCallback((val) => {
@@ -17448,7 +17458,7 @@ function NBackSessionApp() {
                 </div>
               )}
             </div>
-            <div className="text-base text-slate-500">Esc to cancel the round</div>
+            <div className="text-base text-slate-500">Press Esc to cancel the round</div>
 
             <button
               onClick={() => {
@@ -18464,12 +18474,12 @@ function NBackSessionApp() {
           />
           <div className="relative flex items-center justify-center">
             <span
-              className="absolute w-44 h-44 rounded-full border border-cyan-400/50"
-              style={{ animation: "sessionDoneRing 2.2s ease-out 0.55s forwards" }}
+              className="absolute w-44 h-44 rounded-full border"
+              style={{ borderColor: "rgba(135,83,234,0.5)", animation: "sessionDoneRing 2.2s ease-out 0.55s forwards" }}
             />
             <span
-              className="absolute w-44 h-44 rounded-full border border-cyan-400/30"
-              style={{ animation: "sessionDoneRing 2.2s ease-out 0.95s forwards" }}
+              className="absolute w-44 h-44 rounded-full border"
+              style={{ borderColor: "rgba(135,83,234,0.3)", animation: "sessionDoneRing 2.2s ease-out 0.95s forwards" }}
             />
             {/* Sparks thrown out on the beat the mark lands. */}
             {Array.from({ length: 12 }).map((_, i) => {
@@ -18479,8 +18489,9 @@ function NBackSessionApp() {
                 <span
                   key={i}
                   aria-hidden="true"
-                  className="absolute rounded-full bg-cyan-300"
+                  className="absolute rounded-full"
                   style={{
+                    background: "#B9A0F5",
                     width: 5,
                     height: 5,
                     "--sx": `${(Math.cos(angle) * dist).toFixed(1)}px`,
@@ -18507,8 +18518,8 @@ function NBackSessionApp() {
               />
             </svg>
             <div
-              className="w-28 h-28 rounded-full bg-cyan-500/10 flex items-center justify-center text-5xl text-cyan-300"
-              style={{ animation: "sessionDoneMark 0.6s 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}
+              className="w-28 h-28 rounded-full flex items-center justify-center text-5xl"
+              style={{ background: "rgba(117,55,226,0.1)", color: "#B9A0F5", animation: "sessionDoneMark 0.6s 0.6s cubic-bezier(0.34,1.56,0.64,1) both" }}
             >
               ✓
             </div>
@@ -19364,7 +19375,7 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
             {Math.max(CCT_FLOOR_LIMIT, floorMs - CCT_STEP_MS)}ms min. interval
           </p>
         </div>
-        <div className="text-base text-slate-500">Esc to cancel the round</div>
+        <div className="text-base text-slate-500">Press Esc to cancel the round</div>
 
         <button
           onClick={begin}
@@ -19463,10 +19474,13 @@ function CCTExercise({ exercise, onFinish, onStageChange, onSessionEnd, paused }
               return (
                 <span
                   key={i}
-                  className="rounded border transition-colors"
+                  className="shrink-0 rounded border transition-colors"
                   style={{
-                    width: "0.85rem",
-                    height: "0.85rem",
+                    // Whole pixels: at 0.85rem (13.6px) the middle square
+                    // rounded down and drew smaller than the other two.
+                    width: "14px",
+                    height: "14px",
+                    boxSizing: "border-box",
                     borderColor:
                       mark === undefined ? "#3A3E46" : mark ? "#4CB782" : "#EB5757",
                     background:
