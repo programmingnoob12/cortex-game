@@ -9524,15 +9524,38 @@ function brainNoise(i, salt) {
 const BRAIN_VB = { x: -34, y: -34, w: BRAIN_W + 68, h: BRAIN_H + 68 };
 const BRAIN_HOVER_R = 30;
 
-function makeGlowSprite() {
+// Each part of the brain carries one exercise's colour: reasoning (RRT) at
+// the front, Dual N-Back across the top, Quad N-Back through the middle,
+// 3D MOT at the back where vision sits, QNB' along the temporal lobe, CCT in
+// the cerebellum and stem. Lifted a little from the exercise colours so the
+// darker ones (Quad's maroon, 3D MOT's green) still read as light on black.
+const BRAIN_REGION_RGB = {
+  rrt: [244, 162, 58],
+  dual: [77, 143, 245],
+  quad: [200, 64, 112],
+  motion3d: [52, 190, 90],
+  iqnb: [99, 203, 232],
+  cct: [240, 80, 106],
+};
+function brainRegion(x, y) {
+  if (y >= 84 && x < 110) return "iqnb";
+  if (y >= 84) return "cct";
+  if (x < 62) return "rrt";
+  if (x >= 140) return "motion3d";
+  if (y < 52) return "dual";
+  return "quad";
+}
+
+function makeGlowSprite(rgb = [185, 160, 245]) {
   const c = document.createElement("canvas");
   c.width = 64;
   c.height = 64;
   const g = c.getContext("2d");
+  const [r, gr, bl] = rgb;
   const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, "rgba(217,200,255,0.75)");
-  grad.addColorStop(0.45, "rgba(154,108,240,0.26)");
-  grad.addColorStop(1, "rgba(117,55,226,0)");
+  grad.addColorStop(0, `rgba(${Math.round((r + 255 * 2) / 3)},${Math.round((gr + 255 * 2) / 3)},${Math.round((bl + 255 * 2) / 3)},0.8)`);
+  grad.addColorStop(0.45, `rgba(${r},${gr},${bl},0.3)`);
+  grad.addColorStop(1, `rgba(${r},${gr},${bl},0)`);
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);
   return c;
@@ -9558,7 +9581,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) links.push([link, i]);
     }
     const sizes = places.map((_, i) => 1.05 + brainNoise(i, 3) * 0.55);
-    return { places, links, sizes };
+    const regions = places.map((pt) => brainRegion(pt.x, pt.y));
+    return { places, links, sizes, regions };
   }, [days]);
 
   useEffect(() => {
@@ -9567,11 +9591,19 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     if (!canvas || !wrap) return undefined;
     const ctx = canvas.getContext("2d");
     const sprite = makeGlowSprite();
+    const sprites = {};
+    Object.entries(BRAIN_REGION_RGB).forEach(([k, rgb]) => {
+      sprites[k] = makeGlowSprite(rgb);
+    });
+    const rgba = (key, a, lift = 0) => {
+      const [r, g, b] = BRAIN_REGION_RGB[key];
+      return `rgba(${Math.round(r + (255 - r) * lift)},${Math.round(g + (255 - g) * lift)},${Math.round(b + (255 - b) * lift)},${a})`;
+    };
     const reduce =
       typeof window !== "undefined" &&
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const { places, links, sizes } = data;
+    const { places, links, sizes, regions } = data;
     const step = days > 0 ? Math.min(40, (reduce ? 0 : entranceMs) / days) : 0;
     const entranceEnd = reduce ? 0 : (days - 1) * step + 1400;
     const start = performance.now();
@@ -9616,8 +9648,27 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       b.arc(0, 0, rx, 0, Math.PI * 2);
       b.fill();
       b.restore();
-      b.fillStyle = "rgba(185,160,245,0.26)";
+      // A faint wash of each region's colour over its part of the brain.
+      const sums = {};
+      places.forEach((pt, i) => {
+        const k = regions[i];
+        const e = sums[k] || (sums[k] = { x: 0, y: 0, n: 0 });
+        e.x += pt.x;
+        e.y += pt.y;
+        e.n += 1;
+      });
+      Object.entries(sums).forEach(([k, e]) => {
+        const gx = px(e.x / e.n);
+        const gy = py(e.y / e.n);
+        const gr = 46 * scale;
+        const wash = b.createRadialGradient(gx, gy, 0, gx, gy, gr);
+        wash.addColorStop(0, rgba(k, 0.12));
+        wash.addColorStop(1, rgba(k, 0));
+        b.fillStyle = wash;
+        b.fillRect(gx - gr, gy - gr, gr * 2, gr * 2);
+      });
       for (let i = days; i < places.length; i += 1) {
+        b.fillStyle = rgba(regions[i], 0.3, 0.2);
         b.beginPath();
         b.arc(px(places[i].x), py(places[i].y), 0.8 * scale, 0, Math.PI * 2);
         b.fill();
@@ -9678,7 +9729,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         for (let i = days; i < places.length; i += 1) {
           const h = near(places[i].x, places[i].y);
           if (h < 0.05) continue;
-          ctx.fillStyle = `rgba(217,200,255,${0.5 * h})`;
+          ctx.fillStyle = rgba(regions[i], 0.6 * h, 0.4);
           ctx.beginPath();
           ctx.arc(px(places[i].x), py(places[i].y), 1.05 * scale, 0, Math.PI * 2);
           ctx.fill();
@@ -9696,7 +9747,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const a = places[from];
         const b = places[to];
         const h = near((a.x + b.x) / 2, (a.y + b.y) / 2);
-        ctx.strokeStyle = `rgba(${185 + 40 * h},${160 + 60 * h},245,${0.3 + 0.55 * h})`;
+        ctx.strokeStyle = rgba(regions[to], 0.32 + 0.55 * h, 0.25 + 0.45 * h);
         ctx.lineWidth = (0.55 + 0.6 * h) * scale;
         ctx.beginPath();
         ctx.moveTo(px(a.x), py(a.y));
@@ -9717,9 +9768,9 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const x = px(pt.x);
         const y = py(pt.y);
         ctx.globalAlpha = a * (newest ? 1 : 0.55 + 0.45 * h);
-        ctx.drawImage(sprite, x - glow * scale, y - glow * scale, glow * 2 * scale, glow * 2 * scale);
-        ctx.globalAlpha = a * 0.92;
-        ctx.fillStyle = "#F7F8F8";
+        ctx.drawImage(sprites[regions[i]], x - glow * scale, y - glow * scale, glow * 2 * scale, glow * 2 * scale);
+        ctx.globalAlpha = a * 0.95;
+        ctx.fillStyle = rgba(regions[i], 1, 0.62 + 0.3 * h);
         ctx.beginPath();
         ctx.arc(x, y, r * scale, 0, Math.PI * 2);
         ctx.fill();
@@ -9898,7 +9949,6 @@ const SS_SCENES = [
   { kind: "gem", beats: 4 },
   { kind: "word", text: "While they scroll", beats: 2 },
   { kind: "word", text: "you train.", accent: true, beats: 2 },
-  { kind: "count", beats: 4 },
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
   { kind: "brain", text: "Rewire.", beats: 4 },
@@ -9934,33 +9984,6 @@ function SsGemLadder() {
   );
 }
 
-function SsCount() {
-  // 2-back to 10-back, climbing.
-  const [n, setN] = useState(2);
-  useEffect(() => {
-    const id = setInterval(() => setN((v) => Math.min(10, v + 1)), (SS_BEAT_MS * 4) / 10);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <div className="flex flex-col items-center gap-4">
-      <div
-        key={n}
-        className="font-black tabular-nums leading-none"
-        style={{
-          fontSize: "clamp(6rem, 22vw, 16rem)",
-          animation: "ssPop 0.22s ease-out both",
-          background: "linear-gradient(180deg, #FFFFFF 20%, #B9A0F5 100%)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-        }}
-      >
-        {n}
-      </div>
-      <div className="text-2xl sm:text-4xl font-bold uppercase tracking-[0.3em] text-slate-300">Back</div>
-    </div>
-  );
-}
 
 function IdleScreensaver({ onExit }) {
   const exitRef = useRef(onExit);
@@ -10184,15 +10207,16 @@ function IdleScreensaver({ onExit }) {
           </div>
         )}
         {scene.kind === "gem" && <SsGemLadder />}
-        {scene.kind === "count" && <SsCount />}
         {scene.kind === "brain" && (
           <div className="flex flex-col items-center gap-2">
-            <div style={{ width: "min(720px, 80vw)" }}>
+            {/* Sized off the height as well as the width, so the brain and
+                the word under it always fit inside the letterbox. */}
+            <div style={{ width: "min(640px, 80vw, 62vh)" }}>
               <HomeConstellation days={220} showCaption={false} interactive={false} />
             </div>
             <div
-              className="font-black uppercase tracking-tight -mt-10"
-              style={{ ...bigWord, fontSize: "clamp(2.5rem, 7vw, 6rem)", color: "#FFFFFF" }}
+              className="font-black uppercase tracking-tight -mt-6"
+              style={{ ...bigWord, fontSize: "clamp(2.25rem, min(6vw, 8vh), 5rem)", color: "#FFFFFF" }}
             >
               {scene.text}
             </div>
