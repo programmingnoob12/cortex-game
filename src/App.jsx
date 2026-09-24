@@ -9501,7 +9501,7 @@ function brainPlaces(count) {
   }
   return out;
 }
-const BRAIN_LINK_MAX = 30;
+const BRAIN_LINK_MAX = 20;
 // A repeatable 0-1 value per star, for its twinkle timing and size.
 function brainNoise(i, salt) {
   let h = (i + 1) * 374761393 + salt * 668265263;
@@ -9587,23 +9587,27 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
   const data = useMemo(() => {
     const total = Math.max(365, days + 120);
     const places = brainPlaces(total);
+    const regions = places.map((pt, i) =>
+      brainRegion(pt.x + (brainNoise(i, 11) - 0.5) * 22, pt.y + (brainNoise(i, 12) - 0.5) * 22)
+    );
+    // Each star joins the nearest lit star before it in the same part, and
+    // only when that star is close. Wiring across parts, and long lines
+    // spanning the brain, were the ones that looked misplaced.
     const links = [];
     for (let i = 1; i < days; i += 1) {
       let best = Infinity;
       let link = -1;
       for (let j = 0; j < i; j += 1) {
+        if (regions[j] !== regions[i]) continue;
         const d = (places[j].x - places[i].x) ** 2 + (places[j].y - places[i].y) ** 2;
         if (d < best) {
           best = d;
           link = j;
         }
       }
-      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) links.push([link, i]);
+      if (link >= 0 && best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) links.push([link, i]);
     }
     const sizes = places.map((_, i) => 1.05 + brainNoise(i, 3) * 0.55);
-    const regions = places.map((pt, i) =>
-      brainRegion(pt.x + (brainNoise(i, 11) - 0.5) * 22, pt.y + (brainNoise(i, 12) - 0.5) * 22)
-    );
     return { places, links, sizes, regions };
   }, [days]);
 
@@ -9790,15 +9794,23 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const t = (now - pg.t0) / PING_MS;
         if (t < 0 || t > 1) continue;
         const r = PING_R * (1 - (1 - t) ** 2);
-        ctx.strokeStyle = `rgba(217,200,255,${0.55 * (1 - t) ** 1.6})`;
-        ctx.lineWidth = (1.4 * (1 - t) + 0.3) * scale;
+        // A bright ring with a soft echo just inside it.
+        ctx.strokeStyle = rgba(pg.key, 0.8 * (1 - t) ** 1.6, 0.35);
+        ctx.lineWidth = (1.6 * (1 - t) + 0.35) * scale;
         ctx.beginPath();
         ctx.arc(px(pg.x), py(pg.y), r * scale, 0, Math.PI * 2);
         ctx.stroke();
+        if (r > 8) {
+          ctx.strokeStyle = rgba(pg.key, 0.3 * (1 - t) ** 2, 0.2);
+          ctx.lineWidth = 0.6 * scale;
+          ctx.beginPath();
+          ctx.arc(px(pg.x), py(pg.y), (r - 7) * scale, 0, Math.PI * 2);
+          ctx.stroke();
+        }
         if (t < 0.35) {
           const g = (10 + 30 * t) * scale;
-          ctx.globalAlpha = 0.9 * (1 - t / 0.35);
-          ctx.drawImage(sprite, px(pg.x) - g, py(pg.y) - g, g * 2, g * 2);
+          ctx.globalAlpha = 0.95 * (1 - t / 0.35);
+          ctx.drawImage(sprites[pg.key], px(pg.x) - g, py(pg.y) - g, g * 2, g * 2);
           ctx.globalAlpha = 1;
         }
       }
@@ -9826,11 +9838,10 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     };
     const onDown = (ev) => {
       const rect = canvas.getBoundingClientRect();
-      pings.push({
-        x: ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x,
-        y: ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y,
-        t0: performance.now(),
-      });
+      const x = ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x;
+      const y = ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y;
+      // The ring takes the colour of the part that was clicked.
+      pings.push({ x, y, t0: performance.now(), key: brainRegion(x, y) });
       if (pings.length > 6) pings.shift();
       kick();
     };
@@ -10207,7 +10218,22 @@ function IdleScreensaver({ onExit }) {
       >
         {scene.kind === "word" && (
           <div
-            className="font-black uppercase tracking-tight ss-split"
+            aria-hidden="true"
+            className="absolute left-1/2 top-1/2 font-black uppercase tracking-tight pointer-events-none whitespace-nowrap"
+            style={{
+              fontSize: "clamp(6rem, 22vw, 20rem)",
+              lineHeight: 1,
+              color: "transparent",
+              WebkitTextStroke: "1px rgba(217,200,255,0.10)",
+              animation: `ssEcho ${sceneMs}ms linear both`,
+            }}
+          >
+            {scene.text}
+          </div>
+        )}
+        {scene.kind === "word" && (
+          <div
+            className="relative font-black uppercase tracking-tight ss-split"
             style={
               scene.accent
                 ? { ...bigWord, filter: "drop-shadow(0 0 30px rgba(117,55,226,0.55))" }
@@ -10266,11 +10292,37 @@ function IdleScreensaver({ onExit }) {
             >
               Cortex
             </div>
-            <div className="text-lg sm:text-2xl uppercase tracking-[0.4em] text-slate-400">Train the mind</div>
+            <div
+              className="text-sm sm:text-lg uppercase tracking-[0.42em] text-slate-300"
+              style={{ animation: `ssTagline ${sceneMs}ms ease-out both` }}
+            >
+              Dedicated to the pursuit of personal excellence
+            </div>
           </div>
         )}
       </div>
 
+      )}
+
+      {/* Slow rays of light turning behind the big moments. */}
+      {phase === "play" && (scene.accent || scene.kind === "gem" || scene.kind === "end") && (
+        <div
+          key={`r${cut}`}
+          aria-hidden="true"
+          className="absolute left-1/2 top-1/2 pointer-events-none"
+          style={{
+            width: "160vmax",
+            height: "160vmax",
+            marginLeft: "-80vmax",
+            marginTop: "-80vmax",
+            background:
+              "repeating-conic-gradient(from 0deg, rgba(154,108,240,0.07) 0deg 6deg, transparent 6deg 18deg)",
+            WebkitMaskImage: "radial-gradient(circle, #000 0%, transparent 55%)",
+            maskImage: "radial-gradient(circle, #000 0%, transparent 55%)",
+            animation: `ssRays ${sceneMs}ms linear both`,
+            willChange: "transform, opacity",
+          }}
+        />
       )}
 
       {/* A band of light sweeping across each accent line. */}
@@ -14323,6 +14375,20 @@ function NBackSessionApp() {
           0% { transform: translate(-4%, -2%) rotate(0deg); }
           100% { transform: translate(5%, 3%) rotate(8deg); }
         }
+        @keyframes ssEcho {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
+          15% { opacity: 1; }
+          100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1.18); }
+        }
+        @keyframes ssRays {
+          0% { opacity: 0; transform: rotate(0deg) scale(0.9); }
+          20% { opacity: 1; }
+          100% { opacity: 0.7; transform: rotate(14deg) scale(1); }
+        }
+        @keyframes ssTagline {
+          0%, 30% { opacity: 0; letter-spacing: 0.2em; filter: blur(6px); }
+          60%, 100% { opacity: 1; letter-spacing: 0.42em; filter: blur(0); }
+        }
         @keyframes ssWordIn {
           0% { opacity: 0; transform: translateY(0.35em) scale(1.06); filter: blur(10px); }
           100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
@@ -15578,6 +15644,10 @@ function NBackSessionApp() {
                 </button>
               )}
             </div>
+            </div>
+
+            <div className="sm:hidden pt-2 text-center text-[0.7rem] uppercase tracking-[0.28em] text-slate-500">
+              Dedicated to the pursuit of personal excellence
             </div>
 
           </div>
@@ -20003,6 +20073,15 @@ function NBackSessionApp() {
       )}
 
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
+
+      {/* The line Home stands on, bottom centre between the corner pills. */}
+      {mainView === "home" && (
+        <div className="hidden sm:block fixed bottom-9 inset-x-0 text-center pointer-events-none z-20">
+          <span className="text-xs uppercase tracking-[0.32em] text-slate-500">
+            Dedicated to the pursuit of personal excellence
+          </span>
+        </div>
+      )}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
