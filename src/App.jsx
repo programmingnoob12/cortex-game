@@ -9960,6 +9960,9 @@ const SS_VOLUME = 0.45;
 const SS_FADE_OUT_MS = 4000;
 // How long the picture takes to dissolve into Home.
 const SS_DISSOLVE_MS = 1600;
+// The closing title plays its animation over four pairs of beats, as it
+// always has, and then simply stays on screen for the rest of its eight.
+const SS_END_ANIM_MS = SS_TRACK_BEAT_MS * 2 * 4;
 const SS_SCENES = [
   { kind: "word", text: "The mind", beats: 2 },
   { kind: "word", text: "is the weapon.", accent: true, beats: 2 },
@@ -9972,7 +9975,7 @@ const SS_SCENES = [
   { kind: "brain", text: "Rewire.", beats: 4, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
-  { kind: "end", beats: 8, dip: true },
+  { kind: "end", beats: 8 },
 ];
 
 function SsGemLadder() {
@@ -10338,7 +10341,7 @@ function IdleScreensaver({ onExit }) {
           // made that scene drag, so it cuts in without the focus pull.
           animation:
             scene.kind === "end"
-              ? `ssPushIn ${sceneMs}ms cubic-bezier(0.2,0.6,0.3,1) both`
+              ? `ssSlam ${SS_END_ANIM_MS}ms cubic-bezier(0.16,1,0.3,1) both`
               : `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
           willChange: "transform, opacity",
         }}
@@ -10407,57 +10410,22 @@ function IdleScreensaver({ onExit }) {
           </div>
         )}
         {scene.kind === "end" && (
-          /* The title, built up over eight beats: each letter surfaces from
-             the dark in turn, a glint of light runs across the word, the
-             line beneath it arrives, and the whole card slowly comes
-             closer. Transforms and opacity only, so it stays smooth. */
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative">
-              <div
-                className="font-black uppercase flex"
-                style={{
-                  fontSize: "clamp(4rem, 12vw, 10rem)",
-                  lineHeight: 1,
-                  letterSpacing: "0.2em",
-                  paddingLeft: "0.2em",
-                  color: "#FFFFFF",
-                  textShadow: "0 0 70px rgba(117,55,226,0.55)",
-                }}
-              >
-                {"Cortex".split("").map((ch, ci) => (
-                  <span
-                    key={ci}
-                    className="inline-block"
-                    style={{
-                      animation: `ssLetterIn 1.1s cubic-bezier(0.16,1,0.3,1) ${300 + ci * 190}ms both`,
-                      willChange: "transform, opacity",
-                    }}
-                  >
-                    {ch}
-                  </span>
-                ))}
-              </div>
-              {/* The glint: a narrow band of light crossing the letters. */}
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 pointer-events-none overflow-hidden"
-                style={{ mixBlendMode: "screen" }}
-              >
-                <div
-                  className="absolute inset-y-0"
-                  style={{
-                    width: "30%",
-                    background:
-                      "linear-gradient(100deg, transparent 0%, rgba(255,255,255,0.0) 30%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 70%, transparent 100%)",
-                    animation: `ssGlint 1.6s ease-in-out ${300 + 6 * 190 + 200}ms both`,
-                    willChange: "transform",
-                  }}
-                />
-              </div>
+          <div className="flex flex-col items-center gap-5">
+            <div
+              className="font-black uppercase"
+              style={{
+                fontSize: "clamp(4rem, 12vw, 10rem)",
+                lineHeight: 1,
+                color: "#FFFFFF",
+                animation: `ssTrack ${SS_END_ANIM_MS}ms cubic-bezier(0.16,1,0.3,1) both`,
+                textShadow: "0 0 60px rgba(117,55,226,0.6)",
+              }}
+            >
+              Cortex
             </div>
             <div
               className="text-sm sm:text-lg uppercase tracking-[0.42em] text-slate-300"
-              style={{ animation: `ssTaglineIn 1.6s ease-out ${300 + 6 * 190 + 900}ms both` }}
+              style={{ animation: `ssTagline ${SS_END_ANIM_MS}ms ease-out both` }}
             >
               Dedicated to the pursuit of personal excellence
             </div>
@@ -10550,6 +10518,65 @@ function IdleScreensaver({ onExit }) {
       <div className="absolute bottom-[3vh] inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600 z-10">
         {needsTap ? "Tap for sound" : "Tap or press any key to skip"}
       </div>
+    </div>
+  );
+}
+
+// Stars behind Home, so the page reads as deep space. Drawn once onto a
+// canvas (no per-frame cost), plus a dozen brighter ones that twinkle on
+// their own slow cycles with plain CSS opacity.
+function HomeStarfield() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    const draw = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const W = window.innerWidth;
+      const H = window.innerHeight;
+      canvas.width = Math.round(W * dpr);
+      canvas.height = Math.round(H * dpr);
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      const count = Math.round((W * H) / 5200);
+      for (let i = 0; i < count; i += 1) {
+        const x = brainNoise(i, 41) * W;
+        const y = brainNoise(i, 42) * H;
+        const m = brainNoise(i, 43);
+        // Most stars faint and tiny, a few larger and brighter.
+        const r = m > 0.97 ? 1.3 : m > 0.85 ? 0.9 : 0.55;
+        const a = m > 0.97 ? 0.85 : 0.18 + brainNoise(i, 44) * 0.42;
+        const tint = brainNoise(i, 45);
+        ctx.fillStyle =
+          tint > 0.85 ? `rgba(200,180,255,${a})` : tint > 0.72 ? `rgba(180,215,255,${a})` : `rgba(255,255,255,${a})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    };
+    draw();
+    window.addEventListener("resize", draw);
+    return () => window.removeEventListener("resize", draw);
+  }, []);
+  return (
+    <div aria-hidden="true" className="fixed inset-0 pointer-events-none" style={{ zIndex: -1 }}>
+      <canvas ref={ref} className="absolute inset-0" style={{ width: "100%", height: "100%" }} />
+      {Array.from({ length: 12 }, (_, i) => (
+        <span
+          key={i}
+          className="absolute rounded-full"
+          style={{
+            left: `${brainNoise(i, 51) * 100}%`,
+            top: `${brainNoise(i, 52) * 100}%`,
+            width: 2,
+            height: 2,
+            background: "#FFFFFF",
+            boxShadow: "0 0 6px 1px rgba(217,200,255,0.7)",
+            animation: `homeTwinkle ${4 + brainNoise(i, 53) * 5}s ease-in-out ${-brainNoise(i, 54) * 8}s infinite`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -14551,6 +14578,11 @@ function NBackSessionApp() {
           0% { opacity: 1; }
           100% { opacity: 0; }
         }
+        @keyframes homeTwinkle {
+          0%, 100% { opacity: 0.15; transform: scale(0.7); }
+          50% { opacity: 1; transform: scale(1.2); }
+        }
+        @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
         @keyframes ssEcho {
           0% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
           15% { opacity: 1; }
@@ -20246,6 +20278,8 @@ function NBackSessionApp() {
       )}
 
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
+
+      {mainView === "home" && <HomeStarfield />}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
