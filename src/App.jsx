@@ -9781,16 +9781,23 @@ const HomeConstellation = memo(HomeConstellationInner);
 // OPENING EDIT
 // ---------------------------------------------------------------------
 // When the app opens, it plays an edit once through: hard cuts on the beat
-// of the celebration track, big words about the mind and wisdom, the gem
-// climbing its ranks, the brain filling with stars. Then it fades into Home.
-// Any key, click or touch skips it.
+// of "Emotionless", big words about the mind and wisdom, the gem climbing
+// its ranks, the brain filling with stars. Then it fades into Home, the
+// track fading out underneath as Home comes in. Any key, click or touch
+// skips it.
 //
-// The track measures at about 80.7 BPM (a beat every ~743ms), so every cut
-// lands on a beat: a word gets two beats, a set piece gets four.
-const SS_BEAT_MS = 743;
-const SS_VOLUME = 0.35;
-// Where the loud part of the track picks back up when it runs out.
-const SS_LOOP_FROM = 30;
+// The track measures at 128 BPM (a beat every 468.75ms) with its first beat
+// 23ms in. The edit counts in pairs of beats (937.5ms): a word gets two
+// pairs, a set piece four. Cuts are timed off the track's own clock while
+// it plays, so they stay on the beat even if playback starts late; if the
+// browser blocks the sound, a plain timer runs the same cuts.
+const SS_TRACK_URL = "/audio/emotionless.mp3";
+const SS_TRACK_BEAT_MS = 468.75;
+const SS_TRACK_FIRST_BEAT_MS = 23;
+const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
+const SS_VOLUME = 0.45;
+// How long the track takes to fade out once Home is coming in.
+const SS_FADE_OUT_MS = 2200;
 const SS_SCENES = [
   { kind: "word", text: "The mind", beats: 2 },
   { kind: "word", text: "is the weapon.", accent: true, beats: 2 },
@@ -9870,21 +9877,17 @@ function IdleScreensaver({ onExit }) {
   const [leaving, setLeaving] = useState(false);
   const audioRef = useRef(null);
 
-  // The track: in from the drop, faded up, faded out on the way out.
+  // The track: from the top, a quick fade up, and a long fade out that keeps
+  // going after the edit has gone, so it dies away under Home.
   useEffect(() => {
     let raf;
-    const audio = new Audio(SONG_URL);
+    const audio = new Audio(SS_TRACK_URL);
     audioRef.current = audio;
     audio.volume = 0;
-    audio.currentTime = SONG_START;
-    audio.addEventListener("ended", () => {
-      audio.currentTime = SS_LOOP_FROM;
-      audio.play().catch(() => {});
-    });
     audio.play().catch(() => {});
     const start = performance.now();
     const up = (now) => {
-      const t = Math.min(1, (now - start) / 1500);
+      const t = Math.min(1, (now - start) / 600);
       audio.volume = SS_VOLUME * t;
       if (t < 1) raf = requestAnimationFrame(up);
     };
@@ -9894,8 +9897,9 @@ function IdleScreensaver({ onExit }) {
       const from = audio.volume;
       const t0 = performance.now();
       const down = (now) => {
-        const t = Math.min(1, (now - t0) / 500);
-        audio.volume = from * (1 - t);
+        const t = Math.min(1, (now - t0) / SS_FADE_OUT_MS);
+        // Eased, so it falls away gently rather than in a straight line.
+        audio.volume = from * (1 - t) * (1 - t);
         if (t < 1) requestAnimationFrame(down);
         else audio.pause();
       };
@@ -9904,18 +9908,48 @@ function IdleScreensaver({ onExit }) {
   }, []);
 
   // Cut to the next scene on the beat; after the last one, fade into Home.
+  // The clock is the track's own position once it is playing; until then
+  // (or if it never plays) it is wall time from when the edit opened.
   useEffect(() => {
-    const id = setTimeout(() => {
-      if (index === SS_SCENES.length - 1) {
-        setLeaving(true);
-        setTimeout(() => exitRef.current(), 380);
+    const bounds = [];
+    let acc = 0;
+    SS_SCENES.forEach((sc) => {
+      acc += sc.beats * SS_BEAT_MS;
+      bounds.push(acc);
+    });
+    const opened = performance.now();
+    let current = 0;
+    let raf;
+    let done = false;
+    const clock = () => {
+      const audio = audioRef.current;
+      if (audio && !audio.paused && audio.currentTime > 0) {
+        return audio.currentTime * 1000 - SS_TRACK_FIRST_BEAT_MS;
+      }
+      return performance.now() - opened;
+    };
+    const tick = () => {
+      const t = clock();
+      let next = current;
+      while (next < SS_SCENES.length && t >= bounds[next]) next += 1;
+      if (next >= SS_SCENES.length) {
+        if (!done) {
+          done = true;
+          setLeaving(true);
+          setTimeout(() => exitRef.current(), 380);
+        }
         return;
       }
-      setIndex((i) => i + 1);
-      setCut((c) => c + 1);
-    }, SS_SCENES[index].beats * SS_BEAT_MS);
-    return () => clearTimeout(id);
-  }, [index, cut]);
+      if (next !== current) {
+        current = next;
+        setIndex(next);
+        setCut((c) => c + 1);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // Anything at all ends it. A short grace period first, so the motion that
   // happens to land as it opens does not close it straight away.
@@ -9958,7 +9992,7 @@ function IdleScreensaver({ onExit }) {
         style={{
           background:
             "radial-gradient(45% 40% at 50% 50%, rgba(117,55,226,0.38) 0%, rgba(117,55,226,0.1) 45%, transparent 72%)",
-          animation: `ssBeat ${SS_BEAT_MS}ms ease-out infinite`,
+          animation: `ssBeat ${SS_TRACK_BEAT_MS}ms ease-out infinite`,
           willChange: "transform, opacity",
         }}
       />
