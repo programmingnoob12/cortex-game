@@ -7773,8 +7773,8 @@ const GEM_TIERS = {
   3: { color: "#38bdf8", glow: true, label: "Adept" },
   4: { color: "#818CF8", glow: true, label: "Bright" },
   5: { color: "#22d3ee", glow: true, label: "Radiant" },
-  6: { color: "#c084fc", glow: true, label: "Brilliant" },
-  7: { color: "#f59e0b", glow: true, label: "Elite" },
+  6: { color: "#f59e0b", glow: true, label: "Brilliant" },
+  7: { color: "#e879f9", glow: true, label: "Elite" },
   8: { color: "#fb7185", glow: true, label: "Illuminated" },
   9: { color: "#fde047", glow: true, label: "Transcendent" },
   10: { color: "#ef4444", glow: true, label: "Enlightened" },
@@ -7792,9 +7792,13 @@ const MAX_GEM_TIER = Math.max(...GEM_TIER_LEVELS);
 // level 10 is Enlightened, so "D6B" and "Q6B" carry the same name. The
 // exerciseKey the callers pass is accepted and ignored — it is there so a
 // per-exercise mapping can be put back without touching every call site.
-// eslint-disable-next-line no-unused-vars
+// RRT is the one exception: its level 1 is already 2p, and it tops out at
+// 10p (level 9), so its ranks sit one step higher — 2p is Proficient and
+// 10p is Enlightened, instead of Enlightened waiting on an 11p that does
+// not exist.
 function tierIndexFor(level, exerciseKey) {
-  return Math.max(1, Math.min(MAX_GEM_TIER, Math.round(level)));
+  const shifted = exerciseKey === "rrt" ? Math.round(level) + 1 : Math.round(level);
+  return Math.max(1, Math.min(MAX_GEM_TIER, shifted));
 }
 // A gem with its rank name under it, in that rank's own colour — the pair
 // the app shows everywhere a level is displayed.
@@ -14000,7 +14004,7 @@ function NBackSessionApp() {
 
             {/* Extra room under the header on a wide screen, so the day and
                 streak read as a title rather than the first row of cards. */}
-            <div className="flex items-center justify-between gap-4 sm:gap-6 sm:pb-5">
+            <div className="flex items-center justify-between gap-4 sm:gap-6 sm:pb-8">
               <div className="flex-1 min-w-0 flex items-center gap-5">
                 {SHOW_PROFILE_IDENTITY_EDIT && (
                   <AvatarFrame tier={ownAvatarFrameTier}>
@@ -14138,10 +14142,10 @@ function NBackSessionApp() {
             <div
               className={`grid grid-cols-1 sm:grid-cols-2 ${
                 compactHome ? "gap-y-2.5 sm:gap-y-4" : "gap-y-3 sm:gap-y-5"
-              } sm:gap-x-5`}
+              } sm:gap-x-5 sm:pt-3`}
             >
             <div
-              className={`w-full bg-slate-900 border border-slate-700/70 rounded-xl ${
+              className={`w-full sm:mb-3 bg-slate-900 border border-slate-700/70 rounded-xl ${
                 compactHome ? "px-5 py-3.5" : "p-5"
               }`}
             >
