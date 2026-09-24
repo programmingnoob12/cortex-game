@@ -13267,6 +13267,10 @@ function NBackSessionApp() {
                     ? // The summary lays its exercises out in columns, so it
                       // needs more than the reading width the other screens use.
                       "76rem"
+                    : mainView === "regime"
+                    ? // The regime cards are one line of title and length;
+                      // at the full reading width they ran long and empty.
+                      "36rem"
                     : mainView === "home"
                     ? // A quarter rem wider than the reading width, which is
                       // exactly the extra gap between the two card columns,
@@ -13411,10 +13415,16 @@ function NBackSessionApp() {
                             setDeleteRegimeConfirm({ id: entry.id, name: r.title })
                           }
                           title="Delete this regime"
-                          className="no-lift absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center text-lg leading-none opacity-70 hover:opacity-100 transition-opacity"
+                          aria-label="Delete this regime"
+                          /* Drawn, not the × character: the glyph sits on the
+                             text baseline and never looked centred in the
+                             circle. */
+                          className="no-lift absolute right-3 top-3 w-7 h-7 rounded-full flex items-center justify-center opacity-70 hover:opacity-100 transition-opacity"
                           style={{ background: "rgba(0,0,0,0.3)", color: "#F7F8F8" }}
                         >
-                          ×
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                            <path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                          </svg>
                         </button>
                       </div>
                     );
@@ -13507,7 +13517,7 @@ function NBackSessionApp() {
                 <p className="text-slate-500 text-sm mt-2">
                   {customRampStep === 0
                     ? "Start with the full regime."
-                    : `Every exercise starts at ${customRampStep} minutes. ${customRampStep} mins are added each session.`}
+                    : `Start at ${customRampStep} minutes. ${customRampStep} mins are added each session.`}
                 </p>
               </div>
             </div>
