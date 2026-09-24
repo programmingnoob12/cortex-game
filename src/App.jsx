@@ -10003,6 +10003,142 @@ function SsGemLadder() {
 }
 
 
+// Smoke for the opening edit. A handful of large, soft, irregular puffs
+// drift, turn and swell on a canvas drawn at half resolution (smoke has no
+// detail to lose), blended additively so where they overlap the vapour
+// thickens and glows. Cheap: under thirty images a frame.
+function makeSmokePuff(seed) {
+  const size = 256;
+  const c = document.createElement("canvas");
+  c.width = size;
+  c.height = size;
+  const g = c.getContext("2d");
+  // Many overlapping soft blobs make one ragged, cloud-like puff.
+  // Big soft lobes for the body, then many small faint ones for wisps.
+  for (let k = 0; k < 40; k += 1) {
+    const wisp = k >= 12;
+    const a = brainNoise(seed * 53 + k, 1) * Math.PI * 2;
+    const d = brainNoise(seed * 53 + k, 2) * size * (wisp ? 0.34 : 0.18);
+    const x = size / 2 + Math.cos(a) * d;
+    const y = size / 2 + Math.sin(a) * d * 0.7;
+    const r = size * (wisp ? 0.05 + brainNoise(seed * 53 + k, 3) * 0.09 : 0.14 + brainNoise(seed * 53 + k, 3) * 0.16);
+    const peak = wisp ? 0.07 : 0.09;
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, `rgba(255,255,255,${peak})`);
+    grad.addColorStop(0.5, `rgba(255,255,255,${peak * 0.45})`);
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+  }
+  return c;
+}
+const SMOKE_TINTS = [
+  [117, 55, 226],
+  [154, 108, 240],
+  [88, 60, 170],
+  [120, 110, 150],
+];
+function SsSmoke({ playing }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    const RES = 0.5;
+    // Tinted puffs, made once.
+    const puffs = [];
+    for (let i = 0; i < 4; i += 1) {
+      const base = makeSmokePuff(i + 1);
+      SMOKE_TINTS.forEach((tint) => {
+        const t = document.createElement("canvas");
+        t.width = base.width;
+        t.height = base.height;
+        const tg = t.getContext("2d");
+        tg.drawImage(base, 0, 0);
+        tg.globalCompositeOperation = "source-in";
+        tg.fillStyle = `rgb(${tint[0]},${tint[1]},${tint[2]})`;
+        tg.fillRect(0, 0, t.width, t.height);
+        puffs.push(t);
+      });
+    }
+    const clouds = Array.from({ length: 18 }, (_, i) => ({
+      img: puffs[i % puffs.length],
+      x: brainNoise(i, 21),
+      y: 0.15 + brainNoise(i, 22) * 0.7,
+      size: 0.35 + brainNoise(i, 23) * 0.55,
+      vx: (brainNoise(i, 24) - 0.4) * 0.012,
+      vy: (brainNoise(i, 25) - 0.5) * 0.006,
+      rot: brainNoise(i, 26) * Math.PI * 2,
+      vr: (brainNoise(i, 27) - 0.5) * 0.08,
+      alpha: 0.14 + brainNoise(i, 28) * 0.18,
+      phase: brainNoise(i, 29) * Math.PI * 2,
+    }));
+    let W = 0;
+    let H = 0;
+    const resize = () => {
+      W = Math.max(1, Math.round(window.innerWidth * RES));
+      H = Math.max(1, Math.round(window.innerHeight * RES));
+      canvas.width = W;
+      canvas.height = H;
+    };
+    resize();
+    window.addEventListener("resize", resize);
+    let raf;
+    let last = performance.now();
+    const start = last;
+    const draw = (now) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      const t = (now - start) / 1000;
+      ctx.globalCompositeOperation = "source-over";
+      ctx.clearRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "lighter";
+      const unit = Math.max(W, H);
+      // A little brighter on each beat of the track, easing off after it.
+      const into = ((now - start) % SS_TRACK_BEAT_MS) / SS_TRACK_BEAT_MS;
+      const beat = 1 + 0.22 * Math.exp(-into * 5);
+      for (let i = 0; i < clouds.length; i += 1) {
+        const c = clouds[i];
+        c.x += c.vx * dt;
+        c.y += c.vy * dt;
+        c.rot += c.vr * dt;
+        if (c.x > 1.3) c.x = -0.3;
+        if (c.x < -0.3) c.x = 1.3;
+        if (c.y > 1.2) c.y = -0.2;
+        if (c.y < -0.2) c.y = 1.2;
+        const swell = 1 + 0.08 * Math.sin(t * 0.35 + c.phase);
+        const sz = c.size * unit * swell;
+        ctx.save();
+        ctx.translate(c.x * W, c.y * H);
+        ctx.rotate(c.rot);
+        ctx.globalAlpha = Math.min(1, c.alpha * (0.85 + 0.15 * Math.sin(t * 0.5 + c.phase * 2)) * beat);
+        ctx.drawImage(c.img, -sz / 2, -sz / 2, sz, sz);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+      raf = requestAnimationFrame(draw);
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
+  return (
+    <canvas
+      ref={ref}
+      aria-hidden="true"
+      className="absolute inset-0 w-full h-full pointer-events-none"
+      style={{
+        width: "100%",
+        height: "100%",
+        opacity: playing ? 1 : 0,
+        transition: "opacity 1.4s ease-out",
+      }}
+    />
+  );
+}
+
 function IdleScreensaver({ onExit }) {
   const exitRef = useRef(onExit);
   exitRef.current = onExit;
@@ -10173,31 +10309,11 @@ function IdleScreensaver({ onExit }) {
       className="fixed inset-0 z-[70] overflow-hidden bg-black flex items-center justify-center text-center px-8 select-none"
       style={{ animation: leaving ? `ssOut ${SS_DISSOLVE_MS}ms cubic-bezier(0.4,0,0.2,1) forwards` : "ssIn 0.9s ease-out both", cursor: "none" }}
     >
-      {/* The glow that kicks on every beat. */}
-      {phase === "play" && <div
-        aria-hidden="true"
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          background:
-            "radial-gradient(45% 40% at 50% 50%, rgba(117,55,226,0.38) 0%, rgba(117,55,226,0.1) 45%, transparent 72%)",
-          animation: `ssBeat ${SS_TRACK_BEAT_MS}ms ease-out infinite`,
-          willChange: "transform, opacity",
-        }}
-      />}
+      {/* Smoke: slow violet vapour rolling through the frame, breathing a
+          little brighter on every beat of the track. */}
+      <SsSmoke playing={phase === "play"} />
       {/* Faint dust of stars drifting slowly past, for depth. */}
       <div aria-hidden="true" className="ss-stars absolute pointer-events-none" />
-      {/* A slow light leak drifting across the frame. */}
-      <div
-        aria-hidden="true"
-        className="absolute pointer-events-none"
-        style={{
-          inset: "-20%",
-          background:
-            "radial-gradient(30% 40% at 30% 40%, rgba(154,108,240,0.18) 0%, transparent 70%), radial-gradient(25% 35% at 72% 62%, rgba(236,72,153,0.08) 0%, transparent 70%)",
-          animation: "ssLeak 14s ease-in-out infinite alternate",
-          willChange: "transform",
-        }}
-      />
       {/* Vignette, for the filmed look. */}
       <div
         aria-hidden="true"
@@ -10302,27 +10418,6 @@ function IdleScreensaver({ onExit }) {
         )}
       </div>
 
-      )}
-
-      {/* Slow rays of light turning behind the big moments. */}
-      {phase === "play" && (scene.accent || scene.kind === "gem" || scene.kind === "end") && (
-        <div
-          key={`r${cut}`}
-          aria-hidden="true"
-          className="absolute left-1/2 top-1/2 pointer-events-none"
-          style={{
-            width: "160vmax",
-            height: "160vmax",
-            marginLeft: "-80vmax",
-            marginTop: "-80vmax",
-            background:
-              "repeating-conic-gradient(from 0deg, rgba(154,108,240,0.07) 0deg 6deg, transparent 6deg 18deg)",
-            WebkitMaskImage: "radial-gradient(circle, #000 0%, transparent 55%)",
-            maskImage: "radial-gradient(circle, #000 0%, transparent 55%)",
-            animation: `ssRays ${sceneMs}ms linear both`,
-            willChange: "transform, opacity",
-          }}
-        />
       )}
 
       {/* A band of light sweeping across each accent line. */}
@@ -15646,10 +15741,6 @@ function NBackSessionApp() {
             </div>
             </div>
 
-            <div className="sm:hidden pt-2 text-center text-[0.7rem] uppercase tracking-[0.28em] text-slate-500">
-              Dedicated to the pursuit of personal excellence
-            </div>
-
           </div>
         )}
 
@@ -20073,15 +20164,6 @@ function NBackSessionApp() {
       )}
 
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
-
-      {/* The line Home stands on, bottom centre between the corner pills. */}
-      {mainView === "home" && (
-        <div className="hidden sm:block fixed bottom-9 inset-x-0 text-center pointer-events-none z-20">
-          <span className="text-xs uppercase tracking-[0.32em] text-slate-500">
-            Dedicated to the pursuit of personal excellence
-          </span>
-        </div>
-      )}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
