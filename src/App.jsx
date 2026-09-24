@@ -9965,6 +9965,11 @@ const ssImage = (n) => ({ src: `/images/edit/${n}.webp`, bg: `/images/edit/${n}-
 const SS_BURST_RICHES = ["01-gold", "02-watch", "05-mindset", "03-yacht", "04-cash"].map(ssImage);
 const SS_BURST_MIND = ["06-statue", "07-brain", "08-fire", "09-neuron"].map(ssImage);
 const SS_IMAGES = [...SS_BURST_RICHES, ...SS_BURST_MIND];
+// Eight flashes of half a beat each (four beats in all, so the next line
+// still lands on the grid), cycling through the burst's images.
+function ssBurst(list) {
+  return Array.from({ length: 8 }, (_, k) => ({ kind: "image", img: list[k % list.length], beats: 0.25 }));
+}
 let ssImagesReady = null;
 function preloadEditImages() {
   if (typeof window === "undefined") return Promise.resolve();
@@ -9990,16 +9995,16 @@ const SS_DISSOLVE_MS = 1600;
 // always has, and then simply stays on screen for the rest of its eight.
 const SS_END_ANIM_MS = SS_TRACK_BEAT_MS * 2 * 4;
 const SS_SCENES = [
-  { kind: "word", text: "The mind", beats: 2 },
-  { kind: "word", text: "is the weapon.", accent: true, beats: 2 },
+  { kind: "word", text: "Your mind", beats: 2 },
+  { kind: "word", text: "is your edge.", accent: true, beats: 2 },
   { kind: "word", text: "Sharpen it.", beats: 2 },
   { kind: "gem", beats: 4 },
   { kind: "word", text: "While they scroll", beats: 2 },
   { kind: "word", text: "you train.", accent: true, beats: 2 },
-  ...SS_BURST_RICHES.map((im) => ({ kind: "image", img: im, beats: 0.5 })),
+  ...ssBurst(SS_BURST_RICHES),
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
-  ...SS_BURST_MIND.map((im) => ({ kind: "image", img: im, beats: 0.5 })),
+  ...ssBurst(SS_BURST_MIND),
   { kind: "brain", text: "Rewire.", beats: 4, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
@@ -10235,15 +10240,25 @@ function IdleScreensaver({ onExit }) {
       if (!startSound(0)) setNeedsTap(!!ctx);
     };
 
-    const go = () => {
-      if (cancelled) return;
-      clearTimeout(waitTimer);
-      if (ctx && ctx.state !== "running") {
-        // Allowed only if the page has already been interacted with.
-        ctx.resume().catch(() => {}).finally(begin);
-      } else {
-        begin();
+    // If sound is allowed later (the first tap), bring the music in at the
+    // right point in the track.
+    const onState = () => {
+      if (ctx && ctx.state === "running" && !soundRef.current && clockRef.current) {
+        startSound(clockRef.current());
       }
+    };
+    if (ctx) ctx.addEventListener("statechange", onState);
+
+    let started = false;
+    const go = () => {
+      if (cancelled || started) return;
+      started = true;
+      clearTimeout(waitTimer);
+      // Ask, but never wait: until the page has been interacted with, a
+      // browser leaves this request pending indefinitely, and waiting on it
+      // is what held the edit on black before it lurched into life.
+      if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
+      begin();
     };
     waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
     Promise.all([preloadOpeningTrack(), preloadEditImages()]).then(go);
@@ -10251,6 +10266,7 @@ function IdleScreensaver({ onExit }) {
     return () => {
       cancelled = true;
       clearTimeout(waitTimer);
+      if (ctx) ctx.removeEventListener("statechange", onState);
       const snd = soundRef.current;
       if (snd) {
         // Fades out under Home as it comes in.
@@ -10346,7 +10362,7 @@ function IdleScreensaver({ onExit }) {
   return (
     <div
       className="fixed inset-0 z-[70] overflow-hidden bg-black flex items-center justify-center text-center px-8 select-none"
-      style={{ animation: leaving ? `ssOut ${SS_DISSOLVE_MS}ms cubic-bezier(0.4,0,0.2,1) forwards` : "ssIn 0.9s ease-out both", cursor: "none" }}
+      style={{ animation: leaving ? `ssOut ${SS_DISSOLVE_MS}ms cubic-bezier(0.4,0,0.2,1) forwards` : undefined, cursor: "none" }}
     >
       {/* Smoke: slow violet vapour rolling through the frame, breathing a
           little brighter on every beat of the track. */}
@@ -10513,12 +10529,12 @@ function IdleScreensaver({ onExit }) {
       <div
         aria-hidden="true"
         className="absolute inset-x-0 top-0 bg-black pointer-events-none"
-        style={{ height: "9vh", animation: "ssBarTop 1.2s cubic-bezier(0.2,0.8,0.2,1) both" }}
+        style={{ height: "9vh", animation: phase === "play" ? "ssBarTop 1.2s cubic-bezier(0.2,0.8,0.2,1) both" : undefined }}
       />
       <div
         aria-hidden="true"
         className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
-        style={{ height: "9vh", animation: "ssBarBottom 1.2s cubic-bezier(0.2,0.8,0.2,1) both" }}
+        style={{ height: "9vh", animation: phase === "play" ? "ssBarBottom 1.2s cubic-bezier(0.2,0.8,0.2,1) both" : undefined }}
       />
 
       {/* An anamorphic streak across the frame on every cut. */}
@@ -10542,17 +10558,19 @@ function IdleScreensaver({ onExit }) {
 
       {/* Opening: a single line of light opens the frame, like a projector
           warming up, before the first cut. */}
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 pointer-events-none"
-        style={{
-          top: "50%",
-          height: "1px",
-          background: "linear-gradient(90deg, transparent, #FFFFFF 50%, transparent)",
-          boxShadow: "0 0 24px 6px rgba(217,200,255,0.4)",
-          animation: "ssProjector 1.1s cubic-bezier(0.2,0.8,0.2,1) both",
-        }}
-      />
+      {phase === "play" && (
+        <div
+          aria-hidden="true"
+          className="absolute inset-x-0 pointer-events-none"
+          style={{
+            top: "50%",
+            height: "1px",
+            background: "linear-gradient(90deg, transparent, #FFFFFF 50%, transparent)",
+            boxShadow: "0 0 24px 6px rgba(217,200,255,0.4)",
+            animation: "ssProjector 1.1s cubic-bezier(0.2,0.8,0.2,1) both",
+          }}
+        />
+      )}
 
       {/* Before the big moments the frame drops to black for an instant, so
           they land out of darkness instead of on top of the last shot. */}
@@ -10668,13 +10686,15 @@ function HomeSpace() {
       window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const white = spaceSprite([255, 255, 255], 64);
     const blue = spaceSprite([170, 200, 255], 64);
-    const violet = spaceSprite([154, 108, 240], 128);
-    const teal = spaceSprite([60, 170, 200], 128);
-    const rose = spaceSprite([200, 90, 160], 128);
+    // The exercises' own vivid colours: the app's purple, Dual's blue,
+    // QNB's cyan, CCT's crimson.
+    const violet = spaceSprite(hexRgb("#7537E2"), 128);
+    const teal = spaceSprite(hexRgb(EXERCISE_COLORS.iqnb), 128);
+    const rose = spaceSprite(hexRgb(EXERCISE_COLORS.cct), 128);
+    const azure = spaceSprite(hexRgb(EXERCISE_COLORS.dual), 128);
     const galaxies = [
-      { img: makeGalaxy(300, 3, [150, 170, 255], [255, 190, 120]), x: 0.83, y: 0.26, size: 300, tilt: 0.42, angle: 0.6, spin: 0.012 },
-      { img: makeGalaxy(180, 11, [200, 150, 255], [255, 170, 200]), x: 0.9, y: 0.82, size: 180, tilt: 0.55, angle: -0.4, spin: -0.018 },
-      { img: makeGalaxy(120, 23, [160, 210, 255], [255, 220, 170]), x: 0.14, y: 0.88, size: 120, tilt: 0.35, angle: 1.9, spin: 0.02 },
+      { img: makeGalaxy(300, 3, hexRgb(EXERCISE_COLORS.iqnb), [255, 170, 60]), x: 0.83, y: 0.26, size: 300, tilt: 0.42, angle: 0.6, spin: 0.012 },
+      { img: makeGalaxy(180, 11, [178, 110, 255], [255, 110, 170]), x: 0.9, y: 0.82, size: 180, tilt: 0.55, angle: -0.4, spin: -0.018 },
     ];
     let W = 0;
     let H = 0;
@@ -10699,15 +10719,15 @@ function HomeSpace() {
         return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / len;
       };
       g.globalCompositeOperation = "lighter";
-      for (let k = 0; k < 90; k += 1) {
+      for (let k = 0; k < 55; k += 1) {
         const t = brainNoise(k, 61);
-        const off = (brainNoise(k, 62) - 0.5) * H * 0.22;
+        const off = (brainNoise(k, 62) - 0.5) * H * 0.2;
         const x = bx(t) + off * 0.6;
         const y = by(t) + off;
         const sz = H * (0.12 + brainNoise(k, 63) * 0.22);
         const pick = brainNoise(k, 64);
-        g.globalAlpha = 0.035 + brainNoise(k, 65) * 0.04;
-        g.drawImage(pick > 0.7 ? rose : pick > 0.35 ? violet : teal, x - sz, y - sz, sz * 2, sz * 2);
+        g.globalAlpha = 0.07 + brainNoise(k, 65) * 0.07;
+        g.drawImage(pick > 0.72 ? rose : pick > 0.45 ? violet : pick > 0.2 ? azure : teal, x - sz, y - sz, sz * 2, sz * 2);
       }
       // Two nebulae, off the band.
       const nebula = (cx, cy, spr, n, spread, seed) => {
@@ -10715,12 +10735,12 @@ function HomeSpace() {
           const a2 = brainNoise(seed + k, 1) * Math.PI * 2;
           const d = brainNoise(seed + k, 2) * spread;
           const sz = spread * (0.4 + brainNoise(seed + k, 3) * 0.6);
-          g.globalAlpha = 0.05 + brainNoise(seed + k, 4) * 0.05;
+          g.globalAlpha = 0.1 + brainNoise(seed + k, 4) * 0.09;
           g.drawImage(spr, cx + Math.cos(a2) * d - sz, cy + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
         }
       };
-      nebula(W * 0.7, H * 0.62, violet, 26, Math.min(W, H) * 0.22, 700);
-      nebula(W * 0.22, H * 0.3, teal, 18, Math.min(W, H) * 0.16, 900);
+      nebula(W * 0.7, H * 0.62, rose, 16, Math.min(W, H) * 0.2, 700);
+      nebula(W * 0.22, H * 0.3, teal, 12, Math.min(W, H) * 0.15, 900);
       // Dust lanes: darker drifts along the band.
       g.globalCompositeOperation = "source-over";
       for (let k = 0; k < 40; k += 1) {
@@ -10736,7 +10756,7 @@ function HomeSpace() {
       }
       // Stars: many faint, crowding towards the band; a few bright.
       g.globalCompositeOperation = "lighter";
-      const count = Math.round((W * H) / 1900);
+      const count = Math.round((W * H) / 2600);
       twinklers = [];
       for (let i = 0; i < count; i += 1) {
         let x = brainNoise(i, 81) * W;
@@ -10754,22 +10774,22 @@ function HomeSpace() {
         const tint = brainNoise(i, 89);
         g.globalAlpha = a2;
         g.fillStyle = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
-        const r = m > 0.992 ? 1.4 : m > 0.95 ? 1 : 0.6;
+        const r = m > 0.996 ? 1.4 : m > 0.96 ? 1 : 0.6;
         g.beginPath();
         g.arc(x, y, r, 0, Math.PI * 2);
         g.fill();
-        if (m > 0.97) {
-          const gs = m > 0.992 ? 14 : 7;
+        if (m > 0.98) {
+          const gs = m > 0.996 ? 14 : 7;
           g.globalAlpha = 0.35;
           g.drawImage(tint > 0.72 ? blue : white, x - gs, y - gs, gs * 2, gs * 2);
-          if (m > 0.992) {
+          if (m > 0.996) {
             // Diffraction spikes on the very brightest.
             g.globalAlpha = 0.28;
             g.fillStyle = "#FFFFFF";
             g.fillRect(x - 11, y - 0.35, 22, 0.7);
             g.fillRect(x - 0.35, y - 11, 0.7, 22);
           }
-          if (twinklers.length < 28) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
+          if (twinklers.length < 14) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
         }
       }
       g.globalAlpha = 1;
@@ -10794,7 +10814,7 @@ function HomeSpace() {
     let novas = [];
     const t0 = performance.now();
     let nextMeteor = 2500 + Math.random() * 3000;
-    let nextNova = 9000 + Math.random() * 6000;
+    let nextNova = 14000 + Math.random() * 8000;
     const ctx = live.getContext("2d");
     let raf;
     let skip = false;
@@ -10843,7 +10863,7 @@ function HomeSpace() {
           born: t,
           life: 700 + Math.random() * 500,
         });
-        nextMeteor = t + 4500 + Math.random() * 7000;
+        nextMeteor = t + 8000 + Math.random() * 9000;
       }
       meteors = meteors.filter((m) => t - m.born < m.life);
       for (let k = 0; k < meteors.length; k += 1) {
@@ -10876,7 +10896,7 @@ function HomeSpace() {
         // Out in the margins, clear of the column in the middle.
         const side = Math.random() < 0.5 ? 0.06 + Math.random() * 0.2 : 0.74 + Math.random() * 0.2;
         novas.push({ x: side * W, y: (0.15 + Math.random() * 0.7) * H, born: t, hue: Math.random() < 0.5 ? rose : violet });
-        nextNova = t + 26000 + Math.random() * 22000;
+        nextNova = t + 45000 + Math.random() * 35000;
       }
       novas = novas.filter((n) => t - n.born < 6000);
       for (let k = 0; k < novas.length; k += 1) {
@@ -14931,8 +14951,8 @@ function NBackSessionApp() {
         }
         @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
         @keyframes ssImgPunch {
-          0% { opacity: 0.4; transform: scale(1.14); }
-          14% { opacity: 1; transform: scale(1.02); }
+          0% { opacity: 0.6; transform: scale(1.16); }
+          22% { opacity: 1; transform: scale(1.03); }
           100% { opacity: 1; transform: scale(1); }
         }
         @keyframes ssImgBg {
@@ -20635,12 +20655,12 @@ function NBackSessionApp() {
 
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
 
-      {mainView === "home" && <HomeSpace />}
+      {mainView === "home" && !screensaverOn && <HomeSpace />}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
           the column for it. */}
-      {mainView === "home" && (
+      {mainView === "home" && !screensaverOn && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
           style={{
             width: "min(560px, calc((100vw - 42.25rem) / 2 - 24px))",
