@@ -3282,13 +3282,12 @@ const MOTIVATION_LINES = [
     id: 136,
     text: "Session feeling hard today? Break it up into small pieces throughout the day. Just keep your streak going.",
   },
-  { id: 137, text: "Wisdom is the principal thing; therefore get wisdom. And with all your getting, get understanding." },
+  { id: 137, text: "Wisdom is the principal thing; therefore get wisdom: and with all your getting get understanding." },
 ];
 // Held on its own at the close of every session, after the complete
 // animation and before anything else.
 const WISDOM_VERSE =
-  "Wisdom is the principal thing; therefore get wisdom. And with all your getting, get understanding.";
-const WISDOM_VERSE_SOURCE = "Proverbs 4:7";
+  "Wisdom is the principal thing; therefore get wisdom: and with all your getting get understanding.";
 // The entry moment: one slow breath before a session opens.
 const ENTRY_MOMENT_MS = 8000;
 // The closing moment: the verse, held in stillness.
@@ -8140,7 +8139,11 @@ function LevelGem({ level, size = 40, glowPulse = false, exerciseKey }) {
   // on every gem across Home, the leaderboard, achievements, etc.
   const pulse = !!glowPulse;
   const s = size;
-  const gradId = `gem-grad-${level}-${Math.round(s)}`;
+  // Keyed by the tier's colour, not the level: RRT's ranks sit one step
+  // above everyone else's, so an RRT level-1 gem (Proficient green) and a
+  // 3D MOT level-1 gem (Novice grey) shared an id, and SVG ids are global —
+  // both drew with whichever gradient the page defined first.
+  const gradId = `gem-grad-${tier.color.replace("#", "")}-${Math.round(s)}`;
   // A grounding drop-shadow (for depth/pop) plus, on higher tiers, a soft
   // colored glow — real blurred shadows rather than a flat tinted circle
   // sitting behind the gem.
@@ -9230,54 +9233,75 @@ function bootViewFrom(boot) {
 // good. It is not the streak — it never resets and a missed day costs it
 // nothing; it only ever grows.
 //
-// Each star's place is fixed by its number alone (a golden-angle spiral with
-// a little seeded wobble), so star 12 is always where star 12 was and the
-// sky never rearranges itself as it fills. Each new star is joined to the
-// nearest one already there, which draws the figure. When it outgrows the
-// panel the whole sky zooms out rather than moving anything.
-function starNoise(i, salt) {
-  let h = (i + 1) * 374761393 + salt * 668265263;
-  h = (h ^ (h >>> 13)) * 1274126177;
-  h ^= h >>> 16;
-  return ((h >>> 0) % 10000) / 10000;
+// It is a brain. Every place a star can go is already drawn, faintly, so the
+// shape it is filling is visible from the first day. Places are picked by a
+// low-discrepancy (Halton) sequence inside the outline, which spreads each
+// new star evenly across the whole brain instead of clumping, and because
+// the sequence is fixed, star 12 is always where star 12 was. Once the first
+// year's places are lit, more open up between them and it grows denser.
+// Lit stars link to the nearest lit star before them when it is close, so
+// the connections appear as the brain fills in, like wiring.
+const BRAIN_W = 200;
+const BRAIN_H = 155;
+// Side view, facing left: cerebrum, temporal lobe, cerebellum, crown, stem.
+const BRAIN_LOBES = [
+  [100, 62, 90, 52],
+  [62, 88, 46, 28],
+  [146, 96, 40, 26],
+  [92, 40, 70, 38],
+  [118, 128, 11, 24],
+];
+function inBrain(x, y) {
+  return BRAIN_LOBES.some(([cx, cy, rx, ry]) => ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1);
 }
-function constellationStars(count) {
-  const stars = [];
-  for (let i = 0; i < count; i += 1) {
-    const angle = i * 2.39996323 + (starNoise(i, 1) - 0.5) * 0.9;
-    const r = 15 * Math.sqrt(i + 0.35) * (0.82 + starNoise(i, 2) * 0.36);
-    const x = Math.cos(angle) * r;
-    const y = Math.sin(angle) * r * 1.35;
-    let link = -1;
-    let best = Infinity;
-    for (let j = 0; j < i; j += 1) {
-      const d = (stars[j].x - x) ** 2 + (stars[j].y - y) ** 2;
-      if (d < best) {
-        best = d;
-        link = j;
-      }
-    }
-    stars.push({ x, y, link, size: 0.8 + starNoise(i, 3) * 0.7 });
+function halton(i, base) {
+  let f = 1;
+  let r = 0;
+  let n = i;
+  while (n > 0) {
+    f /= base;
+    r += f * (n % base);
+    n = Math.floor(n / base);
   }
-  return stars;
+  return r;
 }
+function brainPlaces(count) {
+  const out = [];
+  let i = 1;
+  while (out.length < count) {
+    const x = halton(i, 2) * BRAIN_W;
+    const y = halton(i, 3) * BRAIN_H;
+    i += 1;
+    if (inBrain(x, y)) out.push({ x, y });
+  }
+  return out;
+}
+const BRAIN_LINK_MAX = 30;
 function HomeConstellation({ days }) {
-  const stars = useMemo(() => constellationStars(days), [days]);
-  // The sky's half-width: never smaller than the starting frame, so the first
-  // few stars sit in open space rather than filling the panel.
-  const extent = Math.max(
-    90,
-    ...stars.map((st) => Math.max(Math.abs(st.x), Math.abs(st.y) / 1.5) + 18)
-  );
-  const w = extent * 2;
-  const h = extent * 3;
-  const unit = extent / 90;
+  const { places, links } = useMemo(() => {
+    const total = Math.max(365, days + 120);
+    const pl = brainPlaces(total);
+    const ln = [];
+    for (let i = 1; i < days; i += 1) {
+      let best = Infinity;
+      let link = -1;
+      for (let j = 0; j < i; j += 1) {
+        const d = (pl[j].x - pl[i].x) ** 2 + (pl[j].y - pl[i].y) ** 2;
+        if (d < best) {
+          best = d;
+          link = j;
+        }
+      }
+      if (best <= BRAIN_LINK_MAX * BRAIN_LINK_MAX) ln.push([link, i]);
+    }
+    return { places: pl, links: ln };
+  }, [days]);
   return (
     <div className="flex flex-col items-center gap-4">
       <svg
-        width="240"
-        height="360"
-        viewBox={`${-extent} ${-extent * 1.5} ${w} ${h}`}
+        width="280"
+        height="216"
+        viewBox={`-6 -6 ${BRAIN_W + 12} ${BRAIN_H + 12}`}
         role="img"
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
         style={{ overflow: "visible" }}
@@ -9288,40 +9312,39 @@ function HomeConstellation({ days }) {
             <stop offset="100%" stopColor="#7537E2" stopOpacity="0" />
           </radialGradient>
         </defs>
-        {stars.map((st, i) =>
-          st.link < 0 ? null : (
-            <line
-              key={`l${i}`}
-              x1={stars[st.link].x}
-              y1={stars[st.link].y}
-              x2={st.x}
-              y2={st.y}
-              stroke="rgba(185,160,245,0.22)"
-              strokeWidth={0.8 * unit}
-            />
+        {/* Every place still to come, faint, so the shape shows. */}
+        {places.map((pt, i) =>
+          i < days ? null : (
+            <circle key={`f${i}`} cx={pt.x} cy={pt.y} r="0.9" fill="#B9A0F5" opacity="0.28" />
           )
         )}
-        {stars.map((st, i) => {
-          const newest = i === stars.length - 1;
+        {links.map(([from, to]) => (
+          <line
+            key={`l${to}`}
+            x1={places[from].x}
+            y1={places[from].y}
+            x2={places[to].x}
+            y2={places[to].y}
+            stroke="rgba(185,160,245,0.28)"
+            strokeWidth="0.6"
+          />
+        ))}
+        {places.slice(0, days).map((pt, i) => {
+          const newest = i === days - 1;
           return (
             <g key={`s${i}`}>
-              {newest && (
-                <circle cx={st.x} cy={st.y} r={9 * unit} fill="url(#star-glow)" />
-              )}
+              {newest && <circle cx={pt.x} cy={pt.y} r="7" fill="url(#star-glow)" />}
               <circle
-                cx={st.x}
-                cy={st.y}
-                r={(newest ? 2.2 : 1.5 * st.size) * unit}
+                cx={pt.x}
+                cy={pt.y}
+                r={newest ? 1.9 : 1.25}
                 fill="#F7F8F8"
-                opacity={newest ? 1 : 0.8}
+                opacity={newest ? 1 : 0.9}
                 style={newest ? { animation: "starNewest 4s ease-in-out infinite" } : undefined}
               />
             </g>
           );
         })}
-        {days === 0 && (
-          <circle cx="0" cy="0" r="1.6" fill="#F7F8F8" opacity="0.25" />
-        )}
       </svg>
       <div className="text-center">
         <div className="text-base font-medium text-slate-200">
@@ -16444,15 +16467,24 @@ function NBackSessionApp() {
              the running screen and the others, which is why this landed in
              the middle after one exercise and near the top after another. */
           <div className="fixed inset-0 z-40 flex flex-col items-center justify-center text-center gap-8 px-6 bg-slate-950">
+            {/* The same soft purple glow the closing verse sits on. */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background:
+                  "radial-gradient(40% 32% at 50% 48%, rgba(117,55,226,0.14) 0%, rgba(117,55,226,0.04) 50%, transparent 74%)",
+              }}
+            />
             <h1
-              className="text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
+              className="relative text-3xl sm:text-4xl font-semibold tracking-tight max-w-2xl"
               style={{ animation: "switchIn 0.9s 0.18s cubic-bezier(0.16,0.8,0.24,1) both", textWrap: "balance" }}
             >
               {switchQuote}
             </h1>
             {/* A line that fills over the wait, so the length of the pause is
                 visible rather than felt as a stall. */}
-            <div className="w-40 h-0.5 rounded-full bg-slate-800 overflow-hidden">
+            <div className="relative w-40 h-0.5 rounded-full bg-slate-800 overflow-hidden">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -18722,12 +18754,6 @@ function NBackSessionApp() {
           >
             {WISDOM_VERSE}
           </div>
-          <div
-            className="relative mt-6 text-sm uppercase tracking-[0.2em] text-slate-500"
-            style={{ animation: `closingSource ${CLOSING_MOMENT_MS}ms ease-out forwards` }}
-          >
-            {WISDOM_VERSE_SOURCE}
-          </div>
         </div>
       )}
 
@@ -18989,7 +19015,7 @@ function NBackSessionApp() {
           the column for it. */}
       {mainView === "home" && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
-          style={{ left: "calc((100vw - 42.25rem) / 4 - 120px)" }}
+          style={{ left: "calc((100vw - 42.25rem) / 4 - 140px)" }}
         >
           <HomeConstellation days={trainedDayCount} />
         </div>
