@@ -9829,6 +9829,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         y: ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y,
       };
       hoverTarget = 1;
+      canvas.style.cursor = inBrain(mouse.x, mouse.y) ? "pointer" : "default";
       // While the pointer moves, draw every frame so the light follows it.
       if (!raf) raf = requestAnimationFrame(draw);
     };
@@ -9840,7 +9841,9 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       const rect = canvas.getBoundingClientRect();
       const x = ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x;
       const y = ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y;
-      // The ring takes the colour of the part that was clicked.
+      // Only the brain itself answers a click; the empty space around it
+      // does nothing. The ring takes the colour of the part clicked.
+      if (!inBrain(x, y)) return;
       pings.push({ x, y, t0: performance.now(), key: brainRegion(x, y) });
       if (pings.length > 6) pings.shift();
       kick();
@@ -10003,26 +10006,27 @@ const SS_SCENES = [
   { kind: "word", text: "Your mind", beats: 2 },
   { kind: "word", text: "is your edge.", accent: true, beats: 2 },
   { kind: "word", text: "Sharpen it.", beats: 2 },
-  { kind: "gem", beats: 4 },
+  { kind: "gem", beats: 3 },
   { kind: "word", text: "While they scroll", beats: 2 },
   { kind: "word", text: "you train.", accent: true, beats: 2 },
   ...ssBurst(SS_BURST_RICHES),
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
   ...ssBurst(SS_BURST_MIND),
-  { kind: "brain", text: "Rewire.", beats: 4, dip: true },
+  { kind: "brain", text: "Dominate.", beats: 4, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
   { kind: "end", beats: 6 },
 ];
 
 function SsGemLadder() {
-  // Novice to Enlightened across the scene's four beats.
+  // Novice to Enlightened, a rank every half beat, then it holds a moment
+  // on Enlightened before the cut.
   const [level, setLevel] = useState(1);
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      (SS_BEAT_MS * 4) / 11
+      SS_TRACK_BEAT_MS / 2
     );
     return () => clearInterval(id);
   }, []);
@@ -10708,7 +10712,6 @@ function HomeSpace() {
     const azure = spaceSprite(hexRgb(EXERCISE_COLORS.dual), 128);
     const galaxies = [
       { img: makeGalaxy(300, 3, hexRgb(EXERCISE_COLORS.iqnb), [255, 170, 60]), x: 0.83, y: 0.26, size: 300, tilt: 0.42, angle: 0.6, spin: 0.012 },
-      { img: makeGalaxy(180, 11, [178, 110, 255], [255, 110, 170]), x: 0.9, y: 0.82, size: 180, tilt: 0.55, angle: -0.4, spin: -0.018 },
     ];
     let W = 0;
     let H = 0;
@@ -10733,14 +10736,15 @@ function HomeSpace() {
         return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / len;
       };
       g.globalCompositeOperation = "lighter";
-      for (let k = 0; k < 55; k += 1) {
+      for (let k = 0; k < 30; k += 1) {
         const t = brainNoise(k, 61);
         const off = (brainNoise(k, 62) - 0.5) * H * 0.2;
         const x = bx(t) + off * 0.6;
         const y = by(t) + off;
-        const sz = H * (0.12 + brainNoise(k, 63) * 0.22);
+        // Fewer, bigger, softer clouds: a smooth band, not blotches.
+        const sz = H * (0.2 + brainNoise(k, 63) * 0.2);
         const pick = brainNoise(k, 64);
-        g.globalAlpha = 0.07 + brainNoise(k, 65) * 0.07;
+        g.globalAlpha = 0.055 + brainNoise(k, 65) * 0.05;
         g.drawImage(pick > 0.72 ? rose : pick > 0.45 ? violet : pick > 0.2 ? azure : teal, x - sz, y - sz, sz * 2, sz * 2);
       }
       // Two nebulae, off the band.
@@ -10754,23 +10758,11 @@ function HomeSpace() {
         }
       };
       nebula(W * 0.7, H * 0.62, rose, 16, Math.min(W, H) * 0.2, 700);
-      nebula(W * 0.22, H * 0.3, teal, 12, Math.min(W, H) * 0.15, 900);
-      // Dust lanes: darker drifts along the band.
+
       g.globalCompositeOperation = "source-over";
-      for (let k = 0; k < 40; k += 1) {
-        const t = brainNoise(k, 71);
-        const off = (brainNoise(k, 72) - 0.5) * H * 0.06;
-        const sz = H * (0.05 + brainNoise(k, 73) * 0.08);
-        const grad = g.createRadialGradient(bx(t), by(t) + off, 0, bx(t), by(t) + off, sz);
-        grad.addColorStop(0, "rgba(4,4,8,0.35)");
-        grad.addColorStop(1, "rgba(4,4,8,0)");
-        g.globalAlpha = 1;
-        g.fillStyle = grad;
-        g.fillRect(bx(t) - sz, by(t) + off - sz, sz * 2, sz * 2);
-      }
       // Stars: many faint, crowding towards the band; a few bright.
       g.globalCompositeOperation = "lighter";
-      const count = Math.round((W * H) / 2600);
+      const count = Math.round((W * H) / 4200);
       twinklers = [];
       for (let i = 0; i < count; i += 1) {
         let x = brainNoise(i, 81) * W;
@@ -10792,7 +10784,7 @@ function HomeSpace() {
         g.beginPath();
         g.arc(x, y, r, 0, Math.PI * 2);
         g.fill();
-        if (m > 0.98) {
+        if (m > 0.99) {
           const gs = m > 0.996 ? 14 : 7;
           g.globalAlpha = 0.35;
           g.drawImage(tint > 0.72 ? blue : white, x - gs, y - gs, gs * 2, gs * 2);
@@ -10803,7 +10795,7 @@ function HomeSpace() {
             g.fillRect(x - 11, y - 0.35, 22, 0.7);
             g.fillRect(x - 0.35, y - 11, 0.7, 22);
           }
-          if (twinklers.length < 14) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
+          if (twinklers.length < 8) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
         }
       }
       g.globalAlpha = 1;
@@ -10828,7 +10820,7 @@ function HomeSpace() {
     let novas = [];
     const t0 = performance.now();
     let nextMeteor = 2500 + Math.random() * 3000;
-    let nextNova = 14000 + Math.random() * 8000;
+    let nextNova = 20000 + Math.random() * 10000;
     const ctx = live.getContext("2d");
     let raf;
     let skip = false;
@@ -10877,7 +10869,7 @@ function HomeSpace() {
           born: t,
           life: 700 + Math.random() * 500,
         });
-        nextMeteor = t + 8000 + Math.random() * 9000;
+        nextMeteor = t + 12000 + Math.random() * 12000;
       }
       meteors = meteors.filter((m) => t - m.born < m.life);
       for (let k = 0; k < meteors.length; k += 1) {
@@ -10910,7 +10902,7 @@ function HomeSpace() {
         // Out in the margins, clear of the column in the middle.
         const side = Math.random() < 0.5 ? 0.06 + Math.random() * 0.2 : 0.74 + Math.random() * 0.2;
         novas.push({ x: side * W, y: (0.15 + Math.random() * 0.7) * H, born: t, hue: Math.random() < 0.5 ? rose : violet });
-        nextNova = t + 45000 + Math.random() * 35000;
+        nextNova = t + 70000 + Math.random() * 40000;
       }
       novas = novas.filter((n) => t - n.born < 6000);
       for (let k = 0; k < novas.length; k += 1) {
