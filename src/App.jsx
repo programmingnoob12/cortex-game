@@ -9401,6 +9401,258 @@ function HomeConstellationInner({ days }) {
 // hundred SVG stars each time is what made the page feel heavy.
 const HomeConstellation = memo(HomeConstellationInner);
 
+// ---------------------------------------------------------------------
+// IDLE SCREENSAVER
+// ---------------------------------------------------------------------
+// Left alone on Home for a while, the app plays an edit: hard cuts on the
+// beat of the celebration track, big words about the mind and wisdom, the
+// gem climbing its ranks, the brain filling with stars. Any movement, key or
+// touch ends it.
+//
+// The track measures at about 80.7 BPM (a beat every ~743ms), so every cut
+// lands on a beat: a word gets two beats, a set piece gets four.
+const IDLE_SCREENSAVER_MS = 90000;
+const SS_BEAT_MS = 743;
+const SS_VOLUME = 0.35;
+// Where the loud part of the track picks back up when it runs out.
+const SS_LOOP_FROM = 30;
+const SS_SCENES = [
+  { kind: "word", text: "The mind", beats: 2 },
+  { kind: "word", text: "is the weapon.", accent: true, beats: 2 },
+  { kind: "word", text: "Sharpen it.", beats: 2 },
+  { kind: "gem", beats: 4 },
+  { kind: "word", text: "While they scroll", beats: 2 },
+  { kind: "word", text: "you train.", accent: true, beats: 2 },
+  { kind: "count", beats: 4 },
+  { kind: "word", text: "Wisdom", beats: 2 },
+  { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
+  { kind: "brain", text: "Rewire.", beats: 4 },
+  { kind: "word", text: "Get wisdom.", beats: 2 },
+  { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
+  { kind: "word", text: "Every day.", beats: 2 },
+  { kind: "end", beats: 4 },
+];
+
+function SsGemLadder() {
+  // Novice to Enlightened across the scene's four beats.
+  const [level, setLevel] = useState(1);
+  useEffect(() => {
+    const id = setInterval(
+      () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
+      (SS_BEAT_MS * 4) / 11
+    );
+    return () => clearInterval(id);
+  }, []);
+  const tier = GEM_TIERS[level];
+  return (
+    <div className="flex flex-col items-center gap-8">
+      <div key={level} style={{ animation: "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both" }}>
+        <LevelGem level={level} size={200} />
+      </div>
+      <div
+        className="text-4xl sm:text-6xl font-black uppercase tracking-[0.12em]"
+        style={{ color: tier.color, textShadow: `0 0 40px ${tier.color}88` }}
+      >
+        {tier.label}
+      </div>
+    </div>
+  );
+}
+
+function SsCount() {
+  // 2-back to 10-back, climbing.
+  const [n, setN] = useState(2);
+  useEffect(() => {
+    const id = setInterval(() => setN((v) => Math.min(10, v + 1)), (SS_BEAT_MS * 4) / 10);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex flex-col items-center gap-4">
+      <div
+        key={n}
+        className="font-black tabular-nums leading-none"
+        style={{
+          fontSize: "clamp(6rem, 22vw, 16rem)",
+          animation: "ssPop 0.22s ease-out both",
+          background: "linear-gradient(180deg, #FFFFFF 20%, #B9A0F5 100%)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        }}
+      >
+        {n}
+      </div>
+      <div className="text-2xl sm:text-4xl font-bold uppercase tracking-[0.3em] text-slate-300">Back</div>
+    </div>
+  );
+}
+
+function IdleScreensaver({ onExit }) {
+  const [index, setIndex] = useState(0);
+  const [cut, setCut] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const audioRef = useRef(null);
+
+  // The track: in from the drop, faded up, faded out on the way out.
+  useEffect(() => {
+    let raf;
+    const audio = new Audio(SONG_URL);
+    audioRef.current = audio;
+    audio.volume = 0;
+    audio.currentTime = SONG_START;
+    audio.addEventListener("ended", () => {
+      audio.currentTime = SS_LOOP_FROM;
+      audio.play().catch(() => {});
+    });
+    audio.play().catch(() => {});
+    const start = performance.now();
+    const up = (now) => {
+      const t = Math.min(1, (now - start) / 1500);
+      audio.volume = SS_VOLUME * t;
+      if (t < 1) raf = requestAnimationFrame(up);
+    };
+    raf = requestAnimationFrame(up);
+    return () => {
+      cancelAnimationFrame(raf);
+      const from = audio.volume;
+      const t0 = performance.now();
+      const down = (now) => {
+        const t = Math.min(1, (now - t0) / 500);
+        audio.volume = from * (1 - t);
+        if (t < 1) requestAnimationFrame(down);
+        else audio.pause();
+      };
+      requestAnimationFrame(down);
+    };
+  }, []);
+
+  // Cut to the next scene on the beat.
+  useEffect(() => {
+    const id = setTimeout(() => {
+      setIndex((i) => (i + 1) % SS_SCENES.length);
+      setCut((c) => c + 1);
+    }, SS_SCENES[index].beats * SS_BEAT_MS);
+    return () => clearTimeout(id);
+  }, [index, cut]);
+
+  // Anything at all ends it. A short grace period first, so the motion that
+  // happens to land as it opens does not close it straight away.
+  useEffect(() => {
+    let armed = false;
+    const arm = setTimeout(() => {
+      armed = true;
+    }, 800);
+    const leave = () => {
+      if (!armed) return;
+      armed = false;
+      setLeaving(true);
+      setTimeout(onExit, 380);
+    };
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "wheel"];
+    events.forEach((ev) => window.addEventListener(ev, leave, { passive: true }));
+    return () => {
+      clearTimeout(arm);
+      events.forEach((ev) => window.removeEventListener(ev, leave));
+    };
+  }, [onExit]);
+
+  const scene = SS_SCENES[index];
+  const sceneMs = scene.beats * SS_BEAT_MS;
+  const bigWord = {
+    fontSize: "clamp(3rem, 9vw, 8.5rem)",
+    lineHeight: 1.02,
+    textWrap: "balance",
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] overflow-hidden bg-black flex items-center justify-center text-center px-8 select-none"
+      style={{ animation: leaving ? "ssOut 0.38s ease-in forwards" : "ssIn 0.9s ease-out both", cursor: "none" }}
+    >
+      {/* The glow that kicks on every beat. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(45% 40% at 50% 50%, rgba(117,55,226,0.38) 0%, rgba(117,55,226,0.1) 45%, transparent 72%)",
+          animation: `ssBeat ${SS_BEAT_MS}ms ease-out infinite`,
+        }}
+      />
+      {/* Vignette, for the filmed look. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%)" }}
+      />
+
+      <div
+        key={cut}
+        className="relative"
+        style={{ animation: `ssSlam ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both` }}
+      >
+        {scene.kind === "word" && (
+          <div
+            className="font-black uppercase tracking-tight"
+            style={
+              scene.accent
+                ? {
+                    ...bigWord,
+                    background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 40%, #9A6CF0 100%)",
+                    WebkitBackgroundClip: "text",
+                    backgroundClip: "text",
+                    color: "transparent",
+                    filter: "drop-shadow(0 0 30px rgba(117,55,226,0.55))",
+                  }
+                : { ...bigWord, color: "#FFFFFF" }
+            }
+          >
+            {scene.text}
+          </div>
+        )}
+        {scene.kind === "gem" && <SsGemLadder />}
+        {scene.kind === "count" && <SsCount />}
+        {scene.kind === "brain" && (
+          <div className="flex flex-col items-center gap-2">
+            <div style={{ width: "min(720px, 80vw)" }}>
+              <HomeConstellation days={220} />
+            </div>
+            <div
+              className="font-black uppercase tracking-tight -mt-10"
+              style={{ ...bigWord, fontSize: "clamp(2.5rem, 7vw, 6rem)", color: "#FFFFFF" }}
+            >
+              {scene.text}
+            </div>
+          </div>
+        )}
+        {scene.kind === "end" && (
+          <div className="flex flex-col items-center gap-5">
+            <div
+              className="font-black uppercase"
+              style={{ fontSize: "clamp(4rem, 12vw, 10rem)", letterSpacing: "0.18em", lineHeight: 1, color: "#FFFFFF" }}
+            >
+              Cortex
+            </div>
+            <div className="text-lg sm:text-2xl uppercase tracking-[0.4em] text-slate-400">Train the mind</div>
+          </div>
+        )}
+      </div>
+
+      {/* A white flash on every cut. */}
+      <div
+        key={`f${cut}`}
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none bg-white"
+        style={{ animation: "ssFlash 0.32s ease-out both" }}
+      />
+
+      <div className="absolute bottom-6 inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600">
+        Move to continue
+      </div>
+    </div>
+  );
+}
+
 // "Thursday 8:05pm". Its own component with its own
 // minute tick, so keeping the clock current never re-renders the rest of
 // the app.
@@ -9612,6 +9864,8 @@ function NBackSessionApp() {
   const [streakReward, setStreakReward] = useState(null);
   const [streakCardOpen, setStreakCardOpen] = useState(false); // home screen's 🔥 streak badge — opens a small popup with the week view
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  // The idle screensaver on Home.
+  const [screensaverOn, setScreensaverOn] = useState(false);
   // True while walking the screens from the Pages list, so every screen
   // carries a way back to it. Testing only.
   const [pagesMode, setPagesMode] = useState(false);
@@ -11718,6 +11972,29 @@ function NBackSessionApp() {
     return days.size;
   }, [exerciseHistory]);
 
+  // Left alone on Home long enough, play the screensaver. Only on Home, and
+  // never over a popup, so it can't cover anything someone is in the middle
+  // of. Any input restarts the wait.
+  useEffect(() => {
+    if (mainView !== "home" || !hasHydrated || screensaverOn) return undefined;
+    if (feedbackOpen || streakCardOpen || unlockInfo) return undefined;
+    let id;
+    const reset = () => {
+      clearTimeout(id);
+      id = setTimeout(() => {
+        if (document.visibilityState === "visible") setScreensaverOn(true);
+      }, IDLE_SCREENSAVER_MS);
+    };
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "wheel", "scroll"];
+    events.forEach((ev) => window.addEventListener(ev, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(id);
+      events.forEach((ev) => window.removeEventListener(ev, reset));
+    };
+  }, [mainView, hasHydrated, screensaverOn, feedbackOpen, streakCardOpen, unlockInfo]);
+  const exitScreensaver = useCallback(() => setScreensaverOn(false), []);
+
   const overviewExercises = Array.from(
     new Set(currentRegime.steps.map((s) => s.key))
   ).map((key) => EXERCISE_LIBRARY[key]);
@@ -13325,6 +13602,28 @@ function NBackSessionApp() {
         }
         /* Short windows: the constellation would run into the corner pills. */
         @media (max-height: 759px) { .home-constellation { display: none !important; } }
+        @keyframes ssIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes ssOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes ssBeat {
+          0% { opacity: 1; transform: scale(1.06); }
+          100% { opacity: 0.45; transform: scale(1); }
+        }
+        @keyframes ssFlash {
+          0% { opacity: 0.22; }
+          100% { opacity: 0; }
+        }
+        @keyframes ssSlam {
+          0% { opacity: 0; transform: scale(1.28); filter: blur(14px); }
+          9% { opacity: 1; transform: scale(1); filter: blur(0); }
+          100% { opacity: 1; transform: scale(1.07); filter: blur(0); }
+        }
+        @keyframes ssPop {
+          0% { transform: scale(0.82); opacity: 0.4; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [style*="ssSlam"], [style*="ssBeat"], [style*="ssFlash"], [style*="ssPop"] { animation: none !important; }
+        }
         /* The constellation's entrance only: stars fade in, lines draw in. */
         @keyframes starIn {
           0% { opacity: 0; }
@@ -14612,6 +14911,10 @@ function NBackSessionApp() {
                     ]?.text || null
                   );
                   setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
+                }),
+                go("Idle screensaver", () => {
+                  setMainView("home");
+                  setScreensaverOn(true);
                 }),
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
@@ -18928,6 +19231,8 @@ function NBackSessionApp() {
           </div>
         </div>
       )}
+
+      {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
