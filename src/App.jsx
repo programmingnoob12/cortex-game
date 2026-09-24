@@ -9954,6 +9954,30 @@ function preloadOpeningTrack() {
   });
 }
 if (typeof window !== "undefined") preloadOpeningTrack();
+
+// The flashing images: graded to one look and saved as WebP, each with a
+// small pre-blurred, darkened copy that fills the frame behind it (so no
+// blur is ever computed live). Loaded and decoded up front with the track,
+// so none of them pops in late mid-burst.
+const SS_IMAGES = ["01-gold", "02-watch", "05-mindset", "03-yacht", "04-cash"].map((n) => ({
+  src: `/images/edit/${n}.webp`,
+  bg: `/images/edit/${n}-bg.webp`,
+}));
+let ssImagesReady = null;
+function preloadEditImages() {
+  if (typeof window === "undefined") return Promise.resolve();
+  if (!ssImagesReady) {
+    ssImagesReady = Promise.all(
+      SS_IMAGES.flatMap((im) => [im.src, im.bg]).map((src) => {
+        const img = new Image();
+        img.src = src;
+        return (img.decode ? img.decode() : Promise.resolve()).catch(() => {});
+      })
+    );
+  }
+  return ssImagesReady;
+}
+if (typeof window !== "undefined") preloadEditImages();
 const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
 const SS_VOLUME = 0.45;
 // How long the track takes to fade out once Home is coming in.
@@ -9970,6 +9994,7 @@ const SS_SCENES = [
   { kind: "gem", beats: 4 },
   { kind: "word", text: "While they scroll", beats: 2 },
   { kind: "word", text: "you train.", accent: true, beats: 2 },
+  ...SS_IMAGES.map((im) => ({ kind: "image", img: im, beats: 0.5 })),
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
   { kind: "brain", text: "Rewire.", beats: 4, dip: true },
@@ -10218,7 +10243,7 @@ function IdleScreensaver({ onExit }) {
       }
     };
     waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
-    preloadOpeningTrack().then(go);
+    Promise.all([preloadOpeningTrack(), preloadEditImages()]).then(go);
 
     return () => {
       cancelled = true;
@@ -10323,6 +10348,20 @@ function IdleScreensaver({ onExit }) {
       {/* Smoke: slow violet vapour rolling through the frame, breathing a
           little brighter on every beat of the track. */}
       <SsSmoke playing={phase === "play"} />
+      {phase === "play" && scene.kind === "image" && (
+        <div
+          key={`b${cut}`}
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `url(${scene.img.bg})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            animation: `ssImgBg ${sceneMs}ms ease-out both`,
+            willChange: "transform",
+          }}
+        />
+      )}
       {/* Faint dust of stars drifting slowly past, for depth. */}
       <div aria-hidden="true" className="ss-stars absolute pointer-events-none" />
       {/* Vignette, for the filmed look. */}
@@ -10342,6 +10381,8 @@ function IdleScreensaver({ onExit }) {
           animation:
             scene.kind === "end"
               ? `ssSlam ${SS_END_ANIM_MS}ms cubic-bezier(0.16,1,0.3,1) both`
+              : scene.kind === "image"
+              ? `ssImgPunch ${sceneMs}ms cubic-bezier(0.2,0.8,0.2,1) both`
               : `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
           willChange: "transform, opacity",
         }}
@@ -10392,6 +10433,20 @@ function IdleScreensaver({ onExit }) {
               </span>
             ))}
           </div>
+        )}
+        {scene.kind === "image" && (
+          <img
+            src={scene.img.src}
+            alt=""
+            draggable={false}
+            className="block"
+            style={{
+              height: "74vh",
+              maxWidth: "82vw",
+              objectFit: "cover",
+              boxShadow: "0 30px 80px -20px rgba(0,0,0,0.9)",
+            }}
+          />
         )}
         {scene.kind === "gem" && <SsGemLadder />}
         {scene.kind === "brain" && (
@@ -14583,6 +14638,15 @@ function NBackSessionApp() {
           50% { opacity: 1; transform: scale(1.2); }
         }
         @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
+        @keyframes ssImgPunch {
+          0% { opacity: 0.4; transform: scale(1.14); }
+          14% { opacity: 1; transform: scale(1.02); }
+          100% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes ssImgBg {
+          0% { transform: scale(1.18); }
+          100% { transform: scale(1.08); }
+        }
         @keyframes ssEcho {
           0% { opacity: 0; transform: translate(-50%, -50%) scale(1.35); }
           15% { opacity: 1; }
