@@ -1900,7 +1900,7 @@ const BUTTON_PULSE = "no-sheen bg-emerald-500";
 const EXERCISE_COLORS = {
   dual: "#136DEC",      // blue
   quad: "#8A0736",      // maroon
-  iqnb: "#7537E2",      // purple
+  iqnb: "#4CB9D8",      // cyan
   rrt: "#E58B09",       // orange
   motion3d: "#008000",  // green
   cct: "#D62246",       // crimson
@@ -14009,7 +14009,7 @@ function NBackSessionApp() {
                     greeting used to be. */}
                 <div className="flex items-baseline gap-3">
                   <h1 className="text-3xl font-semibold tracking-tight">
-                    Regime: {currentRegime.title}
+                    {currentRegime.title}
                   </h1>
                   <span className="text-lg text-slate-400">
                     {currentRegime.steps.reduce((sum, st) => sum + (st.minutes || 0), 0)} min
@@ -14188,8 +14188,11 @@ function NBackSessionApp() {
               <button
                 onClick={sessionParked ? continueSession : startFromHome}
                 disabled={trainedToday && !sessionInProgress && !sessionParked}
+                /* Purple on Home, whatever the regime; the rest of the page
+                   stays on the app's cyan. */
+                style={{ "--ex": "#7537E2" }}
                 className={`w-full deep-fill rounded-lg font-medium shadow-lg shadow-black/30 disabled:opacity-40 disabled:cursor-not-allowed ${
-                  compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
+                  compactHome ? "py-3.5 text-lg" : "py-3.5 sm:py-4 text-lg"
                 }`}
               >
                 {sessionInProgress
@@ -14204,7 +14207,7 @@ function NBackSessionApp() {
               <button
                 onClick={goToOverview}
                 className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                  compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
+                  compactHome ? "py-3.5 text-lg" : "py-3.5 sm:py-4 text-lg"
                 }`}
               >
                 Stats
@@ -14217,7 +14220,7 @@ function NBackSessionApp() {
                     setMainView("hypnosis");
                   }}
                   className={`w-full bg-slate-800 hover:bg-slate-700 transition-colors rounded-lg font-medium ${
-                    compactHome ? "py-3.5 sm:py-4 text-lg" : "py-3.5 sm:py-[19px] text-lg"
+                    compactHome ? "py-3.5 text-lg" : "py-3.5 sm:py-4 text-lg"
                   }`}
                 >
                   Motivation
