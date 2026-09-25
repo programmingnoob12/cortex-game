@@ -9581,10 +9581,10 @@ function makeGlowSprite(rgb = [185, 160, 245]) {
   return c;
 }
 
-// The sound of a ping: a futuristic synth blip. Two detuned saws through a
-// resonant low-pass whose cutoff snaps open and sweeps shut (the "zap" of an
-// analogue synth), a quick upward chirp in pitch, a glassy sine an octave up
-// for sparkle, then a stereo ping-pong echo into a short shimmering reverb.
+// The sound of a ping: a clean, modern digital pluck, the kind of tone a
+// good interface makes. A pure sine with a tiny pitch settle, a soft
+// octave-up partial that dies away fast for the "glass", a breath of
+// high filtered noise for the tick at the front, and a short airy room.
 // Each part of the brain plays its own note of one pentatonic scale, so
 // clicking around always sounds in key.
 const BRAIN_PING_NOTES = {
@@ -9597,14 +9597,15 @@ const BRAIN_PING_NOTES = {
 };
 let brainPingBus = null;
 function brainPingImpulse(ctx) {
-  // A short, bright reverb tail: decaying stereo noise, made once.
-  const len = Math.round(ctx.sampleRate * 1.6);
+  // A short, soft room: decaying stereo noise, darkened, made once.
+  const len = Math.round(ctx.sampleRate * 1.1);
   const buf = ctx.createBuffer(2, len, ctx.sampleRate);
   for (let ch = 0; ch < 2; ch += 1) {
     const d = buf.getChannelData(ch);
+    let lp = 0;
     for (let i = 0; i < len; i += 1) {
-      const t = i / len;
-      d[i] = (Math.random() * 2 - 1) * (1 - t) ** 3.2;
+      lp += ((Math.random() * 2 - 1) - lp) * 0.35;
+      d[i] = lp * (1 - i / len) ** 4;
     }
   }
   return buf;
@@ -9615,106 +9616,83 @@ function playBrainPing(key) {
   if (ctx.state !== "running") ctx.resume().catch(() => {});
   if (!brainPingBus) {
     const out = ctx.createGain();
-    out.gain.value = 0.85;
+    out.gain.value = 0.9;
     out.connect(ctx.destination);
-    // Ping-pong: left echo, then right, each darker than the last.
-    const panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    const panR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
-    if (panL.pan) panL.pan.value = -0.75;
-    if (panR.pan) panR.pan.value = 0.75;
-    const dL = ctx.createDelay(1);
-    const dR = ctx.createDelay(1);
-    dL.delayTime.value = 0.176; // a dotted sixteenth at 128 BPM
-    dR.delayTime.value = 0.176;
-    const tone = ctx.createBiquadFilter();
-    tone.type = "lowpass";
-    tone.frequency.value = 3200;
-    const fb = ctx.createGain();
-    fb.gain.value = 0.42;
-    dL.connect(panL);
-    dL.connect(dR);
-    dR.connect(panR);
-    dR.connect(tone);
-    tone.connect(fb);
-    fb.connect(dL);
-    const echo = ctx.createGain();
-    echo.gain.value = 0.32;
-    panL.connect(echo);
-    panR.connect(echo);
-    echo.connect(out);
     const verb = ctx.createConvolver();
     verb.buffer = brainPingImpulse(ctx);
-    const verbGain = ctx.createGain();
-    verbGain.gain.value = 0.28;
-    verb.connect(verbGain);
-    verbGain.connect(out);
-    echo.connect(verb);
-    brainPingBus = { dry: out, send: dL, verb };
+    const wet = ctx.createGain();
+    wet.gain.value = 0.22;
+    verb.connect(wet);
+    wet.connect(out);
+    let noise = null;
+    {
+      const n = Math.round(ctx.sampleRate * 0.05);
+      noise = ctx.createBuffer(1, n, ctx.sampleRate);
+      const d = noise.getChannelData(0);
+      for (let i = 0; i < n; i += 1) d[i] = Math.random() * 2 - 1;
+    }
+    brainPingBus = { out, verb, noise };
   }
+  const { out, verb, noise } = brainPingBus;
   const f = BRAIN_PING_NOTES[key] || 659.25;
   const t = ctx.currentTime + 0.005;
-  const voice = ctx.createGain();
-  voice.gain.setValueAtTime(0, t);
-  voice.gain.linearRampToValueAtTime(0.11, t + 0.004);
-  voice.gain.exponentialRampToValueAtTime(0.03, t + 0.18);
-  voice.gain.exponentialRampToValueAtTime(0.0006, t + 0.75);
-  voice.connect(brainPingBus.dry);
-  voice.connect(brainPingBus.send);
-  voice.connect(brainPingBus.verb);
-  // The filter: snaps open, then sweeps shut, with a resonant peak.
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.Q.value = 11;
-  lp.frequency.setValueAtTime(f * 0.8, t);
-  lp.frequency.exponentialRampToValueAtTime(f * 9, t + 0.02);
-  lp.frequency.exponentialRampToValueAtTime(f * 1.1, t + 0.45);
-  lp.connect(voice);
-  const oscs = [];
-  // Two saws a few cents apart, one octave below the note, for a wide body.
-  [-7, 7].forEach((cents) => {
-    const o = ctx.createOscillator();
-    o.type = "sawtooth";
-    o.detune.value = cents;
-    const base = f / 2;
-    o.frequency.setValueAtTime(base * 0.94, t);
-    o.frequency.exponentialRampToValueAtTime(base, t + 0.04);
-    const g = ctx.createGain();
-    g.gain.value = 0.5;
-    o.connect(g);
-    g.connect(lp);
-    oscs.push(o);
-  });
-  // A square two octaves down, very quiet, for weight.
-  const sub = ctx.createOscillator();
-  sub.type = "square";
-  sub.frequency.setValueAtTime(f / 4, t);
-  const subG = ctx.createGain();
-  subG.gain.setValueAtTime(0.12, t);
-  subG.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-  sub.connect(subG);
-  subG.connect(lp);
-  oscs.push(sub);
-  // The glassy top: a sine at the note, chirping up into place.
-  const bell = ctx.createOscillator();
-  bell.type = "sine";
-  bell.frequency.setValueAtTime(f * 1.5, t);
-  bell.frequency.exponentialRampToValueAtTime(f * 2, t + 0.03);
-  const bellG = ctx.createGain();
-  bellG.gain.setValueAtTime(0, t);
-  bellG.gain.linearRampToValueAtTime(0.05, t + 0.005);
-  bellG.gain.exponentialRampToValueAtTime(0.0005, t + 0.6);
-  bell.connect(bellG);
-  bellG.connect(brainPingBus.dry);
-  bellG.connect(brainPingBus.send);
-  oscs.push(bell);
-  oscs.forEach((o) => {
-    o.start(t);
-    o.stop(t + 0.9);
-  });
+  const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+  if (pan) pan.pan.value = (Math.random() - 0.5) * 0.5;
+  const bus = ctx.createGain();
+  bus.gain.value = 1;
+  if (pan) {
+    bus.connect(pan);
+    pan.connect(out);
+    pan.connect(verb);
+  } else {
+    bus.connect(out);
+    bus.connect(verb);
+  }
+  // Body: a sine settling onto the note.
+  const body = ctx.createOscillator();
+  body.type = "sine";
+  body.frequency.setValueAtTime(f * 1.012, t);
+  body.frequency.exponentialRampToValueAtTime(f, t + 0.05);
+  const bodyG = ctx.createGain();
+  bodyG.gain.setValueAtTime(0, t);
+  bodyG.gain.linearRampToValueAtTime(0.13, t + 0.003);
+  bodyG.gain.exponentialRampToValueAtTime(0.0004, t + 0.42);
+  body.connect(bodyG);
+  bodyG.connect(bus);
+  // Glass: an octave up, gone quickly.
+  const glass = ctx.createOscillator();
+  glass.type = "sine";
+  glass.frequency.setValueAtTime(f * 2, t);
+  const glassG = ctx.createGain();
+  glassG.gain.setValueAtTime(0, t);
+  glassG.gain.linearRampToValueAtTime(0.045, t + 0.002);
+  glassG.gain.exponentialRampToValueAtTime(0.0003, t + 0.14);
+  glass.connect(glassG);
+  glassG.connect(bus);
+  // Tick: a whisper of bright noise at the very front.
+  const tick = ctx.createBufferSource();
+  tick.buffer = noise;
+  const hp = ctx.createBiquadFilter();
+  hp.type = "bandpass";
+  hp.frequency.value = 7000;
+  hp.Q.value = 1.2;
+  const tickG = ctx.createGain();
+  tickG.gain.setValueAtTime(0.035, t);
+  tickG.gain.exponentialRampToValueAtTime(0.0005, t + 0.03);
+  tick.connect(hp);
+  hp.connect(tickG);
+  tickG.connect(bus);
+  body.start(t);
+  glass.start(t);
+  tick.start(t);
+  body.stop(t + 0.5);
+  glass.stop(t + 0.2);
+  tick.stop(t + 0.05);
 }
 
 
-function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
+
+function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = false }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const data = useMemo(() => {
@@ -9779,8 +9757,16 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     // Click pings: a ring that runs out from the click and lights each star
     // as it passes.
     const pings = [];
-    const PING_MS = 1600;
-    const PING_R = 55;
+    // Alive: each star breathes on its own slow cycle, and now and then a
+    // spark of light runs along a line to the next star, like a thought.
+    const breathSpeed = places.map((_, i) => 0.35 + brainNoise(i, 41) * 0.8);
+    const breathPhase = places.map((_, i) => brainNoise(i, 42) * Math.PI * 2);
+    const sparks = [];
+    const litAt = new Map();
+    let nextSpark = performance.now() + 600;
+    let lastDraw = 0;
+    const PING_MS = 1100;
+    const PING_R = 30;
 
     const px = (x) => (x - BRAIN_VB.x) * scale;
     const py = (y) => (y - BRAIN_VB.y) * scale;
@@ -9832,7 +9818,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         if (t < 0 || t > 1) continue;
         const r = PING_R * (1 - (1 - t) ** 2);
         const d = Math.sqrt((x - pg.x) ** 2 + (y - pg.y) ** 2);
-        const band = Math.exp(-((d - r) ** 2) / 140) + 0.45 * Math.exp(-((d - r * 0.62) ** 2) / 90);
+        const band = Math.exp(-((d - r) ** 2) / 50) + 0.4 * Math.exp(-((d - r * 0.6) ** 2) / 36);
         v = Math.max(v, Math.min(1, band) * (1 - t));
       }
       return v;
@@ -9850,7 +9836,19 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
 
     const draw = (now) => {
       raf = 0;
+      // At rest a living brain only needs 30 frames a second.
+      const busy = pings.length || hover !== hoverTarget || now - start < entranceEnd;
+      if (alive && !busy && now - lastDraw < 30) {
+        raf = requestAnimationFrame(draw);
+        return;
+      }
+      lastDraw = now;
       frameNow = now;
+      if (alive && links.length && now > nextSpark) {
+        const [from, to] = links[Math.floor(Math.random() * links.length)];
+        sparks.push({ from, to, t0: now });
+        nextSpark = now + 500 + Math.random() * 1100;
+      }
       while (pings.length && now - pings[0].t0 > PING_MS) pings.shift();
       hover += (hoverTarget - hover) * 0.14;
       if (Math.abs(hoverTarget - hover) < 0.004) hover = hoverTarget;
@@ -9898,7 +9896,16 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         if (a > 1) a = 1;
         const pt = places[i];
         const newest = i === days - 1;
-        const h = near(pt.x, pt.y);
+        let h = near(pt.x, pt.y);
+        if (alive) {
+          a *= 0.72 + 0.28 * Math.sin(now * 0.001 * breathSpeed[i] + breathPhase[i]);
+          const lit = litAt.get(i);
+          if (lit !== undefined) {
+            const k = 1 - (now - lit) / 700;
+            if (k <= 0) litAt.delete(i);
+            else h = Math.max(h, k * 0.9);
+          }
+        }
         const r = (newest ? 2 : sizes[i]) * (1 + 0.7 * h);
         const glow = (newest ? 7 : r * 2.4) * (1 + 0.9 * h);
         const x = px(pt.x);
@@ -9910,6 +9917,24 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         ctx.beginPath();
         ctx.arc(x, y, r * scale, 0, Math.PI * 2);
         ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      // Sparks running along the lines.
+      for (let k = sparks.length - 1; k >= 0; k -= 1) {
+        const sp = sparks[k];
+        const t = (now - sp.t0) / 650;
+        if (t >= 1) {
+          litAt.set(sp.to, now);
+          sparks.splice(k, 1);
+          continue;
+        }
+        const e = t * t * (3 - 2 * t);
+        const a = places[sp.from];
+        const b = places[sp.to];
+        const g = 4.5 * scale;
+        ctx.globalAlpha = Math.sin(Math.PI * t) * 0.85;
+        ctx.drawImage(sprites[regions[sp.to]], px(a.x + (b.x - a.x) * e) - g, py(a.y + (b.y - a.y) * e) - g, g * 2, g * 2);
       }
       ctx.globalAlpha = 1;
 
@@ -9933,8 +9958,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const cy = py(pg.y);
         const fade = (1 - t) ** 1.5;
         const bands = [
-          [r, 0.34 * fade, 9 + 10 * t],
-          [r * 0.62, 0.16 * fade, 7 + 8 * t],
+          [r, 0.28 * fade, 4 + 5 * t],
+          [r * 0.6, 0.12 * fade, 3 + 4 * t],
         ];
         for (let q = 0; q < bands.length; q += 1) {
           const [br, ba, bw] = bands[q];
@@ -9951,14 +9976,14 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
           ctx.fill();
         }
         if (t < 0.35) {
-          const g = (6 + 14 * t) * scale;
+          const g = (4 + 7 * t) * scale;
           ctx.globalAlpha = 0.95 * (1 - t / 0.35);
           ctx.drawImage(sprites[pg.key], px(pg.x) - g, py(pg.y) - g, g * 2, g * 2);
           ctx.globalAlpha = 1;
         }
       }
 
-      if (elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
+      if (alive || elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
     };
 
     function kick() {
@@ -10013,7 +10038,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       canvas.removeEventListener("pointerleave", onLeave);
       canvas.removeEventListener("pointerdown", onDown);
     };
-  }, [data, days, interactive, entranceMs]);
+  }, [data, days, interactive, entranceMs, alive]);
 
   return (
     <div ref={wrapRef} className="w-full">
@@ -10036,10 +10061,10 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
   );
 }
 
-function HomeConstellationInner({ days, showCaption = true, interactive = true, entranceMs = 1500 }) {
+function HomeConstellationInner({ days, showCaption = true, interactive = true, entranceMs = 1500, alive = false }) {
   return (
     <div className="constellation flex flex-col items-center gap-5 w-full">
-      <BrainCanvas days={days} interactive={interactive} entranceMs={entranceMs} />
+      <BrainCanvas days={days} interactive={interactive} entranceMs={entranceMs} alive={alive} />
       {showCaption && (
         <div className="text-center">
           <div className="text-lg font-semibold text-slate-100 tabular-nums">
@@ -11129,6 +11154,9 @@ function HomeSpace({ live = true, visible = true }) {
       farC.style.transform = `translate3d(${-px * 8}px, ${-py * 8}px, 0)`;
       nearC.style.transform = `translate3d(${-px * 22}px, ${-py * 22}px, 0)`;
       liveC.style.transform = nearC.style.transform;
+      // The brain sits in the near layer of the sky and drifts with it.
+      const brainEl = document.getElementById("brain-drift");
+      if (brainEl) brainEl.style.transform = nearC.style.transform;
       gasC.style.transform = `translate3d(${-px * 4}px, ${-py * 4}px, 0)`;
       skip = !skip;
       if (skip) return;
@@ -11162,16 +11190,16 @@ function HomeSpace({ live = true, visible = true }) {
       for (let k = 0; k < waves.length; k += 1) {
         const w = waves[k];
         const age = (now - w.born) / 1000;
-        if (age > 2.6) continue;
+        if (age > 1.8) continue;
         liveWaves.push({
           x: w.x + SPACE_PAD + px * 22,
           y: w.y + SPACE_PAD + py * 22,
-          r: age * 420,
-          fade: 1 - age / 2.6,
+          r: age * 230,
+          fade: (1 - age / 1.8) ** 2,
           rgb: w.rgb,
         });
       }
-      waves = waves.filter((w) => (now - w.born) / 1000 <= 2.6);
+      waves = waves.filter((w) => (now - w.born) / 1000 <= 1.8);
       if (pointerFresh || liveWaves.length) {
         for (let k = 0; k < stars.length; k += 1) {
           const st = stars[k];
@@ -11184,7 +11212,7 @@ function HomeSpace({ live = true, visible = true }) {
           for (let q = 0; q < liveWaves.length; q += 1) {
             const lw = liveWaves[q];
             const d = Math.hypot(st.x - lw.x, st.y - lw.y);
-            const band = Math.exp(-((d - lw.r) ** 2) / 900) * lw.fade;
+            const band = Math.exp(-((d - lw.r) ** 2) / 400) * lw.fade;
             if (band > glow) {
               glow = band;
               rgb = lw.rgb;
@@ -11199,15 +11227,15 @@ function HomeSpace({ live = true, visible = true }) {
         for (let q = 0; q < liveWaves.length; q += 1) {
           const lw = liveWaves[q];
           if (lw.r < 4) continue;
-          const inner = Math.max(0, lw.r - 40);
-          const grad = ctx.createRadialGradient(lw.x, lw.y, inner, lw.x, lw.y, lw.r + 40);
+          const inner = Math.max(0, lw.r - 22);
+          const grad = ctx.createRadialGradient(lw.x, lw.y, inner, lw.x, lw.y, lw.r + 22);
           const [r0, g0, b0] = lw.rgb;
           grad.addColorStop(0, `rgba(${r0},${g0},${b0},0)`);
-          grad.addColorStop(0.5, `rgba(${r0},${g0},${b0},${0.09 * lw.fade})`);
+          grad.addColorStop(0.5, `rgba(${r0},${g0},${b0},${0.05 * lw.fade})`);
           grad.addColorStop(1, `rgba(${r0},${g0},${b0},0)`);
           ctx.globalAlpha = 1;
           ctx.fillStyle = grad;
-          ctx.fillRect(lw.x - lw.r - 40, lw.y - lw.r - 40, (lw.r + 40) * 2, (lw.r + 40) * 2);
+          ctx.fillRect(lw.x - lw.r - 22, lw.y - lw.r - 22, (lw.r + 22) * 2, (lw.r + 22) * 2);
         }
       }
 
@@ -15321,6 +15349,11 @@ function NBackSessionApp() {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes brainFloat {
+          0% { transform: translateY(4px) scale(0.995); }
+          100% { transform: translateY(-6px) scale(1.012); }
+        }
+        @media (prefers-reduced-motion: reduce) { [style*="brainFloat"] { animation: none !important; } }
         @keyframes spaceBreathe {
           0% { transform: scale(1) rotate(0deg); opacity: 0.8; }
           50% { opacity: 1; }
@@ -20962,7 +20995,7 @@ function NBackSessionApp() {
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
-      <HomeSpace live={mainView === "home" && !screensaverOn} visible={mainView === "home"} />
+      <HomeSpace live={mainView === "home" && (!screensaverOn || spaceWarm)} visible={mainView === "home"} />
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
@@ -20970,14 +21003,21 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
           style={{
-            // Built while the opening edit plays (hidden), so the brain is
-            // already whole when Home appears rather than assembling late.
-            visibility: screensaverOn ? "hidden" : "visible",
+            // Built while the opening edit plays, underneath it, so the brain
+            // is already whole as Home fades in rather than appearing after.
             width: "min(560px, calc((100vw - 42.25rem) / 2 - 24px))",
             left: "calc(((100vw - 42.25rem) / 2 - min(560px, calc((100vw - 42.25rem) / 2 - 24px))) / 2)",
           }}
         >
-          <HomeConstellation days={trainedDayCount} entranceMs={constellationEntrance.current} />
+          <div id="brain-drift" className="w-full" style={{ willChange: "transform" }}>
+            <div className="w-full" style={{ animation: "brainFloat 11s ease-in-out infinite alternate" }}>
+              <HomeConstellation
+                days={trainedDayCount}
+                entranceMs={constellationEntrance.current}
+                alive={!screensaverOn || spaceWarm}
+              />
+            </div>
+          </div>
         </div>
       )}
 
