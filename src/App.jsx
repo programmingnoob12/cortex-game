@@ -10975,6 +10975,738 @@ function makeGalaxy(size, seed, armRgb, coreRgb) {
 // The layers are drawn once; only the small living layer is redrawn, and
 // the drift is done with CSS transforms the graphics card handles.
 const SPACE_PAD = 48; // extra sky beyond each edge, for the layers to drift into
+// ---------------------------------------------------------------------------
+// The launch-style opening edit (a second version, reached from Pages).
+// Modelled on a product-launch teaser: a dark, muffled first act told in
+// small yellow subtitles (a shattered collage, a neon graph, rising bars, a
+// bright iris), a cream swirl that opens the music up, a beat of silence,
+// then the drop into bright lavender glass: embossed words on tilted glass
+// cards, floating app screens, a level count, a web of connections, and a
+// glowing clock to finish. The track is "emotionless", filtered dark for the
+// first act, swept open with a riser, then full on the drop.
+// ---------------------------------------------------------------------------
+const LE_TRACK_URL = "/audio/launch-edit.mp3";
+const LE_BEAT = 468.75; // the track's beat, 128 BPM
+const LE_VOLUME = 0.5;
+const LE_DISSOLVE_MS = 1400;
+let leTrackBytes = null;
+let leTrackBuffer = null;
+function preloadLaunchTrack() {
+  if (typeof window === "undefined") return Promise.resolve(null);
+  if (leTrackBuffer) return Promise.resolve(leTrackBuffer);
+  if (!leTrackBytes) {
+    leTrackBytes = fetch(LE_TRACK_URL)
+      .then((r) => (r.ok ? r.arrayBuffer() : null))
+      .catch(() => null);
+  }
+  return leTrackBytes.then((bytes) => {
+    if (!bytes || leTrackBuffer) return leTrackBuffer;
+    const ctx = letterAudioContext();
+    if (!ctx) return null;
+    return ctx
+      .decodeAudioData(bytes.slice(0))
+      .then((buf) => {
+        leTrackBuffer = buf;
+        return buf;
+      })
+      .catch(() => null);
+  });
+}
+
+const LE_IMG = ["01-gold", "02-watch", "03-yacht", "04-cash", "05-mindset", "06-statue", "07-brain", "08-fire", "09-neuron"].map(
+  (n) => `/images/edit/${n}.webp`
+);
+
+// Scene lengths are in beats; subtitles are [beat within the scene, text].
+const LE_SCENES = [
+  { kind: "collage", beats: 8, subs: [[0, "For years,"], [4, "intelligence was treated as a gift."]] },
+  { kind: "grid", beats: 8, subs: [[0, "A few were called gifted."], [4, "The rest were told it was fixed."]] },
+  { kind: "bars", beats: 8, subs: [[0, "And the gap grew wider"], [4, "every single day."]] },
+  { kind: "iris", beats: 8, subs: [[0, "Yet the mind was never fixed."], [4, "Only untrained."]] },
+  { kind: "swirl", beats: 8, subs: [] },
+  { kind: "glass", word: "EVERYTHING", from: "right", beats: 4, subs: [] },
+  { kind: "glass", word: "INTRODUCING", from: "left", beats: 4, subs: [] },
+  { kind: "cortex", beats: 6, subs: [[1.5, "Elite training for the mind."]] },
+  { kind: "ui", beats: 8, subs: [[0, "Six exercises."], [4, "Built on working memory science."]] },
+  { kind: "count", beats: 6, subs: [[0, "Climb every level,"], [3, "from Novice to Enlightened."]] },
+  { kind: "network", beats: 8, subs: [[0, "Every session,"], [4, "a new connection."]] },
+  { kind: "clock", beats: 10, subs: [] },
+];
+const LE_ACT3_FROM = 5; // index of the first scene after the drop
+
+const LE_CSS = `
+.le-root { perspective: 1100px; }
+.le-sub {
+  position: absolute; left: 50%; bottom: 12.5%; transform: translateX(-50%);
+  font-style: italic; font-weight: 500; letter-spacing: -0.01em; white-space: nowrap;
+  font-size: clamp(14px, 1.45vw, 21px); color: #F4DF4E;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.85), 0 0 10px rgba(0,0,0,0.35);
+  animation: leSubIn 0.28s ease-out both; z-index: 5;
+}
+@keyframes leSubIn { from { opacity: 0; transform: translate(-50%, 4px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes leFlash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes leShake {
+  0% { transform: translate(0,0) scale(1.04); } 15% { transform: translate(-10px,6px) scale(1.03); }
+  30% { transform: translate(8px,-5px) scale(1.02); } 50% { transform: translate(-4px,3px) scale(1.01); }
+  100% { transform: translate(0,0) scale(1); }
+}
+@keyframes leCollageCam {
+  from { transform: translate(-50%,-50%) rotateX(34deg) rotateZ(-10deg) translateZ(-420px) scale(1.15); }
+  to { transform: translate(-50%,-50%) rotateX(16deg) rotateZ(5deg) translateZ(60px) scale(1.05); }
+}
+@keyframes leTileIn { 0% { opacity: 0; } 30% { opacity: 1; } 45% { opacity: 0.35; } 60%, 100% { opacity: 1; } }
+@keyframes leShard {
+  from { transform: translate3d(0,0,0) rotate(0deg); opacity: 0.9; }
+  to { transform: translate3d(var(--dx), var(--dy), 300px) rotate(var(--rot)); opacity: 0; }
+}
+@keyframes leGridCam {
+  from { transform: rotateX(64deg) rotateZ(-14deg) translate3d(0, 0, -80px); }
+  to { transform: rotateX(56deg) rotateZ(-4deg) translate3d(0, 160px, 40px); }
+}
+@keyframes leDraw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes leBarsCam {
+  from { transform: rotateY(-34deg) rotateX(12deg) translateZ(-260px); }
+  to { transform: rotateY(-14deg) rotateX(6deg) translateZ(80px); }
+}
+@keyframes leBar { from { transform: scaleY(0.02); } to { transform: scaleY(1); } }
+@keyframes leBokeh { from { transform: translate3d(0,0,0); } to { transform: translate3d(var(--dx), var(--dy), 0); } }
+@keyframes leIrisCam { from { transform: scale(0.55) rotate(-25deg); } to { transform: scale(1.35) rotate(20deg); } }
+@keyframes leIrisOpen { 0%, 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.6); opacity: 0; } }
+@keyframes leWhiteOut { 0%, 70% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes leBlade { from { transform: translate(-50%,-50%) rotate(-40deg) scale(0.7); } to { transform: translate(-50%,-50%) rotate(320deg) scale(1.5); } }
+@keyframes leRipple { from { transform: translate(-50%,-50%) scale(0.9); } to { transform: translate(-50%,-50%) scale(1.2); } }
+@keyframes leSwirlText {
+  0% { opacity: 0; transform: perspective(900px) rotateY(-70deg) translateZ(-300px) scale(0.8); }
+  30% { opacity: 1; transform: perspective(900px) rotateY(-12deg) translateZ(0) scale(1); }
+  100% { opacity: 1; transform: perspective(900px) rotateY(10deg) translateZ(60px) scale(1.06); }
+}
+@keyframes leCardRight {
+  0% { transform: rotateY(-55deg) rotateX(18deg) translate3d(40vw, 0, -700px); }
+  22% { transform: rotateY(-16deg) rotateX(9deg) translate3d(0, 0, 0); }
+  100% { transform: rotateY(-4deg) rotateX(4deg) translate3d(-2vw, 0, 80px); }
+}
+@keyframes leCardLeft {
+  0% { transform: rotateY(55deg) rotateX(-14deg) translate3d(-40vw, 0, -700px); }
+  22% { transform: rotateY(16deg) rotateX(-6deg) translate3d(0, 0, 0); }
+  100% { transform: rotateY(4deg) rotateX(-2deg) translate3d(2vw, 0, 80px); }
+}
+@keyframes leCardFront {
+  0% { transform: rotateX(28deg) translate3d(0, 10vh, -500px) scale(0.9); }
+  18% { transform: rotateX(6deg) translate3d(0, 0, 0) scale(1); }
+  100% { transform: rotateX(2deg) translate3d(0, 0, 90px) scale(1.02); }
+}
+@keyframes leStreak { from { transform: translateX(-120vw) rotate(var(--a)); } to { transform: translateX(120vw) rotate(var(--a)); } }
+@keyframes leFloat {
+  from { transform: rotateY(var(--ry)) rotateX(var(--rx)) translate3d(0, 0, 0); }
+  to { transform: rotateY(calc(var(--ry) * 0.6)) rotateX(calc(var(--rx) * 0.6)) translate3d(var(--fx), var(--fy), 60px); }
+}
+@keyframes leDolly { from { transform: translateZ(-160px) rotateY(6deg); } to { transform: translateZ(60px) rotateY(-6deg); } }
+@keyframes leIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes leSpaceIn { from { opacity: 0; letter-spacing: 0.7em; } to { opacity: 1; letter-spacing: 0.32em; } }
+@keyframes leNetCam { from { transform: rotateX(18deg) rotateZ(-6deg) translateZ(-200px); } to { transform: rotateX(8deg) rotateZ(3deg) translateZ(60px); } }
+@keyframes leClockIn { from { opacity: 0; transform: scale(1.06); } to { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .le-root * { animation-duration: 0.01ms !important; } }
+`;
+
+// Words pressed into the glass: pale letters with a highlight on one edge and
+// a soft shadow on the other.
+const LE_EMBOSS = {
+  color: "rgba(214,202,255,0.92)",
+  textShadow: "-2px -2px 1px rgba(255,255,255,0.85), 3px 4px 7px rgba(60,25,150,0.45), 0 0 1px rgba(255,255,255,0.5)",
+  fontWeight: 800,
+  letterSpacing: "-0.01em",
+  lineHeight: 1,
+  whiteSpace: "nowrap",
+};
+const LE_LAVENDER =
+  "radial-gradient(60% 50% at 88% 8%, rgba(255,120,220,0.55), transparent 70%), radial-gradient(70% 60% at 6% 96%, rgba(40,60,255,0.6), transparent 70%), linear-gradient(135deg, #D4C6FF 0%, #A68AFF 38%, #6F4BF2 70%, #3B3CF0 100%)";
+const LE_GLASS = {
+  background: "linear-gradient(145deg, rgba(255,255,255,0.55), rgba(255,255,255,0.14) 60%, rgba(255,255,255,0.3))",
+  border: "1px solid rgba(255,255,255,0.65)",
+  boxShadow:
+    "inset 0 0 50px rgba(255,255,255,0.35), inset 0 2px 0 rgba(255,255,255,0.8), 0 0 0 3px rgba(255,120,220,0.18), 0 50px 90px -30px rgba(40,10,130,0.55)",
+};
+
+function LeStreaks({ ms }) {
+  return [
+    { top: "22%", a: "-14deg", d: 0 },
+    { top: "64%", a: "9deg", d: 0.25 },
+    { top: "80%", a: "-4deg", d: 0.5 },
+  ].map((s, i) => (
+    <div
+      key={i}
+      aria-hidden="true"
+      className="absolute left-0 pointer-events-none"
+      style={{
+        top: s.top,
+        width: "70vw",
+        height: 2,
+        "--a": s.a,
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent)",
+        boxShadow: "0 0 14px 3px rgba(255,255,255,0.55)",
+        animation: `leStreak ${ms * 0.9}ms cubic-bezier(0.5,0,0.3,1) ${s.d * ms}ms both`,
+      }}
+    />
+  ));
+}
+
+function LeCount({ beat }) {
+  const [level, setLevel] = useState(1);
+  useEffect(() => {
+    const id = setInterval(() => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)), beat * 0.5);
+    return () => clearInterval(id);
+  }, [beat]);
+  const tier = GEM_TIERS[level];
+  return (
+    <div className="relative flex flex-col items-center" style={{ transformStyle: "preserve-3d", animation: `leCardFront ${beat * 6}ms cubic-bezier(0.16,1,0.3,1) both` }}>
+      <div
+        className="uppercase font-semibold"
+        style={{ fontSize: "clamp(18px, 2.6vw, 38px)", color: "#fff", textShadow: "0 0 18px rgba(255,255,255,0.7)", animation: "leSpaceIn 0.9s cubic-bezier(0.16,1,0.3,1) both", marginBottom: "3vh" }}
+      >
+        Level
+      </div>
+      <div className="relative rounded-[3.5vw] flex items-center justify-center" style={{ ...LE_GLASS, width: "44vw", height: "24vw" }}>
+        <div key={level} style={{ ...LE_EMBOSS, fontSize: "17vw", transform: "scaleY(1.12)", animation: "ssPop 0.22s cubic-bezier(0.2,1.4,0.4,1) both" }}>
+          {level}
+        </div>
+      </div>
+      <div
+        key={`t${level}`}
+        className="uppercase font-bold mt-[3vh]"
+        style={{ fontSize: "clamp(16px, 2vw, 30px)", letterSpacing: "0.3em", color: tier.color, textShadow: `0 0 20px ${tier.color}`, animation: "leIn 0.2s ease-out both" }}
+      >
+        {tier.label}
+      </div>
+    </div>
+  );
+}
+
+function LeClock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 250);
+    return () => clearInterval(id);
+  }, []);
+  const p = (n) => String(n).padStart(2, "0");
+  const date = `${p(now.getDate())}.${p(now.getMonth() + 1)}.${now.getFullYear()}`;
+  const time = `${p(now.getHours())}:${p(now.getMinutes())}:${p(now.getSeconds())}`;
+  const glow = { color: "rgba(255,255,255,0.1)", WebkitTextStroke: "1px rgba(255,255,255,0.75)", textShadow: "0 0 22px rgba(255,255,255,0.35)" };
+  return (
+    <div className="relative flex flex-col items-center" style={{ animation: "leClockIn 1.2s ease-out both" }}>
+      <div style={{ ...glow, fontSize: "clamp(14px, 1.4vw, 20px)", fontWeight: 300, letterSpacing: "0.08em", marginBottom: "2vh" }}>{date}</div>
+      <div className="tabular-nums" style={{ ...glow, fontSize: "clamp(64px, 11vw, 190px)", fontWeight: 200, letterSpacing: "0.02em", lineHeight: 1 }}>
+        {time}
+      </div>
+      <div style={{ color: "rgba(255,255,255,0.8)", textShadow: "0 0 12px rgba(255,255,255,0.45)", fontSize: "clamp(13px, 1.3vw, 19px)", fontWeight: 300, marginTop: "3vh", animation: "leIn 1s ease-out 0.6s both" }}>
+        Your training starts now.
+      </div>
+      <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "clamp(10px, 0.9vw, 13px)", letterSpacing: "0.4em", textTransform: "uppercase", marginTop: "1vh", animation: "leIn 1s ease-out 1s both" }}>
+        Cortex
+      </div>
+    </div>
+  );
+}
+
+function LeScene({ scene, ms }) {
+  const k = scene.kind;
+  if (k === "collage") {
+    const tiles = Array.from({ length: 40 }, (_, i) => i);
+    return (
+      <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse at center, #1a0f08 0%, #000 75%)" }}>
+        <div
+          className="absolute left-1/2 top-1/2"
+          style={{ width: "150vw", height: "110vh", transformStyle: "preserve-3d", animation: `leCollageCam ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both` }}
+        >
+          <div className="grid w-full h-full" style={{ gridTemplateColumns: "repeat(8, 1fr)", gap: "0.8vw", transformStyle: "preserve-3d" }}>
+            {tiles.map((i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundImage: `url(${LE_IMG[(i * 5) % LE_IMG.length]})`,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  border: "1px solid rgba(255,240,220,0.25)",
+                  filter: "saturate(1.3) contrast(1.1)",
+                  transform: `translateZ(${Math.round((brainNoise(i, 7) - 0.5) * 140)}px) rotate(${((brainNoise(i, 8) - 0.5) * 8).toFixed(1)}deg)`,
+                  animation: `leTileIn 0.7s steps(1) ${Math.round(brainNoise(i, 9) * 900)}ms both`,
+                  clipPath: brainNoise(i, 10) > 0.72 ? "polygon(0 12%, 88% 0, 100% 82%, 18% 100%)" : undefined,
+                }}
+              />
+            ))}
+          </div>
+        </div>
+        {/* Shards of glass breaking off towards the camera. */}
+        {Array.from({ length: 9 }, (_, i) => (
+          <div
+            key={`s${i}`}
+            aria-hidden="true"
+            className="absolute"
+            style={{
+              left: `${15 + brainNoise(i, 31) * 70}%`,
+              top: `${15 + brainNoise(i, 32) * 60}%`,
+              width: `${6 + brainNoise(i, 33) * 8}vw`,
+              height: `${5 + brainNoise(i, 34) * 7}vw`,
+              background: "linear-gradient(135deg, rgba(160,230,255,0.55), rgba(255,255,255,0.08) 60%, rgba(255,180,120,0.4))",
+              border: "1px solid rgba(255,255,255,0.7)",
+              clipPath: "polygon(0 0, 100% 20%, 70% 100%)",
+              "--dx": `${(brainNoise(i, 35) - 0.5) * 60}vw`,
+              "--dy": `${(brainNoise(i, 36) - 0.5) * 50}vh`,
+              "--rot": `${(brainNoise(i, 37) - 0.5) * 220}deg`,
+              animation: `leShard ${ms * 0.8}ms cubic-bezier(0.2,0.6,0.3,1) ${LE_BEAT * (1 + (i % 4))}ms both`,
+            }}
+          />
+        ))}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "linear-gradient(120deg, rgba(255,140,40,0.18), transparent 45%, rgba(0,180,200,0.16))", mixBlendMode: "screen" }} />
+      </div>
+    );
+  }
+  if (k === "grid") {
+    const pts = "0,92 25,86 46,88 71,74 95,76 118,58 139,60 164,36 185,30 210,8";
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: "radial-gradient(80% 70% at 60% 40%, #D6249F 0%, #6D1286 45%, #1A0327 80%, #07000D 100%)", perspective: "900px" }}>
+        {/* Halftone dots. */}
+        <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(rgba(255,180,240,0.35) 1.2px, transparent 1.6px)", backgroundSize: "18px 18px", maskImage: "radial-gradient(40% 50% at 30% 40%, #000, transparent 70%)", WebkitMaskImage: "radial-gradient(40% 50% at 30% 40%, #000, transparent 70%)" }} />
+        <div
+          className="absolute"
+          style={{
+            left: "-50%",
+            top: "-10%",
+            width: "200%",
+            height: "160%",
+            backgroundImage: "linear-gradient(rgba(255,170,240,0.45) 1px, transparent 1px), linear-gradient(90deg, rgba(255,170,240,0.45) 1px, transparent 1px)",
+            backgroundSize: "90px 90px",
+            transformOrigin: "50% 50%",
+            animation: `leGridCam ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both`,
+            maskImage: "linear-gradient(to bottom, transparent 0%, #000 35%, #000 80%, transparent 100%)",
+            WebkitMaskImage: "linear-gradient(to bottom, transparent 0%, #000 35%, #000 80%, transparent 100%)",
+          }}
+        />
+        <svg className="absolute" viewBox="0 0 210 100" preserveAspectRatio="none" style={{ left: "12%", top: "16%", width: "74%", height: "62%", overflow: "visible", transform: "rotate(-6deg) skewX(-8deg)" }}>
+          <polyline points={pts} fill="none" stroke="rgba(255,120,230,0.35)" strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="1 1" style={{ animation: `leDraw ${ms * 0.75}ms cubic-bezier(0.4,0,0.2,1) both`, strokeWidth: 4 }} />
+          <polyline points={pts} fill="none" stroke="#FFE6FA" strokeLinecap="round" strokeLinejoin="round" pathLength="1" strokeDasharray="1 1" style={{ animation: `leDraw ${ms * 0.75}ms cubic-bezier(0.4,0,0.2,1) both`, strokeWidth: 0.8 }} />
+        </svg>
+      </div>
+    );
+  }
+  if (k === "bars") {
+    const hs = [0.28, 0.42, 0.36, 0.58, 0.5, 0.78, 1];
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: "radial-gradient(70% 60% at 50% 60%, #2A0F4A 0%, #10051E 60%, #030008 100%)", perspective: "1000px" }}>
+        {Array.from({ length: 8 }, (_, i) => (
+          <div
+            key={`b${i}`}
+            aria-hidden="true"
+            className="absolute rounded-full"
+            style={{
+              left: `${brainNoise(i, 51) * 90}%`,
+              top: `${brainNoise(i, 52) * 80}%`,
+              width: `${4 + brainNoise(i, 53) * 7}vw`,
+              height: `${4 + brainNoise(i, 53) * 7}vw`,
+              background: `radial-gradient(closest-side, rgba(${i % 2 ? "255,120,220" : "180,140,255"},0.55), transparent)`,
+              "--dx": `${(brainNoise(i, 54) - 0.5) * 12}vw`,
+              "--dy": `${(brainNoise(i, 55) - 0.5) * 8}vh`,
+              animation: `leBokeh ${ms}ms linear both`,
+            }}
+          />
+        ))}
+        <div className="absolute inset-0 flex items-end justify-center" style={{ paddingBottom: "14vh", transformStyle: "preserve-3d", animation: `leBarsCam ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both` }}>
+          {hs.map((h, i) => (
+            <div key={i} className="relative" style={{ width: "7vw", height: `${h * 62}vh`, margin: "0 1.1vw" }}>
+              <div
+                className="absolute inset-0"
+                style={{ transformOrigin: "50% 100%", animation: `leBar ${LE_BEAT * 3}ms cubic-bezier(0.16,1,0.3,1) ${i * LE_BEAT * 0.5}ms both` }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(235,200,255,0.95) 0%, rgba(170,90,240,0.85) 18%, rgba(90,30,170,0.9) 100%)",
+                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9), 0 0 30px rgba(190,110,255,0.35)",
+                  }}
+                />
+                <div
+                  className="absolute top-0 bottom-0"
+                  style={{
+                    left: "100%",
+                    width: "2.4vw",
+                    transformOrigin: "0 0",
+                    background: "linear-gradient(180deg, rgba(150,90,220,0.9), rgba(40,10,90,0.95))",
+                    transform: "skewY(-30deg)",
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (k === "iris") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden bg-black">
+        <div style={{ width: "72vmin", height: "72vmin", animation: `leIrisCam ${ms}ms cubic-bezier(0.4,0,0.2,1) both` }} className="relative">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: "radial-gradient(circle, #FFFFFF 0%, #FFF4E4 45%, #E9D6B8 70%, rgba(233,214,184,0) 72%)",
+              boxShadow: "0 0 0 2px rgba(255,80,120,0.25), -6px 0 30px rgba(255,60,120,0.35), 6px 0 30px rgba(60,160,255,0.35), 0 0 120px rgba(255,240,220,0.35)",
+            }}
+          />
+          <svg viewBox="-100 -100 200 200" className="absolute inset-0 w-full h-full" style={{ animation: `leIrisOpen ${ms}ms cubic-bezier(0.6,0,0.3,1) both` }}>
+            <circle r="13" fill="#FFFFFF" />
+            {Array.from({ length: 8 }, (_, i) => (
+              <ellipse key={i} cx="0" cy="-44" rx="11" ry="27" fill="#141014" opacity="0.92" transform={`rotate(${i * 45 + 12}) skewX(18)`} />
+            ))}
+          </svg>
+        </div>
+        <div className="absolute inset-0" style={{ background: "#F6EBDC", animation: `leWhiteOut ${ms}ms ease-in both` }} />
+      </div>
+    );
+  }
+  if (k === "swirl") {
+    const half = ms / 2;
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: "radial-gradient(75% 70% at 50% 50%, #FFF8EE 0%, #F2E2CB 55%, #CDB595 100%)" }}>
+        <div className="absolute left-1/2 top-1/2" style={{ width: "140vmax", height: "140vmax", background: "repeating-radial-gradient(circle, rgba(150,120,90,0.08) 0 2px, transparent 2px 26px)", animation: `leRipple ${ms}ms ease-out both` }} />
+        <svg viewBox="-100 -100 200 200" className="absolute left-1/2 top-1/2" style={{ width: "120vmin", height: "120vmin", animation: `leBlade ${ms}ms cubic-bezier(0.5,0,0.2,1) both` }}>
+          <path d="M0,0 C30,-40 70,-60 96,-30 C60,-30 30,-10 0,0 Z M0,0 C-30,40 -70,60 -96,30 C-60,30 -30,10 0,0 Z" fill="#0A0808" />
+        </svg>
+        {[
+          ["It's time,", 0],
+          ["to rewire.", half * 0.85],
+        ].map(([w, at]) => (
+          <div key={w} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div
+              style={{
+                fontSize: "clamp(40px, 7vw, 120px)",
+                fontWeight: 600,
+                color: "#1B1714",
+                letterSpacing: "-0.03em",
+                textShadow: "-4px 0 rgba(255,0,90,0.45), 4px 0 rgba(0,170,255,0.45)",
+                animation: `leSwirlText ${half}ms cubic-bezier(0.16,1,0.3,1) ${at}ms both, leFlash 0.12s linear ${at + half * 0.85}ms forwards`,
+              }}
+            >
+              {w}
+            </div>
+          </div>
+        ))}
+        {/* The half beat of silence before the drop. */}
+        <div className="absolute inset-0 bg-black" style={{ opacity: 0, animation: `leIn 1ms linear ${ms - LE_BEAT / 2}ms forwards` }} />
+      </div>
+    );
+  }
+  if (k === "glass" || k === "cortex") {
+    const cortex = k === "cortex";
+    return (
+      <div className="absolute inset-0 overflow-hidden flex items-center justify-center" style={{ background: LE_LAVENDER, perspective: "1000px" }}>
+        <LeStreaks ms={ms} />
+        <div
+          className="relative rounded-[4vw] flex flex-col items-center justify-center"
+          style={{
+            ...LE_GLASS,
+            width: cortex ? "58vw" : "66vw",
+            height: cortex ? "30vw" : "26vw",
+            transformStyle: "preserve-3d",
+            animation: `${cortex ? "leCardFront" : scene.from === "left" ? "leCardLeft" : "leCardRight"} ${ms}ms cubic-bezier(0.16,1,0.3,1) both`,
+          }}
+        >
+          <div style={{ ...LE_EMBOSS, fontSize: cortex ? "11vw" : "8.4vw", transform: "scaleY(1.28)" }}>{cortex ? "CORTEX" : scene.word}</div>
+          {cortex && (
+            <div className="uppercase" style={{ marginTop: "2.4vw", color: "rgba(255,255,255,0.85)", textShadow: "0 0 14px rgba(255,255,255,0.6)", fontSize: "clamp(12px, 1.3vw, 20px)", fontWeight: 600, animation: `leSpaceIn 1s cubic-bezier(0.16,1,0.3,1) ${LE_BEAT}ms both` }}>
+              Pursue excellence
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (k === "ui") {
+    const rows = [
+      ["Dual N-Back", EXERCISE_COLORS.dual, "10 min"],
+      ["Relational Reasoning", EXERCISE_COLORS.rrt, "6 min"],
+      ["3-D Motion Tracking", EXERCISE_COLORS.motion3d, "5 min"],
+      ["QNB'", EXERCISE_COLORS.iqnb, "5 min"],
+      ["Quad N-Back", EXERCISE_COLORS.quad, "8 min"],
+    ];
+    const levels = [
+      ["Quad N-Back", "quad", 6],
+      ["Dual N-Back", "dual", 5],
+      ["RRT", "rrt", 4],
+      ["3D MOT", "motion3d", 3],
+      ["CCT", "cct", 7],
+    ];
+    const card = { ...LE_GLASS, background: "rgba(255,255,255,0.92)", borderRadius: "1.6vw", padding: "2vw", width: "30vw", color: "#1B1530" };
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: LE_LAVENDER, perspective: "1100px" }}>
+        <LeStreaks ms={ms} />
+        <div className="absolute inset-0 flex items-center justify-center gap-[6vw]" style={{ transformStyle: "preserve-3d", animation: `leDolly ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both` }}>
+          <div style={{ ...card, "--ry": "26deg", "--rx": "6deg", "--fx": "1vw", "--fy": "-2vh", animation: `leFloat ${ms}ms ease-in-out both` }}>
+            <div className="font-bold" style={{ fontSize: "1.5vw", color: "#7537E2" }}>Next session</div>
+            <div style={{ fontSize: "0.9vw", color: "#8A84A0", marginBottom: "1.2vw" }}>Regime: Deep · 34 min</div>
+            {rows.map(([n, c, m], i) => (
+              <div key={n} className="flex items-center justify-between" style={{ padding: "0.7vw 0", borderTop: i ? "1px solid #EEE9F7" : "none", fontSize: "1vw", animation: `leIn 0.3s ease-out ${200 + i * 110}ms both` }}>
+                <span className="flex items-center gap-[0.7vw]">
+                  <span style={{ width: "0.7vw", height: "0.7vw", borderRadius: 99, background: c, display: "inline-block" }} />
+                  {n}
+                </span>
+                <span style={{ color: "#8A84A0" }}>{m}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...card, "--ry": "-26deg", "--rx": "-4deg", "--fx": "-1vw", "--fy": "2vh", animation: `leFloat ${ms}ms ease-in-out both` }}>
+            <div className="font-bold" style={{ fontSize: "1.5vw", color: "#7537E2" }}>Your levels</div>
+            <div style={{ fontSize: "0.9vw", color: "#8A84A0", marginBottom: "1.2vw" }}>Best this month</div>
+            {levels.map(([n, key, lv], i) => (
+              <div key={n} className="flex items-center justify-between" style={{ padding: "0.55vw 0", borderTop: i ? "1px solid #EEE9F7" : "none", fontSize: "1vw", animation: `leIn 0.3s ease-out ${300 + i * 110}ms both` }}>
+                <span className="flex items-center gap-[0.8vw]">
+                  <LevelGem level={lv} size={22} exerciseKey={key} />
+                  {n}
+                </span>
+                <span className="font-semibold" style={{ color: gemTierFor(lv, key).color }}>{gemTierFor(lv, key).label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="absolute uppercase" style={{ right: "7vw", top: "12vh", color: "rgba(40,20,90,0.7)", fontSize: "clamp(16px, 2.2vw, 34px)", fontWeight: 600, animation: `leSpaceIn 0.9s cubic-bezier(0.16,1,0.3,1) ${LE_BEAT * 4}ms both` }}>
+          Train.
+        </div>
+      </div>
+    );
+  }
+  if (k === "count") {
+    return (
+      <div className="absolute inset-0 overflow-hidden flex items-center justify-center" style={{ background: LE_LAVENDER, perspective: "1000px" }}>
+        <LeStreaks ms={ms} />
+        <LeCount beat={LE_BEAT} />
+      </div>
+    );
+  }
+  if (k === "network") {
+    const nodes = [
+      [18, 30], [36, 18], [52, 38], [70, 22], [84, 44], [28, 62], [48, 72], [66, 60], [86, 78],
+    ];
+    const links = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 2], [6, 7], [7, 4], [7, 8], [2, 7], [1, 3]];
+    return (
+      <div className="absolute inset-0 overflow-hidden" style={{ background: "radial-gradient(60% 50% at 50% 40%, rgba(255,255,255,0.35), transparent 70%), linear-gradient(160deg, #B9A6FF 0%, #7B5CF5 50%, #4136D8 100%)", perspective: "1000px" }}>
+        <div className="absolute inset-0" style={{ transformStyle: "preserve-3d", animation: `leNetCam ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both` }}>
+          <svg viewBox="0 0 178 100" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
+            {links.map(([a, b], i) => (
+              <g key={i}>
+                <line x1={nodes[a][0] * 1.78} y1={nodes[a][1]} x2={nodes[b][0] * 1.78} y2={nodes[b][1]} stroke="rgba(255,255,255,0.3)" strokeLinecap="round" pathLength="1" strokeDasharray="1 1" style={{ strokeWidth: 1.4, animation: `leDraw 0.7s cubic-bezier(0.4,0,0.2,1) ${i * 160}ms both` }} />
+                <line x1={nodes[a][0] * 1.78} y1={nodes[a][1]} x2={nodes[b][0] * 1.78} y2={nodes[b][1]} stroke="#FFFFFF" strokeLinecap="round" pathLength="1" strokeDasharray="1 1" style={{ strokeWidth: 0.3, animation: `leDraw 0.7s cubic-bezier(0.4,0,0.2,1) ${i * 160}ms both` }} />
+              </g>
+            ))}
+          </svg>
+          {nodes.map(([x, y], i) => (
+            <div
+              key={i}
+              className="absolute"
+              style={{
+                left: `${x}%`,
+                top: `${y}%`,
+                width: `${7 + brainNoise(i, 61) * 6}vw`,
+                aspectRatio: "1 / 1",
+                marginLeft: "-5vw",
+                marginTop: "-5vw",
+                backgroundImage: `url(${LE_IMG[i % LE_IMG.length]})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                border: "1px solid rgba(255,255,255,0.8)",
+                boxShadow: "-3px 0 10px rgba(255,40,120,0.35), 3px 0 10px rgba(40,180,255,0.35), 0 20px 40px -10px rgba(30,10,90,0.6)",
+                "--ry": `${Math.round((brainNoise(i, 62) - 0.5) * 70)}deg`,
+                "--rx": `${Math.round((brainNoise(i, 63) - 0.5) * 40)}deg`,
+                "--fx": `${(brainNoise(i, 64) - 0.5) * 4}vw`,
+                "--fy": `${(brainNoise(i, 65) - 0.5) * 4}vh`,
+                animation: `leFloat ${ms}ms ease-in-out both, leIn 0.3s ease-out ${i * 140}ms both`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (k === "clock") {
+    return (
+      <div className="absolute inset-0 flex items-center justify-center bg-black">
+        <LeClock />
+      </div>
+    );
+  }
+  return null;
+}
+
+function LaunchEdit({ onExit }) {
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
+  const [phase, setPhase] = useState("wait");
+  const [index, setIndex] = useState(0);
+  const [cut, setCut] = useState(0);
+  const [beatInScene, setBeatInScene] = useState(0);
+  const [leaving, setLeaving] = useState(false);
+  const clockRef = useRef(null);
+  const soundRef = useRef(null);
+
+  // Load the track, then start picture and sound together on the audio clock.
+  useEffect(() => {
+    let cancelled = false;
+    const ctx = letterAudioContext();
+    if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
+    const startSound = (ms) => {
+      if (!ctx || !leTrackBuffer || soundRef.current || ctx.state !== "running") return false;
+      const gain = ctx.createGain();
+      gain.connect(ctx.destination);
+      const src = ctx.createBufferSource();
+      src.buffer = leTrackBuffer;
+      src.connect(gain);
+      const offset = Math.max(0, ms / 1000);
+      const when = ctx.currentTime + 0.03;
+      gain.gain.setValueAtTime(0, when);
+      gain.gain.linearRampToValueAtTime(LE_VOLUME, when + 0.08);
+      src.start(when, offset);
+      soundRef.current = { ctx, gain, src };
+      clockRef.current = () => (ctx.currentTime - when + offset) * 1000;
+      return true;
+    };
+    const begin = () => {
+      if (cancelled || clockRef.current) return;
+      const opened = performance.now();
+      clockRef.current = () => performance.now() - opened;
+      startSound(0);
+      setPhase("play");
+    };
+    const onState = () => {
+      if (ctx && ctx.state === "running" && !soundRef.current && clockRef.current) startSound(clockRef.current());
+    };
+    if (ctx) ctx.addEventListener("statechange", onState);
+    const wait = setTimeout(begin, 4000);
+    preloadLaunchTrack().then(() => {
+      clearTimeout(wait);
+      if (clockRef.current) onState();
+      else begin();
+    });
+    return () => {
+      cancelled = true;
+      clearTimeout(wait);
+      if (ctx) ctx.removeEventListener("statechange", onState);
+      const snd = soundRef.current;
+      if (snd) {
+        const t = snd.ctx.currentTime;
+        snd.gain.gain.cancelScheduledValues(t);
+        snd.gain.gain.setValueAtTime(snd.gain.gain.value, t);
+        snd.gain.gain.linearRampToValueAtTime(0, t + 1.5);
+        try {
+          snd.src.stop(t + 1.6);
+        } catch {
+          /* already stopped */
+        }
+      }
+    };
+  }, []);
+
+  // Cuts and subtitles follow the clock.
+  useEffect(() => {
+    if (phase !== "play") return undefined;
+    const bounds = [];
+    let acc = 0;
+    LE_SCENES.forEach((sc) => {
+      bounds.push(acc);
+      acc += sc.beats * LE_BEAT;
+    });
+    let raf;
+    let current = -1;
+    let done = false;
+    let lastBeat = -1;
+    const tick = () => {
+      const t = clockRef.current ? clockRef.current() : 0;
+      if (t >= acc) {
+        if (!done) {
+          done = true;
+          setLeaving(true);
+          setTimeout(() => exitRef.current(), LE_DISSOLVE_MS);
+        }
+        return;
+      }
+      let i = current < 0 ? 0 : current;
+      while (i + 1 < LE_SCENES.length && t >= bounds[i + 1]) i += 1;
+      if (i !== current) {
+        current = i;
+        setIndex(i);
+        setCut((c) => c + 1);
+      }
+      const b = Math.floor(((t - bounds[i]) / LE_BEAT) * 2) / 2;
+      if (b !== lastBeat) {
+        lastBeat = b;
+        setBeatInScene(b);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  // Esc, a click or a tap skips it.
+  useEffect(() => {
+    let armed = false;
+    const arm = setTimeout(() => (armed = true), 600);
+    const onInput = () => {
+      if (!armed) return;
+      armed = false;
+      setLeaving(true);
+      setTimeout(() => exitRef.current(), LE_DISSOLVE_MS);
+    };
+    const events = ["mousedown", "keydown", "touchstart"];
+    events.forEach((ev) => window.addEventListener(ev, onInput, { passive: true }));
+    return () => {
+      clearTimeout(arm);
+      events.forEach((ev) => window.removeEventListener(ev, onInput));
+    };
+  }, []);
+
+  const scene = LE_SCENES[index];
+  const ms = scene.beats * LE_BEAT;
+  const sub = [...scene.subs].reverse().find(([at]) => beatInScene >= at);
+  const bright = index >= LE_ACT3_FROM && scene.kind !== "clock";
+  const drop = index === LE_ACT3_FROM;
+
+  return (
+    <div
+      className="le-root fixed inset-0 z-[75] overflow-hidden bg-black select-none"
+      style={{ cursor: "none", animation: leaving ? `ssOut ${LE_DISSOLVE_MS}ms ease-in forwards` : undefined }}
+    >
+      <style>{LE_CSS}</style>
+      {phase === "play" && (
+        <div key={cut} className="absolute inset-0" style={{ animation: drop || scene.kind === "cortex" ? "leShake 0.45s cubic-bezier(0.2,0.8,0.3,1) both" : undefined }}>
+          <LeScene scene={scene} ms={ms} />
+        </div>
+      )}
+      {/* Film grain and vignette over everything. */}
+      <div aria-hidden="true" className="ss-grain absolute pointer-events-none" style={{ opacity: bright ? 0.05 : 0.09 }} />
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: bright ? "radial-gradient(ellipse at center, transparent 55%, rgba(40,10,110,0.35) 100%)" : "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.85) 100%)" }}
+      />
+      {/* A flash on every cut: white after the drop, a dim one before it. */}
+      {phase === "play" && (
+        <div
+          key={`f${cut}`}
+          aria-hidden="true"
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: bright || drop ? "#FFFFFF" : "rgba(255,235,210,0.5)",
+            animation: `leFlash ${drop ? 0.6 : bright ? 0.28 : 0.18}s ease-out both`,
+            opacity: 0,
+          }}
+        />
+      )}
+      {phase === "play" && sub && (
+        <div key={`${cut}-${sub[1]}`} className="le-sub">
+          {sub[1]}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HomeSpace({ live = true, visible = true }) {
   const gasRef = useRef(null);
   const farRef = useRef(null);
@@ -11528,6 +12260,8 @@ function NBackSessionApp() {
   // Set as the edit reaches its closing title: Home's sky is built then,
   // unseen, so it is ready the moment Home comes in.
   const [spaceWarm, setSpaceWarm] = useState(false);
+  // The second, launch-style opening edit, played from Pages.
+  const [launchEditOn, setLaunchEditOn] = useState(false);
   // No build-up when the brain was made under the opening edit; a quick one
   // when coming back to Home from elsewhere.
   const constellationEntrance = useRef(mainView === "home" ? 0 : 700);
@@ -16746,6 +17480,7 @@ function NBackSessionApp() {
                   setMainView("home");
                   setScreensaverOn(true);
                 }),
+                go("Opening edit (launch style)", () => setLaunchEditOn(true)),
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
                   setTimeout(() => setSessionCompleteAnim(false), 5500);
@@ -20991,6 +21726,7 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {launchEditOn && <LaunchEdit onExit={() => setLaunchEditOn(false)} />}
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
