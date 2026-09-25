@@ -8355,7 +8355,7 @@ function LegalPage({ doc, onBack }) {
   );
 }
 
-function LevelGem({ level, size = 40, glowPulse = false, exerciseKey }) {
+function LevelGem({ level, size = 40, glowPulse = false, exerciseKey, sparkles = true }) {
   const tier = gemTierFor(level, exerciseKey);
   // Static everywhere by default — glow (a drop-shadow) and the top-right
   // sparkle accent still show on glow-tier gems, but the pulsing/floating
@@ -8387,7 +8387,7 @@ function LevelGem({ level, size = 40, glowPulse = false, exerciseKey }) {
           one-off unlock overlay. Two drift upward and fade; a third sits
           low-opacity at the bottom rather than fully fading, like a resting
           glint. */}
-      {pulse && (
+      {pulse && sparkles && (
         <>
           <div
             className="absolute pointer-events-none select-none"
@@ -9581,10 +9581,12 @@ function makeGlowSprite(rgb = [185, 160, 245]) {
   return c;
 }
 
-// The sound of a ping: a short glassy tone, FM so it has a bright attack
-// that melts into a pure note, with a soft octave below and a quiet echo
-// tail. Each part of the brain rings on its own note of one pentatonic
-// scale, so clicking around plays something that always sounds in key.
+// The sound of a ping: a futuristic synth blip. Two detuned saws through a
+// resonant low-pass whose cutoff snaps open and sweeps shut (the "zap" of an
+// analogue synth), a quick upward chirp in pitch, a glassy sine an octave up
+// for sparkle, then a stereo ping-pong echo into a short shimmering reverb.
+// Each part of the brain plays its own note of one pentatonic scale, so
+// clicking around always sounds in key.
 const BRAIN_PING_NOTES = {
   rrt: 523.25, // C5
   dual: 659.25, // E5
@@ -9594,65 +9596,123 @@ const BRAIN_PING_NOTES = {
   cct: 587.33, // D5
 };
 let brainPingBus = null;
+function brainPingImpulse(ctx) {
+  // A short, bright reverb tail: decaying stereo noise, made once.
+  const len = Math.round(ctx.sampleRate * 1.6);
+  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let ch = 0; ch < 2; ch += 1) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i += 1) {
+      const t = i / len;
+      d[i] = (Math.random() * 2 - 1) * (1 - t) ** 3.2;
+    }
+  }
+  return buf;
+}
 function playBrainPing(key) {
   const ctx = letterAudioContext();
   if (!ctx) return;
   if (ctx.state !== "running") ctx.resume().catch(() => {});
   if (!brainPingBus) {
-    // A shared echo: a short delay feeding back through a gentle low-pass.
     const out = ctx.createGain();
-    out.gain.value = 0.9;
+    out.gain.value = 0.85;
     out.connect(ctx.destination);
-    const delay = ctx.createDelay(1);
-    delay.delayTime.value = 0.19;
+    // Ping-pong: left echo, then right, each darker than the last.
+    const panL = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    const panR = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    if (panL.pan) panL.pan.value = -0.75;
+    if (panR.pan) panR.pan.value = 0.75;
+    const dL = ctx.createDelay(1);
+    const dR = ctx.createDelay(1);
+    dL.delayTime.value = 0.176; // a dotted sixteenth at 128 BPM
+    dR.delayTime.value = 0.176;
+    const tone = ctx.createBiquadFilter();
+    tone.type = "lowpass";
+    tone.frequency.value = 3200;
     const fb = ctx.createGain();
-    fb.gain.value = 0.32;
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 2400;
-    delay.connect(lp);
-    lp.connect(fb);
-    fb.connect(delay);
-    const wet = ctx.createGain();
-    wet.gain.value = 0.35;
-    lp.connect(wet);
-    wet.connect(out);
-    brainPingBus = { dry: out, send: delay };
+    fb.gain.value = 0.42;
+    dL.connect(panL);
+    dL.connect(dR);
+    dR.connect(panR);
+    dR.connect(tone);
+    tone.connect(fb);
+    fb.connect(dL);
+    const echo = ctx.createGain();
+    echo.gain.value = 0.32;
+    panL.connect(echo);
+    panR.connect(echo);
+    echo.connect(out);
+    const verb = ctx.createConvolver();
+    verb.buffer = brainPingImpulse(ctx);
+    const verbGain = ctx.createGain();
+    verbGain.gain.value = 0.28;
+    verb.connect(verbGain);
+    verbGain.connect(out);
+    echo.connect(verb);
+    brainPingBus = { dry: out, send: dL, verb };
   }
   const f = BRAIN_PING_NOTES[key] || 659.25;
   const t = ctx.currentTime + 0.005;
-  const amp = ctx.createGain();
-  amp.gain.setValueAtTime(0, t);
-  amp.gain.linearRampToValueAtTime(0.16, t + 0.006);
-  amp.gain.exponentialRampToValueAtTime(0.0008, t + 1.1);
-  amp.connect(brainPingBus.dry);
-  amp.connect(brainPingBus.send);
-  const carrier = ctx.createOscillator();
-  carrier.type = "sine";
-  carrier.frequency.setValueAtTime(f, t);
-  const mod = ctx.createOscillator();
-  mod.type = "sine";
-  mod.frequency.setValueAtTime(f * 3.01, t);
-  const modGain = ctx.createGain();
-  modGain.gain.setValueAtTime(f * 1.4, t);
-  modGain.gain.exponentialRampToValueAtTime(1, t + 0.35);
-  mod.connect(modGain);
-  modGain.connect(carrier.frequency);
-  carrier.connect(amp);
+  const voice = ctx.createGain();
+  voice.gain.setValueAtTime(0, t);
+  voice.gain.linearRampToValueAtTime(0.11, t + 0.004);
+  voice.gain.exponentialRampToValueAtTime(0.03, t + 0.18);
+  voice.gain.exponentialRampToValueAtTime(0.0006, t + 0.75);
+  voice.connect(brainPingBus.dry);
+  voice.connect(brainPingBus.send);
+  voice.connect(brainPingBus.verb);
+  // The filter: snaps open, then sweeps shut, with a resonant peak.
+  const lp = ctx.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.Q.value = 11;
+  lp.frequency.setValueAtTime(f * 0.8, t);
+  lp.frequency.exponentialRampToValueAtTime(f * 9, t + 0.02);
+  lp.frequency.exponentialRampToValueAtTime(f * 1.1, t + 0.45);
+  lp.connect(voice);
+  const oscs = [];
+  // Two saws a few cents apart, one octave below the note, for a wide body.
+  [-7, 7].forEach((cents) => {
+    const o = ctx.createOscillator();
+    o.type = "sawtooth";
+    o.detune.value = cents;
+    const base = f / 2;
+    o.frequency.setValueAtTime(base * 0.94, t);
+    o.frequency.exponentialRampToValueAtTime(base, t + 0.04);
+    const g = ctx.createGain();
+    g.gain.value = 0.5;
+    o.connect(g);
+    g.connect(lp);
+    oscs.push(o);
+  });
+  // A square two octaves down, very quiet, for weight.
   const sub = ctx.createOscillator();
-  sub.type = "sine";
-  sub.frequency.setValueAtTime(f / 2, t);
-  const subGain = ctx.createGain();
-  subGain.gain.setValueAtTime(0, t);
-  subGain.gain.linearRampToValueAtTime(0.06, t + 0.01);
-  subGain.gain.exponentialRampToValueAtTime(0.0005, t + 0.7);
-  sub.connect(subGain);
-  subGain.connect(brainPingBus.dry);
-  [carrier, mod, sub].forEach((o) => {
+  sub.type = "square";
+  sub.frequency.setValueAtTime(f / 4, t);
+  const subG = ctx.createGain();
+  subG.gain.setValueAtTime(0.12, t);
+  subG.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+  sub.connect(subG);
+  subG.connect(lp);
+  oscs.push(sub);
+  // The glassy top: a sine at the note, chirping up into place.
+  const bell = ctx.createOscillator();
+  bell.type = "sine";
+  bell.frequency.setValueAtTime(f * 1.5, t);
+  bell.frequency.exponentialRampToValueAtTime(f * 2, t + 0.03);
+  const bellG = ctx.createGain();
+  bellG.gain.setValueAtTime(0, t);
+  bellG.gain.linearRampToValueAtTime(0.05, t + 0.005);
+  bellG.gain.exponentialRampToValueAtTime(0.0005, t + 0.6);
+  bell.connect(bellG);
+  bellG.connect(brainPingBus.dry);
+  bellG.connect(brainPingBus.send);
+  oscs.push(bell);
+  oscs.forEach((o) => {
     o.start(t);
-    o.stop(t + 1.2);
+    o.stop(t + 0.9);
   });
 }
+
 
 function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
   const wrapRef = useRef(null);
@@ -10070,6 +10130,7 @@ function ssBurst(list) {
   return Array.from({ length: 8 }, (_, k) => ({ kind: "image", img: list[k % list.length], beats: 0.25 }));
 }
 let ssImagesReady = null;
+const ssImageRefs = [];
 function preloadEditImages() {
   if (typeof window === "undefined") return Promise.resolve();
   if (!ssImagesReady) {
@@ -10077,6 +10138,7 @@ function preloadEditImages() {
       SS_IMAGES.flatMap((im) => [im.src, im.bg]).map((src) => {
         const img = new Image();
         img.src = src;
+        ssImageRefs.push(img);
         return (img.decode ? img.decode() : Promise.resolve()).catch(() => {});
       })
     );
@@ -10109,13 +10171,13 @@ const SS_SCENES = [
 ];
 
 function SsGemLadder() {
-  // Novice to Enlightened, a rank every half beat, then it holds a moment
+  // Novice to Enlightened, a rank every 134ms, then it holds a moment
   // on Enlightened before the cut.
   const [level, setLevel] = useState(1);
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      SS_TRACK_BEAT_MS / 3.6
+      SS_TRACK_BEAT_MS / 3.5
     );
     return () => clearInterval(id);
   }, []);
@@ -10123,30 +10185,49 @@ function SsGemLadder() {
   const top = level === MAX_GEM_TIER;
   return (
     <div className="relative flex flex-col items-center gap-8">
-      {/* The last rank snaps in: one hard flash of light and it is there.
-          A soft-edged burst around the gem (not a full-frame box: this sits
-          inside the moving scene, where "fixed" would be clipped to it). */}
+      {/* The last rank lands like a hit: a burst of red light behind it,
+          two shockwave rings, a flash, and the gem slamming in from large
+          with a small shake. */}
       {top && (
-        <div
-          aria-hidden="true"
-          className="absolute left-1/2 pointer-events-none rounded-full"
-          style={{
-            top: 100,
-            width: 900,
-            height: 900,
-            marginLeft: -450,
-            marginTop: -450,
-            background: "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,235,235,0.35) 22%, transparent 60%)",
-            animation: "ssTopFlash 0.24s ease-out both",
-          }}
-        />
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 pointer-events-none rounded-full"
+            style={{
+              top: 100,
+              width: 520,
+              height: 520,
+              marginLeft: -260,
+              marginTop: -260,
+              background: `radial-gradient(circle, ${tier.color}AA 0%, ${tier.color}33 35%, transparent 70%)`,
+              animation: "ssTopBurst 0.9s cubic-bezier(0.1,0.8,0.2,1) both",
+            }}
+          />
+          {[0, 110].map((delay) => (
+            <div
+              key={delay}
+              aria-hidden="true"
+              className="absolute left-1/2 pointer-events-none rounded-full"
+              style={{
+                top: 100,
+                width: 220,
+                height: 220,
+                marginLeft: -110,
+                marginTop: -110,
+                border: `2px solid ${tier.color}`,
+                boxShadow: `0 0 24px ${tier.color}`,
+                animation: `ssTopRing 0.8s cubic-bezier(0.1,0.7,0.2,1) ${delay}ms both`,
+              }}
+            />
+          ))}
+        </>
       )}
       <div
         key={level}
         className="relative"
         style={{
           animation: top
-            ? "ssTopSlam 0.26s cubic-bezier(0.2,1.2,0.3,1) both"
+            ? "ssEnlSlam 0.55s cubic-bezier(0.2,1.5,0.3,1) both"
             : "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both",
         }}
       >
@@ -10158,7 +10239,7 @@ function SsGemLadder() {
         style={{
           color: tier.color,
           textShadow: top ? `0 0 50px ${tier.color}, 0 0 12px ${tier.color}` : `0 0 40px ${tier.color}88`,
-          animation: top ? "ssTopLabel 0.26s cubic-bezier(0.2,1.2,0.3,1) both" : undefined,
+          animation: top ? "ssEnlLabel 0.6s cubic-bezier(0.2,1.3,0.3,1) 60ms both" : undefined,
         }}
       >
         {tier.label}
@@ -10393,7 +10474,21 @@ function IdleScreensaver({ onExit, onEnding }) {
       // browser leaves this request pending indefinitely, and waiting on it
       // is what held the edit on black before it lurched into life.
       if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
-      begin();
+      // Hold on black until the page has settled: while the app is still
+      // mounting underneath (Home, its sky, data loading), the first cuts
+      // stuttered. Starts once frames have run smoothly for a moment, and
+      // never waits more than a second and a half for it.
+      const gateStart = performance.now();
+      let smooth = 0;
+      let prev = gateStart;
+      const settle = (now) => {
+        if (cancelled) return;
+        smooth = now - prev < 24 ? smooth + 1 : 0;
+        prev = now;
+        if (smooth >= 14 || now - gateStart > 1500) begin();
+        else requestAnimationFrame(settle);
+      };
+      requestAnimationFrame(settle);
     };
     waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
     // Only the music is worth waiting for: the first images don't appear
@@ -10451,9 +10546,14 @@ function IdleScreensaver({ onExit, onEnding }) {
       const now = performance.now();
       let t = clockRef.current ? clockRef.current() : 0;
       if (lastT !== null && !document.hidden) {
-        // Catch up to the music at most a quarter faster than real time.
-        const allowed = lastT + (now - lastNow) * 1.25;
-        if (t > allowed) t = allowed;
+        // Never faster than real time. After a real stall (a long frame)
+        // the picture simply picks up where the music is, as a video
+        // would; it no longer sprints to catch up, which rushed the cuts.
+        const dt = now - lastNow;
+        if (dt < 150) {
+          const allowed = lastT + dt * 1.02;
+          if (t > allowed) t = allowed;
+        }
       }
       lastT = t;
       lastNow = now;
@@ -11406,6 +11506,12 @@ function NBackSessionApp() {
   // Set as the edit reaches its closing title: Home's sky is built then,
   // unseen, so it is ready the moment Home comes in.
   const [spaceWarm, setSpaceWarm] = useState(false);
+  // No build-up when the brain was made under the opening edit; a quick one
+  // when coming back to Home from elsewhere.
+  const constellationEntrance = useRef(mainView === "home" ? 0 : 700);
+  useEffect(() => {
+    if (mainView !== "home") constellationEntrance.current = 700;
+  }, [mainView]);
   // True while walking the screens from the Pages list, so every screen
   // carries a way back to it. Testing only.
   const [pagesMode, setPagesMode] = useState(false);
@@ -15189,6 +15295,25 @@ function NBackSessionApp() {
           50% { opacity: 1; transform: scale(1.2); }
         }
         @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
+        @keyframes ssEnlSlam {
+          0% { transform: scale(1.9); opacity: 0; filter: brightness(3); }
+          35% { transform: scale(0.94) translate(-4px, 2px); opacity: 1; filter: brightness(1.6); }
+          55% { transform: scale(1.04) translate(3px, -2px); }
+          100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+        }
+        @keyframes ssTopRing {
+          0% { transform: scale(0.4); opacity: 1; }
+          100% { transform: scale(3.2); opacity: 0; }
+        }
+        @keyframes ssTopBurst {
+          0% { transform: scale(0.3); opacity: 0; }
+          25% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1.25); opacity: 0.35; }
+        }
+        @keyframes ssEnlLabel {
+          0% { transform: scale(1.6); opacity: 0; letter-spacing: 0.4em; }
+          100% { transform: scale(1); opacity: 1; letter-spacing: 0.12em; }
+        }
         @keyframes ssTopSlam {
           0% { transform: scale(1.35); opacity: 0.4; }
           45% { transform: scale(0.97) translate(-3px, 1px); opacity: 1; }
@@ -19954,24 +20079,18 @@ function NBackSessionApp() {
 
       {unlockInfo && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8"
-          /* On a record the screen builds over the stretch before the
-             track's drop, rather than cutting in fully formed while the
-             music is still climbing. */
-          style={
-            unlockInfo.isNewPR
-              ? { animation: "prBackdrop 2s ease-out both" }
-              : undefined
-          }
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black p-8 overflow-hidden"
+          style={{ animation: "ssIn 0.6s ease-out both" }}
         >
           {/* The opening edit's look: violet smoke, grain, vignette and
-              widescreen bars, under everything else on this screen. */}
+              widescreen bars. Nothing gold, nothing blurred live, so it
+              stays smooth. */}
           <SsSmoke playing />
           <div aria-hidden="true" className="ss-grain absolute pointer-events-none" />
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.8) 100%)" }}
+            style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%)" }}
           />
           <div
             aria-hidden="true"
@@ -19983,10 +20102,40 @@ function NBackSessionApp() {
             className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
             style={{ height: "8vh", animation: "ssBarBottom 1s cubic-bezier(0.2,0.8,0.2,1) both" }}
           />
-          {/* The moment it lands: a light streak across the frame and a
-              soft flash, as on every cut in the edit. */}
+          {/* Before the drop on a record: violet light slowly gathering in
+              the middle, and a thin line of light drawing across. */}
+          {prCinematic && !prRevealed && (
+            <>
+              <div
+                aria-hidden="true"
+                className="absolute left-1/2 top-1/2 pointer-events-none rounded-full"
+                style={{
+                  width: "90vmax",
+                  height: "90vmax",
+                  marginLeft: "-45vmax",
+                  marginTop: "-45vmax",
+                  background: "radial-gradient(closest-side, rgba(117,55,226,0.28), rgba(117,55,226,0.08) 45%, transparent 70%)",
+                  animation: "prGather 4.6s cubic-bezier(0.4,0,0.2,1) both",
+                  willChange: "transform, opacity",
+                }}
+              />
+              <div
+                aria-hidden="true"
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  top: "50%",
+                  height: "1px",
+                  background: "linear-gradient(90deg, transparent, rgba(217,200,255,0.55), transparent)",
+                  animation: "ssFlare 4.6s ease-in both",
+                  animationDirection: "reverse",
+                }}
+              />
+            </>
+          )}
           {(!prCinematic || prRevealed) && (
             <>
+              {/* The moment it lands: a streak of light and a soft flash,
+                  as on every cut in the edit. */}
               <div
                 aria-hidden="true"
                 className="absolute left-0 right-0 pointer-events-none"
@@ -20004,232 +20153,107 @@ function NBackSessionApp() {
                 aria-hidden="true"
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                  background: "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.12) 30%, transparent 60%)",
-                  animation: "ssTopFlash 0.35s ease-out both",
+                  background: "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.4) 0%, rgba(217,200,255,0.1) 30%, transparent 60%)",
+                  animation: "ssTopFlash 0.4s ease-out both",
+                }}
+              />
+              <div
+                aria-hidden="true"
+                className="absolute left-1/2 top-1/2 pointer-events-none rounded-full"
+                style={{
+                  width: "70vmax",
+                  height: "70vmax",
+                  marginLeft: "-35vmax",
+                  marginTop: "-35vmax",
+                  background: "radial-gradient(closest-side, rgba(117,55,226,0.22), rgba(117,55,226,0.06) 45%, transparent 70%)",
+                  animation: "ssIn 0.5s ease-out both",
                 }}
               />
             </>
           )}
-          {prCinematic && (
-            /* Pre-roll. Sized in viewport units throughout so it fills the
-               screen on any display, rather than being a small scene in the
-               middle of a large dark rectangle. */
-            <div
-              className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
-              aria-hidden="true"
-              style={{ animation: "prPrerollFade 7.2s ease-out both" }}
-            >
-              {/* A beat of true black first. The backdrop behind this is
-                  only 90% opaque, so without it the page still shows
-                  through and nothing feels like it stopped. */}
-              <div
-                className="absolute inset-0 bg-black"
-                style={{ animation: "prBlackout 3.4s ease-out both" }}
-              />
-              {/* Vapour. Six masses spread the full width, heavily blurred
-                  and drifting at different rates — slow enough to read as
-                  atmosphere rather than as objects moving. */}
-              {[
-                { x: -46, s: 1.1, d: 0.6, dur: 6.5, c: `${PR_YELLOW}1f` },
-                { x: -22, s: 0.85, d: 1.6, dur: 7, c: "#ffffff10" },
-                { x: 0, s: 1.3, d: 1.2, dur: 7.5, c: "#ffffff14" },
-                { x: 20, s: 0.9, d: 1.9, dur: 6, c: `${PR_YELLOW}17` },
-                { x: 42, s: 1.15, d: 2.6, dur: 8, c: "#ffffff0f" },
-                { x: 58, s: 1, d: 3.2, dur: 7, c: `${PR_YELLOW}14` },
-              ].map(({ x, s: scale, d, dur, c }, i) => (
-                <div
-                  key={`v${i}`}
-                  className="absolute"
-                  style={{
-                    width: `${52 * scale}vw`,
-                    height: `${46 * scale}vh`,
-                    left: `calc(50% + ${x}vw)`,
-                    transform: "translateX(-50%)",
-                    borderRadius: "50%",
-                    background: `radial-gradient(closest-side, ${c}, transparent 70%)`,
-                    filter: "blur(60px)",
-                    animation: `prVapour ${dur}s ${d}s ease-out both`,
-                  }}
-                />
-              ))}
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: "78vmax",
-                  height: "78vmax",
-                  background: `radial-gradient(closest-side, ${PR_YELLOW}22, ${PR_YELLOW}0b 42%, transparent 70%)`,
-                  animation: "prGather 3.4s ease-out both",
-                }}
-              />
-              {/* Sparkles across the whole field, at irregular positions. */}
-              {[
-                [-42, -34, 0], [38, -38, 0.5], [-46, 22, 1.1],
-                [44, 26, 0.35], [-18, -42, 0.8], [22, 40, 1.4],
-                [47, -12, 0.95], [-33, 38, 0.6], [8, -30, 1.25],
-                [-8, 33, 0.15], [30, 8, 1.55], [-28, -8, 0.75],
-              ].map(([x, y, delay], i) => (
-                <div
-                  key={`s${i}`}
-                  className="absolute"
-                  style={{
-                    left: `calc(50% + ${x}vw)`,
-                    top: `calc(50% + ${y}vh)`,
-                    width: 12,
-                    height: 12,
-                    background: `radial-gradient(closest-side, ${PR_YELLOW}, transparent 70%)`,
-                    animation: `prSparkle 2.2s ${delay}s ease-in-out infinite both`,
-                  }}
-                />
-              ))}
-              {/* Motes converging from off-screen toward the centre. */}
-              {Array.from({ length: 18 }).map((_, i) => {
-                const angle = (i / 18) * Math.PI * 2;
-                const dist = 46 + (i % 3) * 9;
-                return (
-                  <div
-                    key={`m${i}`}
-                    className="absolute rounded-full"
-                    style={{
-                      width: 4,
-                      height: 4,
-                      background: PR_YELLOW,
-                      "--mx": `${(Math.cos(angle) * dist).toFixed(2)}vw`,
-                      "--my": `${(Math.sin(angle) * dist).toFixed(2)}vh`,
-                      /* `both` matters more than it looks: without a fill
-                         mode, a mote waiting out its delay shows its
-                         un-animated state — opacity 1, no transform — so all
-                         eighteen sat stacked at dead centre as one small dot
-                         until their turn came. */
-                      animation: `prMote 2.6s ${(i % 6) * 0.28}s cubic-bezier(0.4,0,0.2,1) infinite both`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-          {prCinematic && (
-            <PrGoldGlow
-              className="pointer-events-none absolute inset-0 w-full h-full"
-              out={prGlowOut}
-              style={{
-                opacity: prRevealed ? 1 : 0,
-                transition: "opacity 2s ease-out",
-              }}
-            />
-          )}
-          <div
-            key={!prCinematic || prRevealed ? "landed" : "waiting"}
-            className="relative flex flex-col items-center text-center gap-14 max-w-sm"
-            style={
-              prCinematic
-                ? {
-                    // Resolves ON the drop. A transition rather than an
-                    // animation, so its end state is simply the element's
-                    // normal appearance and it cannot be left mid-way.
-                    opacity: prRevealed ? 1 : 0,
-                    transform: prRevealed
-                      ? "translateY(0) scale(1)"
-                      : "translateY(26px) scale(0.94)",
-                    filter: prRevealed ? "blur(0px)" : "blur(14px)",
-                    // Long, and eased so almost all the movement happens
-                    // early and it drifts into place — an abrupt arrival is
-                    // usually a curve that finishes fast, not one that is
-                    // too short.
-                    // Lands hard on the drop, like a cut in the edit.
-                    transition:
-                      "opacity 0.35s ease-out, transform 0.5s cubic-bezier(0.2,1.2,0.3,1), filter 0.35s ease-out",
-                  }
-                : undefined
-            }
-          >
-            {unlockInfo.isNewPR ? (
-              <div
-                className="text-2xl font-semibold uppercase tracking-widest mb-2"
-                style={{
-                  color: PR_YELLOW,
-                  textShadow: `0 0 24px ${PR_YELLOW}66`,
-                }}
-              >
-                {/* Word by word, rising out of blur, as the edit's lines do. */}
-                {"New level reached".split(" ").map((w, wi) => (
-                  <span
-                    key={wi}
-                    className="inline-block"
-                    style={{
-                      marginRight: "0.35em",
-                      animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 90}ms both`,
-                    }}
-                  >
-                    {w}
-                  </span>
-                ))}
-              </div>
-            ) : (
-              <div className="text-base uppercase tracking-wide text-slate-400">
-                Level up
-              </div>
-            )}
-
-            <div className="relative" style={{ animation: "ssTopSlam 0.32s cubic-bezier(0.2,1.2,0.3,1) both" }}>
-              <LevelGem
-                level={unlockInfo.level}
-                size={168}
-                exerciseKey={unlockInfo.exerciseKey}
-                glowPulse={gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).glow}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div
-                className="text-3xl font-semibold tracking-tight ss-split"
-                style={{ animationDelay: "180ms" }}
-              >
-                {/* Always the level reached ("Quad 5-Back"), never the bare
-                    exercise name. */}
-                {unlockInfo.title.replace("N-Back", `${unlockInfo.level}-Back`)}
-              </div>
-              {unlockInfo.isNewPR && (
-                <div
-                  className="text-lg font-semibold tracking-wide"
-                  style={{
-                    color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
-                    animation: "ssTaglineIn 0.5s ease-out 320ms both",
-                  }}
-                >
-                  {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
+          {(!prCinematic || prRevealed) && (
+            <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
+              {unlockInfo.isNewPR ? (
+                <div className="text-2xl font-semibold uppercase tracking-widest mb-2">
+                  {/* Word by word, rising out of blur, as the edit's lines do. */}
+                  {"New level reached".split(" ").map((w, wi) => (
+                    <span
+                      key={wi}
+                      className="inline-block"
+                      style={{
+                        marginRight: "0.35em",
+                        background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 45%, #9A6CF0 100%)",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        color: "transparent",
+                        animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 90}ms both`,
+                      }}
+                    >
+                      {w}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-base uppercase tracking-wide text-slate-400">
+                  Level up
                 </div>
               )}
-            </div>
 
-            {/* Dismisses the overlay — doesn't navigate anywhere, so
-                whatever screen was underneath (results, mid-session, etc.)
-                picks up exactly where it was, letting them carry on with
-                the rest of their session instead of getting bounced out.
-                Also explicitly re-checks for newly-unlocked achievements
-                right here (see checkForNewAchievements) so that if this
-                level-up also crossed an achievement threshold, that
-                celebration is guaranteed to be queued and chains in
-                immediately, rather than possibly trailing in later. */}
-            <button
-              onClick={() => {
-                // The tune, not the click: this button is the moment the
-                // reward is collected, so it should sound like one every
-                // time it is pressed.
-                playLevelUp();
-                // Take the music out with the screen rather than cutting it
-                // dead or leaving it running over whatever comes next.
-                fadeOutCelebrationSong();
-                setUnlockInfo(null);
-                checkForNewAchievements();
-              }}
-              className={`w-full max-w-xs bg-gradient-to-r ${
-                ACCENT_STYLES[EXERCISE_LIBRARY[unlockInfo.exerciseKey]?.accent]?.grad ||
-                ACCENT_STYLES.indigo.grad
-              } hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
-            >
-              Accept
-            </button>
-          </div>
+              <div className="relative" style={{ animation: "ssTopSlam 0.32s cubic-bezier(0.2,1.2,0.3,1) both" }}>
+                <LevelGem
+                  level={unlockInfo.level}
+                  size={168}
+                  exerciseKey={unlockInfo.exerciseKey}
+                  glowPulse={gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).glow}
+                  sparkles={false}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <div
+                  className="text-3xl font-semibold tracking-tight ss-split"
+                  style={{ animation: "ssTaglineIn 0.45s ease-out 180ms both, ssSplit 0.5s ease-out 180ms both" }}
+                >
+                  {/* Always the level reached ("Quad 5-Back"), never the bare
+                      exercise name. */}
+                  {unlockInfo.title.replace("N-Back", `${unlockInfo.level}-Back`)}
+                </div>
+                {unlockInfo.isNewPR && (
+                  <div
+                    className="text-lg font-semibold tracking-wide"
+                    style={{
+                      color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
+                      animation: "ssTaglineIn 0.5s ease-out 320ms both",
+                    }}
+                  >
+                    {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
+                  </div>
+                )}
+              </div>
+
+              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.5s ease-out 480ms both" }}>
+              <button
+                onClick={() => {
+                  // The tune, not the click: this button is the moment the
+                  // reward is collected, so it should sound like one every
+                  // time it is pressed.
+                  playLevelUp();
+                  // Take the music out with the screen rather than cutting it
+                  // dead or leaving it running over whatever comes next.
+                  fadeOutCelebrationSong();
+                  setUnlockInfo(null);
+                  checkForNewAchievements();
+                }}
+                className={`w-full max-w-xs bg-gradient-to-r ${
+                  ACCENT_STYLES[EXERCISE_LIBRARY[unlockInfo.exerciseKey]?.accent]?.grad ||
+                  ACCENT_STYLES.indigo.grad
+                } hover:opacity-90 transition-opacity rounded-lg py-3.5 font-medium text-lg shadow-lg shadow-black/30`}
+              >
+                Accept
+              </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -20947,14 +20971,17 @@ function NBackSessionApp() {
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
           the column for it. */}
-      {mainView === "home" && !screensaverOn && (
+      {mainView === "home" && (
         <div className="home-constellation hidden xl:flex fixed z-20 top-1/2 -translate-y-1/2 pointer-events-none"
           style={{
+            // Built while the opening edit plays (hidden), so the brain is
+            // already whole when Home appears rather than assembling late.
+            visibility: screensaverOn ? "hidden" : "visible",
             width: "min(560px, calc((100vw - 42.25rem) / 2 - 24px))",
             left: "calc(((100vw - 42.25rem) / 2 - min(560px, calc((100vw - 42.25rem) / 2 - 24px))) / 2)",
           }}
         >
-          <HomeConstellation days={trainedDayCount} />
+          <HomeConstellation days={trainedDayCount} entranceMs={constellationEntrance.current} />
         </div>
       )}
 
