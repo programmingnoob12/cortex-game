@@ -9772,8 +9772,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         if (t < 0 || t > 1) continue;
         const r = PING_R * (1 - (1 - t) ** 2);
         const d = Math.sqrt((x - pg.x) ** 2 + (y - pg.y) ** 2);
-        const band = Math.exp(-((d - r) ** 2) / 90);
-        v = Math.max(v, band * (1 - t));
+        const band = Math.exp(-((d - r) ** 2) / 140) + 0.45 * Math.exp(-((d - r * 0.62) ** 2) / 90);
+        v = Math.max(v, Math.min(1, band) * (1 - t));
       }
       return v;
     };
@@ -9867,18 +9867,28 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
         const t = (now - pg.t0) / PING_MS;
         if (t < 0 || t > 1) continue;
         const r = PING_R * (1 - (1 - t) ** 2);
-        // A bright ring with a soft echo just inside it.
-        ctx.strokeStyle = rgba(pg.key, 0.8 * (1 - t) ** 1.6, 0.35);
-        ctx.lineWidth = (1.6 * (1 - t) + 0.35) * scale;
-        ctx.beginPath();
-        ctx.arc(px(pg.x), py(pg.y), r * scale, 0, Math.PI * 2);
-        ctx.stroke();
-        if (r > 8) {
-          ctx.strokeStyle = rgba(pg.key, 0.3 * (1 - t) ** 2, 0.2);
-          ctx.lineWidth = 0.6 * scale;
+        // A soft wave of light rolling outward, with a fainter ripple
+        // trailing behind it. No hard edge anywhere.
+        const cx = px(pg.x);
+        const cy = py(pg.y);
+        const fade = (1 - t) ** 1.5;
+        const bands = [
+          [r, 0.34 * fade, 9 + 10 * t],
+          [r * 0.62, 0.16 * fade, 7 + 8 * t],
+        ];
+        for (let q = 0; q < bands.length; q += 1) {
+          const [br, ba, bw] = bands[q];
+          if (br < 1 || ba < 0.004) continue;
+          const inner = Math.max(0, br - bw);
+          const outer = br + bw;
+          const gr = ctx.createRadialGradient(cx, cy, inner * scale, cx, cy, outer * scale);
+          gr.addColorStop(0, rgba(pg.key, 0, 0.3));
+          gr.addColorStop(0.5, rgba(pg.key, ba, 0.3));
+          gr.addColorStop(1, rgba(pg.key, 0, 0.3));
+          ctx.fillStyle = gr;
           ctx.beginPath();
-          ctx.arc(px(pg.x), py(pg.y), (r - 7) * scale, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(cx, cy, outer * scale, 0, Math.PI * 2);
+          ctx.fill();
         }
         if (t < 0.35) {
           const g = (6 + 14 * t) * scale;
@@ -9920,6 +9930,10 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       const key = brainRegion(x, y);
       pings.push({ x, y, t0: performance.now(), key });
       playBrainPing(key);
+      // Send the wave on into the sky behind, so the stars there answer too.
+      window.dispatchEvent(
+        new CustomEvent("cortex-brain-ping", { detail: { x: ev.clientX, y: ev.clientY, rgb: BRAIN_REGION_RGB[key] } }),
+      );
       if (pings.length > 6) pings.shift();
       kick();
     };
@@ -9954,6 +9968,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
           // against the page behind it.
           WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
           maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
+          // Its light adds to the sky behind, so the brain sits among the stars.
+          mixBlendMode: "screen",
         }}
       />
     </div>
@@ -10750,17 +10766,6 @@ function IdleScreensaver({ onExit, onEnding }) {
   );
 }
 
-// Deep space behind Home. Two canvases:
-//
-// The still sky, drawn once per window size: a band of the Milky Way running
-// corner to corner, with dust lanes through it; two nebulae, one violet and
-// one teal; and stars that crowd towards the band the way real ones do, the
-// brightest with a soft glow and a few with diffraction spikes.
-//
-// The living sky, at 30 frames a second on top: two spiral galaxies turning
-// very slowly, bright stars twinkling, a shooting star every several
-// seconds, and now and then a supernova, a flash, a shockwave and a
-// glowing remnant that fades out.
 function spaceSprite(rgb, size = 64) {
   const c = document.createElement("canvas");
   c.width = size;
@@ -10827,84 +10832,115 @@ function makeGalaxy(size, seed, armRgb, coreRgb) {
   return c;
 }
 
+// Deep space behind Home, built to feel like being out there rather than
+// looking at a picture of it:
+//
+// - Depth. The sky is three layers, far stars, near stars and the glowing
+//   gas, each drifting by a different amount as the pointer moves, so the
+//   near stars slide past the far ones (parallax) the way they would if you
+//   were floating among them.
+// - Breath. The gas slowly swells, turns and brightens and dims on a long
+//   cycle, and a faint cosmic dust rolls across in front of it.
+// - Life. Stars twinkle, each on its own rhythm; the odd fiery meteor
+//   crosses; and stars near the pointer glow a little as you move, as if
+//   your hand were among them.
+// - Touch. A ping on the brain carries on out into the sky as a wave in the
+//   brain part's colour, lighting the stars it passes.
+//
+// The layers are drawn once; only the small living layer is redrawn, and
+// the drift is done with CSS transforms the graphics card handles.
+const SPACE_PAD = 48; // extra sky beyond each edge, for the layers to drift into
 function HomeSpace({ live = true, visible = true }) {
-  const stillRef = useRef(null);
+  const gasRef = useRef(null);
+  const farRef = useRef(null);
+  const nearRef = useRef(null);
   const liveRef = useRef(null);
-  // Drawn while the edit is still ending, hidden and still, so the sky is
-  // already there the moment Home arrives; it starts moving once visible.
   const liveOn = useRef(live);
   liveOn.current = live;
   useEffect(() => {
-    const still = stillRef.current;
-    const live = liveRef.current;
-    if (!still || !live) return undefined;
+    const gasC = gasRef.current;
+    const farC = farRef.current;
+    const nearC = nearRef.current;
+    const liveC = liveRef.current;
+    if (!gasC || !farC || !nearC || !liveC) return undefined;
     const reduce =
       window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const white = spaceSprite([255, 255, 255], 64);
     const ember = spaceSprite([255, 130, 40], 64);
-    const blue = spaceSprite([170, 200, 255], 64);
-    // The exercises' own vivid colours: the app's purple, Dual's blue,
-    // QNB's cyan, CCT's crimson.
     const violet = spaceSprite(hexRgb("#7537E2"), 128);
     const teal = spaceSprite(hexRgb(EXERCISE_COLORS.iqnb), 128);
     const rose = spaceSprite(hexRgb(EXERCISE_COLORS.cct), 128);
     const azure = spaceSprite(hexRgb(EXERCISE_COLORS.dual), 128);
-    const galaxies = [];
-    let W = 0;
+    const tinted = {};
+    const spriteFor = (rgb) => {
+      const k = rgb.join(",");
+      if (!tinted[k]) tinted[k] = spaceSprite(rgb, 64);
+      return tinted[k];
+    };
+
+    let W = 0; // the drawn sky, window plus padding
     let H = 0;
+    let stars = []; // brighter stars, kept for the living effects
     let twinklers = [];
 
-    const drawStill = () => {
-      const dpr = Math.min(1.5, window.devicePixelRatio || 1);
-      W = window.innerWidth;
-      H = window.innerHeight;
-      still.width = Math.round(W * dpr);
-      still.height = Math.round(H * dpr);
-      const g = still.getContext("2d");
+    const prep = (c, dpr) => {
+      c.width = Math.round(W * dpr);
+      c.height = Math.round(H * dpr);
+      const g = c.getContext("2d");
       g.setTransform(dpr, 0, 0, dpr, 0, 0);
       g.clearRect(0, 0, W, H);
-      // The band: from bottom left to top right.
+      return g;
+    };
+
+    const drawSky = () => {
+      W = window.innerWidth + SPACE_PAD * 2;
+      H = window.innerHeight + SPACE_PAD * 2;
+      const dpr = Math.min(1.5, window.devicePixelRatio || 1);
       const bx = (t) => W * (-0.05 + t * 1.1);
       const by = (t) => H * (1.05 - t * 1.0);
       const bandDist = (x, y) => {
-        // distance from the line through the band's two ends
         const x1 = bx(0), y1 = by(0), x2 = bx(1), y2 = by(1);
         const len = Math.hypot(x2 - x1, y2 - y1);
         return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / len;
       };
-      g.globalCompositeOperation = "lighter";
+
+      // Gas: the band across the sky and one nebula, soft and faint.
+      const gg = prep(gasC, Math.min(1, dpr));
+      gg.globalCompositeOperation = "lighter";
       for (let k = 0; k < 22; k += 1) {
         const t = brainNoise(k, 61);
         const off = (brainNoise(k, 62) - 0.5) * H * 0.2;
-        const x = bx(t) + off * 0.6;
-        const y = by(t) + off;
-        // Fewer, bigger, softer clouds: a smooth band, not blotches.
         const sz = H * (0.2 + brainNoise(k, 63) * 0.2);
         const pick = brainNoise(k, 64);
-        g.globalAlpha = 0.03 + brainNoise(k, 65) * 0.03;
-        g.drawImage(pick > 0.72 ? rose : pick > 0.45 ? violet : pick > 0.2 ? azure : teal, x - sz, y - sz, sz * 2, sz * 2);
+        gg.globalAlpha = 0.035 + brainNoise(k, 65) * 0.035;
+        gg.drawImage(
+          pick > 0.72 ? rose : pick > 0.45 ? violet : pick > 0.2 ? azure : teal,
+          bx(t) + off * 0.6 - sz,
+          by(t) + off - sz,
+          sz * 2,
+          sz * 2
+        );
       }
-      // Two nebulae, off the band.
-      const nebula = (cx, cy, spr, n, spread, seed) => {
-        for (let k = 0; k < n; k += 1) {
-          const a2 = brainNoise(seed + k, 1) * Math.PI * 2;
-          const d = brainNoise(seed + k, 2) * spread;
-          const sz = spread * (0.4 + brainNoise(seed + k, 3) * 0.6);
-          g.globalAlpha = 0.045 + brainNoise(seed + k, 4) * 0.04;
-          g.drawImage(spr, cx + Math.cos(a2) * d - sz, cy + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
-        }
-      };
-      nebula(W * 0.7, H * 0.62, rose, 10, Math.min(W, H) * 0.2, 700);
+      const spread = Math.min(W, H) * 0.2;
+      for (let k = 0; k < 10; k += 1) {
+        const a2 = brainNoise(700 + k, 1) * Math.PI * 2;
+        const d = brainNoise(700 + k, 2) * spread;
+        const sz = spread * (0.4 + brainNoise(700 + k, 3) * 0.6);
+        gg.globalAlpha = 0.05 + brainNoise(700 + k, 4) * 0.04;
+        gg.drawImage(rose, W * 0.7 + Math.cos(a2) * d - sz, H * 0.62 + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
+      }
 
-      g.globalCompositeOperation = "source-over";
-      // Stars: many faint, crowding towards the band; a few bright.
-      g.globalCompositeOperation = "lighter";
-      const count = Math.round((W * H) / 3000);
+      // Stars, split into a far layer (small, faint) and a near one.
+      const fg = prep(farC, dpr);
+      const ng = prep(nearC, dpr);
+      fg.globalCompositeOperation = "lighter";
+      ng.globalCompositeOperation = "lighter";
+      const count = Math.round((W * H) / 2600);
+      stars = [];
       twinklers = [];
       for (let i = 0; i < count; i += 1) {
         let x = brainNoise(i, 81) * W;
         let y = brainNoise(i, 82) * H;
-        // Half of them pulled in close to the band.
         if (brainNoise(i, 83) < 0.5) {
           const t = brainNoise(i, 84);
           const off = (brainNoise(i, 85) + brainNoise(i, 86) - 1) * H * 0.2;
@@ -10912,89 +10948,170 @@ function HomeSpace({ live = true, visible = true }) {
           y = by(t) + off;
         }
         const m = brainNoise(i, 87);
-        const near = Math.exp(-((bandDist(x, y) / (H * 0.25)) ** 2));
-        const a2 = (0.14 + brainNoise(i, 88) * 0.36) * (0.7 + 0.3 * near);
+        const nearBand = Math.exp(-((bandDist(x, y) / (H * 0.25)) ** 2));
+        const a2 = (0.14 + brainNoise(i, 88) * 0.36) * (0.7 + 0.3 * nearBand);
         const tint = brainNoise(i, 89);
-        g.globalAlpha = a2;
-        g.fillStyle = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
-        const r = m > 0.99 ? 1.1 : m > 0.93 ? 0.8 : 0.55;
+        const colour = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
+        const isNear = m > 0.9;
+        const g = isNear ? ng : fg;
+        const r = m > 0.99 ? 1.15 : isNear ? 0.85 : 0.5;
+        g.globalAlpha = isNear ? Math.min(1, a2 + 0.2) : a2;
+        g.fillStyle = colour;
         g.beginPath();
         g.arc(x, y, r, 0, Math.PI * 2);
         g.fill();
         if (m > 0.99) {
-          // The brightest get only a faint halo of their own light: clean
-          // points, not the crosses and big glows that looked cheap.
           g.globalAlpha = 0.12;
           g.beginPath();
           g.arc(x, y, 2.6, 0, Math.PI * 2);
           g.fill();
-          if (twinklers.length < 5) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
+        }
+        if (isNear) {
+          stars.push({ x, y, r, layer: 1 });
+          if (brainNoise(i, 92) < 0.35 && twinklers.length < 60) {
+            twinklers.push({ x, y, r, phase: brainNoise(i, 90) * 6.28, speed: 0.4 + brainNoise(i, 91) * 1.6 });
+          }
         }
       }
-      g.globalAlpha = 1;
-      g.globalCompositeOperation = "source-over";
     };
 
     const dprL = Math.min(1.25, window.devicePixelRatio || 1);
     const sizeLive = () => {
-      live.width = Math.round(window.innerWidth * dprL);
-      live.height = Math.round(window.innerHeight * dprL);
+      liveC.width = Math.round(W * dprL);
+      liveC.height = Math.round(H * dprL);
     };
     const onResize = () => {
-      drawStill();
+      drawSky();
       sizeLive();
     };
-    // Drawn just after the first frame, so building it never holds up
-    // whatever is on screen when the app starts.
-    const firstDraw = setTimeout(() => {
-      drawStill();
-      sizeLive();
-    }, 0);
+    const firstDraw = setTimeout(onResize, 0);
     window.addEventListener("resize", onResize);
 
-    // Events in the living sky.
+    // The pointer, for parallax and for the stars' glow.
+    const target = { x: 0, y: 0 };
+    const eased = { x: 0, y: 0 };
+    let pointer = null;
+    const onMove = (ev) => {
+      target.x = ev.clientX / window.innerWidth - 0.5;
+      target.y = ev.clientY / window.innerHeight - 0.5;
+      pointer = { x: ev.clientX, y: ev.clientY, t: performance.now() };
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+
+    // Waves sent out from the brain.
+    let waves = [];
+    const onPing = (ev) => {
+      const d = ev.detail || {};
+      waves.push({ x: d.x, y: d.y, rgb: d.rgb || [217, 200, 255], born: performance.now() });
+      if (waves.length > 5) waves.shift();
+    };
+    window.addEventListener("cortex-brain-ping", onPing);
+
     let meteors = [];
     const t0 = performance.now();
-    let nextMeteor = 2500 + Math.random() * 3000;
-    const ctx = live.getContext("2d");
+    let nextMeteor = 4000 + Math.random() * 4000;
+    const ctx = liveC.getContext("2d");
     let raf;
     let skip = false;
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       if (!liveOn.current) return;
+      // Parallax every frame so it glides; the drawing at 30 a second.
+      eased.x += (target.x - eased.x) * 0.04;
+      eased.y += (target.y - eased.y) * 0.04;
+      const drift = (now - t0) / 1000;
+      // A slow wander on its own too, so the sky is never quite still.
+      const wx = Math.sin(drift * 0.05) * 0.18;
+      const wy = Math.cos(drift * 0.037) * 0.14;
+      const px = eased.x + wx;
+      const py = eased.y + wy;
+      farC.style.transform = `translate3d(${-px * 8}px, ${-py * 8}px, 0)`;
+      nearC.style.transform = `translate3d(${-px * 22}px, ${-py * 22}px, 0)`;
+      liveC.style.transform = nearC.style.transform;
+      gasC.style.transform = `translate3d(${-px * 4}px, ${-py * 4}px, 0)`;
       skip = !skip;
       if (skip) return;
+
       const t = now - t0;
       ctx.setTransform(dprL, 0, 0, dprL, 0, 0);
       ctx.clearRect(0, 0, W, H);
       ctx.globalCompositeOperation = "lighter";
-
-      // Galaxies, turning very slowly in their own tilted planes.
-      for (let k = 0; k < galaxies.length; k += 1) {
-        const gx = galaxies[k];
-        ctx.save();
-        ctx.translate(gx.x * W, gx.y * H);
-        ctx.rotate(gx.angle);
-        ctx.scale(1, gx.tilt);
-        ctx.rotate((t / 1000) * gx.spin);
-        ctx.globalAlpha = 0.45;
-        ctx.drawImage(gx.img, -gx.size / 2, -gx.size / 2, gx.size, gx.size);
-        ctx.restore();
-      }
+      // Where the pointer is in the near layer's own coordinates.
+      const offX = SPACE_PAD - px * 22;
+      const offY = SPACE_PAD - py * 22;
+      const pxl = pointer ? pointer.x + SPACE_PAD - offX + SPACE_PAD : 0;
+      const pyl = pointer ? pointer.y + SPACE_PAD - offY + SPACE_PAD : 0;
+      const pointerFresh = pointer && now - pointer.t < 2500;
+      const pointerFade = pointerFresh ? 1 - (now - pointer.t) / 2500 : 0;
 
       // Twinkling.
       for (let k = 0; k < twinklers.length; k += 1) {
         const tw = twinklers[k];
         const v = 0.5 + 0.5 * Math.sin((t / 1000) * tw.speed + tw.phase);
-        ctx.globalAlpha = 0.15 + v * 0.55;
+        if (v < 0.6) continue;
+        ctx.globalAlpha = (v - 0.6) * 1.4;
         ctx.fillStyle = "#FFFFFF";
         ctx.beginPath();
-        ctx.arc(tw.x, tw.y, 1 + v * 0.6, 0, Math.PI * 2);
+        ctx.arc(tw.x, tw.y, tw.r + 0.5, 0, Math.PI * 2);
         ctx.fill();
       }
 
-      // Shooting stars.
+      // Stars near the pointer, and stars under a passing wave, glow.
+      const liveWaves = [];
+      for (let k = 0; k < waves.length; k += 1) {
+        const w = waves[k];
+        const age = (now - w.born) / 1000;
+        if (age > 2.6) continue;
+        liveWaves.push({
+          x: w.x + SPACE_PAD + px * 22,
+          y: w.y + SPACE_PAD + py * 22,
+          r: age * 420,
+          fade: 1 - age / 2.6,
+          rgb: w.rgb,
+        });
+      }
+      waves = waves.filter((w) => (now - w.born) / 1000 <= 2.6);
+      if (pointerFresh || liveWaves.length) {
+        for (let k = 0; k < stars.length; k += 1) {
+          const st = stars[k];
+          let glow = 0;
+          let rgb = null;
+          if (pointerFresh) {
+            const d = Math.hypot(st.x - pxl, st.y - pyl);
+            if (d < 130) glow = (1 - d / 130) ** 2 * 0.8 * pointerFade;
+          }
+          for (let q = 0; q < liveWaves.length; q += 1) {
+            const lw = liveWaves[q];
+            const d = Math.hypot(st.x - lw.x, st.y - lw.y);
+            const band = Math.exp(-((d - lw.r) ** 2) / 900) * lw.fade;
+            if (band > glow) {
+              glow = band;
+              rgb = lw.rgb;
+            }
+          }
+          if (glow < 0.04) continue;
+          const gs = 3 + glow * 7;
+          ctx.globalAlpha = glow * 0.9;
+          ctx.drawImage(rgb ? spriteFor(rgb) : white, st.x - gs, st.y - gs, gs * 2, gs * 2);
+        }
+        // The wave itself: a faint soft band of colour moving through space.
+        for (let q = 0; q < liveWaves.length; q += 1) {
+          const lw = liveWaves[q];
+          if (lw.r < 4) continue;
+          const inner = Math.max(0, lw.r - 40);
+          const grad = ctx.createRadialGradient(lw.x, lw.y, inner, lw.x, lw.y, lw.r + 40);
+          const [r0, g0, b0] = lw.rgb;
+          grad.addColorStop(0, `rgba(${r0},${g0},${b0},0)`);
+          grad.addColorStop(0.5, `rgba(${r0},${g0},${b0},${0.09 * lw.fade})`);
+          grad.addColorStop(1, `rgba(${r0},${g0},${b0},0)`);
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = grad;
+          ctx.fillRect(lw.x - lw.r - 40, lw.y - lw.r - 40, (lw.r + 40) * 2, (lw.r + 40) * 2);
+        }
+      }
+
+      // Fiery meteors.
       if (t > nextMeteor) {
         const fromLeft = Math.random() < 0.5;
         const ang = (fromLeft ? 0.35 : Math.PI - 0.35) + (Math.random() - 0.5) * 0.4;
@@ -11020,8 +11137,6 @@ function HomeSpace({ live = true, visible = true }) {
         const ty = hy - Math.sin(m.ang) * m.len;
         const fade = p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85;
         const grad = ctx.createLinearGradient(tx, ty, hx, hy);
-        // Fiery: deep red at the tail, orange through the body, a
-        // white-hot yellow at the head.
         grad.addColorStop(0, "rgba(180,20,10,0)");
         grad.addColorStop(0.45, `rgba(230,60,20,${0.35 * fade})`);
         grad.addColorStop(0.85, `rgba(255,150,40,${0.75 * fade})`);
@@ -11037,30 +11152,38 @@ function HomeSpace({ live = true, visible = true }) {
         ctx.globalAlpha = 0.9 * fade;
         ctx.drawImage(ember, hx - 9, hy - 9, 18, 18);
       }
-
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
     };
-    if (reduce) {
-      frame(performance.now());
-      cancelAnimationFrame(raf);
-    } else {
-      raf = requestAnimationFrame(frame);
-    }
+    if (!reduce) raf = requestAnimationFrame(frame);
     return () => {
       clearTimeout(firstDraw);
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("cortex-brain-ping", onPing);
     };
   }, []);
+  const layer = { position: "absolute", left: -SPACE_PAD, top: -SPACE_PAD, width: `calc(100% + ${SPACE_PAD * 2}px)`, height: `calc(100% + ${SPACE_PAD * 2}px)`, willChange: "transform" };
   return (
     <div
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none"
-      style={{ position: "fixed", inset: 0, zIndex: -1, visibility: visible ? "visible" : "hidden" }}
+      style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", visibility: visible ? "visible" : "hidden" }}
     >
-      <canvas ref={stillRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
-      <canvas ref={liveRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+      {/* The gas breathes: a slow swell, turn and brighten, on a long cycle. */}
+      <div style={{ position: "absolute", inset: 0, animation: live ? "spaceBreathe 26s ease-in-out infinite alternate" : undefined }}>
+        <canvas ref={gasRef} style={layer} />
+      </div>
+      {/* Faint cosmic dust rolling through in front of the gas. */}
+      {live && (
+        <div style={{ position: "absolute", inset: 0, opacity: 0.35, mixBlendMode: "screen" }}>
+          <SsSmoke playing />
+        </div>
+      )}
+      <canvas ref={farRef} style={layer} />
+      <canvas ref={nearRef} style={layer} />
+      <canvas ref={liveRef} style={layer} />
     </div>
   );
 }
@@ -15079,6 +15202,12 @@ function NBackSessionApp() {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes spaceBreathe {
+          0% { transform: scale(1) rotate(0deg); opacity: 0.8; }
+          50% { opacity: 1; }
+          100% { transform: scale(1.06) rotate(0.8deg) translate(-1%, 0.6%); opacity: 0.85; }
+        }
+        @media (prefers-reduced-motion: reduce) { [style*="spaceBreathe"] { animation: none !important; } }
         @keyframes ssImgPunch {
           0% { opacity: 0.6; transform: scale(1.16); }
           22% { opacity: 1; transform: scale(1.03); }
