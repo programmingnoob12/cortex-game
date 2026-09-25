@@ -10523,6 +10523,10 @@ function IdleScreensaver({ onExit, onEnding }) {
   const [phase, setPhase] = useState("wait");
   // True when the browser has not allowed sound yet; the first tap turns it on.
   const [needsTap, setNeedsTap] = useState(false);
+  // Set when the browser will not play sound until the page is tapped: the
+  // edit then waits on a quiet "Tap to begin" rather than starting silent and
+  // bringing the music in part-way (which skipped the underwater opening).
+  const beginRef = useRef(null);
   const clockRef = useRef(null); // () => ms into the edit
   const soundRef = useRef(null); // { ctx, gain, source }
   const startSoundRef = useRef(null);
@@ -10602,8 +10606,13 @@ function IdleScreensaver({ onExit, onEnding }) {
         if (cancelled) return;
         smooth = now - prev < 24 ? smooth + 1 : 0;
         prev = now;
-        if (smooth >= 14 || now - gateStart > 1500) begin();
-        else requestAnimationFrame(settle);
+        if (smooth >= 14 || now - gateStart > 1500) {
+          if (!ctx || ctx.state === "running") begin();
+          else {
+            beginRef.current = begin;
+            setPhase("tap");
+          }
+        } else requestAnimationFrame(settle);
       };
       requestAnimationFrame(settle);
     };
@@ -10704,6 +10713,22 @@ function IdleScreensaver({ onExit, onEnding }) {
       armed = true;
     }, 600);
     const onInput = () => {
+      if (beginRef.current) {
+        // The tap that starts it: sound on, then the edit from the top.
+        const start = beginRef.current;
+        beginRef.current = null;
+        const ctx = letterAudioContext();
+        const run = () => {
+          start();
+          armed = false;
+          setTimeout(() => {
+            armed = true;
+          }, 900);
+        };
+        if (ctx && ctx.state !== "running") ctx.resume().then(run).catch(run);
+        else run();
+        return;
+      }
       if (needsTap) {
         const ctx = letterAudioContext();
         if (ctx) {
@@ -10979,11 +11004,24 @@ function IdleScreensaver({ onExit, onEnding }) {
       />
 
       <div className="absolute bottom-[3vh] inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600 z-10">
-        {needsTap ? "Tap for sound" : "Tap or press any key to skip"}
+        {phase === "tap" ? "" : needsTap ? "Tap for sound" : "Tap or press any key to skip"}
       </div>
+      {phase === "tap" && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-10 text-sm uppercase tracking-[0.4em]"
+          style={{ color: "rgba(217,200,255,0.75)", animation: "ssTaglineIn 0.8s ease-out both" }}
+        >
+          <span style={{ animation: "ssTapPulse 2.4s ease-in-out infinite" }}>Tap to begin</span>
+        </div>
+      )}
     </div>
   );
 }
+
+// The app re-renders often while it loads (settings, data, auth), and each
+// time it re-rendered the edit too, which is part of what made its first
+// seconds stutter. Its callbacks are read through refs, so it never needs to.
+const IdleScreensaverMemo = memo(IdleScreensaver, () => true);
 
 function spaceSprite(rgb, size = 64) {
   const c = document.createElement("canvas");
@@ -12002,7 +12040,9 @@ function HomeSpace({ live = true, visible = true }) {
       if (brainEl) brainEl.style.transform = `translate3d(${nearTx}px, ${nearTy}px, 0)`;
       gasC.style.transform = `translate3d(${-px * 5}px, ${-py * 5}px, 0) scale(${sGas}) rotate(${Math.sin(drift * 0.03) * 2}deg)`;
       gasC.style.opacity = String(0.65 + 0.35 * (0.5 + 0.5 * Math.sin((drift * TAU) / 11)));
-      skip = !skip;
+      // Half rate is plenty for twinkling, but a shooting star moves fast and
+      // stutters at 30 frames a second, so while one is crossing, every frame.
+      skip = meteors.length ? false : !skip;
       if (skip) return;
 
       const t = now - t0;
@@ -16225,6 +16265,7 @@ function NBackSessionApp() {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes ssTapPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes ssCardFloat {
           from { transform: rotateY(var(--ry)) rotateX(var(--rx)) translate3d(0, 0, 0); }
           to { transform: rotateY(calc(var(--ry) * 0.6)) rotateX(calc(var(--rx) * 0.6)) translate3d(var(--fx), var(--fy), 60px); }
@@ -21881,7 +21922,7 @@ function NBackSessionApp() {
       )}
 
       {launchEditOn && <LaunchEdit onExit={() => setLaunchEditOn(false)} />}
-      {screensaverOn && <IdleScreensaver onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
+      {screensaverOn && <IdleScreensaverMemo onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
