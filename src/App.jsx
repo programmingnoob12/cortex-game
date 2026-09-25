@@ -10104,7 +10104,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // Just the part of the song the edit uses (46 seconds, faded at the end),
 // about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
 // by the time the edit opens rather than arriving seconds into it.
-const SS_TRACK_URL = "/audio/emotionless-edit.mp3";
+const SS_TRACK_URL = "/audio/emotionless-edit-v2.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
 const SS_TRACK_FIRST_BEAT_MS = 40;
 // Longest the edit will hold on black waiting for the track. Starting the
@@ -10192,9 +10192,101 @@ const SS_SCENES = [
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
   { kind: "word", text: "Be smarter than everyone.", beats: 2 },
+  { kind: "cards", text: "Elite training for the mind.", beats: 4 },
   { kind: "end", beats: 5 },
 ];
 
+// The app itself, floating in the dark: two cards of Cortex's own screens
+// (the next session, and your levels) tilted in 3-D space, drifting, with
+// the line above them.
+function SsCards({ text, ms }) {
+  const rows = [
+    ["Dual N-Back", EXERCISE_COLORS.dual, "10 min"],
+    ["Relational Reasoning", EXERCISE_COLORS.rrt, "6 min"],
+    ["3-D Motion Tracking", EXERCISE_COLORS.motion3d, "5 min"],
+    ["QNB'", EXERCISE_COLORS.iqnb, "5 min"],
+    ["Quad N-Back", EXERCISE_COLORS.quad, "8 min"],
+  ];
+  const levels = [
+    ["Quad N-Back", "quad", 6],
+    ["Dual N-Back", "dual", 5],
+    ["RRT", "rrt", 4],
+    ["3D MOT", "motion3d", 3],
+    ["CCT", "cct", 7],
+  ];
+  const card = {
+    background: "linear-gradient(160deg, rgba(34,26,56,0.92), rgba(12,10,20,0.94))",
+    border: "1px solid rgba(217,200,255,0.16)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08), 0 0 60px -10px rgba(117,55,226,0.45), 0 40px 80px -20px rgba(0,0,0,0.9)",
+    borderRadius: "clamp(12px, 1.4vw, 22px)",
+    padding: "clamp(14px, 1.8vw, 28px)",
+    width: "min(30vw, 420px)",
+    minWidth: 240,
+    color: "#E9E4F5",
+    textAlign: "left",
+    fontSize: "clamp(11px, 1vw, 15px)",
+  };
+  const rowStyle = (i, delay) => ({
+    padding: "0.6em 0",
+    borderTop: i ? "1px solid rgba(255,255,255,0.07)" : "none",
+    animation: `ssTaglineIn 0.35s ease-out ${delay + i * 90}ms both`,
+  });
+  return (
+    <div className="flex flex-col items-center" style={{ gap: "6vh" }}>
+      <div
+        className="font-black uppercase tracking-tight ss-split"
+        style={{ fontSize: "clamp(1.8rem, min(4.6vw, 7vh), 4.2rem)", lineHeight: 1.02, textWrap: "balance" }}
+      >
+        {text.split(" ").map((w, wi) => (
+          <span
+            key={wi}
+            className="inline-block"
+            style={{
+              marginRight: "0.28em",
+              background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 40%, #9A6CF0 100%)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+              animation: `ssWordIn 0.62s cubic-bezier(0.16,1,0.3,1) ${wi * 80}ms both`,
+            }}
+          >
+            {w}
+          </span>
+        ))}
+      </div>
+      <div style={{ perspective: "1100px" }}>
+        <div className="flex items-center" style={{ gap: "5vw", transformStyle: "preserve-3d", animation: `ssCardsDolly ${ms}ms cubic-bezier(0.3,0.1,0.3,1) both` }}>
+          <div style={{ ...card, "--ry": "24deg", "--rx": "6deg", "--fx": "1vw", "--fy": "-1.5vh", animation: `ssCardFloat ${ms}ms ease-in-out both` }}>
+            <div className="font-bold" style={{ fontSize: "1.35em", color: "#B9A0F5" }}>Next session</div>
+            <div style={{ color: "#7F7A92", marginBottom: "0.9em" }}>Regime: Deep · 34 min</div>
+            {rows.map(([n, c, m], i) => (
+              <div key={n} className="flex items-center justify-between" style={rowStyle(i, 200)}>
+                <span className="flex items-center" style={{ gap: "0.6em" }}>
+                  <span style={{ width: "0.6em", height: "0.6em", borderRadius: 99, background: c, boxShadow: `0 0 8px ${c}`, display: "inline-block" }} />
+                  {n}
+                </span>
+                <span style={{ color: "#7F7A92" }}>{m}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ ...card, "--ry": "-24deg", "--rx": "-4deg", "--fx": "-1vw", "--fy": "1.5vh", animation: `ssCardFloat ${ms}ms ease-in-out both` }}>
+            <div className="font-bold" style={{ fontSize: "1.35em", color: "#B9A0F5" }}>Your levels</div>
+            <div style={{ color: "#7F7A92", marginBottom: "0.9em" }}>Best this month</div>
+            {levels.map(([n, key, lv], i) => (
+              <div key={n} className="flex items-center justify-between" style={rowStyle(i, 300)}>
+                <span className="flex items-center" style={{ gap: "0.7em" }}>
+                  <LevelGem level={lv} size={20} exerciseKey={key} />
+                  {n}
+                </span>
+                <span className="font-semibold" style={{ color: gemTierFor(lv, key).color }}>{gemTierFor(lv, key).label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function SsGemLadder() {
   // Novice to Enlightened, a rank every 174ms, then it holds a moment
   // on Enlightened before the cut.
@@ -10754,6 +10846,7 @@ function IdleScreensaver({ onExit, onEnding }) {
           />
         )}
         {scene.kind === "gem" && <SsGemLadder />}
+        {scene.kind === "cards" && <SsCards text={scene.text} ms={sceneMs} />}
         {scene.kind === "brain" && (
           <div className="flex flex-col items-center gap-2">
             {/* Sized off the height as well as the width, so the brain and
@@ -16082,6 +16175,14 @@ function NBackSessionApp() {
         @keyframes ssTopLabel {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes ssCardFloat {
+          from { transform: rotateY(var(--ry)) rotateX(var(--rx)) translate3d(0, 0, 0); }
+          to { transform: rotateY(calc(var(--ry) * 0.6)) rotateX(calc(var(--rx) * 0.6)) translate3d(var(--fx), var(--fy), 60px); }
+        }
+        @keyframes ssCardsDolly {
+          from { transform: translateZ(-180px) rotateY(7deg); }
+          to { transform: translateZ(40px) rotateY(-5deg); }
         }
         @keyframes brainFloat {
           0% { transform: translateY(4px) scale(0.995); }
