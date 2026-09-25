@@ -9647,7 +9647,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
     // as it passes.
     const pings = [];
     const PING_MS = 1600;
-    const PING_R = 115;
+    const PING_R = 55;
 
     const px = (x) => (x - BRAIN_VB.x) * scale;
     const py = (y) => (y - BRAIN_VB.y) * scale;
@@ -9808,7 +9808,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
           ctx.stroke();
         }
         if (t < 0.35) {
-          const g = (10 + 30 * t) * scale;
+          const g = (6 + 14 * t) * scale;
           ctx.globalAlpha = 0.95 * (1 - t / 0.35);
           ctx.drawImage(sprites[pg.key], px(pg.x) - g, py(pg.y) - g, g * 2, g * 2);
           ctx.globalAlpha = 1;
@@ -10031,14 +10031,65 @@ function SsGemLadder() {
     return () => clearInterval(id);
   }, []);
   const tier = GEM_TIERS[level];
+  const top = level === MAX_GEM_TIER;
   return (
-    <div className="flex flex-col items-center gap-8">
-      <div key={level} style={{ animation: "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both" }}>
-        <LevelGem level={level} size={200} />
+    <div className="relative flex flex-col items-center gap-8">
+      {/* The last rank lands like a hit: a burst of red light behind it,
+          two shockwave rings, a flash, and the gem slamming in from large
+          with a small shake. */}
+      {top && (
+        <>
+          <div
+            aria-hidden="true"
+            className="absolute left-1/2 pointer-events-none rounded-full"
+            style={{
+              top: 100,
+              width: 520,
+              height: 520,
+              marginLeft: -260,
+              marginTop: -260,
+              background: `radial-gradient(circle, ${tier.color}AA 0%, ${tier.color}33 35%, transparent 70%)`,
+              animation: "ssTopBurst 0.9s cubic-bezier(0.1,0.8,0.2,1) both",
+            }}
+          />
+          {[0, 110].map((delay) => (
+            <div
+              key={delay}
+              aria-hidden="true"
+              className="absolute left-1/2 pointer-events-none rounded-full"
+              style={{
+                top: 100,
+                width: 220,
+                height: 220,
+                marginLeft: -110,
+                marginTop: -110,
+                border: `2px solid ${tier.color}`,
+                boxShadow: `0 0 24px ${tier.color}`,
+                animation: `ssTopRing 0.8s cubic-bezier(0.1,0.7,0.2,1) ${delay}ms both`,
+              }}
+            />
+          ))}
+        </>
+      )}
+      <div
+        key={level}
+        className="relative"
+        style={{
+          animation: top
+            ? "ssTopSlam 0.55s cubic-bezier(0.2,1.5,0.3,1) both"
+            : "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both",
+        }}
+      >
+        <LevelGem level={level} size={200} glowPulse={top} />
       </div>
       <div
-        className="text-4xl sm:text-6xl font-black uppercase tracking-[0.12em]"
-        style={{ color: tier.color, textShadow: `0 0 40px ${tier.color}88` }}
+        key={`l${level}`}
+        className="relative text-4xl sm:text-6xl font-black uppercase tracking-[0.12em]"
+        style={{
+          color: tier.color,
+          textShadow: top ? `0 0 50px ${tier.color}, 0 0 12px ${tier.color}` : `0 0 40px ${tier.color}88`,
+          animation: top ? "ssTopLabel 0.6s cubic-bezier(0.2,1.3,0.3,1) 60ms both" : undefined,
+        }}
       >
         {tier.label}
       </div>
@@ -10192,9 +10243,11 @@ function SsSmoke({ playing }) {
   );
 }
 
-function IdleScreensaver({ onExit }) {
+function IdleScreensaver({ onExit, onEnding }) {
   const exitRef = useRef(onExit);
   exitRef.current = onExit;
+  const endingRef = useRef(onEnding);
+  endingRef.current = onEnding;
   const [index, setIndex] = useState(0);
   const [cut, setCut] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -10273,7 +10326,9 @@ function IdleScreensaver({ onExit }) {
       begin();
     };
     waitTimer = setTimeout(go, SS_TRACK_WAIT_MS);
-    Promise.all([preloadOpeningTrack(), preloadEditImages()]).then(go);
+    // Only the music is worth waiting for: the first images don't appear
+    // until several seconds in, and they keep loading in the meantime.
+    preloadOpeningTrack().then(go);
     // If the track was still loading when the edit had to start, bring it
     // in the moment it is ready, at the point the picture has reached.
     // (Before, nothing retried, so the music only arrived on some later
@@ -10346,6 +10401,7 @@ function IdleScreensaver({ onExit }) {
         current = next;
         setIndex(next);
         setCut((c) => c + 1);
+        if (SS_SCENES[next].kind === "end" && endingRef.current) endingRef.current();
       }
       raf = requestAnimationFrame(tick);
     };
@@ -10374,6 +10430,7 @@ function IdleScreensaver({ onExit }) {
       }
       if (!armed) return;
       armed = false;
+      if (endingRef.current) endingRef.current();
       setLeaving(true);
       setTimeout(() => exitRef.current(), SS_DISSOLVE_MS);
     };
@@ -10535,7 +10592,7 @@ function IdleScreensaver({ onExit }) {
               className="text-sm sm:text-lg uppercase tracking-[0.42em] text-slate-300"
               style={{ animation: `ssTagline ${SS_END_ANIM_MS}ms ease-out both` }}
             >
-              Dedicated to the pursuit of personal excellence
+              Pursue Excellence
             </div>
           </div>
         )}
@@ -10709,9 +10766,13 @@ function makeGalaxy(size, seed, armRgb, coreRgb) {
   return c;
 }
 
-function HomeSpace() {
+function HomeSpace({ live = true }) {
   const stillRef = useRef(null);
   const liveRef = useRef(null);
+  // Drawn while the edit is still ending, hidden and still, so the sky is
+  // already there the moment Home arrives; it starts moving once visible.
+  const liveOn = useRef(live);
+  liveOn.current = live;
   useEffect(() => {
     const still = stillRef.current;
     const live = liveRef.current;
@@ -10778,7 +10839,7 @@ function HomeSpace() {
       g.globalCompositeOperation = "source-over";
       // Stars: many faint, crowding towards the band; a few bright.
       g.globalCompositeOperation = "lighter";
-      const count = Math.round((W * H) / 7500);
+      const count = Math.round((W * H) / 3000);
       twinklers = [];
       for (let i = 0; i < count; i += 1) {
         let x = brainNoise(i, 81) * W;
@@ -10833,16 +10894,15 @@ function HomeSpace() {
 
     // Events in the living sky.
     let meteors = [];
-    let novas = [];
     const t0 = performance.now();
     let nextMeteor = 2500 + Math.random() * 3000;
-    let nextNova = 20000 + Math.random() * 10000;
     const ctx = live.getContext("2d");
     let raf;
     let skip = false;
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
+      if (!liveOn.current) return;
       skip = !skip;
       if (skip) return;
       const t = now - t0;
@@ -10913,45 +10973,6 @@ function HomeSpace() {
         ctx.drawImage(white, hx - 6, hy - 6, 12, 12);
       }
 
-      // Supernovae: a flash, a shockwave, a remnant.
-      if (t > nextNova) {
-        // Out in the margins, clear of the column in the middle.
-        const side = Math.random() < 0.5 ? 0.06 + Math.random() * 0.2 : 0.74 + Math.random() * 0.2;
-        novas.push({ x: side * W, y: (0.15 + Math.random() * 0.7) * H, born: t, hue: Math.random() < 0.5 ? rose : violet });
-        nextNova = t + 70000 + Math.random() * 40000;
-      }
-      novas = novas.filter((n) => t - n.born < 6000);
-      for (let k = 0; k < novas.length; k += 1) {
-        const n = novas[k];
-        const age = t - n.born;
-        // Flash: swells fast, fades over two seconds.
-        const flash = age < 350 ? age / 350 : Math.max(0, 1 - (age - 350) / 1900);
-        const fs = 10 + 70 * Math.min(1, age / 350) * (0.6 + 0.4 * flash);
-        ctx.globalAlpha = flash;
-        ctx.drawImage(white, n.x - fs, n.y - fs, fs * 2, fs * 2);
-        ctx.globalAlpha = flash * 0.6;
-        ctx.drawImage(blue, n.x - fs * 1.8, n.y - fs * 1.8, fs * 3.6, fs * 3.6);
-        // Shockwave ring.
-        const rp = Math.min(1, age / 3800);
-        const rr = 12 + (1 - (1 - rp) ** 3) * 180;
-        // Soft-edged: a wide faint band with a thinner brighter edge.
-        ctx.strokeStyle = "rgba(190,170,255,1)";
-        ctx.globalAlpha = (1 - rp) * 0.12;
-        ctx.lineWidth = 10 + (1 - rp) * 8;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, rr, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = (1 - rp) ** 1.5 * 0.32;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(n.x, n.y, rr + 3, 0, Math.PI * 2);
-        ctx.stroke();
-        // The remnant: a coloured cloud that blooms and fades.
-        const rem = age < 900 ? age / 900 : Math.max(0, 1 - (age - 900) / 5100);
-        const rs = 40 + rp * 150;
-        ctx.globalAlpha = rem * 0.35;
-        ctx.drawImage(n.hue, n.x - rs, n.y - rs, rs * 2, rs * 2);
-      }
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
     };
@@ -10967,7 +10988,11 @@ function HomeSpace() {
     };
   }, []);
   return (
-    <div aria-hidden="true" className="fixed inset-0 pointer-events-none" style={{ position: "fixed", inset: 0, zIndex: -1 }}>
+    <div
+      aria-hidden="true"
+      className="fixed inset-0 pointer-events-none"
+      style={{ position: "fixed", inset: 0, zIndex: -1, opacity: live ? 1 : 0, transition: "opacity 1.2s ease-out" }}
+    >
       <canvas ref={stillRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
       <canvas ref={liveRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
     </div>
@@ -11189,6 +11214,9 @@ function NBackSessionApp() {
   // On from the very first render when the app opens onto Home, so a
   // refresh goes straight into the edit instead of flashing Home first.
   const [screensaverOn, setScreensaverOn] = useState(() => mainView === "home");
+  // Set as the edit reaches its closing title: Home's sky is built then,
+  // unseen, so it is ready the moment Home comes in.
+  const [spaceWarm, setSpaceWarm] = useState(false);
   // True while walking the screens from the Pages list, so every screen
   // carries a way back to it. Testing only.
   const [pagesMode, setPagesMode] = useState(false);
@@ -14972,6 +15000,25 @@ function NBackSessionApp() {
           50% { opacity: 1; transform: scale(1.2); }
         }
         @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
+        @keyframes ssTopSlam {
+          0% { transform: scale(1.9); opacity: 0; filter: brightness(3); }
+          35% { transform: scale(0.94) translate(-4px, 2px); opacity: 1; filter: brightness(1.6); }
+          55% { transform: scale(1.04) translate(3px, -2px); }
+          100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+        }
+        @keyframes ssTopRing {
+          0% { transform: scale(0.4); opacity: 1; }
+          100% { transform: scale(3.2); opacity: 0; }
+        }
+        @keyframes ssTopBurst {
+          0% { transform: scale(0.3); opacity: 0; }
+          25% { transform: scale(1.05); opacity: 1; }
+          100% { transform: scale(1.25); opacity: 0.35; }
+        }
+        @keyframes ssTopLabel {
+          0% { transform: scale(1.6); opacity: 0; letter-spacing: 0.4em; }
+          100% { transform: scale(1); opacity: 1; letter-spacing: 0.12em; }
+        }
         @keyframes ssImgPunch {
           0% { opacity: 0.6; transform: scale(1.16); }
           22% { opacity: 1; transform: scale(1.03); }
@@ -20675,9 +20722,9 @@ function NBackSessionApp() {
         </div>
       )}
 
-      {screensaverOn && <IdleScreensaver onExit={exitScreensaver} />}
+      {screensaverOn && <IdleScreensaver onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
 
-      {mainView === "home" && !screensaverOn && <HomeSpace />}
+      {mainView === "home" && (!screensaverOn || spaceWarm) && <HomeSpace live={!screensaverOn} />}
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
