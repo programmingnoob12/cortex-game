@@ -9696,7 +9696,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const data = useMemo(() => {
-    const total = Math.max(365, days + 120);
+    const total = Math.max(200, days + 70);
     const places = brainPlaces(total);
     const regions = places.map((pt, i) =>
       brainRegion(pt.x + (brainNoise(i, 11) - 0.5) * 22, pt.y + (brainNoise(i, 12) - 0.5) * 22)
@@ -9785,7 +9785,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
         const gx = px(places[i].x);
         const gy = py(places[i].y);
         const gr = 22 * scale;
-        b.globalAlpha = 0.09;
+        b.globalAlpha = 0.13;
         b.drawImage(sprites[regions[i]], gx - gr, gy - gr, gr * 2, gr * 2);
       }
       b.globalAlpha = 1;
@@ -9990,23 +9990,44 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
       if (!raf) raf = requestAnimationFrame(draw);
     }
 
+    // Listened for on the window, with the canvas itself letting clicks
+    // through: it is bigger than the gap it sits in and its faded edges run
+    // under the page, so only the brain's own shape answers, and never when
+    // the pointer is on a button or link.
+    let pointerSet = false;
+    const setCursor = (on) => {
+      if (on === pointerSet) return;
+      pointerSet = on;
+      document.documentElement.style.cursor = on ? "pointer" : "";
+    };
+    const overControl = (ev) =>
+      ev.target && ev.target.closest && ev.target.closest("button, a, input, textarea, select, [role='button']");
     const onMove = (ev) => {
       const rect = canvas.getBoundingClientRect();
+      const inside =
+        ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+      if (!inside || rect.width === 0) {
+        if (hoverTarget) onLeave();
+        return;
+      }
       mouse = {
         x: ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x,
         y: ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y,
       };
       hoverTarget = 1;
-      canvas.style.cursor = inBrain(mouse.x, mouse.y) ? "pointer" : "default";
+      setCursor(inBrain(mouse.x, mouse.y) && !overControl(ev));
       // While the pointer moves, draw every frame so the light follows it.
       if (!raf) raf = requestAnimationFrame(draw);
     };
-    const onLeave = () => {
+    function onLeave() {
       hoverTarget = 0;
+      setCursor(false);
       kick();
-    };
+    }
     const onDown = (ev) => {
+      if (overControl(ev)) return;
       const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom) return;
       const x = ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x;
       const y = ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y;
       // Only the brain itself answers a click; the empty space around it
@@ -10027,16 +10048,15 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
     ro.observe(wrap);
     resize();
     if (interactive) {
-      canvas.addEventListener("pointermove", onMove);
-      canvas.addEventListener("pointerleave", onLeave);
-      canvas.addEventListener("pointerdown", onDown);
+      window.addEventListener("pointermove", onMove, { passive: true });
+      window.addEventListener("pointerdown", onDown);
     }
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
-      canvas.removeEventListener("pointermove", onMove);
-      canvas.removeEventListener("pointerleave", onLeave);
-      canvas.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerdown", onDown);
+      setCursor(false);
     };
   }, [data, days, interactive, entranceMs, alive]);
 
@@ -10048,7 +10068,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
         aria-label={`Your constellation: ${days} ${days === 1 ? "star" : "stars"}, one for each day you have trained`}
         className="block w-full"
         style={{
-          pointerEvents: interactive ? "auto" : "none",
+          pointerEvents: "none",
           // Fades the canvas out towards its edges, so no box can ever show
           // against the page behind it.
           WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
@@ -10104,7 +10124,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // Just the part of the song the edit uses (46 seconds, faded at the end),
 // about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
 // by the time the edit opens rather than arriving seconds into it.
-const SS_TRACK_URL = "/audio/emotionless-edit-v3.mp3";
+const SS_TRACK_URL = "/audio/emotionless-edit-v4.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
 const SS_TRACK_FIRST_BEAT_MS = 40;
 // Longest the edit will hold on black waiting for the track. Starting the
@@ -10186,11 +10206,10 @@ const SS_SCENES = [
   { kind: "word", text: "you train.", accent: true, beats: 2 },
   ...ssBurst(SS_BURST_RICHES),
   { kind: "word", text: "Wisdom", beats: 2 },
-  { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
+  { kind: "word", text: "is the principal thing.", accent: true, beats: 1.5 },
   ...ssBurst(SS_BURST_MIND),
   { kind: "brain", text: "Dominate.", beats: 2, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
-  { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
   { kind: "word", text: "Be smarter than everyone.", beats: 2 },
   { kind: "cards", text: "Elite training for the mind.", beats: 4 },
   { kind: "end", beats: 5 },
@@ -10936,18 +10955,8 @@ function IdleScreensaver({ onExit, onEnding }) {
         />
       )}
 
-      {/* Film grain, and letterbox bars for the widescreen frame. */}
+      {/* Film grain. */}
       <div aria-hidden="true" className="ss-grain absolute pointer-events-none" />
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 top-0 bg-black pointer-events-none"
-        style={{ height: "9vh", animation: phase === "play" ? "ssBarTop 1.2s cubic-bezier(0.2,0.8,0.2,1) both" : undefined }}
-      />
-      <div
-        aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
-        style={{ height: "9vh", animation: phase === "play" ? "ssBarBottom 1.2s cubic-bezier(0.2,0.8,0.2,1) both" : undefined }}
-      />
 
       {/* An anamorphic streak across the frame on every cut. */}
       {phase === "play" && (
@@ -10995,12 +11004,17 @@ function IdleScreensaver({ onExit, onEnding }) {
         />
       )}
 
-      {/* A white flash on every cut. */}
+      {/* A white flash on every cut; a hard one as a burst of images hits. */}
       <div
         key={`f${cut}`}
         aria-hidden="true"
         className="absolute inset-0 pointer-events-none bg-white"
-        style={{ animation: "ssFlash 0.32s ease-out both" }}
+        style={{
+          animation:
+            scene.kind === "image" && (index === 0 || SS_SCENES[index - 1].kind !== "image")
+              ? "ssFlashHard 0.28s ease-out both"
+              : "ssFlash 0.32s ease-out both",
+        }}
       />
 
       <div className="absolute bottom-[3vh] inset-x-0 text-center text-xs uppercase tracking-[0.3em] text-slate-600 z-10">
@@ -12023,8 +12037,9 @@ function HomeSpace({ live = true, visible = true }) {
       // and settling on its own long breath. The pointer only nudges it.
       const wx = Math.sin(drift * 0.06) * 1.0 + Math.sin(drift * 0.15 + 1.3) * 0.35;
       const wy = Math.cos(drift * 0.05) * 0.8 + Math.sin(drift * 0.13 + 0.5) * 0.3;
-      const px = eased.x * 0.5 + wx;
-      const py = eased.y * 0.5 + wy;
+      // Moves on its own only; the pointer no longer steers it.
+      const px = wx;
+      const py = wy;
       const TAU = Math.PI * 2;
       const sFar = 1 + 0.025 * (0.5 + 0.5 * Math.sin((drift * TAU) / 15));
       const sNear = 1 + 0.045 * (0.5 + 0.5 * Math.sin((drift * TAU) / 12 + 1));
@@ -16265,6 +16280,7 @@ function NBackSessionApp() {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        @keyframes ssFlashHard { 0% { opacity: 0.75; } 100% { opacity: 0; } }
         @keyframes ssTapPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes ssCardFloat {
           from { transform: rotateY(var(--ry)) rotateX(var(--rx)) translate3d(0, 0, 0); }
@@ -21936,8 +21952,14 @@ function NBackSessionApp() {
           style={{
             // Built while the opening edit plays, underneath it, so the brain
             // is already whole as Home fades in rather than appearing after.
-            width: "min(560px, calc((100vw - 42.25rem) / 2 - 24px))",
-            left: "calc(((100vw - 42.25rem) / 2 - min(560px, calc((100vw - 42.25rem) / 2 - 24px))) / 2)",
+            // Wider than the gap beside the column: its edges fade out (the
+            // canvas is masked), so it can spill a little under the column
+            // and off the left edge without any hard edge showing.
+            // Sized so the brain itself spans the whole gap, from just in
+            // from the window edge to the column; only its faded glow runs
+            // under the column (clicks pass straight through it).
+            width: "min(820px, calc((100vw - 42.25rem - 100px) * 0.744))",
+            left: "calc(44px - 0.164 * min(820px, calc((100vw - 42.25rem - 100px) * 0.744)))",
           }}
         >
           <div id="brain-drift" className="w-full" style={{ willChange: "transform" }}>
