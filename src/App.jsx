@@ -9885,10 +9885,10 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
   );
 }
 
-function HomeConstellationInner({ days, showCaption = true, interactive = true }) {
+function HomeConstellationInner({ days, showCaption = true, interactive = true, entranceMs = 1500 }) {
   return (
     <div className="constellation flex flex-col items-center gap-5 w-full">
-      <BrainCanvas days={days} interactive={interactive} />
+      <BrainCanvas days={days} interactive={interactive} entranceMs={entranceMs} />
       {showCaption && (
         <div className="text-center">
           <div className="text-lg font-semibold text-slate-100 tabular-nums">
@@ -10013,7 +10013,7 @@ const SS_SCENES = [
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 2 },
   ...ssBurst(SS_BURST_MIND),
-  { kind: "brain", text: "Dominate.", beats: 4, dip: true },
+  { kind: "brain", text: "Dominate.", beats: 2, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
   { kind: "end", beats: 6 },
@@ -10246,7 +10246,10 @@ function IdleScreensaver({ onExit }) {
       const opened = performance.now();
       clockRef.current = () => performance.now() - opened;
       setPhase("play");
-      if (!startSound(0)) setNeedsTap(!!ctx);
+      // Only ask for a tap when the browser is really holding sound back.
+      // It used to ask while the track was merely still loading too, which
+      // invited taps, and the next one after that skipped the edit.
+      if (!startSound(0) && ctx && ctx.state !== "running") setNeedsTap(true);
     };
 
     // If sound is allowed later (the first tap), bring the music in at the
@@ -10314,8 +10317,21 @@ function IdleScreensaver({ onExit }) {
     let current = 0;
     let raf;
     let done = false;
+    // Guard: the edit may follow the music, but never leap ahead of real
+    // time. If the clock ever jumps (a clock switch, a hiccup), time moves
+    // on at the normal rate instead, so the ending can't arrive early.
+    let lastT = null;
+    let lastNow = 0;
     const tick = () => {
-      const t = clockRef.current ? clockRef.current() : 0;
+      const now = performance.now();
+      let t = clockRef.current ? clockRef.current() : 0;
+      if (lastT !== null && !document.hidden) {
+        // Catch up to the music at most a quarter faster than real time.
+        const allowed = lastT + (now - lastNow) * 1.25;
+        if (t > allowed) t = allowed;
+      }
+      lastT = t;
+      lastNow = now;
       let next = current;
       while (next < SS_SCENES.length && t >= bounds[next]) next += 1;
       if (next >= SS_SCENES.length) {
@@ -10491,7 +10507,7 @@ function IdleScreensaver({ onExit }) {
             {/* Sized off the height as well as the width, so the brain and
                 the word under it always fit inside the letterbox. */}
             <div style={{ width: "min(640px, 80vw, 62vh)" }}>
-              <HomeConstellation days={220} showCaption={false} interactive={false} />
+              <HomeConstellation days={220} showCaption={false} interactive={false} entranceMs={700} />
             </div>
             <div
               className="font-black uppercase tracking-tight -mt-6"
@@ -10736,7 +10752,7 @@ function HomeSpace() {
         return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / len;
       };
       g.globalCompositeOperation = "lighter";
-      for (let k = 0; k < 30; k += 1) {
+      for (let k = 0; k < 22; k += 1) {
         const t = brainNoise(k, 61);
         const off = (brainNoise(k, 62) - 0.5) * H * 0.2;
         const x = bx(t) + off * 0.6;
@@ -10757,12 +10773,12 @@ function HomeSpace() {
           g.drawImage(spr, cx + Math.cos(a2) * d - sz, cy + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
         }
       };
-      nebula(W * 0.7, H * 0.62, rose, 16, Math.min(W, H) * 0.2, 700);
+      nebula(W * 0.7, H * 0.62, rose, 10, Math.min(W, H) * 0.2, 700);
 
       g.globalCompositeOperation = "source-over";
       // Stars: many faint, crowding towards the band; a few bright.
       g.globalCompositeOperation = "lighter";
-      const count = Math.round((W * H) / 4200);
+      const count = Math.round((W * H) / 7500);
       twinklers = [];
       for (let i = 0; i < count; i += 1) {
         let x = brainNoise(i, 81) * W;
@@ -10776,7 +10792,7 @@ function HomeSpace() {
         }
         const m = brainNoise(i, 87);
         const near = Math.exp(-((bandDist(x, y) / (H * 0.25)) ** 2));
-        const a2 = (0.12 + brainNoise(i, 88) * 0.4) * (0.7 + 0.3 * near);
+        const a2 = (0.1 + brainNoise(i, 88) * 0.35) * (0.7 + 0.3 * near);
         const tint = brainNoise(i, 89);
         g.globalAlpha = a2;
         g.fillStyle = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
@@ -10795,7 +10811,7 @@ function HomeSpace() {
             g.fillRect(x - 11, y - 0.35, 22, 0.7);
             g.fillRect(x - 0.35, y - 11, 0.7, 22);
           }
-          if (twinklers.length < 8) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
+          if (twinklers.length < 5) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
         }
       }
       g.globalAlpha = 1;
@@ -10869,7 +10885,7 @@ function HomeSpace() {
           born: t,
           life: 700 + Math.random() * 500,
         });
-        nextMeteor = t + 12000 + Math.random() * 12000;
+        nextMeteor = t + 16000 + Math.random() * 16000;
       }
       meteors = meteors.filter((m) => t - m.born < m.life);
       for (let k = 0; k < meteors.length; k += 1) {
