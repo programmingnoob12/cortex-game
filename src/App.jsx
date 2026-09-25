@@ -10104,7 +10104,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // Just the part of the song the edit uses (46 seconds, faded at the end),
 // about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
 // by the time the edit opens rather than arriving seconds into it.
-const SS_TRACK_URL = "/audio/emotionless-edit-v2.mp3";
+const SS_TRACK_URL = "/audio/emotionless-edit-v3.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
 const SS_TRACK_FIRST_BEAT_MS = 40;
 // Longest the edit will hold on black waiting for the track. Starting the
@@ -10816,6 +10816,7 @@ function IdleScreensaver({ onExit, onEnding }) {
                 style={{
                   marginRight: "0.28em",
                   animation: `ssWordIn 0.62s cubic-bezier(0.16,1,0.3,1) ${wi * 90}ms both`,
+                  willChange: "transform, opacity, filter",
                   ...(scene.accent
                     ? {
                         background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 40%, #9A6CF0 100%)",
@@ -11067,7 +11068,7 @@ function makeGalaxy(size, seed, armRgb, coreRgb) {
 //
 // The layers are drawn once; only the small living layer is redrawn, and
 // the drift is done with CSS transforms the graphics card handles.
-const SPACE_PAD = 48; // extra sky beyond each edge, for the layers to drift into
+const SPACE_PAD = 96; // extra sky beyond each edge, for the layers to drift into
 // ---------------------------------------------------------------------------
 // The launch-style opening edit (a second version, reached from Pages).
 // Modelled on a product-launch teaser: a dark, muffled first act told in
@@ -11963,26 +11964,44 @@ function HomeSpace({ live = true, visible = true }) {
     const ctx = liveC.getContext("2d");
     let raf;
     let skip = false;
+    let nearTx = 0;
+    let nearTy = 0;
+    let nearS = 1;
+    // A point on screen, in the near layer's own (moved and scaled) coordinates.
+    const toNear = (sx, sy) => [
+      (sx + SPACE_PAD - W / 2 - nearTx) / nearS + W / 2,
+      (sy + SPACE_PAD - H / 2 - nearTy) / nearS + H / 2,
+    ];
 
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       if (!liveOn.current) return;
       // Parallax every frame so it glides; the drawing at 30 a second.
-      eased.x += (target.x - eased.x) * 0.04;
-      eased.y += (target.y - eased.y) * 0.04;
+      eased.x += (target.x - eased.x) * 0.03;
+      eased.y += (target.y - eased.y) * 0.03;
       const drift = (now - t0) / 1000;
-      // A slow wander on its own too, so the sky is never quite still.
-      const wx = Math.sin(drift * 0.05) * 0.18;
-      const wy = Math.cos(drift * 0.037) * 0.14;
-      const px = eased.x + wx;
-      const py = eased.y + wy;
-      farC.style.transform = `translate3d(${-px * 8}px, ${-py * 8}px, 0)`;
-      nearC.style.transform = `translate3d(${-px * 22}px, ${-py * 22}px, 0)`;
+      // The sky moves on its own, all the time: a slow drift made of a few
+      // unrelated cycles so it never visibly repeats, and each layer swelling
+      // and settling on its own long breath. The pointer only nudges it.
+      const wx = Math.sin(drift * 0.06) * 1.0 + Math.sin(drift * 0.15 + 1.3) * 0.35;
+      const wy = Math.cos(drift * 0.05) * 0.8 + Math.sin(drift * 0.13 + 0.5) * 0.3;
+      const px = eased.x * 0.5 + wx;
+      const py = eased.y * 0.5 + wy;
+      const TAU = Math.PI * 2;
+      const sFar = 1 + 0.025 * (0.5 + 0.5 * Math.sin((drift * TAU) / 15));
+      const sNear = 1 + 0.045 * (0.5 + 0.5 * Math.sin((drift * TAU) / 12 + 1));
+      const sGas = 1 + 0.06 * (0.5 + 0.5 * Math.sin((drift * TAU) / 18 + 2));
+      nearTx = -px * 26;
+      nearTy = -py * 26;
+      nearS = sNear;
+      farC.style.transform = `translate3d(${-px * 10}px, ${-py * 10}px, 0) scale(${sFar})`;
+      nearC.style.transform = `translate3d(${nearTx}px, ${nearTy}px, 0) scale(${sNear})`;
       liveC.style.transform = nearC.style.transform;
       // The brain sits in the near layer of the sky and drifts with it.
       const brainEl = document.getElementById("brain-drift");
-      if (brainEl) brainEl.style.transform = nearC.style.transform;
-      gasC.style.transform = `translate3d(${-px * 4}px, ${-py * 4}px, 0)`;
+      if (brainEl) brainEl.style.transform = `translate3d(${nearTx}px, ${nearTy}px, 0)`;
+      gasC.style.transform = `translate3d(${-px * 5}px, ${-py * 5}px, 0) scale(${sGas}) rotate(${Math.sin(drift * 0.03) * 2}deg)`;
+      gasC.style.opacity = String(0.65 + 0.35 * (0.5 + 0.5 * Math.sin((drift * TAU) / 11)));
       skip = !skip;
       if (skip) return;
 
@@ -11991,10 +12010,7 @@ function HomeSpace({ live = true, visible = true }) {
       ctx.clearRect(0, 0, W, H);
       ctx.globalCompositeOperation = "lighter";
       // Where the pointer is in the near layer's own coordinates.
-      const offX = SPACE_PAD - px * 22;
-      const offY = SPACE_PAD - py * 22;
-      const pxl = pointer ? pointer.x + SPACE_PAD - offX + SPACE_PAD : 0;
-      const pyl = pointer ? pointer.y + SPACE_PAD - offY + SPACE_PAD : 0;
+      const [pxl, pyl] = pointer ? toNear(pointer.x, pointer.y) : [0, 0];
       const pointerFresh = pointer && now - pointer.t < 2500;
       const pointerFade = pointerFresh ? 1 - (now - pointer.t) / 2500 : 0;
 
@@ -12016,9 +12032,10 @@ function HomeSpace({ live = true, visible = true }) {
         const w = waves[k];
         const age = (now - w.born) / 1000;
         if (age > 1.8) continue;
+        const [wx0, wy0] = toNear(w.x, w.y);
         liveWaves.push({
-          x: w.x + SPACE_PAD + px * 22,
-          y: w.y + SPACE_PAD + py * 22,
+          x: wx0,
+          y: wy0,
           r: age * 230,
           fade: (1 - age / 1.8) ** 2,
           rgb: w.rgb,
@@ -15855,6 +15872,38 @@ function NBackSessionApp() {
     };
   }, [prCinematic, unlockInfo]);
 
+  // Now and then, on an exercise's start screen, a quiet suggestion to put
+  // the music on. Only when it is off, about one time in three, and never
+  // more than once every ten minutes, so it stays a hint and not a nag.
+  const [musicHint, setMusicHint] = useState(false);
+  const musicHintAt = useRef(0);
+  const atExerciseStart =
+    mainView === "app" &&
+    exercise.key !== "overview" &&
+    screen === "setup" &&
+    (exercise.key !== "cct" || cctStage === "setup") &&
+    (exercise.key !== "rrt" || rrtStage === "setup") &&
+    (exercise.key !== "motion3d" || motion3dStage === "setup");
+  useEffect(() => {
+    if (!atExerciseStart) {
+      setMusicHint(false);
+      return undefined;
+    }
+    if (binauralBeatsEnabled || unlockInfo) return undefined;
+    if (Date.now() - musicHintAt.current < 10 * 60 * 1000) return undefined;
+    if (Math.random() > 0.34) return undefined;
+    const show = setTimeout(() => {
+      musicHintAt.current = Date.now();
+      setMusicHint(true);
+    }, 900);
+    const hide = setTimeout(() => setMusicHint(false), 10900);
+    return () => {
+      clearTimeout(show);
+      clearTimeout(hide);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atExerciseStart, exercise.key]);
+
   // Fetch and decode the applause once, up front, so the first record of a
   // session is not the one that misses it.
   useEffect(() => {
@@ -17582,6 +17631,10 @@ function NBackSessionApp() {
                   setScreensaverOn(true);
                 }),
                 go("Opening edit (launch style)", () => setLaunchEditOn(true)),
+                go("Music hint", () => {
+                  jumpToExercise("dual");
+                  setTimeout(() => setMusicHint(true), 300);
+                }),
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
                   setTimeout(() => setSessionCompleteAnim(false), 5500);
@@ -21858,6 +21911,37 @@ function NBackSessionApp() {
         </div>
       )}
 
+      {musicHint && !binauralBeatsEnabled && (
+        <div
+          className="fixed z-40 left-1/2 bottom-20 flex items-center gap-4 rounded-xl border px-5 py-3.5 text-base shadow-xl"
+          style={{
+            transform: "translateX(-50%)",
+            borderColor: "rgba(117,55,226,0.45)",
+            background: "#0F0D17",
+            color: "#E9E4F5",
+            boxShadow: "0 0 40px -10px rgba(117,55,226,0.6)",
+            animation: "ssTaglineIn 0.45s ease-out both",
+            maxWidth: "calc(100vw - 2rem)",
+          }}
+        >
+          <span>Having a hard session? Turn some music on to help you get it done.</span>
+          <button
+            onClick={() => {
+              unlockBinauralAudio();
+              setBinauralBeatsEnabled(true);
+              setMusicHint(false);
+            }}
+            className="shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium"
+            style={{ background: "#7537E2", color: "#fff" }}
+          >
+            Turn on
+          </button>
+          <button onClick={() => setMusicHint(false)} className="shrink-0 text-slate-500 hover:text-slate-300" aria-label="Dismiss">
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Testing: plays the first-time personal record celebration for the
           exercise on screen, one level above its best, without training. */}
       {mainView === "app" &&
@@ -21882,7 +21966,7 @@ function NBackSessionApp() {
                 : exercise.title.replace("N-Back", `${level}-Back`);
             setUnlockInfo({ exerciseKey: exercise.key, level, title, isNewPR: true });
           }}
-          className="fixed bottom-6 left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="fixed bottom-6 left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           🧪 Test PR animation
         </button>
@@ -21892,7 +21976,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("notes")}
           /* Under the Testing station pill, same treatment. */
-          className="hidden sm:flex fixed top-14 left-3 sm:top-[8.125rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-14 left-3 sm:top-[8.125rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           Notes
         </button>
@@ -21902,7 +21986,7 @@ function NBackSessionApp() {
       {pagesMode && mainView !== "pages" && (
         <button
           onClick={() => setMainView("pages")}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 border border-dashed border-slate-500 text-slate-300 hover:text-slate-100 hover:border-slate-300 bg-slate-900/95 backdrop-blur transition-colors rounded-full py-2 px-5 text-sm font-medium shadow-lg"
+          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 border border-dashed border-slate-500 text-slate-300 hover:text-slate-100 hover:border-slate-300 bg-slate-900/95 transition-colors rounded-full py-2 px-5 text-sm font-medium shadow-lg"
         >
           &lsaquo; Pages
         </button>
@@ -21916,7 +22000,7 @@ function NBackSessionApp() {
           }}
           /* Under Notes, same treatment. Opens the list of every screen in
              the app, for walking the responsive checklist. */
-          className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[10.875rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-[6.5rem] left-3 sm:top-[10.875rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           📐 Pages
         </button>
@@ -21937,7 +22021,7 @@ function NBackSessionApp() {
         <button
           onClick={() => setMainView("testing")}
           /* Top left, opposite Achievements. */
-          className="hidden sm:flex fixed top-3 left-3 sm:top-[5.375rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 backdrop-blur transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 left-3 sm:top-[5.375rem] sm:left-6 z-30 flex items-center gap-2 border border-dashed border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-400 bg-slate-900/90 transition-colors rounded-full py-2 px-4 text-sm font-medium shadow-lg"
         >
           🧪 Testing station
         </button>
