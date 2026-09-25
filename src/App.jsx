@@ -10171,13 +10171,13 @@ const SS_SCENES = [
 ];
 
 function SsGemLadder() {
-  // Novice to Enlightened, a rank every 134ms, then it holds a moment
+  // Novice to Enlightened, a rank every 174ms, then it holds a moment
   // on Enlightened before the cut.
   const [level, setLevel] = useState(1);
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      SS_TRACK_BEAT_MS / 3.5
+      SS_TRACK_BEAT_MS / 2.7
     );
     return () => clearInterval(id);
   }, []);
@@ -10759,7 +10759,7 @@ function IdleScreensaver({ onExit, onEnding }) {
                 fontSize: "clamp(4rem, 12vw, 10rem)",
                 lineHeight: 1,
                 color: "#FFFFFF",
-                animation: `ssTrack ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+                animation: `ssTrack ${sceneMs}ms linear both`,
                 textShadow: "0 0 60px rgba(117,55,226,0.6)",
               }}
             >
@@ -11275,12 +11275,6 @@ function HomeSpace({ live = true, visible = true }) {
       <div style={{ position: "absolute", inset: 0, animation: live ? "spaceBreathe 26s ease-in-out infinite alternate" : undefined }}>
         <canvas ref={gasRef} style={layer} />
       </div>
-      {/* Faint cosmic dust rolling through in front of the gas. */}
-      {live && (
-        <div style={{ position: "absolute", inset: 0, opacity: 0.35, mixBlendMode: "screen" }}>
-          <SsSmoke playing />
-        </div>
-      )}
       <canvas ref={farRef} style={layer} />
       <canvas ref={nearRef} style={layer} />
       <canvas ref={liveRef} style={layer} />
@@ -15393,10 +15387,12 @@ function NBackSessionApp() {
         }
         @keyframes ssBarTop { from { transform: translateY(-100%); } to { transform: translateY(0); } }
         @keyframes ssBarBottom { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        /* The letters punch out on the hit (the first half second), then
+           keep drifting apart slowly for the rest of the card. */
         @keyframes ssTrack {
-          0% { letter-spacing: 0.02em; opacity: 0; filter: blur(8px); }
-          18% { opacity: 1; filter: blur(0); }
-          100% { letter-spacing: 0.22em; opacity: 1; filter: blur(0); }
+          0% { letter-spacing: 0.02em; opacity: 0; filter: blur(6px); animation-timing-function: cubic-bezier(0.05,0.9,0.2,1); }
+          11% { letter-spacing: 0.18em; opacity: 1; filter: blur(0); animation-timing-function: linear; }
+          100% { letter-spacing: 0.24em; opacity: 1; filter: blur(0); }
         }
         .ss-grain {
           inset: -6%;
