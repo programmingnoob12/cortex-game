@@ -9581,6 +9581,79 @@ function makeGlowSprite(rgb = [185, 160, 245]) {
   return c;
 }
 
+// The sound of a ping: a short glassy tone, FM so it has a bright attack
+// that melts into a pure note, with a soft octave below and a quiet echo
+// tail. Each part of the brain rings on its own note of one pentatonic
+// scale, so clicking around plays something that always sounds in key.
+const BRAIN_PING_NOTES = {
+  rrt: 523.25, // C5
+  dual: 659.25, // E5
+  quad: 392.0, // G4
+  motion3d: 880.0, // A5
+  iqnb: 783.99, // G5
+  cct: 587.33, // D5
+};
+let brainPingBus = null;
+function playBrainPing(key) {
+  const ctx = letterAudioContext();
+  if (!ctx) return;
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  if (!brainPingBus) {
+    // A shared echo: a short delay feeding back through a gentle low-pass.
+    const out = ctx.createGain();
+    out.gain.value = 0.9;
+    out.connect(ctx.destination);
+    const delay = ctx.createDelay(1);
+    delay.delayTime.value = 0.19;
+    const fb = ctx.createGain();
+    fb.gain.value = 0.32;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 2400;
+    delay.connect(lp);
+    lp.connect(fb);
+    fb.connect(delay);
+    const wet = ctx.createGain();
+    wet.gain.value = 0.35;
+    lp.connect(wet);
+    wet.connect(out);
+    brainPingBus = { dry: out, send: delay };
+  }
+  const f = BRAIN_PING_NOTES[key] || 659.25;
+  const t = ctx.currentTime + 0.005;
+  const amp = ctx.createGain();
+  amp.gain.setValueAtTime(0, t);
+  amp.gain.linearRampToValueAtTime(0.16, t + 0.006);
+  amp.gain.exponentialRampToValueAtTime(0.0008, t + 1.1);
+  amp.connect(brainPingBus.dry);
+  amp.connect(brainPingBus.send);
+  const carrier = ctx.createOscillator();
+  carrier.type = "sine";
+  carrier.frequency.setValueAtTime(f, t);
+  const mod = ctx.createOscillator();
+  mod.type = "sine";
+  mod.frequency.setValueAtTime(f * 3.01, t);
+  const modGain = ctx.createGain();
+  modGain.gain.setValueAtTime(f * 1.4, t);
+  modGain.gain.exponentialRampToValueAtTime(1, t + 0.35);
+  mod.connect(modGain);
+  modGain.connect(carrier.frequency);
+  carrier.connect(amp);
+  const sub = ctx.createOscillator();
+  sub.type = "sine";
+  sub.frequency.setValueAtTime(f / 2, t);
+  const subGain = ctx.createGain();
+  subGain.gain.setValueAtTime(0, t);
+  subGain.gain.linearRampToValueAtTime(0.06, t + 0.01);
+  subGain.gain.exponentialRampToValueAtTime(0.0005, t + 0.7);
+  sub.connect(subGain);
+  subGain.connect(brainPingBus.dry);
+  [carrier, mod, sub].forEach((o) => {
+    o.start(t);
+    o.stop(t + 1.2);
+  });
+}
+
 function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
@@ -9844,7 +9917,9 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500 }) {
       // Only the brain itself answers a click; the empty space around it
       // does nothing. The ring takes the colour of the part clicked.
       if (!inBrain(x, y)) return;
-      pings.push({ x, y, t0: performance.now(), key: brainRegion(x, y) });
+      const key = brainRegion(x, y);
+      pings.push({ x, y, t0: performance.now(), key });
+      playBrainPing(key);
       if (pings.length > 6) pings.shift();
       kick();
     };
@@ -10013,6 +10088,7 @@ const SS_SCENES = [
   { kind: "brain", text: "Dominate.", beats: 2, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
+  { kind: "word", text: "Be smarter than everyone.", beats: 2 },
   { kind: "end", beats: 5 },
 ];
 
@@ -10023,7 +10099,7 @@ function SsGemLadder() {
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      SS_TRACK_BEAT_MS / 3
+      SS_TRACK_BEAT_MS / 3.6
     );
     return () => clearInterval(id);
   }, []);
@@ -10471,7 +10547,7 @@ function IdleScreensaver({ onExit, onEnding }) {
               ? `ssSlam ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`
               : scene.kind === "image"
               ? `ssImgPunch ${sceneMs}ms cubic-bezier(0.2,0.8,0.2,1) both`
-              : `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
+              : `ssSlam ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
           willChange: "transform, opacity",
         }}
       >
@@ -10542,11 +10618,18 @@ function IdleScreensaver({ onExit, onEnding }) {
             {/* Sized off the height as well as the width, so the brain and
                 the word under it always fit inside the letterbox. */}
             <div style={{ width: "min(640px, 80vw, 62vh)" }}>
-              <HomeConstellation days={220} showCaption={false} interactive={false} entranceMs={700} />
+              <HomeConstellation days={220} showCaption={false} interactive={false} entranceMs={260} />
             </div>
             <div
-              className="font-black uppercase tracking-tight -mt-6"
-              style={{ ...bigWord, fontSize: "clamp(2.25rem, min(6vw, 8vh), 5rem)", color: "#FFFFFF" }}
+              className="font-black uppercase tracking-tight -mt-6 ss-split"
+              style={{
+                ...bigWord,
+                fontSize: "clamp(2.5rem, min(7vw, 9vh), 5.5rem)",
+                color: "#FFFFFF",
+                // Punches in hard, as the gem's last rank does.
+                animation: "ssTopSlam 0.26s cubic-bezier(0.2,1.2,0.3,1) both, ssSplit 0.5s ease-out both",
+                textShadow: "0 0 40px rgba(117,55,226,0.6)",
+              }}
             >
               {scene.text}
             </div>
@@ -10744,7 +10827,7 @@ function makeGalaxy(size, seed, armRgb, coreRgb) {
   return c;
 }
 
-function HomeSpace({ live = true }) {
+function HomeSpace({ live = true, visible = true }) {
   const stillRef = useRef(null);
   const liveRef = useRef(null);
   // Drawn while the edit is still ending, hidden and still, so the sky is
@@ -10758,6 +10841,7 @@ function HomeSpace({ live = true }) {
     const reduce =
       window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const white = spaceSprite([255, 255, 255], 64);
+    const ember = spaceSprite([255, 130, 40], 64);
     const blue = spaceSprite([170, 200, 255], 64);
     // The exercises' own vivid colours: the app's purple, Dual's blue,
     // QNB's cyan, CCT's crimson.
@@ -10765,9 +10849,7 @@ function HomeSpace({ live = true }) {
     const teal = spaceSprite(hexRgb(EXERCISE_COLORS.iqnb), 128);
     const rose = spaceSprite(hexRgb(EXERCISE_COLORS.cct), 128);
     const azure = spaceSprite(hexRgb(EXERCISE_COLORS.dual), 128);
-    const galaxies = [
-      { img: makeGalaxy(300, 3, hexRgb(EXERCISE_COLORS.iqnb), [255, 170, 60]), x: 0.83, y: 0.26, size: 300, tilt: 0.42, angle: 0.6, spin: 0.012 },
-    ];
+    const galaxies = [];
     let W = 0;
     let H = 0;
     let twinklers = [];
@@ -10831,25 +10913,21 @@ function HomeSpace({ live = true }) {
         }
         const m = brainNoise(i, 87);
         const near = Math.exp(-((bandDist(x, y) / (H * 0.25)) ** 2));
-        const a2 = (0.08 + brainNoise(i, 88) * 0.28) * (0.7 + 0.3 * near);
+        const a2 = (0.14 + brainNoise(i, 88) * 0.36) * (0.7 + 0.3 * near);
         const tint = brainNoise(i, 89);
         g.globalAlpha = a2;
         g.fillStyle = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
-        const r = m > 0.996 ? 1.4 : m > 0.96 ? 1 : 0.6;
+        const r = m > 0.99 ? 1.1 : m > 0.93 ? 0.8 : 0.55;
         g.beginPath();
         g.arc(x, y, r, 0, Math.PI * 2);
         g.fill();
         if (m > 0.99) {
-          const gs = m > 0.996 ? 14 : 7;
-          g.globalAlpha = 0.22;
-          g.drawImage(tint > 0.72 ? blue : white, x - gs, y - gs, gs * 2, gs * 2);
-          if (m > 0.996) {
-            // Diffraction spikes on the very brightest.
-            g.globalAlpha = 0.28;
-            g.fillStyle = "#FFFFFF";
-            g.fillRect(x - 11, y - 0.35, 22, 0.7);
-            g.fillRect(x - 0.35, y - 11, 0.7, 22);
-          }
+          // The brightest get only a faint halo of their own light: clean
+          // points, not the crosses and big glows that looked cheap.
+          g.globalAlpha = 0.12;
+          g.beginPath();
+          g.arc(x, y, 2.6, 0, Math.PI * 2);
+          g.fill();
           if (twinklers.length < 5) twinklers.push({ x, y, phase: brainNoise(i, 90) * 6.28, speed: 0.6 + brainNoise(i, 91) * 1.4 });
         }
       }
@@ -10866,8 +10944,12 @@ function HomeSpace({ live = true }) {
       drawStill();
       sizeLive();
     };
-    drawStill();
-    sizeLive();
+    // Drawn just after the first frame, so building it never holds up
+    // whatever is on screen when the app starts.
+    const firstDraw = setTimeout(() => {
+      drawStill();
+      sizeLive();
+    }, 0);
     window.addEventListener("resize", onResize);
 
     // Events in the living sky.
@@ -10905,9 +10987,11 @@ function HomeSpace({ live = true }) {
       for (let k = 0; k < twinklers.length; k += 1) {
         const tw = twinklers[k];
         const v = 0.5 + 0.5 * Math.sin((t / 1000) * tw.speed + tw.phase);
-        const gs = 5 + v * 7;
-        ctx.globalAlpha = 0.1 + v * 0.35;
-        ctx.drawImage(white, tw.x - gs, tw.y - gs, gs * 2, gs * 2);
+        ctx.globalAlpha = 0.15 + v * 0.55;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(tw.x, tw.y, 1 + v * 0.6, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       // Shooting stars.
@@ -10936,19 +11020,22 @@ function HomeSpace({ live = true }) {
         const ty = hy - Math.sin(m.ang) * m.len;
         const fade = p < 0.15 ? p / 0.15 : 1 - (p - 0.15) / 0.85;
         const grad = ctx.createLinearGradient(tx, ty, hx, hy);
-        grad.addColorStop(0, "rgba(154,108,240,0)");
-        grad.addColorStop(0.7, `rgba(200,190,255,${0.35 * fade})`);
-        grad.addColorStop(1, `rgba(255,255,255,${0.95 * fade})`);
+        // Fiery: deep red at the tail, orange through the body, a
+        // white-hot yellow at the head.
+        grad.addColorStop(0, "rgba(180,20,10,0)");
+        grad.addColorStop(0.45, `rgba(230,60,20,${0.35 * fade})`);
+        grad.addColorStop(0.85, `rgba(255,150,40,${0.75 * fade})`);
+        grad.addColorStop(1, `rgba(255,240,200,${0.95 * fade})`);
         ctx.globalAlpha = 1;
         ctx.strokeStyle = grad;
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = 2.2;
         ctx.lineCap = "round";
         ctx.beginPath();
         ctx.moveTo(tx, ty);
         ctx.lineTo(hx, hy);
         ctx.stroke();
         ctx.globalAlpha = 0.9 * fade;
-        ctx.drawImage(white, hx - 6, hy - 6, 12, 12);
+        ctx.drawImage(ember, hx - 9, hy - 9, 18, 18);
       }
 
       ctx.globalAlpha = 1;
@@ -10961,6 +11048,7 @@ function HomeSpace({ live = true }) {
       raf = requestAnimationFrame(frame);
     }
     return () => {
+      clearTimeout(firstDraw);
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
     };
@@ -10969,7 +11057,7 @@ function HomeSpace({ live = true }) {
     <div
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none"
-      style={{ position: "fixed", inset: 0, zIndex: -1, opacity: live ? 1 : 0, transition: "opacity 1.2s ease-out" }}
+      style={{ position: "fixed", inset: 0, zIndex: -1, visibility: visible ? "visible" : "hidden" }}
     >
       <canvas ref={stillRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
       <canvas ref={liveRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
@@ -19747,6 +19835,52 @@ function NBackSessionApp() {
               : undefined
           }
         >
+          {/* The opening edit's look: violet smoke, grain, vignette and
+              widescreen bars, under everything else on this screen. */}
+          <SsSmoke playing />
+          <div aria-hidden="true" className="ss-grain absolute pointer-events-none" />
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none"
+            style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.8) 100%)" }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 bg-black pointer-events-none"
+            style={{ height: "8vh", animation: "ssBarTop 1s cubic-bezier(0.2,0.8,0.2,1) both" }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
+            style={{ height: "8vh", animation: "ssBarBottom 1s cubic-bezier(0.2,0.8,0.2,1) both" }}
+          />
+          {/* The moment it lands: a light streak across the frame and a
+              soft flash, as on every cut in the edit. */}
+          {(!prCinematic || prRevealed) && (
+            <>
+              <div
+                aria-hidden="true"
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  top: "50%",
+                  height: "2px",
+                  marginTop: "-1px",
+                  background:
+                    "linear-gradient(90deg, transparent 0%, rgba(154,108,240,0) 10%, rgba(217,200,255,0.9) 50%, rgba(154,108,240,0) 90%, transparent 100%)",
+                  boxShadow: "0 0 18px 4px rgba(154,108,240,0.35)",
+                  animation: "ssFlare 0.6s ease-out both",
+                }}
+              />
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.12) 30%, transparent 60%)",
+                  animation: "ssTopFlash 0.35s ease-out both",
+                }}
+              />
+            </>
+          )}
           {prCinematic && (
             /* Pre-roll. Sized in viewport units throughout so it fills the
                screen on any display, rather than being a small scene in the
@@ -19818,45 +19952,6 @@ function NBackSessionApp() {
                   }}
                 />
               ))}
-              {/* Rings in pairs: a bright thin one with a soft wide one
-                  chasing it a beat behind, so each pulse has a leading edge
-                  and a wake rather than being a single hard outline. They
-                  scale out past the viewport edge. */}
-              {[
-                { d: 0, size: 30, w: 1, blur: 0 },
-                { d: 0.28, size: 30, w: 9, blur: 18 },
-                { d: 1.3, size: 24, w: 1, blur: 0 },
-                { d: 1.58, size: 24, w: 9, blur: 18 },
-                { d: 2.6, size: 34, w: 1, blur: 0 },
-                { d: 2.88, size: 34, w: 9, blur: 18 },
-              ].map(({ d, size, w, blur }, i) => (
-                <div
-                  key={`r${i}`}
-                  className="absolute rounded-full"
-                  style={{
-                    width: `${size}vmax`,
-                    height: `${size}vmax`,
-                    border: `${w}px solid ${PR_YELLOW}${blur ? "18" : "55"}`,
-                    filter: blur ? `blur(${blur}px)` : undefined,
-                    boxShadow: blur ? undefined : `0 0 34px ${PR_YELLOW}26`,
-                    animation: `prRing 4.6s ${d}s cubic-bezier(0.19,0.75,0.28,1) both`,
-                  }}
-                />
-              ))}
-              {/* Rings travelling the other way, tightening inward from
-                  beyond the edges, so the motion is not all one direction. */}
-              {[0.5, 2.4].map((d) => (
-                <div
-                  key={`i${d}`}
-                  className="absolute rounded-full"
-                  style={{
-                    width: "72vmax",
-                    height: "72vmax",
-                    border: `1px solid ${PR_YELLOW}2e`,
-                    animation: `prRingIn 4s ${d}s cubic-bezier(0.33,0,0.25,1) both`,
-                  }}
-                />
-              ))}
               {/* Motes converging from off-screen toward the centre. */}
               {Array.from({ length: 18 }).map((_, i) => {
                 const angle = (i / 18) * Math.PI * 2;
@@ -19894,6 +19989,7 @@ function NBackSessionApp() {
             />
           )}
           <div
+            key={!prCinematic || prRevealed ? "landed" : "waiting"}
             className="relative flex flex-col items-center text-center gap-14 max-w-sm"
             style={
               prCinematic
@@ -19910,8 +20006,9 @@ function NBackSessionApp() {
                     // early and it drifts into place — an abrupt arrival is
                     // usually a curve that finishes fast, not one that is
                     // too short.
+                    // Lands hard on the drop, like a cut in the edit.
                     transition:
-                      "opacity 5s cubic-bezier(0.16,0.8,0.24,1), transform 5s cubic-bezier(0.16,0.8,0.24,1), filter 4.2s cubic-bezier(0.16,0.8,0.24,1)",
+                      "opacity 0.35s ease-out, transform 0.5s cubic-bezier(0.2,1.2,0.3,1), filter 0.35s ease-out",
                   }
                 : undefined
             }
@@ -19924,7 +20021,19 @@ function NBackSessionApp() {
                   textShadow: `0 0 24px ${PR_YELLOW}66`,
                 }}
               >
-                New level reached
+                {/* Word by word, rising out of blur, as the edit's lines do. */}
+                {"New level reached".split(" ").map((w, wi) => (
+                  <span
+                    key={wi}
+                    className="inline-block"
+                    style={{
+                      marginRight: "0.35em",
+                      animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 90}ms both`,
+                    }}
+                  >
+                    {w}
+                  </span>
+                ))}
               </div>
             ) : (
               <div className="text-base uppercase tracking-wide text-slate-400">
@@ -19932,7 +20041,7 @@ function NBackSessionApp() {
               </div>
             )}
 
-            <div className="relative" style={{ animation: "gemPop 0.7s cubic-bezier(0.34,1.56,0.64,1)" }}>
+            <div className="relative" style={{ animation: "ssTopSlam 0.32s cubic-bezier(0.2,1.2,0.3,1) both" }}>
               <LevelGem
                 level={unlockInfo.level}
                 size={168}
@@ -19942,7 +20051,10 @@ function NBackSessionApp() {
             </div>
 
             <div className="space-y-2">
-              <div className="text-3xl font-semibold tracking-tight">
+              <div
+                className="text-3xl font-semibold tracking-tight ss-split"
+                style={{ animationDelay: "180ms" }}
+              >
                 {/* Always the level reached ("Quad 5-Back"), never the bare
                     exercise name. */}
                 {unlockInfo.title.replace("N-Back", `${unlockInfo.level}-Back`)}
@@ -19950,7 +20062,10 @@ function NBackSessionApp() {
               {unlockInfo.isNewPR && (
                 <div
                   className="text-lg font-semibold tracking-wide"
-                  style={{ color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color }}
+                  style={{
+                    color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
+                    animation: "ssTaglineIn 0.5s ease-out 320ms both",
+                  }}
                 >
                   {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
                 </div>
@@ -20696,7 +20811,9 @@ function NBackSessionApp() {
 
       {screensaverOn && <IdleScreensaver onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
 
-      {mainView === "home" && (!screensaverOn || spaceWarm) && <HomeSpace live={!screensaverOn} />}
+      {/* Kept mounted the whole time the app is open, so Home's sky is
+          already drawn whenever Home appears; it only moves while seen. */}
+      <HomeSpace live={mainView === "home" && !screensaverOn} visible={mainView === "home"} />
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
