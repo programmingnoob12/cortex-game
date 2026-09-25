@@ -9999,9 +9999,6 @@ const SS_VOLUME = 0.45;
 const SS_FADE_OUT_MS = 4000;
 // How long the picture takes to dissolve into Home.
 const SS_DISSOLVE_MS = 1600;
-// The closing title plays its animation over four pairs of beats, as it
-// always has, and then simply stays on screen for the rest of its eight.
-const SS_END_ANIM_MS = SS_TRACK_BEAT_MS * 2 * 4;
 const SS_SCENES = [
   { kind: "word", text: "Your mind", beats: 2 },
   { kind: "word", text: "is your edge.", accent: true, beats: 2 },
@@ -10016,7 +10013,7 @@ const SS_SCENES = [
   { kind: "brain", text: "Dominate.", beats: 2, dip: true },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Get understanding.", accent: true, beats: 2 },
-  { kind: "end", beats: 6 },
+  { kind: "end", beats: 5 },
 ];
 
 function SsGemLadder() {
@@ -10026,7 +10023,7 @@ function SsGemLadder() {
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      SS_TRACK_BEAT_MS / 2
+      SS_TRACK_BEAT_MS / 3
     );
     return () => clearInterval(id);
   }, []);
@@ -10034,49 +10031,30 @@ function SsGemLadder() {
   const top = level === MAX_GEM_TIER;
   return (
     <div className="relative flex flex-col items-center gap-8">
-      {/* The last rank lands like a hit: a burst of red light behind it,
-          two shockwave rings, a flash, and the gem slamming in from large
-          with a small shake. */}
+      {/* The last rank snaps in: one hard flash of light and it is there.
+          A soft-edged burst around the gem (not a full-frame box: this sits
+          inside the moving scene, where "fixed" would be clipped to it). */}
       {top && (
-        <>
-          <div
-            aria-hidden="true"
-            className="absolute left-1/2 pointer-events-none rounded-full"
-            style={{
-              top: 100,
-              width: 520,
-              height: 520,
-              marginLeft: -260,
-              marginTop: -260,
-              background: `radial-gradient(circle, ${tier.color}AA 0%, ${tier.color}33 35%, transparent 70%)`,
-              animation: "ssTopBurst 0.9s cubic-bezier(0.1,0.8,0.2,1) both",
-            }}
-          />
-          {[0, 110].map((delay) => (
-            <div
-              key={delay}
-              aria-hidden="true"
-              className="absolute left-1/2 pointer-events-none rounded-full"
-              style={{
-                top: 100,
-                width: 220,
-                height: 220,
-                marginLeft: -110,
-                marginTop: -110,
-                border: `2px solid ${tier.color}`,
-                boxShadow: `0 0 24px ${tier.color}`,
-                animation: `ssTopRing 0.8s cubic-bezier(0.1,0.7,0.2,1) ${delay}ms both`,
-              }}
-            />
-          ))}
-        </>
+        <div
+          aria-hidden="true"
+          className="absolute left-1/2 pointer-events-none rounded-full"
+          style={{
+            top: 100,
+            width: 900,
+            height: 900,
+            marginLeft: -450,
+            marginTop: -450,
+            background: "radial-gradient(circle, rgba(255,255,255,0.9) 0%, rgba(255,235,235,0.35) 22%, transparent 60%)",
+            animation: "ssTopFlash 0.24s ease-out both",
+          }}
+        />
       )}
       <div
         key={level}
         className="relative"
         style={{
           animation: top
-            ? "ssTopSlam 0.55s cubic-bezier(0.2,1.5,0.3,1) both"
+            ? "ssTopSlam 0.26s cubic-bezier(0.2,1.2,0.3,1) both"
             : "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both",
         }}
       >
@@ -10088,7 +10066,7 @@ function SsGemLadder() {
         style={{
           color: tier.color,
           textShadow: top ? `0 0 50px ${tier.color}, 0 0 12px ${tier.color}` : `0 0 40px ${tier.color}88`,
-          animation: top ? "ssTopLabel 0.6s cubic-bezier(0.2,1.3,0.3,1) 60ms both" : undefined,
+          animation: top ? "ssTopLabel 0.26s cubic-bezier(0.2,1.2,0.3,1) both" : undefined,
         }}
       >
         {tier.label}
@@ -10490,7 +10468,7 @@ function IdleScreensaver({ onExit, onEnding }) {
           // made that scene drag, so it cuts in without the focus pull.
           animation:
             scene.kind === "end"
-              ? `ssSlam ${SS_END_ANIM_MS}ms cubic-bezier(0.16,1,0.3,1) both`
+              ? `ssSlam ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`
               : scene.kind === "image"
               ? `ssImgPunch ${sceneMs}ms cubic-bezier(0.2,0.8,0.2,1) both`
               : `${scene.kind === "brain" ? "ssSlamSoft" : "ssSlam"} ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
@@ -10582,7 +10560,7 @@ function IdleScreensaver({ onExit, onEnding }) {
                 fontSize: "clamp(4rem, 12vw, 10rem)",
                 lineHeight: 1,
                 color: "#FFFFFF",
-                animation: `ssTrack ${SS_END_ANIM_MS}ms cubic-bezier(0.16,1,0.3,1) both`,
+                animation: `ssTrack ${sceneMs}ms cubic-bezier(0.16,1,0.3,1) both`,
                 textShadow: "0 0 60px rgba(117,55,226,0.6)",
               }}
             >
@@ -10590,7 +10568,7 @@ function IdleScreensaver({ onExit, onEnding }) {
             </div>
             <div
               className="text-sm sm:text-lg uppercase tracking-[0.42em] text-slate-300"
-              style={{ animation: `ssTagline ${SS_END_ANIM_MS}ms ease-out both` }}
+              style={{ animation: `ssTagline ${sceneMs}ms ease-out both` }}
             >
               Pursue Excellence
             </div>
@@ -10821,7 +10799,7 @@ function HomeSpace({ live = true }) {
         // Fewer, bigger, softer clouds: a smooth band, not blotches.
         const sz = H * (0.2 + brainNoise(k, 63) * 0.2);
         const pick = brainNoise(k, 64);
-        g.globalAlpha = 0.055 + brainNoise(k, 65) * 0.05;
+        g.globalAlpha = 0.03 + brainNoise(k, 65) * 0.03;
         g.drawImage(pick > 0.72 ? rose : pick > 0.45 ? violet : pick > 0.2 ? azure : teal, x - sz, y - sz, sz * 2, sz * 2);
       }
       // Two nebulae, off the band.
@@ -10830,7 +10808,7 @@ function HomeSpace({ live = true }) {
           const a2 = brainNoise(seed + k, 1) * Math.PI * 2;
           const d = brainNoise(seed + k, 2) * spread;
           const sz = spread * (0.4 + brainNoise(seed + k, 3) * 0.6);
-          g.globalAlpha = 0.1 + brainNoise(seed + k, 4) * 0.09;
+          g.globalAlpha = 0.045 + brainNoise(seed + k, 4) * 0.04;
           g.drawImage(spr, cx + Math.cos(a2) * d - sz, cy + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
         }
       };
@@ -10853,7 +10831,7 @@ function HomeSpace({ live = true }) {
         }
         const m = brainNoise(i, 87);
         const near = Math.exp(-((bandDist(x, y) / (H * 0.25)) ** 2));
-        const a2 = (0.1 + brainNoise(i, 88) * 0.35) * (0.7 + 0.3 * near);
+        const a2 = (0.08 + brainNoise(i, 88) * 0.28) * (0.7 + 0.3 * near);
         const tint = brainNoise(i, 89);
         g.globalAlpha = a2;
         g.fillStyle = tint > 0.86 ? "#CDB8FF" : tint > 0.72 ? "#BFD8FF" : tint > 0.66 ? "#FFE3C0" : "#FFFFFF";
@@ -10863,7 +10841,7 @@ function HomeSpace({ live = true }) {
         g.fill();
         if (m > 0.99) {
           const gs = m > 0.996 ? 14 : 7;
-          g.globalAlpha = 0.35;
+          g.globalAlpha = 0.22;
           g.drawImage(tint > 0.72 ? blue : white, x - gs, y - gs, gs * 2, gs * 2);
           if (m > 0.996) {
             // Diffraction spikes on the very brightest.
@@ -10918,7 +10896,7 @@ function HomeSpace({ live = true }) {
         ctx.rotate(gx.angle);
         ctx.scale(1, gx.tilt);
         ctx.rotate((t / 1000) * gx.spin);
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 0.45;
         ctx.drawImage(gx.img, -gx.size / 2, -gx.size / 2, gx.size, gx.size);
         ctx.restore();
       }
@@ -10928,7 +10906,7 @@ function HomeSpace({ live = true }) {
         const tw = twinklers[k];
         const v = 0.5 + 0.5 * Math.sin((t / 1000) * tw.speed + tw.phase);
         const gs = 5 + v * 7;
-        ctx.globalAlpha = 0.15 + v * 0.55;
+        ctx.globalAlpha = 0.1 + v * 0.35;
         ctx.drawImage(white, tw.x - gs, tw.y - gs, gs * 2, gs * 2);
       }
 
@@ -15001,23 +14979,17 @@ function NBackSessionApp() {
         }
         @media (prefers-reduced-motion: reduce) { [style*="homeTwinkle"] { animation: none !important; } }
         @keyframes ssTopSlam {
-          0% { transform: scale(1.9); opacity: 0; filter: brightness(3); }
-          35% { transform: scale(0.94) translate(-4px, 2px); opacity: 1; filter: brightness(1.6); }
-          55% { transform: scale(1.04) translate(3px, -2px); }
-          100% { transform: scale(1) translate(0, 0); filter: brightness(1); }
+          0% { transform: scale(1.35); opacity: 0.4; }
+          45% { transform: scale(0.97) translate(-3px, 1px); opacity: 1; }
+          100% { transform: scale(1) translate(0, 0); }
         }
-        @keyframes ssTopRing {
-          0% { transform: scale(0.4); opacity: 1; }
-          100% { transform: scale(3.2); opacity: 0; }
-        }
-        @keyframes ssTopBurst {
-          0% { transform: scale(0.3); opacity: 0; }
-          25% { transform: scale(1.05); opacity: 1; }
-          100% { transform: scale(1.25); opacity: 0.35; }
+        @keyframes ssTopFlash {
+          0% { opacity: 0.55; }
+          100% { opacity: 0; }
         }
         @keyframes ssTopLabel {
-          0% { transform: scale(1.6); opacity: 0; letter-spacing: 0.4em; }
-          100% { transform: scale(1); opacity: 1; letter-spacing: 0.12em; }
+          0% { transform: scale(1.3); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
         }
         @keyframes ssImgPunch {
           0% { opacity: 0.6; transform: scale(1.16); }
