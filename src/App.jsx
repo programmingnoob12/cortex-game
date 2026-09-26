@@ -9786,6 +9786,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
     const litAt = new Map();
     let nextSpark = performance.now() + 600;
     let lastDraw = 0;
+    let aliveAmt = aliveRef.current ? 1 : 0;
     const PING_MS = 1100;
     const PING_R = 30;
 
@@ -9859,14 +9860,17 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
       raf = 0;
       // At rest a living brain only needs 30 frames a second.
       const busy = pings.length || hover !== hoverTarget || now - start < entranceEnd;
-      const alive = aliveRef.current;
-      if (alive && !busy && now - lastDraw < 30) {
+      // Comes alive gradually, over a second or so, rather than switching.
+      aliveAmt += ((aliveRef.current ? 1 : 0) - aliveAmt) * 0.05;
+      if (Math.abs(aliveAmt - (aliveRef.current ? 1 : 0)) < 0.002) aliveAmt = aliveRef.current ? 1 : 0;
+      const alive = aliveAmt > 0;
+      if (alive && aliveAmt === 1 && !busy && now - lastDraw < 30) {
         raf = requestAnimationFrame(draw);
         return;
       }
       lastDraw = now;
       frameNow = now;
-      if (alive && links.length && now > nextSpark) {
+      if (aliveAmt > 0.6 && links.length && now > nextSpark) {
         const [from, to] = links[Math.floor(Math.random() * links.length)];
         sparks.push({ from, to, t0: now });
         nextSpark = now + 500 + Math.random() * 1100;
@@ -9932,7 +9936,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
         const newest = i === days - 1;
         let h = near(pt.x, pt.y);
         if (alive) {
-          a *= 0.72 + 0.28 * Math.sin(now * 0.001 * breathSpeed[i] + breathPhase[i]);
+          a *= 1 - aliveAmt * 0.28 * (1 - Math.sin(now * 0.001 * breathSpeed[i] + breathPhase[i]));
           const lit = litAt.get(i);
           if (lit !== undefined) {
             const k = 1 - (now - lit) / 700;
@@ -10026,7 +10030,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
         }
       }
 
-      if (aliveRef.current || elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
+      if (aliveRef.current || aliveAmt > 0 || elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
     };
 
     function kick() {
@@ -10618,9 +10622,11 @@ function SsSmoke({ playing }) {
   );
 }
 
-function IdleScreensaver({ onExit, onEnding }) {
+function IdleScreensaver({ onExit, onEnding, onLeaving }) {
   const exitRef = useRef(onExit);
   exitRef.current = onExit;
+  const leavingCbRef = useRef(onLeaving);
+  leavingCbRef.current = onLeaving;
   const endingRef = useRef(onEnding);
   endingRef.current = onEnding;
   const [index, setIndex] = useState(0);
@@ -10640,6 +10646,7 @@ function IdleScreensaver({ onExit, onEnding }) {
   const startSoundRef = useRef(null);
   useEffect(() => {
     if (!leaving) return;
+    if (leavingCbRef.current) leavingCbRef.current();
     const snd = soundRef.current;
     if (!snd) return;
     const t = snd.ctx.currentTime;
@@ -11985,6 +11992,171 @@ function LaunchEdit({ onExit }) {
   );
 }
 
+// The level-up backdrop: deep space, one star in the middle, and on the
+// moment of the level-up that star goes supernova. Before it blows (a
+// record's pre-roll) the star swells and brightens, then pinches in for an
+// instant; then a blinding flash, a spray of glowing debris thrown out fast
+// and slowing as it spreads, and a colourful cloud of gas left expanding
+// behind the gem. No rings, no hard edges: all soft light.
+function SupernovaSky({ revealed, preroll }) {
+  const ref = useRef(null);
+  const revealedRef = useRef(revealed);
+  revealedRef.current = revealed;
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    const ctx = canvas.getContext("2d");
+    const RES = Math.min(1, window.devicePixelRatio || 1) * 0.8;
+    let W = 0;
+    let H = 0;
+    const resize = () => {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.round(W * RES);
+      canvas.height = Math.round(H * RES);
+    };
+    resize();
+    window.addEventListener("resize", resize);
+    const PAL = [
+      [255, 255, 255],
+      [217, 200, 255],
+      [185, 160, 245],
+      [117, 55, 226],
+      [92, 240, 255],
+      [76, 185, 216],
+      [255, 122, 217],
+    ];
+    const sprites = PAL.map((c) => spaceSprite(c, 64));
+    const white = sprites[0];
+    const big = PAL.map((c) => spaceSprite(c, 128));
+    // A still field of stars behind it all.
+    const stars = Array.from({ length: 260 }, (_, i) => ({
+      x: brainNoise(i, 301),
+      y: brainNoise(i, 302),
+      r: 0.4 + brainNoise(i, 303) ** 3 * 1.4,
+      a: 0.2 + brainNoise(i, 304) * 0.6,
+      tw: brainNoise(i, 305) * 6.28,
+    }));
+    // Debris: thrown out along random directions at a range of speeds.
+    const debris = Array.from({ length: 520 }, (_, i) => {
+      const ang = brainNoise(i, 311) * Math.PI * 2;
+      const fast = brainNoise(i, 312);
+      return {
+        ang,
+        v: 180 + fast ** 1.6 * 1100,
+        size: 1.2 + brainNoise(i, 313) * 3.2,
+        c: Math.floor(brainNoise(i, 314) * PAL.length),
+        life: 1.6 + brainNoise(i, 315) * 2.6,
+        wob: (brainNoise(i, 316) - 0.5) * 0.25,
+      };
+    });
+    // The remnant: soft clouds of gas pushed outward and left glowing.
+    const clouds = Array.from({ length: 18 }, (_, i) => ({
+      ang: brainNoise(i, 321) * Math.PI * 2,
+      dist: 0.25 + brainNoise(i, 322) * 0.75,
+      size: 0.13 + brainNoise(i, 323) * 0.2,
+      c: [2, 3, 4, 5, 6, 1][i % 6],
+      a: 0.07 + brainNoise(i, 324) * 0.08,
+    }));
+    const start = performance.now();
+    let boomAt = revealedRef.current ? start : null;
+    let raf;
+    let last = 0;
+    const draw = (now) => {
+      raf = requestAnimationFrame(draw);
+      if (boomAt === null && revealedRef.current) boomAt = now;
+      // Full rate for the blast; once the debris has gone, the slow drift
+      // of the remnant only needs a few frames a second.
+      const tb = boomAt === null ? -1 : (now - boomAt) / 1000;
+      const interval = tb > 4.6 ? 66 : tb > 2.5 ? 33 : 0;
+      if (now - last < interval) return;
+      last = now;
+      const cx = W / 2;
+      const cy = H * 0.46;
+      const unit = Math.max(W, H);
+      ctx.setTransform(RES, 0, 0, RES, 0, 0);
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = "#030208";
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = "lighter";
+      const since = (now - start) / 1000;
+      const t = boomAt === null ? -1 : (now - boomAt) / 1000;
+      // Stars, lit up briefly by the blast.
+      const lit = t >= 0 ? Math.exp(-t * 1.6) : 0;
+      for (let i = 0; i < stars.length; i += 1) {
+        const s = stars[i];
+        const tw = 0.75 + 0.25 * Math.sin(since * 1.3 + s.tw);
+        ctx.globalAlpha = Math.min(1, s.a * tw * (1 + lit * 2));
+        const g = s.r * (3 + lit * 3);
+        ctx.drawImage(white, s.x * W - g, s.y * H - g, g * 2, g * 2);
+      }
+      if (t < 0) {
+        // Before: the star swells and brightens, then pinches in just
+        // before it goes.
+        const p = preroll ? Math.min(1, since / 4.4) : 1;
+        const pinch = preroll && since > 4.2 ? Math.max(0.35, 1 - (since - 4.2) * 3) : 1;
+        const g = (18 + p * p * 70) * pinch;
+        ctx.globalAlpha = 0.5 + p * 0.5;
+        ctx.drawImage(big[2], cx - g * 3, cy - g * 3, g * 6, g * 6);
+        ctx.globalAlpha = 1;
+        ctx.drawImage(white, cx - g, cy - g, g * 2, g * 2);
+      } else {
+        // The remnant cloud, blooming out and settling.
+        const grow = 1 - Math.exp(-t / 1.6);
+        const glow = Math.min(1, t * 3) * (0.55 + 0.45 * Math.exp(-t / 2.5));
+        for (let i = 0; i < clouds.length; i += 1) {
+          const c = clouds[i];
+          const d = c.dist * unit * 0.32 * grow;
+          const sz = c.size * unit * (0.5 + 0.8 * grow);
+          ctx.globalAlpha = c.a * glow * 2.2;
+          ctx.drawImage(
+            big[c.c],
+            cx + Math.cos(c.ang + t * 0.02) * d - sz,
+            cy + Math.sin(c.ang + t * 0.02) * d * 0.8 - sz,
+            sz * 2,
+            sz * 2
+          );
+        }
+        // Debris: fast, then slowing, fading as it spreads.
+        if (t < 4.5) {
+          for (let i = 0; i < debris.length; i += 1) {
+            const p = debris[i];
+            if (t > p.life) continue;
+            const dist = p.v * 0.7 * (1 - Math.exp(-t / 0.7));
+            const ang = p.ang + p.wob * t;
+            const fade = 1 - t / p.life;
+            const g = p.size * (1.5 + fade * 2.5);
+            ctx.globalAlpha = Math.min(1, fade * 1.2);
+            ctx.drawImage(sprites[p.c], cx + Math.cos(ang) * dist - g, cy + Math.sin(ang) * dist - g, g * 2, g * 2);
+          }
+        }
+        // The core: a blinding flash that collapses to a hot bright point.
+        const flash = Math.exp(-t * 5);
+        const core = 26 + 260 * flash;
+        ctx.globalAlpha = Math.min(1, 0.35 + flash);
+        ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
+        ctx.globalAlpha = 0.5 * flash + 0.15;
+        const halo = unit * (0.15 + 0.5 * flash);
+        ctx.drawImage(big[1], cx - halo, cy - halo, halo * 2, halo * 2);
+        // The whole frame whites out for an instant as it goes.
+        if (t < 0.35) {
+          ctx.globalCompositeOperation = "source-over";
+          ctx.globalAlpha = (1 - t / 0.35) ** 2 * 0.85;
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, W, H);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+    raf = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", resize);
+    };
+  }, [preroll]);
+  return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
+}
+
 function HomeSpace({ live = true, visible = true }) {
   const gasRef = useRef(null);
   const farRef = useRef(null);
@@ -12088,9 +12260,9 @@ function HomeSpace({ live = true, visible = true }) {
       // Centred just past the corners (in the padded edge of the sky), so
       // only their inner edge reaches onto the screen.
       const reach = Math.min(W, H) * 0.36;
-      const pad = SPACE_PAD * 0.6;
-      cloud(teal, pad, pad, reach, 0.08, 800);
-      cloud(lavender, W - pad, H - pad, reach, 0.1, 900);
+      const pad = 20; // the screen's corner is at SPACE_PAD, so these sit well past it
+      cloud(teal, pad, pad, reach, 0.1, 800);
+      cloud(lavender, W - pad, H - pad, reach, 0.12, 900);
 
       }
       if (only === "gas") return;
@@ -12199,13 +12371,26 @@ function HomeSpace({ live = true, visible = true }) {
       (sy + SPACE_PAD - H / 2 - nearTy) / nearS + H / 2,
     ];
 
+    // The sky's own clock only runs while it is live, and the layers are
+    // placed from it even while it is paused, so when it comes alive it
+    // carries on from exactly where it sits: no jump.
+    let clock = 0;
+    let prevNow = performance.now();
+    let placed = false;
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
-      if (!liveOn.current) return;
+      const dtc = Math.min(50, now - prevNow);
+      prevNow = now;
+      if (!liveOn.current) {
+        if (placed) return;
+      } else {
+        clock += dtc;
+      }
+      placed = true;
       // Parallax every frame so it glides; the drawing at 30 a second.
       eased.x += (target.x - eased.x) * 0.03;
       eased.y += (target.y - eased.y) * 0.03;
-      const drift = (now - t0) / 1000;
+      const drift = clock / 1000;
       // The sky moves on its own, all the time: a slow drift made of a few
       // unrelated cycles so it never visibly repeats, and each layer swelling
       // and settling on its own long breath. The pointer only nudges it.
@@ -12231,6 +12416,7 @@ function HomeSpace({ live = true, visible = true }) {
       gasC.style.opacity = String(0.65 + 0.35 * (0.5 + 0.5 * Math.sin((drift * TAU) / 11)));
       // Half rate is plenty for twinkling, but a shooting star moves fast and
       // stutters at 30 frames a second, so while one is crossing, every frame.
+      if (!liveOn.current) return;
       skip = meteors.length ? false : !skip;
       if (skip) return;
 
@@ -14736,7 +14922,7 @@ function NBackSessionApp() {
       setHomeLive(false);
       return undefined;
     }
-    const id = setTimeout(() => setHomeLive(true), 350);
+    const id = setTimeout(() => setHomeLive(true), 0);
     return () => clearTimeout(id);
   }, [screensaverOn]);
 
@@ -21280,95 +21466,13 @@ function NBackSessionApp() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black p-8 overflow-hidden"
           style={{ animation: "ssIn 0.6s ease-out both" }}
         >
-          {/* The opening edit's look: violet smoke, grain, vignette and
-              widescreen bars. Nothing gold, nothing blurred live, so it
-              stays smooth. */}
-          <SsSmoke playing />
-          <div aria-hidden="true" className="ss-grain absolute pointer-events-none" />
+          {/* Space, and a star going supernova as the level lands. */}
+          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} />
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
-            style={{ background: "radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.85) 100%)" }}
+            style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%)" }}
           />
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 top-0 bg-black pointer-events-none"
-            style={{ height: "8vh", animation: "ssBarTop 1s cubic-bezier(0.2,0.8,0.2,1) both" }}
-          />
-          <div
-            aria-hidden="true"
-            className="absolute inset-x-0 bottom-0 bg-black pointer-events-none"
-            style={{ height: "8vh", animation: "ssBarBottom 1s cubic-bezier(0.2,0.8,0.2,1) both" }}
-          />
-          {/* Before the drop on a record: violet light slowly gathering in
-              the middle, and a thin line of light drawing across. */}
-          {prCinematic && !prRevealed && (
-            <>
-              <div
-                aria-hidden="true"
-                className="absolute left-1/2 top-1/2 pointer-events-none rounded-full"
-                style={{
-                  width: "90vmax",
-                  height: "90vmax",
-                  marginLeft: "-45vmax",
-                  marginTop: "-45vmax",
-                  background: "radial-gradient(closest-side, rgba(117,55,226,0.28), rgba(117,55,226,0.08) 45%, transparent 70%)",
-                  animation: "prGather 4.6s cubic-bezier(0.4,0,0.2,1) both",
-                  willChange: "transform, opacity",
-                }}
-              />
-              <div
-                aria-hidden="true"
-                className="absolute left-0 right-0 pointer-events-none"
-                style={{
-                  top: "50%",
-                  height: "1px",
-                  background: "linear-gradient(90deg, transparent, rgba(217,200,255,0.55), transparent)",
-                  animation: "ssFlare 4.6s ease-in both",
-                  animationDirection: "reverse",
-                }}
-              />
-            </>
-          )}
-          {(!prCinematic || prRevealed) && (
-            <>
-              {/* The moment it lands: a streak of light and a soft flash,
-                  as on every cut in the edit. */}
-              <div
-                aria-hidden="true"
-                className="absolute left-0 right-0 pointer-events-none"
-                style={{
-                  top: "50%",
-                  height: "2px",
-                  marginTop: "-1px",
-                  background:
-                    "linear-gradient(90deg, transparent 0%, rgba(154,108,240,0) 10%, rgba(217,200,255,0.9) 50%, rgba(154,108,240,0) 90%, transparent 100%)",
-                  boxShadow: "0 0 18px 4px rgba(154,108,240,0.35)",
-                  animation: "ssFlare 0.6s ease-out both",
-                }}
-              />
-              <div
-                aria-hidden="true"
-                className="absolute inset-0 pointer-events-none"
-                style={{
-                  background: "radial-gradient(circle at 50% 45%, rgba(255,255,255,0.4) 0%, rgba(217,200,255,0.1) 30%, transparent 60%)",
-                  animation: "ssTopFlash 0.4s ease-out both",
-                }}
-              />
-              <div
-                aria-hidden="true"
-                className="absolute left-1/2 top-1/2 pointer-events-none rounded-full"
-                style={{
-                  width: "70vmax",
-                  height: "70vmax",
-                  marginLeft: "-35vmax",
-                  marginTop: "-35vmax",
-                  background: "radial-gradient(closest-side, rgba(117,55,226,0.22), rgba(117,55,226,0.06) 45%, transparent 70%)",
-                  animation: "ssIn 0.5s ease-out both",
-                }}
-              />
-            </>
-          )}
           {(!prCinematic || prRevealed) && (
             <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
               {unlockInfo.isNewPR ? (
@@ -22161,7 +22265,7 @@ function NBackSessionApp() {
       )}
 
       {launchEditOn && <LaunchEdit onExit={() => setLaunchEditOn(false)} />}
-      {screensaverOn && <IdleScreensaverMemo onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
+      {screensaverOn && <IdleScreensaverMemo onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} onLeaving={() => setHomeLive(true)} />}
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
