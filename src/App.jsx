@@ -9607,10 +9607,10 @@ function brainPingImpulse(ctx) {
   }
   return buf;
 }
-function playBrainPing(key) {
-  const ctx = letterAudioContext();
-  if (!ctx) return;
-  if (ctx.state !== "running") ctx.resume().catch(() => {});
+// Builds the ping's echo room once. Done ahead of the first click (while
+// Home is idle), because making a convolver on the spot made the audio
+// hiccup the first time the brain was clicked.
+function ensureBrainPingBus(ctx) {
   if (!brainPingBus) {
     const out = ctx.createGain();
     out.gain.value = 0.9;
@@ -9630,6 +9630,12 @@ function playBrainPing(key) {
     }
     brainPingBus = { out, verb, noise };
   }
+}
+function playBrainPing(key) {
+  const ctx = letterAudioContext();
+  if (!ctx) return;
+  if (ctx.state !== "running") ctx.resume().catch(() => {});
+  ensureBrainPingBus(ctx);
   const { out, verb, noise } = brainPingBus;
   const f = BRAIN_PING_NOTES[key] || 659.25;
   const t = ctx.currentTime + 0.005;
@@ -9698,6 +9704,16 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
   useEffect(() => {
     if (aliveProp && kickRef.current) kickRef.current();
   }, [aliveProp]);
+  // Get the ping's sound ready while nothing is happening, so the first
+  // click on the brain does not stall the audio.
+  useEffect(() => {
+    if (!interactive || !aliveProp) return undefined;
+    const id = setTimeout(() => {
+      const ctx = letterAudioContext();
+      if (ctx) ensureBrainPingBus(ctx);
+    }, 1500);
+    return () => clearTimeout(id);
+  }, [interactive, aliveProp]);
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const data = useMemo(() => {
@@ -10159,7 +10175,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // its own grid: two beats of each (sped or slowed slightly so no song makes
 // the edit feel rushed or dragged).
 const SS_TRACKS = [
-  { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit-v5.mp3", beatMs: 468.75 },
+  { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit-v6.mp3", beatMs: 468.75 },
 ];
 const SS_EDIT_DAY_KEY = "cortex.editDay";
 function ssTodayTrackIndex() {
@@ -10659,8 +10675,11 @@ function IdleScreensaver({ onExit, onEnding }) {
     };
     startSoundRef.current = startSound;
 
+    let begun = false;
     const begin = () => {
-      if (cancelled) return;
+      // Only ever once: a second start would lay the track over itself.
+      if (cancelled || begun) return;
+      begun = true;
       const opened = performance.now();
       clockRef.current = () => performance.now() - opened;
       ssMarkEditPlayed();
@@ -12012,7 +12031,7 @@ function HomeSpace({ live = true, visible = true }) {
       return g;
     };
 
-    const drawSky = () => {
+    const drawSky = (only) => {
       W = window.innerWidth + SPACE_PAD * 2;
       H = window.innerHeight + SPACE_PAD * 2;
       const dpr = Math.min(1.5, window.devicePixelRatio || 1);
@@ -12024,8 +12043,11 @@ function HomeSpace({ live = true, visible = true }) {
         return Math.abs((y2 - y1) * x - (x2 - x1) * y + x2 * y1 - y2 * x1) / len;
       };
 
-      // Gas: the band across the sky and one nebula, soft and faint.
-      const gg = prep(gasC, Math.min(1, dpr));
+      // Gas: the band across the sky and one nebula, soft and faint. At half
+      // resolution: it has no fine detail, and it is by far the heaviest
+      // thing to draw, so this is most of what made Home hitch as it came in.
+      if (only !== "stars") {
+      const gg = prep(gasC, 0.5);
       gg.globalCompositeOperation = "lighter";
       for (let k = 0; k < 22; k += 1) {
         const t = brainNoise(k, 61);
@@ -12063,10 +12085,15 @@ function HomeSpace({ live = true, visible = true }) {
       };
       // Wide, faint and ragged, reaching well into the sky, so each fades
       // into the rest of the gas instead of sitting in its corner.
-      const reach = Math.min(W, H) * 0.42;
-      cloud(teal, W * 0.03, H * 0.03, reach, 0.065, 800);
-      cloud(lavender, W * 0.97, H * 0.97, reach, 0.085, 900);
+      // Centred just past the corners (in the padded edge of the sky), so
+      // only their inner edge reaches onto the screen.
+      const reach = Math.min(W, H) * 0.36;
+      const pad = SPACE_PAD * 0.6;
+      cloud(teal, pad, pad, reach, 0.08, 800);
+      cloud(lavender, W - pad, H - pad, reach, 0.1, 900);
 
+      }
+      if (only === "gas") return;
       // Stars, split into a far layer (small, faint) and a near one.
       const fg = prep(farC, Math.min(1, dpr));
       const ng = prep(nearC, dpr);
@@ -12121,10 +12148,20 @@ function HomeSpace({ live = true, visible = true }) {
       drawSky();
       sizeLive();
     };
+    // The first draw is spread over two frames (gas, then stars), after
+    // Home's own first paint, so no single frame stalls; then it fades up.
+    let rafA = 0;
+    let rafB = 0;
     const firstDraw = setTimeout(() => {
-      onResize();
-      requestAnimationFrame(() => setDrawn(true));
-    }, 0);
+      rafA = requestAnimationFrame(() => {
+        drawSky("gas");
+        rafB = requestAnimationFrame(() => {
+          drawSky("stars");
+          sizeLive();
+          setDrawn(true);
+        });
+      });
+    }, 60);
     window.addEventListener("resize", onResize);
 
     // The pointer, for parallax and for the stars' glow.
@@ -12320,6 +12357,8 @@ function HomeSpace({ live = true, visible = true }) {
     if (!reduce) raf = requestAnimationFrame(frame);
     return () => {
       clearTimeout(firstDraw);
+      cancelAnimationFrame(rafA);
+      cancelAnimationFrame(rafB);
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onMove);
@@ -17693,7 +17732,7 @@ function NBackSessionApp() {
               </div>
               {sessionInProgress || sessionParked ? (
                 <div className={`mt-1 font-medium ${compactHome ? "text-base" : "text-lg"}`} style={{ color: PR_YELLOW }}>
-                  In progress: {formatDuration(totalSessionTimeRemainingMs())} left
+                  In progress · {formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div

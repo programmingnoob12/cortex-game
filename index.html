@@ -12,7 +12,7 @@
       try {
         var d = new Date();
         if (localStorage.getItem("cortex.editDay") !== d.toDateString()) {
-          var songs = ["/audio/emotionless-edit-v5.mp3"];
+          var songs = ["/audio/emotionless-edit-v6.mp3"];
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "fetch"; l.type = "audio/mpeg"; l.crossOrigin = "anonymous";
           l.href = songs[Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000) % songs.length];
