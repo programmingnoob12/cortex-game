@@ -18266,7 +18266,7 @@ function NBackSessionApp() {
               </div>
               {sessionInProgress || sessionParked ? (
                 <div className={`mt-1 font-medium ${compactHome ? "text-base" : "text-lg"}`} style={{ color: PR_YELLOW }}>
-                  In progress - {formatDuration(totalSessionTimeRemainingMs())} left
+                  In progress<span style={{ margin: "0 0.6em", opacity: 0.8 }}>·</span>{formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div
@@ -19687,7 +19687,7 @@ function NBackSessionApp() {
                 on every child and a utility would not win against it. */}
             <button
               onClick={() => setMainView("regime")}
-              style={{ marginTop: "2rem" }}
+              style={{ marginTop: "1rem" }}
               className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 hover:border-slate-500 transition-all duration-200 hover:shadow-lg rounded-lg py-3.5 sm:py-[15px] text-lg font-medium text-left px-7 flex items-center justify-between"
             >
               <span>Regime</span>
@@ -22633,8 +22633,8 @@ function NBackSessionApp() {
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
       <HomeSpace
-        live={(mainView === "home" || mainView === "achievements") && homeLive}
-        visible={mainView === "home" || mainView === "achievements"}
+        live={(mainView === "home" || mainView === "achievements" || mainView === "proverbs") && homeLive}
+        visible={mainView === "home" || mainView === "achievements" || mainView === "proverbs"}
       />
 
       {/* The constellation, in the empty space to the left of Home's column.
