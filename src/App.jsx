@@ -618,6 +618,7 @@ const NOTE_GROUPS = [
       "The goal isn't just a brain training app. It is psychological solutions that make it feel better and easier, a pseudo motivation mindset coach on top of the exercises.",
       "Guide their mind and provide psychological solutions so training feels easier and they see the vision.",
       "Create a hot zealous feeling like a religious trance ritual experience in the worship of wisdom.",
+      "Ascending: the real ascension is ascending your intelligence.",
     ],
   },
   {
@@ -10179,7 +10180,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // its own grid: two beats of each (sped or slowed slightly so no song makes
 // the edit feel rushed or dragged).
 const SS_TRACKS = [
-  { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit-v6.mp3", beatMs: 468.75 },
+  { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit.mp3", beatMs: 468.75 },
 ];
 const SS_EDIT_DAY_KEY = "cortex.editDay";
 function ssTodayTrackIndex() {
@@ -12030,12 +12031,12 @@ function SupernovaSky({ revealed, preroll }) {
       c.height = S;
       const g = c.getContext("2d");
       const base = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-      base.addColorStop(0, "rgba(255,250,255,1)");
-      base.addColorStop(0.3, "rgba(236,222,255,1)");
-      base.addColorStop(0.62, "rgba(196,160,255,1)");
-      base.addColorStop(0.86, "rgba(140,88,238,1)");
-      base.addColorStop(0.97, "rgba(88,40,196,1)");
-      base.addColorStop(1, "rgba(70,30,170,0)");
+      base.addColorStop(0, "rgba(255,250,230,1)");
+      base.addColorStop(0.3, "rgba(255,236,170,1)");
+      base.addColorStop(0.62, "rgba(255,190,90,1)");
+      base.addColorStop(0.86, "rgba(250,130,40,1)");
+      base.addColorStop(0.97, "rgba(205,70,20,1)");
+      base.addColorStop(1, "rgba(170,40,10,0)");
       g.fillStyle = base;
       g.fillRect(0, 0, S, S);
       g.globalCompositeOperation = "source-atop";
@@ -12047,7 +12048,7 @@ function SupernovaSky({ revealed, preroll }) {
         const y = S / 2 + Math.sin(a) * d;
         const gr = g.createRadialGradient(x, y, 0, x, y, r0);
         const hot = brainNoise(k, salt + 3) > 0.7;
-        gr.addColorStop(0, hot ? "rgba(255,255,255,0.55)" : "rgba(120,60,210,0.35)");
+        gr.addColorStop(0, hot ? "rgba(255,252,225,0.6)" : "rgba(190,70,10,0.38)");
         gr.addColorStop(1, "rgba(255,255,255,0)");
         g.fillStyle = gr;
         g.fillRect(x - r0, y - r0, r0 * 2, r0 * 2);
@@ -12063,6 +12064,15 @@ function SupernovaSky({ revealed, preroll }) {
       g.fill();
       return c;
     };
+    // Our own sun's colours for the star: white-gold, yellow, orange, red.
+    const SUN = [
+      [255, 246, 220],
+      [255, 214, 120],
+      [255, 165, 55],
+      [255, 105, 30],
+      [255, 70, 35],
+    ].map((c) => spaceSprite(c, 128));
+    const BLUE = spaceSprite([200, 225, 255], 128);
     const surfA = makeSurface(401);
     const surfB = makeSurface(501);
     // Flares arcing off the surface, more and more of them as it destabilises.
@@ -12210,7 +12220,7 @@ function SupernovaSky({ revealed, preroll }) {
         // in the last moments gas pours in and it collapses to a point.
         const T = preroll ? 4.7 : 0.01;
         const q = Math.min(1, since / T);
-        const R0 = Math.min(W, H) * 0.075;
+        const R0 = Math.min(W, H) * 0.105;
         const collapseAt = T - 0.38;
         const collapse = since > collapseAt ? Math.min(1, (since - collapseAt) / 0.38) : 0;
         const unstable = q * q;
@@ -12219,9 +12229,9 @@ function SupernovaSky({ revealed, preroll }) {
         const heat = 0.8 + 0.4 * unstable + 0.4 * collapse;
         // The star lights the gas around it: a wide, dim glow in the nebula
         // that grows as the star brightens.
-        ctx.globalAlpha = Math.min(1, 0.18 + 0.35 * unstable + 0.3 * collapse);
+        ctx.globalAlpha = Math.min(1, 0.14 + 0.3 * unstable + 0.3 * collapse);
         const neb = unit * (0.35 + 0.1 * Math.sin(since * 0.7));
-        ctx.drawImage(big[3], cx - neb, cy - neb, neb * 2, neb * 2);
+        ctx.drawImage(SUN[3], cx - neb, cy - neb, neb * 2, neb * 2);
         // Corona: soft streamers of hot gas flowing off it on every side,
         // slowly turning, flickering, longer and brighter as it destabilises.
         for (let k = 0; k < 44; k += 1) {
@@ -12233,18 +12243,24 @@ function SupernovaSky({ revealed, preroll }) {
           ctx.translate(cx + Math.cos(ang) * R * 0.9, cy + Math.sin(ang) * R * 0.9);
           ctx.rotate(ang);
           ctx.globalAlpha = (0.05 + 0.08 * unstable) * flick * (1 - collapse);
-          ctx.drawImage(big[[2, 1, 6, 4][k % 4]], 0, -wid, len * 2, wid * 2);
+          ctx.drawImage(SUN[k % 4], 0, -wid, len * 2, wid * 2);
           ctx.restore();
         }
         // The broad glow round the disc.
         ctx.globalAlpha = Math.min(1, (0.4 + 0.35 * unstable) * (1 + 0.12 * Math.sin(since * 5)));
         const cor = R * (3.4 + 0.6 * Math.sin(since * 2.3));
-        ctx.drawImage(big[2], cx - cor, cy - cor, cor * 2, cor * 2);
+        ctx.drawImage(SUN[2], cx - cor, cy - cor, cor * 2, cor * 2);
+        // Runaway fusion at the very end turns it blue-white.
+        if (unstable > 0.55) {
+          ctx.globalAlpha = (unstable - 0.55) * 1.2 + collapse * 0.5;
+          const bc = R * 2.6;
+          ctx.drawImage(BLUE, cx - bc, cy - bc, bc * 2, bc * 2);
+        }
         // Prominences: plumes of glowing plasma looping up off the surface and
         // back, made of drifting gas, not lines.
         if (since > nextFlare && collapse === 0) {
           const ang = Math.random() * Math.PI * 2;
-          flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [6, 1, 2, 4][Math.floor(Math.random() * 4)] });
+          flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [1, 2, 3, 4][Math.floor(Math.random() * 4)] });
           nextFlare = since + Math.max(0.12, 0.8 - unstable * 0.65) * (0.5 + Math.random());
         }
         for (let k = flares.length - 1; k >= 0; k -= 1) {
@@ -12271,7 +12287,7 @@ function SupernovaSky({ revealed, preroll }) {
             const y = iu * iu * y1 + 2 * iu * u * ky + u * u * y2;
             const puff = R * (0.07 + 0.09 * Math.sin(u * Math.PI)) * (0.8 + 0.4 * brainNoise(n, 391));
             ctx.globalAlpha = env * 0.22 * (0.6 + 0.4 * Math.sin(u * Math.PI));
-            ctx.drawImage(big[f.c], x - puff * 2, y - puff * 2, puff * 4, puff * 4);
+            ctx.drawImage(SUN[f.c], x - puff * 2, y - puff * 2, puff * 4, puff * 4);
           }
         }
         // The surface itself, churning: two layers turning against each other.
@@ -12286,6 +12302,24 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.drawImage(surfB, -R, -R, R * 2, R * 2);
         ctx.restore();
         ctx.globalCompositeOperation = "lighter";
+        // Fusion: points of searing light flaring up across the surface, more
+        // and more of them, and the core beating like a heart, faster and
+        // harder, as the reactions run away.
+        const spots = Math.floor(4 + unstable * 40);
+        for (let k = 0; k < spots; k += 1) {
+          const life = 0.35 + brainNoise(k, 411) * 0.4;
+          const ph = ((since + brainNoise(k, 412) * 5) % life) / life;
+          const a2 = brainNoise(k + Math.floor((since + brainNoise(k, 412) * 5) / life) * 97, 413) * Math.PI * 2;
+          const d2 = Math.sqrt(brainNoise(k + Math.floor((since + brainNoise(k, 412) * 5) / life) * 97, 414)) * R * 0.85;
+          const g = R * (0.08 + 0.12 * unstable) * Math.sin(ph * Math.PI);
+          ctx.globalAlpha = Math.sin(ph * Math.PI) * (0.5 + 0.5 * unstable);
+          ctx.drawImage(SUN[0], cx + Math.cos(a2) * d2 - g * 2, cy + Math.sin(a2) * d2 - g * 2, g * 4, g * 4);
+        }
+        const rate = 1.2 + unstable * 7;
+        const beat = Math.pow(0.5 + 0.5 * Math.sin(since * rate * Math.PI * 2), 6);
+        ctx.globalAlpha = Math.min(1, 0.15 + 0.6 * unstable) * (0.4 + 0.6 * beat);
+        const hb = R * (0.55 + 0.35 * beat * unstable);
+        ctx.drawImage(SUN[0], cx - hb * 2, cy - hb * 2, hb * 4, hb * 4);
         // It heats up: a white-hot heart that grows as it nears the end.
         ctx.globalAlpha = Math.min(1, 0.12 + unstable * 0.45 + collapse * 0.8) * (heat / 1.6);
         const hc = R * (0.7 + 0.6 * collapse);
@@ -12305,14 +12339,14 @@ function SupernovaSky({ revealed, preroll }) {
             ctx.translate(x, y);
             ctx.rotate(ang + Math.PI / 2 - 0.5);
             ctx.globalAlpha = inflow * ph * 0.7;
-            ctx.drawImage(sprites[[1, 4, 6, 2][k % 4]], -len, -2, len * 2, 4);
+            ctx.drawImage(k % 3 === 0 ? sprites[0] : SUN[1 + (k % 3)], -len, -2, len * 2, 4);
             ctx.restore();
           }
         }
         // A soft horizontal flare off the star, like a camera lens catching it.
         ctx.globalAlpha = 0.12 + 0.25 * unstable + 0.4 * collapse;
         const fl = R * (6 + 6 * unstable);
-        ctx.drawImage(big[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
+        ctx.drawImage(SUN[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
         // A shudder of the whole frame as it becomes unstable.
         if (unstable > 0.5) {
           const jig = (unstable - 0.5) * 4;
@@ -17317,6 +17351,9 @@ function NBackSessionApp() {
               </h1>
               <p className="text-slate-400 text-base mt-3">
                 You'll start with 5 mins per exercise.
+              </p>
+              <p className="text-slate-500 text-base mt-2">
+                Pick a regime you can do consistently. Don't be unrealistic about what you can handle.
               </p>
             </div>
 
