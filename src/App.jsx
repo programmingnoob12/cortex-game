@@ -10147,7 +10147,7 @@ const HomeConstellation = memo(HomeConstellationInner);
 // Just the part of the song the edit uses (46 seconds, faded at the end),
 // about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
 // by the time the edit opens rather than arriving seconds into it.
-const SS_TRACK_URL = "/audio/emotionless-edit-v4.mp3";
+const SS_TRACK_URL = "/audio/emotionless-edit-v5.mp3";
 const SS_TRACK_BEAT_MS = 468.75;
 const SS_TRACK_FIRST_BEAT_MS = 40;
 // Longest the edit will hold on black waiting for the track. Starting the
@@ -10224,14 +10224,14 @@ const SS_SCENES = [
   { kind: "word", text: "Your mind", beats: 2 },
   { kind: "word", text: "is your edge.", accent: true, beats: 2 },
   { kind: "word", text: "Sharpen it.", beats: 2 },
-  { kind: "gem", beats: 3 },
+  { kind: "gem", beats: 2.5 },
   { kind: "word", text: "While they scroll", beats: 2 },
   { kind: "word", text: "you train.", accent: true, beats: 2 },
   ...ssBurst(SS_BURST_RICHES),
   { kind: "word", text: "Wisdom", beats: 2 },
   { kind: "word", text: "is the principal thing.", accent: true, beats: 1.5 },
   ...ssBurst(SS_BURST_MIND),
-  { kind: "brain", text: "Dominate.", beats: 2, dip: true },
+  { kind: "brain", text: "Dominate.", beats: 2 },
   { kind: "word", text: "Get wisdom.", beats: 2 },
   { kind: "word", text: "Be smarter than everyone.", beats: 2 },
   { kind: "cards", text: "Elite training for the mind.", beats: 4 },
@@ -10568,6 +10568,7 @@ function IdleScreensaver({ onExit, onEnding }) {
   // edit then waits on a quiet "Tap to begin" rather than starting silent and
   // bringing the music in part-way (which skipped the underwater opening).
   const beginRef = useRef(null);
+  const brainLayerRef = useRef(null);
   const clockRef = useRef(null); // () => ms into the edit
   const soundRef = useRef(null); // { ctx, gain, source }
   const startSoundRef = useRef(null);
@@ -10799,6 +10800,32 @@ function IdleScreensaver({ onExit, onEnding }) {
 
   const scene = SS_SCENES[index];
   const sceneMs = scene.beats * SS_BEAT_MS;
+  // The brain's punch-in, run on the element directly so the canvas inside
+  // is never re-mounted: in from large and bright, a snap past, settle, then
+  // a slow push for the rest of the shot.
+  useEffect(() => {
+    const el = brainLayerRef.current;
+    if (!el || scene.kind !== "brain" || !el.animate) return undefined;
+    const hit = el.animate(
+      [
+        { transform: "scale(1.45)", opacity: 0, filter: "brightness(2.6)" },
+        { transform: "scale(0.94)", opacity: 1, filter: "brightness(1.5)", offset: 0.32 },
+        { transform: "scale(1.03)", filter: "brightness(1.1)", offset: 0.6 },
+        { transform: "scale(1)", filter: "brightness(1)" },
+      ],
+      { duration: 360, easing: "cubic-bezier(0.25,0.9,0.3,1)", fill: "both" }
+    );
+    const push = el.animate([{ transform: "scale(1)" }, { transform: "scale(1.06)" }], {
+      duration: sceneMs,
+      delay: 360,
+      easing: "linear",
+      fill: "forwards",
+    });
+    return () => {
+      hit.cancel();
+      push.cancel();
+    };
+  }, [cut, scene.kind, sceneMs]);
   const bigWord = {
     fontSize: "clamp(3rem, 9vw, 8.5rem)",
     lineHeight: 1.02,
@@ -10916,28 +10943,6 @@ function IdleScreensaver({ onExit, onEnding }) {
         )}
         {scene.kind === "gem" && <SsGemLadder />}
         {scene.kind === "cards" && <SsCards text={scene.text} ms={sceneMs} />}
-        {scene.kind === "brain" && (
-          <div className="flex flex-col items-center gap-2">
-            {/* Sized off the height as well as the width, so the brain and
-                the word under it always fit inside the letterbox. */}
-            <div style={{ width: "min(640px, 80vw, 62vh)" }}>
-              <HomeConstellation days={220} showCaption={false} interactive={false} entranceMs={260} />
-            </div>
-            <div
-              className="font-black uppercase tracking-tight -mt-6 ss-split"
-              style={{
-                ...bigWord,
-                fontSize: "clamp(2.5rem, min(7vw, 9vh), 5.5rem)",
-                color: "#FFFFFF",
-                // Punches in hard, as the gem's last rank does.
-                animation: "ssTopSlam 0.26s cubic-bezier(0.2,1.2,0.3,1) both, ssSplit 0.5s ease-out both",
-                textShadow: "0 0 40px rgba(117,55,226,0.6)",
-              }}
-            >
-              {scene.text}
-            </div>
-          </div>
-        )}
         {scene.kind === "end" && (
           <div className="flex flex-col items-center gap-5">
             <div
@@ -11017,6 +11022,38 @@ function IdleScreensaver({ onExit, onEnding }) {
         />
       )}
 
+      {/* The brain for "Dominate.", built once when the edit opens and kept
+          mounted (hidden) so it is ready the instant it is needed: building
+          it on the cut is what made the move from the images stutter. It
+          punches in on the cut rather than fading up out of black. Flattened
+          a little so it reads as a brain seen from the side, not a dome. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+        style={{ opacity: phase === "play" && scene.kind === "brain" ? 1 : 0 }}
+      >
+        <div ref={brainLayerRef} className="flex flex-col items-center" style={{ willChange: "transform" }}>
+          <div style={{ width: "min(780px, 88vw, 96vh)", transform: "scaleY(0.8)", marginTop: "-4vh", marginBottom: "-13vh" }}>
+            <HomeConstellation days={220} showCaption={false} interactive={false} entranceMs={0} />
+          </div>
+        </div>
+        {scene.kind === "brain" && (
+          <div
+            key={`w${cut}`}
+            className="font-black uppercase tracking-tight ss-split relative"
+            style={{
+              ...bigWord,
+              fontSize: "clamp(2.5rem, min(7vw, 9vh), 5.5rem)",
+              color: "#FFFFFF",
+              animation: "ssEnlWord 0.36s cubic-bezier(0.25,0.9,0.3,1) 60ms both, ssSplit 0.5s ease-out 60ms both",
+              textShadow: "0 0 40px rgba(117,55,226,0.6)",
+            }}
+          >
+            {scene.text}
+          </div>
+        )}
+      </div>
+
       {/* Before the big moments the frame drops to black for an instant, so
           they land out of darkness instead of on top of the last shot. */}
       {phase === "play" && scene.dip && (
@@ -11035,7 +11072,7 @@ function IdleScreensaver({ onExit, onEnding }) {
         className="absolute inset-0 pointer-events-none bg-white"
         style={{
           animation:
-            scene.kind === "image" && (index === 0 || SS_SCENES[index - 1].kind !== "image")
+            (scene.kind === "image" && (index === 0 || SS_SCENES[index - 1].kind !== "image")) || scene.kind === "brain"
               ? "ssFlashHard 0.28s ease-out both"
               : "ssFlash 0.32s ease-out both",
         }}
