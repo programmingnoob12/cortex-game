@@ -9689,7 +9689,15 @@ function playBrainPing(key) {
 
 
 
-function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = false }) {
+function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: aliveProp = false }) {
+  // Read through a ref: switching it on must not tear down and rebuild the
+  // whole canvas (that rebuild was a hitch just as Home came in).
+  const aliveRef = useRef(aliveProp);
+  aliveRef.current = aliveProp;
+  const kickRef = useRef(null);
+  useEffect(() => {
+    if (aliveProp && kickRef.current) kickRef.current();
+  }, [aliveProp]);
   const wrapRef = useRef(null);
   const canvasRef = useRef(null);
   const data = useMemo(() => {
@@ -9835,6 +9843,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
       raf = 0;
       // At rest a living brain only needs 30 frames a second.
       const busy = pings.length || hover !== hoverTarget || now - start < entranceEnd;
+      const alive = aliveRef.current;
       if (alive && !busy && now - lastDraw < 30) {
         raf = requestAnimationFrame(draw);
         return;
@@ -10001,12 +10010,13 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
         }
       }
 
-      if (alive || elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
+      if (aliveRef.current || elapsed < entranceEnd || hover !== hoverTarget || pings.length) raf = requestAnimationFrame(draw);
     };
 
     function kick() {
       if (!raf) raf = requestAnimationFrame(draw);
     }
+    kickRef.current = kick;
 
     // Listened for on the window, with the canvas itself letting clicks
     // through: it is bigger than the gap it sits in and its faded edges run
@@ -10076,7 +10086,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
       window.removeEventListener("pointerdown", onDown);
       setCursor(false);
     };
-  }, [data, days, interactive, entranceMs, alive]);
+  }, [data, days, interactive, entranceMs]);
 
   return (
     <div ref={wrapRef} className="w-full">
@@ -10142,8 +10152,39 @@ const HomeConstellation = memo(HomeConstellationInner);
 // Just the part of the song the edit uses (46 seconds, faded at the end),
 // about 0.9MB instead of the full 4.4MB track, so it is loaded and ready
 // by the time the edit opens rather than arriving seconds into it.
-const SS_TRACK_URL = "/audio/emotionless-edit-v5.mp3";
-const SS_TRACK_BEAT_MS = 468.75;
+// The opening edit's songs, one a day in turn. Each is cut so its first beat
+// falls 40ms in, and each has the underwater opening, the drop into the first
+// images and the hit into the second baked in at the edit's own times. The
+// scenes are measured in "units" of the song's beat, so every song stays on
+// its own grid: two beats of each (sped or slowed slightly so no song makes
+// the edit feel rushed or dragged).
+const SS_TRACKS = [
+  { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit-v5.mp3", beatMs: 468.75 },
+  { key: "fear", label: "Fear", url: "/audio/edit-fear.mp3", beatMs: 60000 / (168.2 * 0.85) },
+  { key: "afterlife", label: "Afterlife", url: "/audio/edit-afterlife.mp3", beatMs: 60000 / (150 * 0.9) },
+];
+const SS_EDIT_DAY_KEY = "cortex.editDay";
+function ssTodayTrackIndex() {
+  const d = new Date();
+  return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000) % SS_TRACKS.length;
+}
+// Once a day: the edit plays the first time the app is opened each day.
+function ssEditDueToday() {
+  try {
+    return localStorage.getItem(SS_EDIT_DAY_KEY) !== new Date().toDateString();
+  } catch {
+    return true;
+  }
+}
+function ssMarkEditPlayed() {
+  try {
+    localStorage.setItem(SS_EDIT_DAY_KEY, new Date().toDateString());
+  } catch {
+    /* nowhere to remember it */
+  }
+}
+let SS_TRACK_URL = SS_TRACKS[0].url;
+let SS_TRACK_BEAT_MS = SS_TRACKS[0].beatMs;
 const SS_TRACK_FIRST_BEAT_MS = 40;
 // Longest the edit will hold on black waiting for the track. Starting the
 // picture without it means the music joins part-way through, so it is worth
@@ -10175,7 +10216,23 @@ function preloadOpeningTrack() {
       .catch(() => null);
   });
 }
-if (typeof window !== "undefined") preloadOpeningTrack();
+// Picks the song (today's, or one chosen from Pages to test) and resets the
+// loaded track if it changed.
+function selectOpeningTrack(index) {
+  const t = SS_TRACKS[index] || SS_TRACKS[0];
+  if (t.url !== SS_TRACK_URL) {
+    ssTrackBytes = null;
+    ssTrackBuffer = null;
+  }
+  SS_TRACK_URL = t.url;
+  SS_TRACK_BEAT_MS = t.beatMs;
+  SS_BEAT_MS = t.beatMs * 2;
+}
+if (typeof window !== "undefined") {
+  selectOpeningTrack(ssTodayTrackIndex());
+  // Only fetched when it is going to play.
+  if (ssEditDueToday()) preloadOpeningTrack();
+}
 
 // The flashing images: graded to one look and saved as WebP, each with a
 // small pre-blurred, darkened copy that fills the frame behind it (so no
@@ -10208,13 +10265,13 @@ function preloadEditImages() {
   }
   return ssImagesReady;
 }
-if (typeof window !== "undefined") preloadEditImages();
-const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
+if (typeof window !== "undefined" && ssEditDueToday()) preloadEditImages();
+var SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
 const SS_VOLUME = 0.45;
 // How long the track takes to fade out once Home is coming in.
 const SS_FADE_OUT_MS = 7000;
 // How long the picture takes to dissolve into Home.
-const SS_DISSOLVE_MS = 1600;
+const SS_DISSOLVE_MS = 2000;
 const SS_SCENES = [
   { kind: "word", text: "Your mind", beats: 2 },
   { kind: "word", text: "is your edge.", accent: true, beats: 2 },
@@ -10330,7 +10387,7 @@ function SsGemLadder() {
   useEffect(() => {
     const id = setInterval(
       () => setLevel((l) => Math.min(MAX_GEM_TIER, l + 1)),
-      SS_TRACK_BEAT_MS / 2.7
+      174
     );
     return () => clearInterval(id);
   }, []);
@@ -10580,6 +10637,7 @@ function IdleScreensaver({ onExit, onEnding }) {
   useEffect(() => {
     let cancelled = false;
     let waitTimer;
+    preloadEditImages();
     const ctx = letterAudioContext();
 
     // Start the track at a given point in the edit, on the audio clock.
@@ -10607,6 +10665,7 @@ function IdleScreensaver({ onExit, onEnding }) {
       if (cancelled) return;
       const opened = performance.now();
       clockRef.current = () => performance.now() - opened;
+      ssMarkEditPlayed();
       setPhase("play");
       // Only ask for a tap when the browser is really holding sound back.
       // It used to ask while the track was merely still loading too, which
@@ -11993,7 +12052,7 @@ function HomeSpace({ live = true, visible = true }) {
       // the sky's own gas rather than flat gradients laid over the page, so
       // they drift and breathe with it.
       const cloud = (sprite, cx, cy, reach, alpha, salt) => {
-        for (let k = 0; k < 14; k += 1) {
+        for (let k = 0; k < 22; k += 1) {
           const a3 = brainNoise(salt + k, 1) * Math.PI * 2;
           const d = brainNoise(salt + k, 2) * reach;
           const sz = reach * (0.45 + brainNoise(salt + k, 3) * 0.7);
@@ -12001,9 +12060,11 @@ function HomeSpace({ live = true, visible = true }) {
           gg.drawImage(sprite, cx + Math.cos(a3) * d - sz, cy + Math.sin(a3) * d * 0.75 - sz, sz * 2, sz * 2);
         }
       };
-      const reach = Math.min(W, H) * 0.38;
-      cloud(teal, W * 0.04, H * 0.04, reach, 0.09, 800);
-      cloud(lavender, W * 0.96, H * 0.96, reach, 0.12, 900);
+      // Wide, faint and ragged, reaching well into the sky, so each fades
+      // into the rest of the gas instead of sitting in its corner.
+      const reach = Math.min(W, H) * 0.6;
+      cloud(teal, W * 0.1, H * 0.1, reach, 0.05, 800);
+      cloud(lavender, W * 0.9, H * 0.9, reach, 0.065, 900);
 
       // Stars, split into a far layer (small, faint) and a near one.
       const fg = prep(farC, Math.min(1, dpr));
@@ -12493,7 +12554,7 @@ function NBackSessionApp() {
   // The opening edit, played once as the app opens.
   // On from the very first render when the app opens onto Home, so a
   // refresh goes straight into the edit instead of flashing Home first.
-  const [screensaverOn, setScreensaverOn] = useState(() => mainView === "home");
+  const [screensaverOn, setScreensaverOn] = useState(() => mainView === "home" && ssEditDueToday());
   // Set as the edit reaches its closing title: Home's sky is built then,
   // unseen, so it is ready the moment Home comes in.
   const [spaceWarm, setSpaceWarm] = useState(false);
@@ -14620,7 +14681,10 @@ function NBackSessionApp() {
   // never a second time until the app is opened again.
   const exitScreensaver = useCallback(() => setScreensaverOn(false), []);
   useEffect(() => {
-    if (screensaverOn) return undefined;
+    if (screensaverOn) {
+      setHomeLive(false);
+      return undefined;
+    }
     const id = setTimeout(() => setHomeLive(true), 350);
     return () => clearTimeout(id);
   }, [screensaverOn]);
@@ -17789,10 +17853,18 @@ function NBackSessionApp() {
                   );
                   setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
                 }),
-                go("Opening edit", () => {
+                go("Opening edit (today's song)", () => {
+                  selectOpeningTrack(ssTodayTrackIndex());
                   setMainView("home");
                   setScreensaverOn(true);
                 }),
+                ...SS_TRACKS.map((t, i) =>
+                  go(`Opening edit: ${t.label}`, () => {
+                    selectOpeningTrack(i);
+                    setMainView("home");
+                    setScreensaverOn(true);
+                  })
+                ),
                 go("Opening edit (launch style)", () => setLaunchEditOn(true)),
                 go("Music hint", () => {
                   jumpToExercise("dual");
