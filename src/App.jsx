@@ -8054,7 +8054,7 @@ function tierIndexFor(level, exerciseKey) {
 }
 // A gem with its rank name under it, in that rank's own colour — the pair
 // the app shows everywhere a level is displayed.
-function RankedGem({ level, size, glowPulse, exerciseKey, labelClass = "text-[0.65rem]" }) {
+function RankedGem({ level, size, glowPulse, exerciseKey, labelClass = "text-[0.65rem]", noGlow = false }) {
   const tier = gemTierFor(level, exerciseKey);
   // The block is exactly the gem's width and the name is centred UNDER it
   // rather than in the flow — otherwise "Illuminated" makes a wider block
@@ -8064,7 +8064,7 @@ function RankedGem({ level, size, glowPulse, exerciseKey, labelClass = "text-[0.
       className="relative flex flex-col items-center"
       style={{ width: size, paddingBottom: "1.05rem" }}
     >
-      <LevelGem level={level} size={size} glowPulse={glowPulse} exerciseKey={exerciseKey} />
+      <LevelGem level={level} size={size} glowPulse={glowPulse} exerciseKey={exerciseKey} noGlow={noGlow} />
       <span
         className={`absolute left-1/2 -translate-x-1/2 whitespace-nowrap font-semibold uppercase leading-none ${labelClass}`}
         style={{
@@ -8352,7 +8352,7 @@ function LegalPage({ doc, onBack }) {
   );
 }
 
-function LevelGem({ level, size = 40, glowPulse = false, exerciseKey, sparkles = true }) {
+function LevelGem({ level, size = 40, glowPulse = false, exerciseKey, sparkles = true, noGlow = false }) {
   const tier = gemTierFor(level, exerciseKey);
   // Static everywhere by default — glow (a drop-shadow) and the top-right
   // sparkle accent still show on glow-tier gems, but the pulsing/floating
@@ -8373,7 +8373,7 @@ function LevelGem({ level, size = 40, glowPulse = false, exerciseKey, sparkles =
     3,
     s * 0.09
   )}px rgba(0,0,0,0.55))`;
-  const colorGlow = tier.glow ? ` drop-shadow(0 0 ${s * 0.16}px ${tier.color}99)` : "";
+  const colorGlow = tier.glow && !noGlow ? ` drop-shadow(0 0 ${s * 0.16}px ${tier.color}99)` : "";
   const sparkleSize = Math.max(9, s * 0.22);
 
   return (
@@ -10160,8 +10160,6 @@ const HomeConstellation = memo(HomeConstellationInner);
 // the edit feel rushed or dragged).
 const SS_TRACKS = [
   { key: "emotionless", label: "Emotionless", url: "/audio/emotionless-edit-v5.mp3", beatMs: 468.75 },
-  { key: "fear", label: "Fear", url: "/audio/edit-fear.mp3", beatMs: 60000 / (168.2 * 0.85) },
-  { key: "afterlife", label: "Afterlife", url: "/audio/edit-afterlife.mp3", beatMs: 60000 / (150 * 0.9) },
 ];
 const SS_EDIT_DAY_KEY = "cortex.editDay";
 function ssTodayTrackIndex() {
@@ -11974,6 +11972,9 @@ function HomeSpace({ live = true, visible = true }) {
   const nearRef = useRef(null);
   const liveRef = useRef(null);
   const liveOn = useRef(live);
+  // The sky fades up once it has been drawn, rather than appearing a beat
+  // after the rest of Home in one jump.
+  const [drawn, setDrawn] = useState(false);
   liveOn.current = live;
   useEffect(() => {
     const gasC = gasRef.current;
@@ -12062,9 +12063,9 @@ function HomeSpace({ live = true, visible = true }) {
       };
       // Wide, faint and ragged, reaching well into the sky, so each fades
       // into the rest of the gas instead of sitting in its corner.
-      const reach = Math.min(W, H) * 0.6;
-      cloud(teal, W * 0.1, H * 0.1, reach, 0.05, 800);
-      cloud(lavender, W * 0.9, H * 0.9, reach, 0.065, 900);
+      const reach = Math.min(W, H) * 0.42;
+      cloud(teal, W * 0.03, H * 0.03, reach, 0.065, 800);
+      cloud(lavender, W * 0.97, H * 0.97, reach, 0.085, 900);
 
       // Stars, split into a far layer (small, faint) and a near one.
       const fg = prep(farC, Math.min(1, dpr));
@@ -12120,7 +12121,10 @@ function HomeSpace({ live = true, visible = true }) {
       drawSky();
       sizeLive();
     };
-    const firstDraw = setTimeout(onResize, 0);
+    const firstDraw = setTimeout(() => {
+      onResize();
+      requestAnimationFrame(() => setDrawn(true));
+    }, 0);
     window.addEventListener("resize", onResize);
 
     // The pointer, for parallax and for the stars' glow.
@@ -12327,7 +12331,15 @@ function HomeSpace({ live = true, visible = true }) {
     <div
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none"
-      style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", visibility: visible ? "visible" : "hidden" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: -1,
+        overflow: "hidden",
+        visibility: visible ? "visible" : "hidden",
+        opacity: drawn ? 1 : 0,
+        transition: "opacity 1.4s ease-out",
+      }}
     >
       {/* The gas breathes: a slow swell, turn and brighten, on a long cycle. */}
       <div style={{ position: "absolute", inset: 0 }}>
@@ -17652,6 +17664,7 @@ function NBackSessionApp() {
                           size={compactHome ? 44 : 60}
                           exerciseKey={e.key}
                           labelClass={compactHome ? "text-[0.66rem]" : "text-[0.7rem]"}
+                          noGlow
                         />
                       </span>
                     </div>
@@ -17853,18 +17866,11 @@ function NBackSessionApp() {
                   );
                   setTimeout(() => setSessionStartLine(null), SESSION_START_MS);
                 }),
-                go("Opening edit (today's song)", () => {
-                  selectOpeningTrack(ssTodayTrackIndex());
+                go("Opening edit", () => {
+                  selectOpeningTrack(0);
                   setMainView("home");
                   setScreensaverOn(true);
                 }),
-                ...SS_TRACKS.map((t, i) =>
-                  go(`Opening edit: ${t.label}`, () => {
-                    selectOpeningTrack(i);
-                    setMainView("home");
-                    setScreensaverOn(true);
-                  })
-                ),
                 go("Opening edit (launch style)", () => setLaunchEditOn(true)),
                 go("Music hint", () => {
                   jumpToExercise("dual");
