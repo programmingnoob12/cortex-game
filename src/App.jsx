@@ -11992,12 +11992,13 @@ function LaunchEdit({ onExit }) {
   );
 }
 
-// The level-up backdrop: deep space, one star in the middle, and on the
-// moment of the level-up that star goes supernova. Before it blows (a
-// record's pre-roll) the star swells and brightens, then pinches in for an
-// instant; then a blinding flash, a spray of glowing debris thrown out fast
-// and slowing as it spreads, and a colourful cloud of gas left expanding
-// behind the gem. No rings, no hard edges: all soft light.
+// The level-up backdrop: living deep space, and one star in it going
+// supernova as the level lands. The sky drifts and breathes the whole time
+// (gas clouds swelling and turning, two layers of stars moving at different
+// depths, the camera slowly pushing in). Before the blast the star swells,
+// then pinches in; then a flash, a streak of lens flare, a shudder of the
+// camera, debris streaking outward and slowing, a soft wave of light rolling
+// through the gas, and a dim, glowing remnant left behind the gem.
 function SupernovaSky({ revealed, preroll }) {
   const ref = useRef(null);
   const revealedRef = useRef(revealed);
@@ -12007,16 +12008,6 @@ function SupernovaSky({ revealed, preroll }) {
     if (!canvas) return undefined;
     const ctx = canvas.getContext("2d");
     const RES = Math.min(1, window.devicePixelRatio || 1) * 0.8;
-    let W = 0;
-    let H = 0;
-    const resize = () => {
-      W = window.innerWidth;
-      H = window.innerHeight;
-      canvas.width = Math.round(W * RES);
-      canvas.height = Math.round(H * RES);
-    };
-    resize();
-    window.addEventListener("resize", resize);
     const PAL = [
       [255, 255, 255],
       [217, 200, 255],
@@ -12027,36 +12018,80 @@ function SupernovaSky({ revealed, preroll }) {
       [255, 122, 217],
     ];
     const sprites = PAL.map((c) => spaceSprite(c, 64));
-    const white = sprites[0];
     const big = PAL.map((c) => spaceSprite(c, 128));
-    // A still field of stars behind it all.
-    const stars = Array.from({ length: 260 }, (_, i) => ({
-      x: brainNoise(i, 301),
-      y: brainNoise(i, 302),
-      r: 0.4 + brainNoise(i, 303) ** 3 * 1.4,
-      a: 0.2 + brainNoise(i, 304) * 0.6,
-      tw: brainNoise(i, 305) * 6.28,
-    }));
-    // Debris: thrown out along random directions at a range of speeds.
-    const debris = Array.from({ length: 520 }, (_, i) => {
+    const white = sprites[0];
+    let W = 0;
+    let H = 0;
+    let gas = null;
+    let far = null;
+    let near = [];
+    const layer = (w, h) => {
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(w));
+      c.height = Math.max(1, Math.round(h));
+      return c;
+    };
+    const build = () => {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      canvas.width = Math.round(W * RES);
+      canvas.height = Math.round(H * RES);
+      // Gas: soft clouds of colour, half resolution, a little larger than the
+      // screen so it can drift and turn without showing an edge.
+      const GW = W * 1.3;
+      const GH = H * 1.3;
+      gas = layer(GW * 0.5, GH * 0.5);
+      const gg = gas.getContext("2d");
+      gg.scale(0.5, 0.5);
+      gg.globalCompositeOperation = "lighter";
+      for (let k = 0; k < 26; k += 1) {
+        const pick = [3, 5, 6, 2, 3, 5][k % 6];
+        const sz = Math.min(GW, GH) * (0.18 + brainNoise(k, 331) * 0.3);
+        gg.globalAlpha = 0.05 + brainNoise(k, 332) * 0.06;
+        gg.drawImage(big[pick], brainNoise(k, 333) * GW - sz, brainNoise(k, 334) * GH - sz, sz * 2, sz * 2);
+      }
+      // Far stars on one image; near stars kept as a list (they twinkle and
+      // catch the blast's light).
+      far = layer(GW * RES, GH * RES);
+      const fg = far.getContext("2d");
+      fg.scale(RES, RES);
+      fg.fillStyle = "#FFFFFF";
+      for (let i = 0; i < Math.round((GW * GH) / 3200); i += 1) {
+        fg.globalAlpha = 0.15 + brainNoise(i, 341) * 0.45;
+        fg.beginPath();
+        fg.arc(brainNoise(i, 342) * GW, brainNoise(i, 343) * GH, 0.4 + brainNoise(i, 344) ** 4 * 0.9, 0, Math.PI * 2);
+        fg.fill();
+      }
+      near = Array.from({ length: 110 }, (_, i) => ({
+        x: brainNoise(i, 351) * 1.2 - 0.1,
+        y: brainNoise(i, 352) * 1.2 - 0.1,
+        r: 0.6 + brainNoise(i, 353) ** 3 * 1.6,
+        a: 0.35 + brainNoise(i, 354) * 0.5,
+        tw: brainNoise(i, 355) * 6.28,
+        sp: 0.6 + brainNoise(i, 356) * 1.4,
+      }));
+    };
+    build();
+    window.addEventListener("resize", build);
+    const debris = Array.from({ length: 420 }, (_, i) => {
       const ang = brainNoise(i, 311) * Math.PI * 2;
-      const fast = brainNoise(i, 312);
       return {
         ang,
-        v: 180 + fast ** 1.6 * 1100,
-        size: 1.2 + brainNoise(i, 313) * 3.2,
+        v: 160 + brainNoise(i, 312) ** 1.7 * 1200,
+        size: 0.8 + brainNoise(i, 313) * 2.2,
         c: Math.floor(brainNoise(i, 314) * PAL.length),
-        life: 1.6 + brainNoise(i, 315) * 2.6,
-        wob: (brainNoise(i, 316) - 0.5) * 0.25,
+        life: 1.8 + brainNoise(i, 315) * 2.6,
+        wob: (brainNoise(i, 316) - 0.5) * 0.2,
       };
     });
-    // The remnant: soft clouds of gas pushed outward and left glowing.
-    const clouds = Array.from({ length: 18 }, (_, i) => ({
+    // The remnant: a ragged shell of small wisps rather than a few blobs.
+    const wisps = Array.from({ length: 60 }, (_, i) => ({
       ang: brainNoise(i, 321) * Math.PI * 2,
-      dist: 0.25 + brainNoise(i, 322) * 0.75,
-      size: 0.13 + brainNoise(i, 323) * 0.2,
-      c: [2, 3, 4, 5, 6, 1][i % 6],
-      a: 0.07 + brainNoise(i, 324) * 0.08,
+      dist: 0.55 + brainNoise(i, 322) * 0.5,
+      size: 0.05 + brainNoise(i, 323) * 0.11,
+      c: [2, 3, 4, 5, 6, 1, 3, 5][i % 8],
+      a: 0.05 + brainNoise(i, 324) * 0.06,
+      drift: (brainNoise(i, 325) - 0.5) * 0.03,
     }));
     const start = performance.now();
     let boomAt = revealedRef.current ? start : null;
@@ -12065,93 +12100,148 @@ function SupernovaSky({ revealed, preroll }) {
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
       if (boomAt === null && revealedRef.current) boomAt = now;
-      // Full rate for the blast; once the debris has gone, the slow drift
-      // of the remnant only needs a few frames a second.
-      const tb = boomAt === null ? -1 : (now - boomAt) / 1000;
-      const interval = tb > 4.6 ? 66 : tb > 2.5 ? 33 : 0;
-      if (now - last < interval) return;
+      const t = boomAt === null ? -1 : (now - boomAt) / 1000;
+      // Full rate while things are moving fast; the slow drift after that
+      // only needs half.
+      if (t > 4.6 && now - last < 33) return;
       last = now;
+      const since = (now - start) / 1000;
+      const unit = Math.max(W, H);
       const cx = W / 2;
       const cy = H * 0.46;
-      const unit = Math.max(W, H);
+      // The camera: a slow push in the whole time, and a shudder on the blast.
+      const pre = preroll ? Math.min(1, since / 4.6) : 1;
+      const zoom = 1 + 0.05 * pre * pre + (t > 0 ? 0.012 * t : 0);
+      const shake = t >= 0 && t < 0.9 ? (1 - t / 0.9) ** 2 * 14 : 0;
+      const sx = shake * Math.sin(now * 0.09);
+      const sy = shake * Math.cos(now * 0.073);
       ctx.setTransform(RES, 0, 0, RES, 0, 0);
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = "#030208";
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#020107";
       ctx.fillRect(0, 0, W, H);
+      ctx.save();
+      ctx.translate(cx + sx, cy + sy);
+      ctx.scale(zoom, zoom);
+      ctx.translate(-cx, -cy);
       ctx.globalCompositeOperation = "lighter";
-      const since = (now - start) / 1000;
-      const t = boomAt === null ? -1 : (now - boomAt) / 1000;
-      // Stars, lit up briefly by the blast.
-      const lit = t >= 0 ? Math.exp(-t * 1.6) : 0;
-      for (let i = 0; i < stars.length; i += 1) {
-        const s = stars[i];
-        const tw = 0.75 + 0.25 * Math.sin(since * 1.3 + s.tw);
-        ctx.globalAlpha = Math.min(1, s.a * tw * (1 + lit * 2));
-        const g = s.r * (3 + lit * 3);
-        ctx.drawImage(white, s.x * W - g, s.y * H - g, g * 2, g * 2);
+      // The blast's light, fading, lifts everything it touches.
+      const lit = t >= 0 ? Math.exp(-t * 1.4) : 0;
+      // Gas: breathing and slowly turning.
+      const breath = 1 + 0.04 * Math.sin(since * 0.45);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(Math.sin(since * 0.05) * 0.03);
+      ctx.scale(breath, breath);
+      ctx.globalAlpha = Math.min(1, 0.75 + 0.2 * Math.sin(since * 0.6) + lit * 0.9);
+      ctx.drawImage(gas, -W * 0.65 + Math.sin(since * 0.07) * 12, -H * 0.65 + Math.cos(since * 0.06) * 10, W * 1.3, H * 1.3);
+      ctx.restore();
+      // Far stars drift slowly; near stars drift faster and twinkle.
+      ctx.globalAlpha = Math.min(1, 0.8 + lit);
+      ctx.drawImage(far, -W * 0.15 + since * -2.2, -H * 0.15 + since * -0.8, W * 1.3, H * 1.3);
+      // A soft wave of light rolling out through the sky from the blast.
+      const waveR = t >= 0 ? t * unit * 0.45 : -1;
+      for (let i = 0; i < near.length; i += 1) {
+        const s = near[i];
+        const x = (s.x * W - since * 5) % (W * 1.2);
+        const y = s.y * H - since * 1.6;
+        const px = x < -W * 0.1 ? x + W * 1.2 : x;
+        let glow = 0;
+        if (waveR > 0 && t < 2.6) {
+          const d = Math.hypot(px - cx, y - cy);
+          glow = Math.exp(-((d - waveR) ** 2) / 6000) * (1 - t / 2.6);
+        }
+        const tw = 0.7 + 0.3 * Math.sin(since * s.sp + s.tw);
+        ctx.globalAlpha = Math.min(1, s.a * tw + glow);
+        const g = s.r * (3 + glow * 5);
+        ctx.drawImage(glow > 0.2 ? sprites[4] : white, px - g, y - g, g * 2, g * 2);
       }
       if (t < 0) {
-        // Before: the star swells and brightens, then pinches in just
-        // before it goes.
-        const p = preroll ? Math.min(1, since / 4.4) : 1;
-        const pinch = preroll && since > 4.2 ? Math.max(0.35, 1 - (since - 4.2) * 3) : 1;
-        const g = (18 + p * p * 70) * pinch;
-        ctx.globalAlpha = 0.5 + p * 0.5;
-        ctx.drawImage(big[2], cx - g * 3, cy - g * 3, g * 6, g * 6);
-        ctx.globalAlpha = 1;
+        // The star before it goes: swelling and brightening, a slow pulse,
+        // then pinching in for an instant.
+        const pulse = 1 + 0.08 * Math.sin(since * 6 * (0.4 + pre));
+        const pinch = preroll && since > 4.3 ? Math.max(0.3, 1 - (since - 4.3) * 3.5) : 1;
+        const g = (12 + pre * pre * 46) * pulse * pinch;
+        ctx.globalAlpha = 0.35 + pre * 0.45;
+        ctx.drawImage(big[2], cx - g * 3.2, cy - g * 3.2, g * 6.4, g * 6.4);
+        ctx.globalAlpha = 0.9;
         ctx.drawImage(white, cx - g, cy - g, g * 2, g * 2);
       } else {
-        // The remnant cloud, blooming out and settling.
-        const grow = 1 - Math.exp(-t / 1.6);
-        const glow = Math.min(1, t * 3) * (0.55 + 0.45 * Math.exp(-t / 2.5));
-        for (let i = 0; i < clouds.length; i += 1) {
-          const c = clouds[i];
-          const d = c.dist * unit * 0.32 * grow;
-          const sz = c.size * unit * (0.5 + 0.8 * grow);
-          ctx.globalAlpha = c.a * glow * 2.2;
-          ctx.drawImage(
-            big[c.c],
-            cx + Math.cos(c.ang + t * 0.02) * d - sz,
-            cy + Math.sin(c.ang + t * 0.02) * d * 0.8 - sz,
-            sz * 2,
-            sz * 2
-          );
+        // The remnant: wisps thrown out and slowing, then settling dim.
+        const grow = 1 - Math.exp(-t / 1.5);
+        const bright = Math.min(1, t * 2.5) * (0.35 + 0.65 * Math.exp(-t / 1.8));
+        for (let i = 0; i < wisps.length; i += 1) {
+          const w = wisps[i];
+          const d = w.dist * unit * 0.3 * grow;
+          const ang = w.ang + w.drift * t;
+          const sz = w.size * unit * (0.6 + 0.9 * grow);
+          ctx.globalAlpha = w.a * bright * 2;
+          ctx.drawImage(big[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
         }
-        // Debris: fast, then slowing, fading as it spreads.
-        if (t < 4.5) {
+        // Debris: streaks along their path, fast then slowing, fading.
+        if (t < 4.6) {
+          ctx.lineCap = "round";
           for (let i = 0; i < debris.length; i += 1) {
             const p = debris[i];
             if (t > p.life) continue;
-            const dist = p.v * 0.7 * (1 - Math.exp(-t / 0.7));
+            const k = Math.exp(-t / 0.7);
+            const dist = p.v * 0.7 * (1 - k);
+            const speed = p.v * k;
             const ang = p.ang + p.wob * t;
             const fade = 1 - t / p.life;
-            const g = p.size * (1.5 + fade * 2.5);
-            ctx.globalAlpha = Math.min(1, fade * 1.2);
-            ctx.drawImage(sprites[p.c], cx + Math.cos(ang) * dist - g, cy + Math.sin(ang) * dist - g, g * 2, g * 2);
+            const x = cx + Math.cos(ang) * dist;
+            const y = cy + Math.sin(ang) * dist;
+            const tail = Math.min(60, speed * 0.05);
+            const [r, g, b] = PAL[p.c];
+            ctx.globalAlpha = Math.min(1, fade * 0.9);
+            ctx.strokeStyle = `rgb(${r},${g},${b})`;
+            ctx.lineWidth = p.size;
+            ctx.beginPath();
+            ctx.moveTo(x - Math.cos(ang) * tail, y - Math.sin(ang) * tail);
+            ctx.lineTo(x, y);
+            ctx.stroke();
+            if (p.size > 2) {
+              const gl = p.size * 3;
+              ctx.globalAlpha = fade * 0.5;
+              ctx.drawImage(sprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
+            }
           }
         }
-        // The core: a blinding flash that collapses to a hot bright point.
-        const flash = Math.exp(-t * 5);
-        const core = 26 + 260 * flash;
-        ctx.globalAlpha = Math.min(1, 0.35 + flash);
+        // The core: the flash, collapsing to a faint pulsing point.
+        const flash = Math.exp(-t * 4.5);
+        const core = 14 + 240 * flash + 3 * Math.sin(since * 3);
+        ctx.globalAlpha = Math.min(1, 0.22 + flash);
         ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
-        ctx.globalAlpha = 0.5 * flash + 0.15;
-        const halo = unit * (0.15 + 0.5 * flash);
+        const halo = unit * (0.1 + 0.45 * flash);
+        ctx.globalAlpha = 0.45 * flash + 0.06;
         ctx.drawImage(big[1], cx - halo, cy - halo, halo * 2, halo * 2);
-        // The whole frame whites out for an instant as it goes.
-        if (t < 0.35) {
-          ctx.globalCompositeOperation = "source-over";
-          ctx.globalAlpha = (1 - t / 0.35) ** 2 * 0.85;
-          ctx.fillStyle = "#FFFFFF";
-          ctx.fillRect(0, 0, W, H);
+        // A horizontal streak of lens flare as it goes.
+        if (t < 1.2) {
+          const f = (1 - t / 1.2) ** 1.5;
+          const len = unit * (0.4 + t * 0.6);
+          const grd = ctx.createLinearGradient(cx - len, cy, cx + len, cy);
+          grd.addColorStop(0, "rgba(160,200,255,0)");
+          grd.addColorStop(0.5, `rgba(235,240,255,${0.9 * f})`);
+          grd.addColorStop(1, "rgba(160,200,255,0)");
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = grd;
+          ctx.fillRect(cx - len, cy - 1.5 - 3 * f, len * 2, 3 + 6 * f);
         }
+      }
+      ctx.restore();
+      // The frame whites out for an instant as it goes.
+      if (t >= 0 && t < 0.3) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = (1 - t / 0.3) ** 2 * 0.9;
+        ctx.fillStyle = "#F4F0FF";
+        ctx.fillRect(0, 0, W, H);
       }
       ctx.globalAlpha = 1;
     };
     raf = requestAnimationFrame(draw);
     return () => {
       cancelAnimationFrame(raf);
-      window.removeEventListener("resize", resize);
+      window.removeEventListener("resize", build);
     };
   }, [preroll]);
   return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
@@ -12259,10 +12349,10 @@ function HomeSpace({ live = true, visible = true }) {
       // into the rest of the gas instead of sitting in its corner.
       // Centred just past the corners (in the padded edge of the sky), so
       // only their inner edge reaches onto the screen.
-      const reach = Math.min(W, H) * 0.36;
-      const pad = 20; // the screen's corner is at SPACE_PAD, so these sit well past it
-      cloud(teal, pad, pad, reach, 0.1, 800);
-      cloud(lavender, W - pad, H - pad, reach, 0.12, 900);
+      const reach = Math.min(W, H) * 0.33;
+      const pad = -30; // the screen's corner is at SPACE_PAD, so these sit well past it
+      cloud(teal, pad, pad, reach, 0.11, 800);
+      cloud(lavender, W - pad, H - pad, reach, 0.13, 900);
 
       }
       if (only === "gas") return;
