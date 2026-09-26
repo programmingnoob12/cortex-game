@@ -10342,23 +10342,24 @@ function SsGemLadder() {
   const tier = GEM_TIERS[level];
   const top = level === MAX_GEM_TIER;
   return (
-    <div className="relative flex flex-col items-center gap-8">
-      {/* The last rank lands like a cut in the edit: a hard flash, a streak
-          of light across the frame through the gem, and the gem and its name
-          punching in with the red/blue split. Over in a third of a second. */}
+    // On the last rank the whole shot takes the hit: a sharp shake.
+    <div className="relative flex flex-col items-center gap-8" style={{ animation: top ? "ssEnlShake 0.38s linear both" : undefined }}>
+      {/* The last rank lands hard: a blinding flash, a streak of light
+          through the gem, and the gem smashing in from huge with a sharp
+          overshoot and settle, torn into red and blue for an instant. */}
       {top && (
         <>
           <div
             aria-hidden="true"
-            className="absolute left-1/2 pointer-events-none rounded-full"
+            className="absolute left-1/2 pointer-events-none"
             style={{
               top: 100,
-              width: 700,
-              height: 700,
-              marginLeft: -350,
-              marginTop: -350,
-              background: `radial-gradient(circle, rgba(255,255,255,0.85) 0%, ${tier.color}55 22%, transparent 58%)`,
-              animation: "ssTopFlash 0.2s ease-out both",
+              width: 2400,
+              height: 2400,
+              marginLeft: -1200,
+              marginTop: -1200,
+              background: `radial-gradient(circle, #FFFFFF 0%, rgba(255,255,255,0.85) 10%, ${tier.color}66 24%, transparent 50%)`,
+              animation: "ssEnlFlash 0.3s ease-out both",
             }}
           />
           <div
@@ -10367,12 +10368,12 @@ function SsGemLadder() {
             style={{
               top: 99,
               left: "50%",
-              width: "180vw",
-              marginLeft: "-90vw",
-              height: 2,
-              background: `linear-gradient(90deg, transparent 0%, ${tier.color}00 15%, rgba(255,235,235,0.95) 50%, ${tier.color}00 85%, transparent 100%)`,
-              boxShadow: `0 0 16px 3px ${tier.color}88`,
-              animation: "ssFlare 0.45s ease-out both",
+              width: "200vw",
+              marginLeft: "-100vw",
+              height: 3,
+              background: `linear-gradient(90deg, transparent 0%, ${tier.color}00 12%, #FFFFFF 50%, ${tier.color}00 88%, transparent 100%)`,
+              boxShadow: `0 0 22px 5px ${tier.color}AA`,
+              animation: "ssFlare 0.5s cubic-bezier(0.2,0.8,0.2,1) both",
             }}
           />
         </>
@@ -10382,7 +10383,7 @@ function SsGemLadder() {
         className="relative"
         style={{
           animation: top
-            ? "ssTopSlam 0.22s cubic-bezier(0.2,1.2,0.3,1) both"
+            ? "ssEnlHit 0.46s cubic-bezier(0.25,0.9,0.3,1) both"
             : "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both",
         }}
       >
@@ -10394,7 +10395,7 @@ function SsGemLadder() {
         style={{
           color: tier.color,
           textShadow: top ? `0 0 34px ${tier.color}` : `0 0 40px ${tier.color}88`,
-          animation: top ? "ssTopLabel 0.22s cubic-bezier(0.2,1.2,0.3,1) both, ssSplit 0.45s ease-out both" : undefined,
+          animation: top ? "ssEnlWord 0.4s cubic-bezier(0.25,0.9,0.3,1) 50ms both, ssSplit 0.5s ease-out 50ms both" : undefined,
         }}
       >
         {tier.label}
@@ -10402,6 +10403,7 @@ function SsGemLadder() {
     </div>
   );
 }
+
 
 
 
@@ -11875,548 +11877,6 @@ function LaunchEdit({ onExit }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// The silhouette-style edit (a test piece, reached only from Pages).
-// Modelled closely on a short neon edit: first a row of white line-art
-// symbols over dark shattered glass, the camera jumping between them on the
-// beat as each one lights up in its own neon colour, with an RGB glitch on
-// every cut; then a white whip into black silhouettes with glowing eyes on
-// flat saturated colour, the colour flipping three times a shot, and out to
-// black. Here the symbols are intelligence ones: a neuron, eyes, a pen, a
-// brain, DNA. The track is "emotionless", sped up to 152 BPM.
-// ---------------------------------------------------------------------------
-const FE_TRACK_URL = "/audio/flash-edit.mp3";
-const FE_BEAT = 468.75 / 1.1875; // 152 BPM
-const FE_VOLUME = 0.5;
-let feTrackBytes = null;
-let feTrackBuffer = null;
-function preloadFlashTrack() {
-  if (typeof window === "undefined") return Promise.resolve(null);
-  if (feTrackBuffer) return Promise.resolve(feTrackBuffer);
-  if (!feTrackBytes) {
-    feTrackBytes = fetch(FE_TRACK_URL)
-      .then((r) => (r.ok ? r.arrayBuffer() : null))
-      .catch(() => null);
-  }
-  return feTrackBytes.then((bytes) => {
-    if (!bytes || feTrackBuffer) return feTrackBuffer;
-    const ctx = letterAudioContext();
-    if (!ctx) return null;
-    return ctx
-      .decodeAudioData(bytes.slice(0))
-      .then((buf) => {
-        feTrackBuffer = buf;
-        return buf;
-      })
-      .catch(() => null);
-  });
-}
-
-// Part one: which symbol is lit (or none), and where the camera sits.
-// Symbol centres are at x = 160, 480, 800, 1120, 1440 on a 1600 x 600 row.
-const FE_ROW = [
-  { at: 0, len: 2.25, lit: null, fx: 800, s: 1.0, r: 0 },
-  { at: 2.25, len: 2, lit: 2, fx: 700, s: 1.25, r: -2 },
-  { at: 4.25, len: 2, lit: 3, fx: 1120, s: 1.7, r: 0 },
-  { at: 6.25, len: 2, lit: 1, fx: 520, s: 1.6, r: 1.5 },
-  { at: 8.25, len: 2, lit: 4, fx: 1300, s: 1.55, r: -1 },
-  { at: 10.25, len: 2, lit: 0, fx: 360, s: 1.45, r: 2 },
-  { at: 12.25, len: 2, lit: null, fx: 800, s: 1.1, r: 0 },
-  { at: 14.25, len: 1.5, lit: 2, fx: 760, s: 1.5, r: -3 },
-];
-const FE_WHIP_AT = 15.75;
-const FE_PART2_AT = 16.5;
-const FE_NEON = ["#39FF6A", "#35E6FF", "#C04BFF", "#FF2A3D", "#9B5CFF"]; // neuron, eyes, pen, brain, DNA
-// Part two: seven shots of two beats, each flipping through three colours.
-const FE_SHOTS = [
-  { kind: "hand", colors: ["#E8142C", "#D8189E", "#16B4E4"] },
-  { kind: "bust", colors: ["#D8189E", "#2E5FE6", "#C8C8C8"] },
-  { kind: "profile", colors: ["#E8142C", "#6A3DE8", "#A9D3E0"] },
-  { kind: "king", colors: ["#E8142C", "#D8189E", "#1AA7BC"] },
-  { kind: "eyes", colors: ["#2A0A04", "#D8189E", "#16B4E4"] },
-  { kind: "tilt", colors: ["#D8189E", "#16B4E4", "#D9D9D9"] },
-  { kind: "close", colors: ["#6A3DE8", "#E8146E", "#E8142C"] },
-];
-const FE_END = FE_PART2_AT + FE_SHOTS.length * 2; // then out to black
-const FE_TOTAL = FE_END + 3.2;
-const FE_EYE = {
-  "#E8142C": "#FF4050", "#D8189E": "#FF4FD8", "#16B4E4": "#5CF0FF", "#2E5FE6": "#6E98FF",
-  "#C8C8C8": "#FFFFFF", "#6A3DE8": "#B292FF", "#A9D3E0": "#F2FFFF", "#1AA7BC": "#6FF5FF",
-  "#2A0A04": "#FF8A3A", "#D9D9D9": "#FFFFFF", "#E8146E": "#FF4F9A",
-};
-
-const FE_CSS = `
-@keyframes feDrift { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(-1.5%, 0.6%, 0) scale(1.05); } }
-@keyframes fePush { from { transform: scale(1); } to { transform: scale(1.07); } }
-@keyframes feWhip { from { transform: translateX(60%) skewX(-18deg); } to { transform: translateX(-80%) skewX(-18deg); } }
-@keyframes feFadeIn { from { opacity: 0; } to { opacity: 1; } }
-`;
-
-// Line-art symbols for the row: white strokes, no fill.
-function FeSymbol({ i }) {
-  const cx = [160, 480, 800, 1120, 1440][i];
-  if (i === 0) {
-    // A neuron: a round body and an axon bristling with short dendrites.
-    const spikes = [];
-    for (let k = 0; k < 18; k += 1) {
-      const x = cx - 110 + k * 13;
-      const up = k % 2 === 0;
-      const h = 10 + ((k * 37) % 17);
-      spikes.push(`M${x},300 L${x + 6},${up ? 300 - h : 300 + h}`);
-      if (k % 3 === 0) spikes.push(`M${x + 3},300 L${x - 5},${up ? 312 : 288}`);
-    }
-    return (
-      <g>
-        <circle cx={cx - 128} cy={300} r={14} />
-        <path d={`M${cx - 114},300 L${cx + 130},300`} />
-        <path d={spikes.join(" ")} />
-        <path d={`M${cx - 142},300 L${cx - 160},286 M${cx - 140},292 L${cx - 158},270 M${cx - 140},308 L${cx - 160},322`} />
-      </g>
-    );
-  }
-  if (i === 1) {
-    // Six watching eyes, two columns of three.
-    const eyes = [];
-    [-52, 52].forEach((dx) =>
-      [-92, 0, 92].forEach((dy) => {
-        const x = cx + dx;
-        const y = 300 + dy;
-        eyes.push(
-          <g key={`${dx}${dy}`}>
-            <path d={`M${x - 34},${y} Q${x},${y - 26} ${x + 34},${y} Q${x},${y + 24} ${x - 34},${y} Z`} />
-            <circle cx={x} cy={y} r={11} />
-            <circle cx={x} cy={y} r={4} fill="currentColor" />
-            <path d={`M${x - 38},${y - 4} L${x - 46},${y - 10} M${x + 38},${y - 4} L${x + 46},${y - 10}`} />
-          </g>
-        );
-      })
-    );
-    return <g>{eyes}</g>;
-  }
-  if (i === 2) {
-    // A tall fountain pen, point down, with a wisp of smoke around it.
-    return (
-      <g>
-        <path d={`M${cx - 16},80 L${cx + 16},80 L${cx + 18},380 L${cx - 18},380 Z`} />
-        <path d={`M${cx - 18},380 L${cx - 24},400 L${cx + 24},400 L${cx + 18},380`} />
-        <path d={`M${cx - 20},400 L${cx},540 L${cx + 20},400`} />
-        <path d={`M${cx},470 L${cx},508 M${cx},462 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0`} />
-        <path d={`M${cx - 16},120 L${cx + 16},120 M${cx + 16},96 L${cx + 26},100 L${cx + 26},250 L${cx + 16},254`} />
-        <path d={`M${cx - 30},180 C${cx - 70},150 ${cx - 10},120 ${cx - 50},90 M${cx + 34},300 C${cx + 70},270 ${cx + 20},240 ${cx + 60},210 M${cx - 30},330 C${cx - 60},360 ${cx - 20},380 ${cx - 50},420`} strokeWidth="2" opacity="0.7" />
-      </g>
-    );
-  }
-  if (i === 3) {
-    // A brain seen from the front: two hemispheres and their folds.
-    return (
-      <g>
-        <path d={`M${cx - 6},170 C${cx - 60},140 ${cx - 150},170 ${cx - 150},250 C${cx - 185},290 ${cx - 160},370 ${cx - 105},385 C${cx - 80},425 ${cx - 25},420 ${cx - 6},395 Z`} />
-        <path d={`M${cx + 6},170 C${cx + 60},140 ${cx + 150},170 ${cx + 150},250 C${cx + 185},290 ${cx + 160},370 ${cx + 105},385 C${cx + 80},425 ${cx + 25},420 ${cx + 6},395 Z`} />
-        <path d={`M${cx - 30},200 C${cx - 90},200 ${cx - 70},250 ${cx - 120},255 M${cx - 40},280 C${cx - 90},270 ${cx - 90},320 ${cx - 130},325 M${cx - 30},350 C${cx - 60},340 ${cx - 70},375 ${cx - 95},370`} />
-        <path d={`M${cx + 30},200 C${cx + 90},200 ${cx + 70},250 ${cx + 120},255 M${cx + 40},280 C${cx + 90},270 ${cx + 90},320 ${cx + 130},325 M${cx + 30},350 C${cx + 60},340 ${cx + 70},375 ${cx + 95},370`} />
-        <path d={`M${cx - 6},395 L${cx - 10},440 M${cx + 6},395 L${cx + 10},440`} />
-      </g>
-    );
-  }
-  // DNA: two strands twisting round each other, with the rungs between.
-  const a = [];
-  const b = [];
-  const rungs = [];
-  for (let y = 90; y <= 510; y += 10) {
-    const ph = ((y - 90) / 420) * Math.PI * 3.5;
-    const x1 = cx + Math.sin(ph) * 46;
-    const x2 = cx - Math.sin(ph) * 46;
-    a.push(`${x1.toFixed(1)},${y}`);
-    b.push(`${x2.toFixed(1)},${y}`);
-    if ((y - 90) % 30 === 0) rungs.push(`M${x1.toFixed(1)},${y} L${x2.toFixed(1)},${y}`);
-  }
-  return (
-    <g>
-      <polyline points={a.join(" ")} />
-      <polyline points={b.join(" ")} />
-      <path d={rungs.join(" ")} strokeWidth="2" />
-    </g>
-  );
-}
-
-// Dark shattered glass behind the row: a jittered grid split into triangles
-// in greys, made once.
-function FeShards() {
-  const tris = useMemo(() => {
-    const cols = 11;
-    const rows = 7;
-    const pts = [];
-    for (let r = 0; r <= rows; r += 1) {
-      for (let c = 0; c <= cols; c += 1) {
-        const jx = c === 0 || c === cols ? 0 : (brainNoise(r * 31 + c, 71) - 0.5) * 70;
-        const jy = r === 0 || r === rows ? 0 : (brainNoise(r * 31 + c, 72) - 0.5) * 70;
-        pts.push([(c / cols) * 1600 + jx, (r / rows) * 900 + jy]);
-      }
-    }
-    const out = [];
-    const P = (r, c) => pts[r * (cols + 1) + c];
-    for (let r = 0; r < rows; r += 1) {
-      for (let c = 0; c < cols; c += 1) {
-        const flip = brainNoise(r * 17 + c, 73) > 0.5;
-        const q = [P(r, c), P(r, c + 1), P(r + 1, c + 1), P(r + 1, c)];
-        const pairs = flip ? [[q[0], q[1], q[2]], [q[0], q[2], q[3]]] : [[q[0], q[1], q[3]], [q[1], q[2], q[3]]];
-        pairs.forEach((t, k) => {
-          const g = Math.round(10 + brainNoise(r * 97 + c * 5 + k, 74) ** 2 * 44);
-          out.push({ d: `M${t[0].join(",")} L${t[1].join(",")} L${t[2].join(",")} Z`, g });
-        });
-      }
-    }
-    return out;
-  }, []);
-  return (
-    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full">
-      {tris.map((t, i) => (
-        <path key={i} d={t.d} fill={`rgb(${t.g},${t.g},${t.g})`} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-      ))}
-    </svg>
-  );
-}
-
-const FE_BUST =
-  "M500,210 C415,210 370,270 368,350 C366,410 385,470 420,510 C430,530 440,545 445,560 L440,610 C360,640 230,660 150,720 C100,760 80,850 70,1000 L930,1000 C920,850 900,760 850,720 C770,660 640,640 560,610 L555,560 C560,545 570,530 580,510 C615,470 634,410 632,350 C630,270 585,210 500,210 Z";
-const FE_HAIR =
-  "M362,352 C348,262 398,188 470,178 C525,160 604,176 642,232 C662,262 668,304 652,350 L632,318 L622,362 L602,302 L588,352 L562,290 L546,348 L522,286 L506,352 L482,290 L462,348 L440,296 L420,358 L402,310 L386,368 Z";
-const FE_PROFILE =
-  "M430,200 C530,170 630,215 650,300 C655,325 648,340 672,372 C686,392 680,402 660,405 C668,420 662,432 650,438 C656,452 646,466 632,466 C628,500 600,515 560,512 L552,580 C620,610 760,640 820,720 C860,780 870,880 875,1000 L200,1000 C205,880 220,780 260,730 C300,680 350,650 390,625 L385,560 C330,520 300,450 305,370 C310,280 360,220 430,200 Z";
-const FE_PROFILE_HAIR =
-  "M300,390 C288,285 352,190 452,183 C562,170 642,222 656,292 L612,272 L620,305 L572,264 L576,302 L522,260 L520,300 C470,302 422,322 392,362 L362,342 L350,402 Z";
-const FE_KING =
-  "M40,480 L160,480 L160,450 L140,440 L150,410 L120,400 L135,250 L150,240 L150,215 L120,210 L128,190 L108,190 L108,165 L125,165 L125,150 L108,150 L108,120 L92,120 L92,150 L75,150 L75,165 L92,165 L92,190 L72,190 L80,210 L50,215 L50,240 L65,250 L80,400 L50,410 L60,440 L40,450 Z";
-
-function FeEyes({ x1, y1, x2, y2, color, r = 1 }) {
-  return (
-    <g>
-      {[[x1, y1], [x2, y2]].map(([x, y], i) => (
-        <g key={i}>
-          <circle cx={x} cy={y} r={48 * r} fill="url(#feGlow)" />
-          <ellipse cx={x} cy={y} rx={17 * r} ry={7 * r} fill={color} />
-          <ellipse cx={x} cy={y} rx={8 * r} ry={3 * r} fill="#FFFFFF" />
-        </g>
-      ))}
-    </g>
-  );
-}
-
-function FeShot({ shot, color }) {
-  const eye = FE_EYE[color] || "#FFFFFF";
-  const ink = "#050407";
-  const k = shot.kind;
-  return (
-    <div className="absolute inset-0" style={{ background: `radial-gradient(110% 85% at 50% 38%, ${color} 0%, ${color} 35%, #000 130%)` }}>
-      <svg viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 w-full h-full" style={{ color: eye }}>
-        <defs>
-          <radialGradient id="feGlow">
-            <stop offset="0%" stopColor={eye} stopOpacity="0.9" />
-            <stop offset="35%" stopColor={eye} stopOpacity="0.35" />
-            <stop offset="100%" stopColor={eye} stopOpacity="0" />
-          </radialGradient>
-        </defs>
-        {k === "hand" && (
-          <g>
-            <g transform="translate(560,-40) scale(0.9)" opacity="0.95">
-              <path d={FE_BUST} fill={ink} />
-              <path d={FE_HAIR} fill={ink} />
-              <FeEyes x1={455} y1={392} x2={545} y2={392} color={eye} />
-            </g>
-            <g transform="translate(120,330) rotate(-14)">
-              {[
-                [96, 130, 64, 330, -8],
-                [168, 60, 68, 400, -2],
-                [244, 80, 66, 380, 4],
-                [316, 150, 60, 320, 10],
-              ].map(([x, y, w, h, r], i) => (
-                <rect key={i} x={x} y={y} width={w} height={h} rx={w / 2} fill={ink} transform={`rotate(${r} ${x + w / 2} ${y + h})`} />
-              ))}
-              <rect x={20} y={330} width={70} height={270} rx={35} fill={ink} transform="rotate(-42 55 465)" />
-              <rect x={90} y={320} width={300} height={440} rx={130} fill={ink} />
-              <rect x={180} y={250} width={56} height={34} rx={12} fill="#DFFBFF" style={{ filter: "drop-shadow(0 0 10px #35E6FF) drop-shadow(0 0 26px #35E6FF)" }} />
-            </g>
-          </g>
-        )}
-        {(k === "bust" || k === "eyes" || k === "tilt" || k === "close") && (
-          <g
-            transform={
-              k === "eyes"
-                ? "translate(-1090,-640) scale(3.2)"
-                : k === "tilt"
-                ? "translate(140,60) rotate(-14 500 500) scale(1.25)"
-                : k === "close"
-                ? "translate(-420,-170) scale(1.85)"
-                : ""
-            }
-          >
-            <path d={FE_BUST} fill={ink} />
-            <path d={FE_HAIR} fill={ink} />
-            <FeEyes x1={455} y1={392} x2={545} y2={392} color={eye} r={k === "eyes" ? 0.8 : 1} />
-            {k === "tilt" && (
-              <path d="M612,330 L640,318 L652,340 L676,326" fill="none" stroke="#DFFBFF" strokeWidth="5" strokeLinecap="round" style={{ filter: "drop-shadow(0 0 8px #35E6FF)" }} />
-            )}
-          </g>
-        )}
-        {k === "profile" && (
-          <g>
-            <path d={FE_PROFILE} fill={ink} />
-            <path d={FE_PROFILE_HAIR} fill={ink} />
-            <circle cx={604} cy={335} r={44} fill="url(#feGlow)" />
-            <ellipse cx={604} cy={335} rx={15} ry={6} fill={eye} />
-            <g transform="translate(150,640)">
-              <rect x={0} y={60} width={150} height={220} rx={50} fill={ink} />
-              <rect x={42} y={-40} width={30} height={90} rx={15} fill="#DFFBFF" style={{ filter: "drop-shadow(0 0 12px #35E6FF) drop-shadow(0 0 30px #35E6FF)" }} />
-              <rect x={10} y={40} width={130} height={46} rx={23} fill={ink} />
-            </g>
-          </g>
-        )}
-        {k === "king" && (
-          <g>
-            <g transform="translate(560,120) scale(1.7)">
-              <path d={FE_KING} fill={ink} opacity="0.85" />
-            </g>
-            <g transform="translate(40,300) scale(0.75)">
-              <path d={FE_BUST} fill={ink} />
-              <path d={FE_HAIR} fill={ink} />
-              <FeEyes x1={455} y1={392} x2={545} y2={392} color={eye} />
-              <rect x={150} y={900} width={700} height={400} fill={ink} />
-            </g>
-          </g>
-        )}
-      </svg>
-    </div>
-  );
-}
-
-function FlashEdit({ onExit }) {
-  const exitRef = useRef(onExit);
-  exitRef.current = onExit;
-  const [phase, setPhase] = useState("wait");
-  const [view, setView] = useState({ seg: 0, glitch: true, shot: -1, color: 0, whip: false, out: false });
-  const [leaving, setLeaving] = useState(false);
-  const [vw, setVw] = useState(() => (typeof window !== "undefined" ? window.innerWidth : 1280));
-  const clockRef = useRef(null);
-  const soundRef = useRef(null);
-
-  useEffect(() => {
-    const onR = () => setVw(window.innerWidth);
-    window.addEventListener("resize", onR);
-    return () => window.removeEventListener("resize", onR);
-  }, []);
-
-  // The track and the clock, as in the other edits: picture follows sound.
-  useEffect(() => {
-    let cancelled = false;
-    const ctx = letterAudioContext();
-    if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
-    const startSound = (ms) => {
-      if (!ctx || !feTrackBuffer || soundRef.current || ctx.state !== "running") return false;
-      const gain = ctx.createGain();
-      gain.connect(ctx.destination);
-      const src = ctx.createBufferSource();
-      src.buffer = feTrackBuffer;
-      src.connect(gain);
-      const offset = Math.max(0, ms / 1000);
-      const when = ctx.currentTime + 0.03;
-      gain.gain.setValueAtTime(FE_VOLUME, when);
-      src.start(when, offset);
-      soundRef.current = { ctx, gain, src };
-      clockRef.current = () => (ctx.currentTime - when + offset) * 1000;
-      return true;
-    };
-    const begin = () => {
-      if (cancelled || clockRef.current) return;
-      const opened = performance.now();
-      clockRef.current = () => performance.now() - opened;
-      startSound(0);
-      setPhase("play");
-    };
-    const onState = () => {
-      if (ctx && ctx.state === "running" && !soundRef.current && clockRef.current) startSound(clockRef.current());
-    };
-    if (ctx) ctx.addEventListener("statechange", onState);
-    const wait = setTimeout(begin, 4000);
-    preloadFlashTrack().then(() => {
-      clearTimeout(wait);
-      if (clockRef.current) onState();
-      else begin();
-    });
-    return () => {
-      cancelled = true;
-      clearTimeout(wait);
-      if (ctx) ctx.removeEventListener("statechange", onState);
-      const snd = soundRef.current;
-      if (snd) {
-        const t = snd.ctx.currentTime;
-        snd.gain.gain.cancelScheduledValues(t);
-        snd.gain.gain.setValueAtTime(snd.gain.gain.value, t);
-        snd.gain.gain.linearRampToValueAtTime(0, t + 0.6);
-        try {
-          snd.src.stop(t + 0.7);
-        } catch {
-          /* already stopped */
-        }
-      }
-    };
-  }, []);
-
-  // Work out what should be on screen from the clock; only re-render when
-  // that changes.
-  useEffect(() => {
-    if (phase !== "play") return undefined;
-    let raf;
-    let last = "";
-    let done = false;
-    const tick = () => {
-      const t = clockRef.current ? clockRef.current() : 0;
-      const b = t / FE_BEAT;
-      if (b >= FE_TOTAL) {
-        if (!done) {
-          done = true;
-          exitRef.current();
-        }
-        return;
-      }
-      let v;
-      if (b < FE_WHIP_AT) {
-        let seg = 0;
-        while (seg + 1 < FE_ROW.length && b >= FE_ROW[seg + 1].at) seg += 1;
-        v = { seg, glitch: b - FE_ROW[seg].at < 0.28, shot: -1, color: 0, whip: false, out: false };
-      } else if (b < FE_PART2_AT) {
-        v = { seg: FE_ROW.length - 1, glitch: false, shot: -1, color: 0, whip: true, out: false };
-      } else if (b < FE_END) {
-        const into = b - FE_PART2_AT;
-        const shot = Math.floor(into / 2);
-        const within = into - shot * 2;
-        v = { seg: 0, glitch: within < 0.25 && shot !== 0, shot, color: Math.min(2, Math.floor(within / (2 / 3))), whip: false, out: false };
-      } else {
-        v = { seg: 0, glitch: false, shot: FE_SHOTS.length - 1, color: 2, whip: false, out: true };
-      }
-      const key = JSON.stringify(v);
-      if (key !== last) {
-        last = key;
-        setView(v);
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [phase]);
-
-  // Any input leaves.
-  useEffect(() => {
-    let armed = false;
-    const arm = setTimeout(() => (armed = true), 600);
-    const onInput = () => {
-      if (!armed) return;
-      armed = false;
-      setLeaving(true);
-      setTimeout(() => exitRef.current(), 500);
-    };
-    const events = ["mousedown", "keydown", "touchstart"];
-    events.forEach((ev) => window.addEventListener(ev, onInput, { passive: true }));
-    return () => {
-      clearTimeout(arm);
-      events.forEach((ev) => window.removeEventListener(ev, onInput));
-    };
-  }, []);
-
-  const glitchFilter = "blur(5px) drop-shadow(-16px 0 rgba(255,20,70,0.85)) drop-shadow(16px 0 rgba(20,230,255,0.85)) brightness(1.3)";
-  const row = FE_ROW[view.seg];
-  // Fit the 1600-wide row to the window, then frame the camera on the focus.
-  const base = vw / 980;
-  const s = base * row.s;
-
-  return (
-    <div
-      className="fixed inset-0 z-[75] overflow-hidden bg-black select-none"
-      style={{ cursor: "none", opacity: leaving ? 0 : 1, transition: "opacity 0.5s ease" }}
-    >
-      <style>{FE_CSS}</style>
-      {phase === "play" && view.shot < 0 && !view.whip && (
-        <div key={`r${view.seg}`} className="absolute inset-0" style={{ filter: view.glitch ? glitchFilter : undefined, transform: view.glitch ? "translateX(-2%) scale(1.04)" : undefined }}>
-          <div className="absolute" style={{ inset: "-8%", animation: `feDrift ${row.len * FE_BEAT}ms linear both` }}>
-            <FeShards />
-          </div>
-          <div
-            className="absolute left-1/2 top-1/2"
-            style={{
-              width: 1600,
-              height: 600,
-              transformOrigin: "0 0",
-              transform: `rotate(${row.r}deg) scale(${s}) translate(${-row.fx}px, -300px)`,
-            }}
-          >
-            <svg width="1600" height="600" viewBox="0 0 1600 600" fill="none" strokeLinecap="round" strokeLinejoin="round" style={{ overflow: "visible" }}>
-              {[0, 1, 2, 3, 4].map((i) => {
-                const lit = row.lit === i;
-                const c = lit ? FE_NEON[i] : "#F4F4F4";
-                return (
-                  <g
-                    key={i}
-                    stroke={c}
-                    strokeWidth={lit ? 4.5 : 3.5}
-                    style={{
-                      color: c,
-                      filter: lit
-                        ? `drop-shadow(0 0 6px ${c}) drop-shadow(0 0 18px ${c})`
-                        : "drop-shadow(0 0 3px rgba(255,255,255,0.35))",
-                    }}
-                  >
-                    <FeSymbol i={i} />
-                  </g>
-                );
-              })}
-            </svg>
-          </div>
-        </div>
-      )}
-      {phase === "play" && view.whip && (
-        <div className="absolute inset-0 bg-white overflow-hidden">
-          <div
-            className="absolute"
-            style={{
-              top: "-20%",
-              bottom: "-20%",
-              left: "30%",
-              width: "40%",
-              background: "linear-gradient(90deg, transparent, rgba(40,44,48,0.85) 35%, rgba(90,160,170,0.6) 50%, rgba(40,44,48,0.85) 65%, transparent)",
-              filter: "blur(28px)",
-              animation: `feWhip ${(FE_PART2_AT - FE_WHIP_AT) * FE_BEAT}ms linear both`,
-            }}
-          />
-        </div>
-      )}
-      {phase === "play" && view.shot >= 0 && (
-        <div
-          key={`s${view.shot}`}
-          className="absolute inset-0"
-          style={{
-            animation: `fePush ${2 * FE_BEAT}ms linear both`,
-            filter: view.glitch ? glitchFilter : undefined,
-            opacity: view.out ? 0 : 1,
-            transition: view.out ? "opacity 1.2s ease-out" : undefined,
-          }}
-        >
-          <FeShot shot={FE_SHOTS[view.shot]} color={FE_SHOTS[view.shot].colors[view.color]} />
-        </div>
-      )}
-      {/* Grain and a faint watermark, as on the original. */}
-      <div aria-hidden="true" className="ss-grain absolute pointer-events-none" style={{ opacity: 0.08 }} />
-      {phase === "play" && !view.out && (
-        <div
-          aria-hidden="true"
-          className="absolute bottom-[4vh] inset-x-0 text-center pointer-events-none"
-          style={{ fontSize: 11, letterSpacing: "0.35em", fontWeight: 800, fontStyle: "italic", color: view.shot >= 0 ? "rgba(0,0,0,0.35)" : "rgba(255,255,255,0.12)" }}
-        >
-          CORTEX
-        </div>
-      )}
-    </div>
-  );
-}
-
 function HomeSpace({ live = true, visible = true }) {
   const gasRef = useRef(null);
   const farRef = useRef(null);
@@ -12991,8 +12451,6 @@ function NBackSessionApp() {
   const [spaceWarm, setSpaceWarm] = useState(false);
   // The second, launch-style opening edit, played from Pages.
   const [launchEditOn, setLaunchEditOn] = useState(false);
-  // The silhouette-style test edit, also only from Pages.
-  const [flashEditOn, setFlashEditOn] = useState(false);
   // No build-up when the brain was made under the opening edit; a quick one
   // when coming back to Home from elsewhere.
   const constellationEntrance = useRef(mainView === "home" ? 0 : 700);
@@ -16846,6 +16304,31 @@ function NBackSessionApp() {
           0% { transform: scale(1.3); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
         }
+        /* Enlightened: smashes in from huge, overshoots, snaps back, settles. */
+        @keyframes ssEnlHit {
+          0% { transform: scale(3.4) rotate(-8deg); opacity: 0; filter: brightness(3) drop-shadow(-18px 0 rgba(255,0,60,0.9)) drop-shadow(18px 0 rgba(0,220,255,0.9)); }
+          14% { transform: scale(0.82) rotate(4deg); opacity: 1; filter: brightness(2.2) drop-shadow(-10px 0 rgba(255,0,60,0.8)) drop-shadow(10px 0 rgba(0,220,255,0.8)); }
+          26% { transform: scale(1.14) rotate(-2.5deg); filter: brightness(1.5) drop-shadow(-4px 0 rgba(255,0,60,0.5)) drop-shadow(4px 0 rgba(0,220,255,0.5)); }
+          38% { transform: scale(0.95) rotate(1deg); filter: brightness(1.2) drop-shadow(0 0 0 rgba(255,0,60,0)) drop-shadow(0 0 0 rgba(0,220,255,0)); }
+          52% { transform: scale(1.03) rotate(0deg); }
+          68%, 100% { transform: scale(1) rotate(0deg); filter: brightness(1) drop-shadow(0 0 0 rgba(255,0,60,0)) drop-shadow(0 0 0 rgba(0,220,255,0)); }
+        }
+        @keyframes ssEnlWord {
+          0% { transform: scale(2.4) translateY(-10px); opacity: 0; letter-spacing: 0.5em; }
+          18% { transform: scale(0.9); opacity: 1; letter-spacing: 0.08em; }
+          34% { transform: scale(1.06); letter-spacing: 0.14em; }
+          50%, 100% { transform: scale(1); letter-spacing: 0.12em; }
+        }
+        @keyframes ssEnlFlash { 0% { opacity: 1; } 100% { opacity: 0; } }
+        @keyframes ssEnlShake {
+          0% { transform: translate(0, 0); }
+          10% { transform: translate(-16px, 9px); }
+          22% { transform: translate(13px, -8px); }
+          34% { transform: translate(-9px, 5px); }
+          48% { transform: translate(6px, -3px); }
+          64% { transform: translate(-3px, 2px); }
+          100% { transform: translate(0, 0); }
+        }
         @keyframes ssFlashHard { 0% { opacity: 0.75; } 100% { opacity: 0; } }
         @keyframes ssTapPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
         @keyframes ssCardFloat {
@@ -18254,7 +17737,6 @@ function NBackSessionApp() {
                   setScreensaverOn(true);
                 }),
                 go("Opening edit (launch style)", () => setLaunchEditOn(true)),
-                go("Opening edit (silhouette style)", () => setFlashEditOn(true)),
                 go("Music hint", () => {
                   jumpToExercise("dual");
                   setTimeout(() => setMusicHint(true), 300);
@@ -22360,7 +21842,7 @@ function NBackSessionApp() {
       {SHOW_LEADERBOARD && mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
-          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
         >
           <span>🏆</span>
           <span className="hidden sm:inline">Leaderboard</span>
@@ -22378,9 +21860,10 @@ function NBackSessionApp() {
       {mainView === "home" && !customRegimeNoticeDismissed && !customRegimeEarned && (
         <div className="fixed z-40 inset-x-4 bottom-32 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+9.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
-            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden bg-slate-900 border border-slate-700/60"
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
-              // The same face as Home's exercise cards.
+              background: "#1B1D20",
+              border: "1px solid #2C2F34",
               boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
             }}
           >
@@ -22422,9 +21905,10 @@ function NBackSessionApp() {
       {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
         <div className="fixed z-40 inset-x-4 bottom-4 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
-            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden bg-slate-900 border border-slate-700/60"
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
             style={{
-              // The same face as Home's exercise cards.
+              background: "#1B1D20",
+              border: "1px solid #2C2F34",
               boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
             }}
           >
@@ -22503,7 +21987,6 @@ function NBackSessionApp() {
       )}
 
       {launchEditOn && <LaunchEdit onExit={() => setLaunchEditOn(false)} />}
-      {flashEditOn && <FlashEdit onExit={() => setFlashEditOn(false)} />}
       {screensaverOn && <IdleScreensaverMemo onExit={exitScreensaver} onEnding={() => setSpaceWarm(true)} />}
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
@@ -22524,8 +22007,8 @@ function NBackSessionApp() {
             // Sized so the brain itself spans the whole gap, from just in
             // from the window edge to the column; only its faded glow runs
             // under the column (clicks pass straight through it).
-            width: "min(480px, 56vh, calc((100vw - 42.25rem - 100px) * 0.62))",
-            left: "calc(((100vw - 42.25rem) / 2 - min(480px, 56vh, calc((100vw - 42.25rem - 100px) * 0.62))) / 2)",
+            width: "min(580px, 64vh, calc((100vw - 42.25rem - 100px) * 0.7))",
+            left: "calc(((100vw - 42.25rem) / 2 - min(580px, 64vh, calc((100vw - 42.25rem - 100px) * 0.7))) / 2)",
           }}
         >
           <div id="brain-drift" className="w-full" style={{ willChange: "transform" }}>
@@ -22640,7 +22123,7 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("proverbs")}
-          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
         >
           Proverbs
         </button>
@@ -22663,7 +22146,7 @@ function NBackSessionApp() {
           onClick={() => setMainView("achievements")}
           /* Top right while the Leaderboard is hidden. When that comes back it
              takes this corner and Achievements returns to the left. */
-          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
         >
           <span className="text-lg">🏅</span>
           <span className="hidden sm:inline">Achievements</span>
@@ -22714,7 +22197,7 @@ function NBackSessionApp() {
             retireBinauralHint();
             setMainView("account");
           }}
-          className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
           {SHOW_PROFILE_IDENTITY_EDIT && (
             <AvatarFrame tier={ownAvatarFrameTier}>
@@ -22732,7 +22215,7 @@ function NBackSessionApp() {
             setFeedbackText("");
             setFeedbackOpen(true);
           }}
-          className="hidden sm:flex fixed bottom-6 left-6 flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
         >
           💬 Feedback
         </button>
