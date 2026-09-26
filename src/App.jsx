@@ -9721,7 +9721,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
     const total = Math.max(200, days + 70);
     const places = brainPlaces(total);
     const regions = places.map((pt, i) =>
-      brainRegion(pt.x + (brainNoise(i, 11) - 0.5) * 22, pt.y + (brainNoise(i, 12) - 0.5) * 22)
+      brainRegion(pt.x, pt.y)
     );
     // Each star joins the nearest lit star before it in the same part, and
     // only when that star is close. Wiring across parts, and long lines
@@ -9807,8 +9807,8 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
       for (let i = 0; i < places.length; i += 1) {
         const gx = px(places[i].x);
         const gy = py(places[i].y);
-        const gr = 22 * scale;
-        b.globalAlpha = 0.13;
+        const gr = 13 * scale;
+        b.globalAlpha = 0.16;
         b.drawImage(sprites[regions[i]], gx - gr, gy - gr, gr * 2, gr * 2);
       }
       b.globalAlpha = 1;
@@ -12012,7 +12012,7 @@ function LaunchEdit({ onExit }) {
 // then pinches in; then a flash, a streak of lens flare, a shudder of the
 // camera, debris streaking outward and slowing, a soft wave of light rolling
 // through the gas, and a dim, glowing remnant left behind the gem.
-function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
+function SupernovaSky({ revealed, preroll, variant = "supernova", centerRef }) {
   // "birth" (achievements): gas gathers into a new star that ignites, a
   // gentler cousin of the level-up's supernova.
   const BIRTH = variant === "birth";
@@ -12174,8 +12174,18 @@ function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
       last = now;
       const since = (now - start) / 1000;
       const unit = Math.max(W, H);
-      const cx = W / 2;
-      const cy = H * 0.46;
+      // Centred on the gem (or medal) itself, so it is born exactly out of
+      // the light rather than a little way off it.
+      let cx = W / 2;
+      let cy = H * 0.46;
+      const anchor = centerRef && centerRef.current;
+      if (anchor) {
+        const ar = anchor.getBoundingClientRect();
+        if (ar.width > 0) {
+          cx = ar.left + ar.width / 2;
+          cy = ar.top + ar.height / 2;
+        }
+      }
       // The camera: a slow push in the whole time, and a shudder on the blast.
       const pre = preroll ? Math.min(1, since / 4.6) : 1;
       const zoom = 1 + 0.05 * pre * pre + (t > 0 ? 0.012 * t : 0);
@@ -12295,7 +12305,7 @@ function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
         // in the last moments gas pours in and it collapses to a point.
         const T = BIRTH ? 1.6 : preroll ? 4.7 : 0.01;
         const q = Math.min(1, since / T);
-        const R0 = Math.min(W, H) * (BIRTH ? 0.03 : 0.075);
+        const R0 = Math.min(W, H) * (BIRTH ? 0.03 : 0.1);
         const collapseAt = T - 0.38;
         const collapse = since > collapseAt ? Math.min(1, (since - collapseAt) / 0.38) : 0;
         const unstable = BIRTH ? q * 0.3 : q * q;
@@ -16598,6 +16608,8 @@ function NBackSessionApp() {
   // Every exercise's record gets the full reveal, not just Quad's. A record
   // is a record whichever screen it came off.
   const prCinematic = !!unlockInfo && unlockInfo.isNewPR;
+  const lvGemRef = useRef(null);
+  const achIconRef = useRef(null);
   useEffect(() => {
     if (!prCinematic) {
       setPrRevealed(false);
@@ -16996,6 +17008,10 @@ function NBackSessionApp() {
           48% { transform: translate(6px, -3px); }
           64% { transform: translate(-3px, 2px); }
           100% { transform: translate(0, 0); }
+        }
+        @keyframes ssSoftIn {
+          0% { opacity: 0; transform: translateY(10px); filter: blur(8px); }
+          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
         }
         @keyframes gemEmerge {
           0% { transform: scale(0.12); opacity: 0; filter: brightness(4) blur(10px); }
@@ -21786,14 +21802,20 @@ function NBackSessionApp() {
           style={{ animation: "ssIn 0.6s ease-out both" }}
         >
           {/* Space, and a star going supernova as the level lands. */}
-          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} />
+          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} centerRef={lvGemRef} />
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
             style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%)" }}
           />
-          {(!prCinematic || prRevealed) && (
-            <div className="relative flex flex-col items-center text-center gap-14 max-w-sm">
+          {/* Always laid out (hidden until the blast) so the star can be
+              centred on the gem, and so nothing jumps when it appears. */}
+          {(
+            <div
+              key={!prCinematic || prRevealed ? "on" : "off"}
+              className="relative flex flex-col items-center text-center gap-14 max-w-sm"
+              style={{ visibility: !prCinematic || prRevealed ? "visible" : "hidden" }}
+            >
               {unlockInfo.isNewPR ? (
                 <div className="text-2xl font-semibold uppercase tracking-widest mb-2">
                   {/* Word by word, rising out of blur, as the edit's lines do. */}
@@ -21807,7 +21829,7 @@ function NBackSessionApp() {
                         WebkitBackgroundClip: "text",
                         backgroundClip: "text",
                         color: "transparent",
-                        animation: `ssWordIn 0.45s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 60}ms both`,
+                        animation: `ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) ${380 + wi * 70}ms both`,
                       }}
                     >
                       {w}
@@ -21822,7 +21844,7 @@ function NBackSessionApp() {
 
               {/* The gem emerges out of the blast: born from the light at its
                   heart, small and blinding, growing and cooling into itself. */}
-              <div className="relative" style={{ animation: "gemEmerge 1.1s cubic-bezier(0.16,1,0.3,1) 0.05s both" }}>
+              <div ref={lvGemRef} className="relative" style={{ animation: "gemEmerge 1.3s cubic-bezier(0.22,1,0.36,1) 0.02s both" }}>
                 <LevelGem
                   level={unlockInfo.level}
                   size={168}
@@ -21835,7 +21857,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ animation: "ssTaglineIn 0.4s ease-out 0.25s both, ssSplit 0.5s ease-out 0.25s both" }}
+                  style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.55s both" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21846,7 +21868,7 @@ function NBackSessionApp() {
                     className="text-lg font-semibold tracking-wide"
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
-                      animation: "ssTaglineIn 0.4s ease-out 0.35s both",
+                      animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.68s both",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21854,7 +21876,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.4s ease-out 0.45s both" }}>
+              <div className="w-full flex justify-center" style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.82s both" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
@@ -21965,7 +21987,7 @@ function NBackSessionApp() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black p-8 overflow-hidden" style={{ animation: "ssIn 0.6s ease-out both" }}>
             {/* Living space: a shooting star streaks in and comes to rest,
                 and the achievement emerges from its light. */}
-            <SupernovaSky key={current.id || current.title} revealed={false} preroll={false} variant="calm" />
+            <SupernovaSky key={current.id || current.title} revealed={false} preroll={false} variant="calm" centerRef={achIconRef} />
             <div
               aria-hidden="true"
               className="absolute inset-0 pointer-events-none"
@@ -21984,7 +22006,7 @@ function NBackSessionApp() {
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       color: "transparent",
-                      animation: `ssWordIn 0.45s cubic-bezier(0.16,1,0.3,1) ${1250 + wi * 60}ms both`,
+                      animation: `ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) ${1500 + wi * 70}ms both`,
                     }}
                   >
                     {w}
@@ -21993,16 +22015,17 @@ function NBackSessionApp() {
               </div>
 
               <div
+                ref={achIconRef}
                 className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad}`}
                 style={{
                   boxShadow: "0 0 60px -6px rgba(185,160,245,0.55), 0 20px 40px -12px rgba(0,0,0,0.6)",
-                  animation: "gemEmerge 1.1s cubic-bezier(0.16,1,0.3,1) 1.1s both",
+                  animation: "gemEmerge 1.3s cubic-bezier(0.22,1,0.36,1) 1.22s both",
                 }}
               >
                 {current.icon}
               </div>
 
-              <div className="space-y-3" style={{ animation: "ssTaglineIn 0.4s ease-out 1.4s both" }}>
+              <div className="space-y-3" style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.7s both" }}>
                 <AchievementTitle
                   achievement={current}
                   className="text-3xl font-semibold tracking-tight"
@@ -22015,7 +22038,7 @@ function NBackSessionApp() {
                 )}
               </div>
               <button
-                style={{ animation: "ssTaglineIn 0.4s ease-out 1.5s both" }}
+                style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.85s both" }}
                 onClick={() => {
                   playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));
