@@ -12000,7 +12000,7 @@ function LaunchEdit({ onExit }) {
 // then pinches in; then a flash, a streak of lens flare, a shudder of the
 // camera, debris streaking outward and slowing, a soft wave of light rolling
 // through the gas, and a dim, glowing remnant left behind the gem.
-function SupernovaSky({ revealed, preroll, orange = false }) {
+function SupernovaSky({ revealed, preroll }) {
   const ref = useRef(null);
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
@@ -12021,21 +12021,6 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
     const sprites = PAL.map((c) => spaceSprite(c, 64));
     const big = PAL.map((c) => spaceSprite(c, 128));
     const white = sprites[0];
-    // The blast and what it leaves behind: violet, cyan and pink normally;
-    // in the orange version, the sun's own colours carried through.
-    const EXPAL = orange
-      ? [
-          [255, 250, 235],
-          [255, 226, 150],
-          [255, 190, 90],
-          [255, 140, 40],
-          [255, 100, 30],
-          [255, 170, 70],
-          [240, 80, 40],
-        ]
-      : PAL;
-    const exSprites = orange ? EXPAL.map((c) => spaceSprite(c, 64)) : sprites;
-    const exBig = orange ? EXPAL.map((c) => spaceSprite(c, 128)) : big;
     // The star's face: a disc with a white-hot middle darkening to violet at
     // the rim, covered in boiling cells of brighter gas. Two versions, so the
     // surface can churn as they turn against each other.
@@ -12046,12 +12031,12 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
       c.height = S;
       const g = c.getContext("2d");
       const base = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-      base.addColorStop(0, "rgba(255,250,230,1)");
-      base.addColorStop(0.3, "rgba(255,236,170,1)");
-      base.addColorStop(0.62, "rgba(255,190,90,1)");
-      base.addColorStop(0.86, "rgba(250,130,40,1)");
-      base.addColorStop(0.97, "rgba(205,70,20,1)");
-      base.addColorStop(1, "rgba(170,40,10,0)");
+      base.addColorStop(0, "rgba(255,250,255,1)");
+      base.addColorStop(0.3, "rgba(236,222,255,1)");
+      base.addColorStop(0.62, "rgba(196,160,255,1)");
+      base.addColorStop(0.86, "rgba(140,88,238,1)");
+      base.addColorStop(0.97, "rgba(88,40,196,1)");
+      base.addColorStop(1, "rgba(70,30,170,0)");
       g.fillStyle = base;
       g.fillRect(0, 0, S, S);
       g.globalCompositeOperation = "source-atop";
@@ -12063,7 +12048,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         const y = S / 2 + Math.sin(a) * d;
         const gr = g.createRadialGradient(x, y, 0, x, y, r0);
         const hot = brainNoise(k, salt + 3) > 0.7;
-        gr.addColorStop(0, hot ? "rgba(255,252,225,0.6)" : "rgba(190,70,10,0.38)");
+        gr.addColorStop(0, hot ? "rgba(255,255,255,0.55)" : "rgba(120,60,210,0.35)");
         gr.addColorStop(1, "rgba(255,255,255,0)");
         g.fillStyle = gr;
         g.fillRect(x - r0, y - r0, r0 * 2, r0 * 2);
@@ -12079,15 +12064,6 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
       g.fill();
       return c;
     };
-    // Our own sun's colours for the star: white-gold, yellow, orange, red.
-    const SUN = [
-      [255, 246, 220],
-      [255, 214, 120],
-      [255, 165, 55],
-      [255, 105, 30],
-      [255, 70, 35],
-    ].map((c) => spaceSprite(c, 128));
-    const BLUE = spaceSprite([200, 225, 255], 128);
     const surfA = makeSurface(401);
     const surfB = makeSurface(501);
     // Flares arcing off the surface, more and more of them as it destabilises.
@@ -12227,7 +12203,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         const tw = 0.7 + 0.3 * Math.sin(since * s.sp + s.tw);
         ctx.globalAlpha = Math.min(1, s.a * tw + glow);
         const g = s.r * (3 + glow * 5);
-        ctx.drawImage(glow > 0.2 ? exSprites[4] : white, px - g, y - g, g * 2, g * 2);
+        ctx.drawImage(glow > 0.2 ? sprites[4] : white, px - g, y - g, g * 2, g * 2);
       }
       if (t < 0) {
         // The star before it goes. It swells, its surface boils faster and
@@ -12235,7 +12211,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         // in the last moments gas pours in and it collapses to a point.
         const T = preroll ? 4.7 : 0.01;
         const q = Math.min(1, since / T);
-        const R0 = Math.min(W, H) * 0.105;
+        const R0 = Math.min(W, H) * 0.075;
         const collapseAt = T - 0.38;
         const collapse = since > collapseAt ? Math.min(1, (since - collapseAt) / 0.38) : 0;
         const unstable = q * q;
@@ -12244,9 +12220,9 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         const heat = 0.8 + 0.4 * unstable + 0.4 * collapse;
         // The star lights the gas around it: a wide, dim glow in the nebula
         // that grows as the star brightens.
-        ctx.globalAlpha = Math.min(1, 0.14 + 0.3 * unstable + 0.3 * collapse);
+        ctx.globalAlpha = Math.min(1, 0.18 + 0.35 * unstable + 0.3 * collapse);
         const neb = unit * (0.35 + 0.1 * Math.sin(since * 0.7));
-        ctx.drawImage(SUN[3], cx - neb, cy - neb, neb * 2, neb * 2);
+        ctx.drawImage(big[3], cx - neb, cy - neb, neb * 2, neb * 2);
         // Corona: soft streamers of hot gas flowing off it on every side,
         // slowly turning, flickering, longer and brighter as it destabilises.
         for (let k = 0; k < 44; k += 1) {
@@ -12258,24 +12234,18 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
           ctx.translate(cx + Math.cos(ang) * R * 0.9, cy + Math.sin(ang) * R * 0.9);
           ctx.rotate(ang);
           ctx.globalAlpha = (0.05 + 0.08 * unstable) * flick * (1 - collapse);
-          ctx.drawImage(SUN[k % 4], 0, -wid, len * 2, wid * 2);
+          ctx.drawImage(big[[2, 1, 6, 4][k % 4]], 0, -wid, len * 2, wid * 2);
           ctx.restore();
         }
         // The broad glow round the disc.
         ctx.globalAlpha = Math.min(1, (0.4 + 0.35 * unstable) * (1 + 0.12 * Math.sin(since * 5)));
         const cor = R * (3.4 + 0.6 * Math.sin(since * 2.3));
-        ctx.drawImage(SUN[2], cx - cor, cy - cor, cor * 2, cor * 2);
-        // Runaway fusion at the very end turns it blue-white.
-        if (unstable > 0.55) {
-          ctx.globalAlpha = (unstable - 0.55) * 1.2 + collapse * 0.5;
-          const bc = R * 2.6;
-          ctx.drawImage(BLUE, cx - bc, cy - bc, bc * 2, bc * 2);
-        }
+        ctx.drawImage(big[2], cx - cor, cy - cor, cor * 2, cor * 2);
         // Prominences: plumes of glowing plasma looping up off the surface and
         // back, made of drifting gas, not lines.
         if (since > nextFlare && collapse === 0) {
           const ang = Math.random() * Math.PI * 2;
-          flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [1, 2, 3, 4][Math.floor(Math.random() * 4)] });
+          flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [6, 1, 2, 4][Math.floor(Math.random() * 4)] });
           nextFlare = since + Math.max(0.12, 0.8 - unstable * 0.65) * (0.5 + Math.random());
         }
         for (let k = flares.length - 1; k >= 0; k -= 1) {
@@ -12302,7 +12272,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
             const y = iu * iu * y1 + 2 * iu * u * ky + u * u * y2;
             const puff = R * (0.07 + 0.09 * Math.sin(u * Math.PI)) * (0.8 + 0.4 * brainNoise(n, 391));
             ctx.globalAlpha = env * 0.22 * (0.6 + 0.4 * Math.sin(u * Math.PI));
-            ctx.drawImage(SUN[f.c], x - puff * 2, y - puff * 2, puff * 4, puff * 4);
+            ctx.drawImage(big[f.c], x - puff * 2, y - puff * 2, puff * 4, puff * 4);
           }
         }
         // The surface itself, churning: two layers turning against each other.
@@ -12317,24 +12287,6 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         ctx.drawImage(surfB, -R, -R, R * 2, R * 2);
         ctx.restore();
         ctx.globalCompositeOperation = "lighter";
-        // Fusion: points of searing light flaring up across the surface, more
-        // and more of them, and the core beating like a heart, faster and
-        // harder, as the reactions run away.
-        const spots = Math.floor(4 + unstable * 40);
-        for (let k = 0; k < spots; k += 1) {
-          const life = 0.35 + brainNoise(k, 411) * 0.4;
-          const ph = ((since + brainNoise(k, 412) * 5) % life) / life;
-          const a2 = brainNoise(k + Math.floor((since + brainNoise(k, 412) * 5) / life) * 97, 413) * Math.PI * 2;
-          const d2 = Math.sqrt(brainNoise(k + Math.floor((since + brainNoise(k, 412) * 5) / life) * 97, 414)) * R * 0.85;
-          const g = R * (0.08 + 0.12 * unstable) * Math.sin(ph * Math.PI);
-          ctx.globalAlpha = Math.sin(ph * Math.PI) * (0.5 + 0.5 * unstable);
-          ctx.drawImage(SUN[0], cx + Math.cos(a2) * d2 - g * 2, cy + Math.sin(a2) * d2 - g * 2, g * 4, g * 4);
-        }
-        const rate = 1.2 + unstable * 7;
-        const beat = Math.pow(0.5 + 0.5 * Math.sin(since * rate * Math.PI * 2), 6);
-        ctx.globalAlpha = Math.min(1, 0.15 + 0.6 * unstable) * (0.4 + 0.6 * beat);
-        const hb = R * (0.55 + 0.35 * beat * unstable);
-        ctx.drawImage(SUN[0], cx - hb * 2, cy - hb * 2, hb * 4, hb * 4);
         // It heats up: a white-hot heart that grows as it nears the end.
         ctx.globalAlpha = Math.min(1, 0.12 + unstable * 0.45 + collapse * 0.8) * (heat / 1.6);
         const hc = R * (0.7 + 0.6 * collapse);
@@ -12354,14 +12306,14 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
             ctx.translate(x, y);
             ctx.rotate(ang + Math.PI / 2 - 0.5);
             ctx.globalAlpha = inflow * ph * 0.7;
-            ctx.drawImage(k % 3 === 0 ? sprites[0] : SUN[1 + (k % 3)], -len, -2, len * 2, 4);
+            ctx.drawImage(sprites[[1, 4, 6, 2][k % 4]], -len, -2, len * 2, 4);
             ctx.restore();
           }
         }
         // A soft horizontal flare off the star, like a camera lens catching it.
         ctx.globalAlpha = 0.12 + 0.25 * unstable + 0.4 * collapse;
         const fl = R * (6 + 6 * unstable);
-        ctx.drawImage(SUN[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
+        ctx.drawImage(big[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
         // A shudder of the whole frame as it becomes unstable.
         if (unstable > 0.5) {
           const jig = (unstable - 0.5) * 4;
@@ -12378,7 +12330,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
           const ang = w.ang + w.drift * t;
           const sz = w.size * unit * (0.6 + 0.9 * grow);
           ctx.globalAlpha = w.a * bright * 2;
-          ctx.drawImage(exBig[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
+          ctx.drawImage(big[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
         }
         // Debris: streaks along their path, fast then slowing, fading.
         if (t < 4.6) {
@@ -12394,7 +12346,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
             const x = cx + Math.cos(ang) * dist;
             const y = cy + Math.sin(ang) * dist;
             const tail = Math.min(60, speed * 0.05);
-            const [r, g, b] = EXPAL[p.c];
+            const [r, g, b] = PAL[p.c];
             ctx.globalAlpha = Math.min(1, fade * 0.9);
             ctx.strokeStyle = `rgb(${r},${g},${b})`;
             ctx.lineWidth = p.size;
@@ -12405,7 +12357,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
             if (p.size > 2) {
               const gl = p.size * 3;
               ctx.globalAlpha = fade * 0.5;
-              ctx.drawImage(exSprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
+              ctx.drawImage(sprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
             }
           }
         }
@@ -12421,7 +12373,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
             ctx.translate(cx, cy);
             ctx.rotate(ang);
             ctx.globalAlpha = fb * (0.12 + brainNoise(k, 404) * 0.2);
-            ctx.drawImage(exBig[[1, 4, 6, 2, 0][k % 5]], 0, -wid, len, wid * 2);
+            ctx.drawImage(big[[1, 4, 6, 2, 0][k % 5]], 0, -wid, len, wid * 2);
             ctx.restore();
           }
         }
@@ -12432,15 +12384,15 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
         ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
         const halo = unit * (0.1 + 0.45 * flash);
         ctx.globalAlpha = 0.45 * flash + 0.06;
-        ctx.drawImage(exBig[1], cx - halo, cy - halo, halo * 2, halo * 2);
+        ctx.drawImage(big[1], cx - halo, cy - halo, halo * 2, halo * 2);
         // A horizontal streak of lens flare as it goes.
         if (t < 1.2) {
           const f = (1 - t / 1.2) ** 1.5;
           const len = unit * (0.4 + t * 0.6);
           const grd = ctx.createLinearGradient(cx - len, cy, cx + len, cy);
-          grd.addColorStop(0, orange ? "rgba(255,190,110,0)" : "rgba(160,200,255,0)");
-          grd.addColorStop(0.5, orange ? `rgba(255,240,215,${0.9 * f})` : `rgba(235,240,255,${0.9 * f})`);
-          grd.addColorStop(1, orange ? "rgba(255,190,110,0)" : "rgba(160,200,255,0)");
+          grd.addColorStop(0, "rgba(160,200,255,0)");
+          grd.addColorStop(0.5, `rgba(235,240,255,${0.9 * f})`);
+          grd.addColorStop(1, "rgba(160,200,255,0)");
           ctx.globalAlpha = 1;
           ctx.fillStyle = grd;
           ctx.fillRect(cx - len, cy - 1.5 - 3 * f, len * 2, 3 + 6 * f);
@@ -12451,7 +12403,7 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
       if (t >= 0 && t < 0.3) {
         ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = (1 - t / 0.3) ** 2 * 0.9;
-        ctx.fillStyle = orange ? "#FFF4E2" : "#F4F0FF";
+        ctx.fillStyle = "#F4F0FF";
         ctx.fillRect(0, 0, W, H);
       }
       ctx.globalAlpha = 1;
@@ -12461,8 +12413,120 @@ function SupernovaSky({ revealed, preroll, orange = false }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", build);
     };
-  }, [preroll, orange]);
+  }, [preroll]);
   return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
+}
+
+// A single asteroid, rendered once in detail: a lumpy, irregular rock shaded
+// pixel by pixel from a height field (rough surface noise plus craters with
+// raised rims), lit hard from one side by a distant star, with a faint cool
+// rim of light from the nebula on its dark side.
+function makeAsteroid(seed = 1, S = 200) {
+  const c = document.createElement("canvas");
+  c.width = S;
+  c.height = S;
+  const g = c.getContext("2d");
+  const img = g.createImageData(S, S);
+  const d = img.data;
+  const hash = (x, y) => {
+    let h = (x * 374761393 + y * 668265263 + seed * 2147483647) | 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177);
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  };
+  const vnoise = (x, y) => {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+    const u = xf * xf * (3 - 2 * xf);
+    const v = yf * yf * (3 - 2 * yf);
+    const a = hash(xi, yi);
+    const b = hash(xi + 1, yi);
+    const cc = hash(xi, yi + 1);
+    const dd = hash(xi + 1, yi + 1);
+    return a + (b - a) * u + (cc - a) * v + (a - b - cc + dd) * u * v;
+  };
+  const fbm = (x, y) => {
+    let v = 0;
+    let amp = 0.5;
+    let f = 1;
+    for (let o = 0; o < 5; o += 1) {
+      v += amp * vnoise(x * f, y * f);
+      f *= 2.03;
+      amp *= 0.5;
+    }
+    return v;
+  };
+  // Outline: a radius that wanders with the angle.
+  const harm = Array.from({ length: 6 }, (_, k) => ({
+    a: (hash(k, 11) - 0.5) * (0.22 / (k + 1)) * 2,
+    p: hash(k, 12) * Math.PI * 2,
+  }));
+  const R = S * 0.36;
+  const radius = (th) => {
+    let r = 1;
+    for (let k = 0; k < harm.length; k += 1) r += harm[k].a * Math.sin((k + 2) * th + harm[k].p);
+    return R * r;
+  };
+  const craters = Array.from({ length: 20 }, (_, k) => ({
+    x: (hash(k, 21) - 0.5) * 1.3 * R,
+    y: (hash(k, 22) - 0.5) * 1.1 * R,
+    r: R * (0.06 + hash(k, 23) ** 2 * 0.28),
+    depth: 0.5 + hash(k, 24) * 0.6,
+  }));
+  const height = (x, y) => {
+    let h = fbm(x * 0.035, y * 0.035) * 0.9 + fbm(x * 0.12 + 40, y * 0.12) * 0.32 + fbm(x * 0.4, y * 0.4 + 70) * 0.06;
+    for (let k = 0; k < craters.length; k += 1) {
+      const cr = craters[k];
+      const q = Math.hypot(x - cr.x, y - cr.y) / cr.r;
+      if (q < 1) h -= (1 - q * q) * cr.depth * 0.6;
+      else if (q < 1.35) h += Math.sin(((q - 1) / 0.35) * Math.PI) * cr.depth * 0.12;
+    }
+    return h;
+  };
+  const L = [-0.62, -0.5, 0.6];
+  const ln = Math.hypot(...L);
+  const lx = L[0] / ln;
+  const ly = L[1] / ln;
+  const lz = L[2] / ln;
+  const e = 1.2;
+  for (let py = 0; py < S; py += 1) {
+    for (let px = 0; px < S; px += 1) {
+      const x = px - S / 2;
+      const y = py - S / 2;
+      const th = Math.atan2(y, x);
+      const rr = radius(th);
+      const dist = Math.hypot(x, y);
+      if (dist > rr + 1) continue;
+      const edge = Math.min(1, rr + 1 - dist);
+      // A rounded body, roughened by the height field.
+      const q = Math.min(0.999, dist / rr);
+      let nx = x / rr;
+      let ny = y / rr;
+      let nz = Math.sqrt(1 - q * q);
+      const h0 = height(x, y);
+      const hx = (height(x + e, y) - h0) / e;
+      const hy = (height(x, y + e) - h0) / e;
+      nx -= hx * 4.6;
+      ny -= hy * 4.6;
+      const nl = Math.hypot(nx, ny, nz);
+      nx /= nl;
+      ny /= nl;
+      nz /= nl;
+      const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
+      const rim = Math.max(0, (nx * 0.7 + ny * 0.5)) ** 3 * 0.35;
+      const tone = 0.75 + 0.35 * fbm(x * 0.06 + 90, y * 0.06);
+      const ao = 0.55 + 0.45 * Math.min(1, Math.max(0, h0 + 0.3));
+      const lit = (0.03 + diff * 0.95) * tone * ao;
+      const i = (py * S + px) * 4;
+      d[i] = Math.min(255, 150 * lit + 70 * rim + 6);
+      d[i + 1] = Math.min(255, 138 * lit + 110 * rim + 6);
+      d[i + 2] = Math.min(255, 128 * lit + 150 * rim + 10);
+      d[i + 3] = 255 * edge;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  return c;
 }
 
 function HomeSpace({ live = true, visible = true }) {
@@ -12470,6 +12534,7 @@ function HomeSpace({ live = true, visible = true }) {
   const farRef = useRef(null);
   const nearRef = useRef(null);
   const liveRef = useRef(null);
+  const rockRef = useRef(null);
   const liveOn = useRef(live);
   // The sky fades up once it has been drawn, rather than appearing a beat
   // after the rest of Home in one jump.
@@ -12480,6 +12545,7 @@ function HomeSpace({ live = true, visible = true }) {
     const farC = farRef.current;
     const nearC = nearRef.current;
     const liveC = liveRef.current;
+    const rockC = rockRef.current;
     if (!gasC || !farC || !nearC || !liveC) return undefined;
     const reduce =
       window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -12683,6 +12749,21 @@ function HomeSpace({ live = true, visible = true }) {
     // placed from it even while it is paused, so when it comes alive it
     // carries on from exactly where it sits: no jump.
     let clock = 0;
+    let rock = null;
+    let rockImg = null;
+    let nextRock = 14000 + Math.random() * 14000;
+    // The rock is rendered once, while Home is idle, never mid-animation.
+    const rockTimer = setTimeout(() => {
+      const make = () => {
+        if (!rockC) return;
+        rockImg = makeAsteroid(1 + Math.floor(Math.random() * 1000));
+        rockC.width = rockImg.width;
+        rockC.height = rockImg.height;
+        rockC.getContext("2d").drawImage(rockImg, 0, 0);
+      };
+      if (window.requestIdleCallback) window.requestIdleCallback(make, { timeout: 4000 });
+      else make();
+    }, 6000);
     let prevNow = performance.now();
     let placed = false;
     const frame = (now) => {
@@ -12725,6 +12806,44 @@ function HomeSpace({ live = true, visible = true }) {
       // Half rate is plenty for twinkling, but a shooting star moves fast and
       // stutters at 30 frames a second, so while one is crossing, every frame.
       if (!liveOn.current) return;
+      // Now and then an asteroid tumbles slowly across the sky.
+      if (rockC) {
+        if (!rock && clock > nextRock) {
+          if (!rockImg) {
+            nextRock = clock + 5000;
+            return;
+          }
+          const fromLeft = Math.random() < 0.5;
+          const vw = window.innerWidth;
+          const vh = window.innerHeight;
+          const size = 70 + Math.random() * 70;
+          rock = {
+            born: clock,
+            dur: 22000 + Math.random() * 12000,
+            x0: fromLeft ? -size * 1.5 : vw + size * 1.5,
+            x1: fromLeft ? vw + size * 1.5 : -size * 1.5,
+            y0: vh * (0.1 + Math.random() * 0.5),
+            y1: vh * (0.3 + Math.random() * 0.6),
+            spin: (Math.random() - 0.5) * 40,
+            rot: Math.random() * 360,
+            s: size / rockImg.width,
+          };
+        }
+        if (rock) {
+          const p = (clock - rock.born) / rock.dur;
+          if (p >= 1) {
+            rock = null;
+            rockC.style.opacity = "0";
+            nextRock = clock + 45000 + Math.random() * 45000;
+          } else {
+            const x = rock.x0 + (rock.x1 - rock.x0) * p;
+            const y = rock.y0 + (rock.y1 - rock.y0) * p;
+            const rot = rock.rot + (rock.spin * (clock - rock.born)) / 1000;
+            rockC.style.opacity = "1";
+            rockC.style.transform = `translate3d(${x - rockC.width / 2}px, ${y - rockC.height / 2}px, 0) rotate(${rot}deg) scale(${rock.s})`;
+          }
+        }
+      }
       skip = meteors.length ? false : !skip;
       if (skip) return;
 
@@ -12851,6 +12970,7 @@ function HomeSpace({ live = true, visible = true }) {
     if (!reduce) raf = requestAnimationFrame(frame);
     return () => {
       clearTimeout(firstDraw);
+      clearTimeout(rockTimer);
       cancelAnimationFrame(rafA);
       cancelAnimationFrame(rafB);
       cancelAnimationFrame(raf);
@@ -12881,6 +13001,10 @@ function HomeSpace({ live = true, visible = true }) {
       <canvas ref={farRef} style={layer} />
       <canvas ref={nearRef} style={layer} />
       <canvas ref={liveRef} style={layer} />
+      <canvas
+        ref={rockRef}
+        style={{ position: "absolute", left: 0, top: 0, opacity: 0, transformOrigin: "50% 50%", willChange: "transform", filter: "drop-shadow(0 0 6px rgba(120,140,255,0.15))" }}
+      />
     </div>
   );
 }
@@ -13109,11 +13233,6 @@ function NBackSessionApp() {
   const [homeLive, setHomeLive] = useState(() => mainView !== "home");
   // The second, launch-style opening edit, played from Pages.
   const [launchEditOn, setLaunchEditOn] = useState(false);
-  // Test only (Pages): the level-up with an orange supernova.
-  const [supernovaOrange, setSupernovaOrange] = useState(false);
-  useEffect(() => {
-    if (!unlockInfo) setSupernovaOrange(false);
-  }, [unlockInfo]);
   // No build-up when the brain was made under the opening edit; a quick one
   // when coming back to Home from elsewhere.
   const constellationEntrance = useRef(mainView === "home" ? 0 : 700);
@@ -18234,7 +18353,7 @@ function NBackSessionApp() {
               </div>
               {sessionInProgress || sessionParked ? (
                 <div className={`mt-1 font-medium ${compactHome ? "text-base" : "text-lg"}`} style={{ color: PR_YELLOW }}>
-                  In progress · {formatDuration(totalSessionTimeRemainingMs())} left
+                  In progress - {formatDuration(totalSessionTimeRemainingMs())} left
                 </div>
               ) : (
                 <div
@@ -18420,15 +18539,6 @@ function NBackSessionApp() {
                 go("Session complete animation", () => {
                   setSessionCompleteAnim(true);
                   setTimeout(() => setSessionCompleteAnim(false), 5500);
-                }),
-                go("Level up celebration (orange supernova)", () => {
-                  setSupernovaOrange(true);
-                  setUnlockInfo({
-                    exerciseKey: "dual",
-                    level: Math.min(EXERCISE_LIBRARY.dual.maxN, (exerciseLevels.dual ?? 2) + 1),
-                    title: "Dual N-Back",
-                    isNewPR: true,
-                  });
                 }),
                 go("Level up celebration", () =>
                   setUnlockInfo({
@@ -21792,7 +21902,7 @@ function NBackSessionApp() {
           style={{ animation: "ssIn 0.6s ease-out both" }}
         >
           {/* Space, and a star going supernova as the level lands. */}
-          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} orange={supernovaOrange} />
+          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} />
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
@@ -22594,7 +22704,10 @@ function NBackSessionApp() {
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
-      <HomeSpace live={mainView === "home" && homeLive} visible={mainView === "home"} />
+      <HomeSpace
+        live={(mainView === "home" || mainView === "achievements") && homeLive}
+        visible={mainView === "home" || mainView === "achievements"}
+      />
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
@@ -22610,8 +22723,8 @@ function NBackSessionApp() {
             // Sized so the brain itself spans the whole gap, from just in
             // from the window edge to the column; only its faded glow runs
             // under the column (clicks pass straight through it).
-            width: "min(580px, 64vh, calc((100vw - 42.25rem - 100px) * 0.7))",
-            left: "calc(((100vw - 42.25rem) / 2 - min(580px, 64vh, calc((100vw - 42.25rem - 100px) * 0.7))) / 2)",
+            width: "min(620px, 68vh, calc((100vw - 42.25rem - 100px) * 0.74))",
+            left: "calc(((100vw - 42.25rem) / 2 - min(620px, 68vh, calc((100vw - 42.25rem - 100px) * 0.74))) / 2)",
           }}
         >
           <div id="brain-drift" className="w-full" style={{ willChange: "transform" }}>
