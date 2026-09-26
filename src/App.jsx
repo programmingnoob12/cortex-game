@@ -46,10 +46,7 @@ html,body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Dis
 html,body{color:#F7F8F8;}
 body{background-color:transparent;}
 body::before{content:"";position:fixed;inset:0;width:100vw;z-index:-1;pointer-events:none;
-background-color:#08090A;
-background-image:
-radial-gradient(30rem 30rem at -4rem -4rem, rgba(76,185,216,0.22), rgba(76,185,216,0) 70%),
-radial-gradient(30rem 30rem at calc(100% + 4rem) calc(100% + 4rem), rgba(139,127,232,0.18), rgba(139,127,232,0) 70%);}
+background-color:#08090A;}
 .accent-indigo-500{accent-color:var(--ex) !important}
 .accent-teal-500{accent-color:var(--ex) !important}
 .bg-amber-400{background-color:#B08D34 !important}
@@ -10094,8 +10091,6 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
           // against the page behind it.
           WebkitMaskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
           maskImage: "radial-gradient(ellipse 50% 50% at 50% 50%, #000 72%, transparent 100%)",
-          // Its light adds to the sky behind, so the brain sits among the stars.
-          mixBlendMode: "screen",
         }}
       />
     </div>
@@ -11933,6 +11928,7 @@ function HomeSpace({ live = true, visible = true }) {
     const ember = spaceSprite([255, 130, 40], 64);
     const violet = spaceSprite(hexRgb("#7537E2"), 128);
     const teal = spaceSprite(hexRgb(EXERCISE_COLORS.iqnb), 128);
+    const lavender = spaceSprite([139, 127, 232], 128);
     const rose = spaceSprite(hexRgb(EXERCISE_COLORS.cct), 128);
     const azure = spaceSprite(hexRgb(EXERCISE_COLORS.dual), 128);
     const tinted = {};
@@ -11993,9 +11989,24 @@ function HomeSpace({ live = true, visible = true }) {
         gg.globalAlpha = 0.05 + brainNoise(700 + k, 4) * 0.04;
         gg.drawImage(rose, W * 0.7 + Math.cos(a2) * d - sz, H * 0.62 + Math.sin(a2) * d * 0.7 - sz, sz * 2, sz * 2);
       }
+      // The cyan glow top left and the violet glow bottom right, as clouds of
+      // the sky's own gas rather than flat gradients laid over the page, so
+      // they drift and breathe with it.
+      const cloud = (sprite, cx, cy, reach, alpha, salt) => {
+        for (let k = 0; k < 14; k += 1) {
+          const a3 = brainNoise(salt + k, 1) * Math.PI * 2;
+          const d = brainNoise(salt + k, 2) * reach;
+          const sz = reach * (0.45 + brainNoise(salt + k, 3) * 0.7);
+          gg.globalAlpha = alpha * (0.6 + brainNoise(salt + k, 4) * 0.6);
+          gg.drawImage(sprite, cx + Math.cos(a3) * d - sz, cy + Math.sin(a3) * d * 0.75 - sz, sz * 2, sz * 2);
+        }
+      };
+      const reach = Math.min(W, H) * 0.38;
+      cloud(teal, W * 0.04, H * 0.04, reach, 0.09, 800);
+      cloud(lavender, W * 0.96, H * 0.96, reach, 0.12, 900);
 
       // Stars, split into a far layer (small, faint) and a near one.
-      const fg = prep(farC, dpr);
+      const fg = prep(farC, Math.min(1, dpr));
       const ng = prep(nearC, dpr);
       fg.globalCompositeOperation = "lighter";
       ng.globalCompositeOperation = "lighter";
@@ -12258,7 +12269,7 @@ function HomeSpace({ live = true, visible = true }) {
       style={{ position: "fixed", inset: 0, zIndex: -1, overflow: "hidden", visibility: visible ? "visible" : "hidden" }}
     >
       {/* The gas breathes: a slow swell, turn and brighten, on a long cycle. */}
-      <div style={{ position: "absolute", inset: 0, animation: live ? "spaceBreathe 26s ease-in-out infinite alternate" : undefined }}>
+      <div style={{ position: "absolute", inset: 0 }}>
         <canvas ref={gasRef} style={layer} />
       </div>
       <canvas ref={farRef} style={layer} />
@@ -12486,6 +12497,10 @@ function NBackSessionApp() {
   // Set as the edit reaches its closing title: Home's sky is built then,
   // unseen, so it is ready the moment Home comes in.
   const [spaceWarm, setSpaceWarm] = useState(false);
+  // Home's sky and brain start moving a moment after the opening edit has
+  // gone, not while it is still dissolving over them: running both at once,
+  // with the edit tearing down, was the lag on arriving at Home.
+  const [homeLive, setHomeLive] = useState(() => mainView !== "home");
   // The second, launch-style opening edit, played from Pages.
   const [launchEditOn, setLaunchEditOn] = useState(false);
   // No build-up when the brain was made under the opening edit; a quick one
@@ -14604,6 +14619,11 @@ function NBackSessionApp() {
   // Not over a restored screen elsewhere (a session they left mid-way), and
   // never a second time until the app is opened again.
   const exitScreensaver = useCallback(() => setScreensaverOn(false), []);
+  useEffect(() => {
+    if (screensaverOn) return undefined;
+    const id = setTimeout(() => setHomeLive(true), 350);
+    return () => clearTimeout(id);
+  }, [screensaverOn]);
 
   const overviewExercises = Array.from(
     new Set(currentRegime.steps.map((s) => s.key))
@@ -22028,7 +22048,7 @@ function NBackSessionApp() {
 
       {/* Kept mounted the whole time the app is open, so Home's sky is
           already drawn whenever Home appears; it only moves while seen. */}
-      <HomeSpace live={mainView === "home" && (!screensaverOn || spaceWarm)} visible={mainView === "home"} />
+      <HomeSpace live={mainView === "home" && homeLive} visible={mainView === "home"} />
 
       {/* The constellation, in the empty space to the left of Home's column.
           Wide screens only: narrower than this and there is no space beside
@@ -22053,7 +22073,7 @@ function NBackSessionApp() {
               <HomeConstellation
                 days={trainedDayCount}
                 entranceMs={constellationEntrance.current}
-                alive={!screensaverOn || spaceWarm}
+                alive={homeLive}
               />
             </div>
           </div>
