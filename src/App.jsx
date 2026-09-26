@@ -10200,8 +10200,15 @@ function ssTodayTrackIndex() {
   return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000) % SS_TRACKS.length;
 }
 // Once a day: the edit plays the first time the app is opened each day.
+// Account > "Turn off daily cinematic" sets this, and the edit then never
+// plays on its own (it can still be opened from Pages).
+const SS_EDIT_OFF_KEY = "cortex.editOff";
+function ssEditOff() {
+  try { return localStorage.getItem(SS_EDIT_OFF_KEY) === "1"; } catch { return false; }
+}
 function ssEditDueToday() {
   try {
+    if (ssEditOff()) return false;
     return localStorage.getItem(SS_EDIT_DAY_KEY) !== new Date().toDateString();
   } catch {
     return true;
@@ -13287,6 +13294,7 @@ function NBackSessionApp() {
       return true;
     }
   });
+  const [dailyCinematicOff, setDailyCinematicOff] = useState(() => ssEditOff());
   const [badgesExpanded, setBadgesExpanded] = useState(false); // Account page — Badges row toggles the grid open in place
   const [customizeExpanded, setCustomizeExpanded] = useState(false); // Account page — Customize profile row toggles avatar/frame/color/background/featured-badge pickers open in place
   const [profileBadgesExpanded, setProfileBadgesExpanded] = useState(false); // Profile page — same toggle pattern as Account
@@ -19705,6 +19713,21 @@ function NBackSessionApp() {
               />
             </div>
 
+            <button
+              type="button"
+              onClick={() => {
+                const next = !dailyCinematicOff;
+                try {
+                  if (next) localStorage.setItem(SS_EDIT_OFF_KEY, "1");
+                  else localStorage.removeItem(SS_EDIT_OFF_KEY);
+                } catch {}
+                setDailyCinematicOff(next);
+              }}
+              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 rounded-lg py-5 px-7 text-left text-xl font-medium transition-colors"
+            >
+              {dailyCinematicOff ? "Turn on daily cinematic" : "Turn off daily cinematic"}
+            </button>
+
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
               <div>
                 <div className="text-xl font-medium">Show tutorials</div>
@@ -21829,7 +21852,8 @@ function NBackSessionApp() {
                         WebkitBackgroundClip: "text",
                         backgroundClip: "text",
                         color: "transparent",
-                        animation: `ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) ${380 + wi * 70}ms both`,
+                        opacity: 0,
+                        animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards",
                       }}
                     >
                       {w}
@@ -21857,7 +21881,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.55s both" }}
+                  style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21868,7 +21892,8 @@ function NBackSessionApp() {
                     className="text-lg font-semibold tracking-wide"
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
-                      animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.68s both",
+                      opacity: 0,
+                      animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21876,7 +21901,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.82s both" }}>
+              <div className="w-full flex justify-center" style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
@@ -21995,7 +22020,7 @@ function NBackSessionApp() {
             />
 
             <div className="relative flex flex-col items-center text-center gap-10 max-w-md px-6 py-4">
-              <div className="text-base uppercase tracking-widest font-semibold">
+              <div className="text-2xl uppercase tracking-widest font-semibold mb-2">
                 {"Achievement unlocked".split(" ").map((w, wi) => (
                   <span
                     key={wi}
@@ -22006,7 +22031,8 @@ function NBackSessionApp() {
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       color: "transparent",
-                      animation: `ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) ${1500 + wi * 70}ms both`,
+                      opacity: 0,
+                      animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.6s forwards",
                     }}
                   >
                     {w}
@@ -22025,7 +22051,7 @@ function NBackSessionApp() {
                 {current.icon}
               </div>
 
-              <div className="space-y-3" style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.7s both" }}>
+              <div className="space-y-3" style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.6s forwards" }}>
                 <AchievementTitle
                   achievement={current}
                   className="text-3xl font-semibold tracking-tight"
@@ -22038,7 +22064,7 @@ function NBackSessionApp() {
                 )}
               </div>
               <button
-                style={{ animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.85s both" }}
+                style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 1.6s forwards" }}
                 onClick={() => {
                   playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));

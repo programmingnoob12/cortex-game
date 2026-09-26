@@ -11,7 +11,7 @@
     <script>
       try {
         var d = new Date();
-        if (localStorage.getItem("cortex.editDay") !== d.toDateString()) {
+        if (localStorage.getItem("cortex.editOff") !== "1" && localStorage.getItem("cortex.editDay") !== d.toDateString()) {
           var songs = ["/audio/emotionless-edit.mp3"];
           var l = document.createElement("link");
           l.rel = "preload"; l.as = "fetch"; l.type = "audio/mpeg"; l.crossOrigin = "anonymous";
