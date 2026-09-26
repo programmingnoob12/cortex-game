@@ -12020,6 +12020,54 @@ function SupernovaSky({ revealed, preroll }) {
     const sprites = PAL.map((c) => spaceSprite(c, 64));
     const big = PAL.map((c) => spaceSprite(c, 128));
     const white = sprites[0];
+    // The star's face: a disc with a white-hot middle darkening to violet at
+    // the rim, covered in boiling cells of brighter gas. Two versions, so the
+    // surface can churn as they turn against each other.
+    const makeSurface = (salt) => {
+      const S = 256;
+      const c = document.createElement("canvas");
+      c.width = S;
+      c.height = S;
+      const g = c.getContext("2d");
+      const base = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      base.addColorStop(0, "rgba(255,250,255,1)");
+      base.addColorStop(0.3, "rgba(236,222,255,1)");
+      base.addColorStop(0.62, "rgba(196,160,255,1)");
+      base.addColorStop(0.86, "rgba(140,88,238,1)");
+      base.addColorStop(0.97, "rgba(88,40,196,1)");
+      base.addColorStop(1, "rgba(70,30,170,0)");
+      g.fillStyle = base;
+      g.fillRect(0, 0, S, S);
+      g.globalCompositeOperation = "source-atop";
+      for (let k = 0; k < 320; k += 1) {
+        const a = brainNoise(k, salt) * Math.PI * 2;
+        const d = Math.sqrt(brainNoise(k, salt + 1)) * S * 0.46;
+        const r0 = S * (0.015 + brainNoise(k, salt + 2) * 0.05);
+        const x = S / 2 + Math.cos(a) * d;
+        const y = S / 2 + Math.sin(a) * d;
+        const gr = g.createRadialGradient(x, y, 0, x, y, r0);
+        const hot = brainNoise(k, salt + 3) > 0.7;
+        gr.addColorStop(0, hot ? "rgba(255,255,255,0.55)" : "rgba(120,60,210,0.35)");
+        gr.addColorStop(1, "rgba(255,255,255,0)");
+        g.fillStyle = gr;
+        g.fillRect(x - r0, y - r0, r0 * 2, r0 * 2);
+      }
+      // Clip to the disc.
+      g.globalCompositeOperation = "destination-in";
+      const m = g.createRadialGradient(S / 2, S / 2, S * 0.44, S / 2, S / 2, S / 2);
+      m.addColorStop(0, "rgba(0,0,0,1)");
+      m.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = m;
+      g.beginPath();
+      g.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2);
+      g.fill();
+      return c;
+    };
+    const surfA = makeSurface(401);
+    const surfB = makeSurface(501);
+    // Flares arcing off the surface, more and more of them as it destabilises.
+    const flares = [];
+    let nextFlare = 0;
     let W = 0;
     let H = 0;
     let gas = null;
@@ -12157,16 +12205,96 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.drawImage(glow > 0.2 ? sprites[4] : white, px - g, y - g, g * 2, g * 2);
       }
       if (t < 0) {
-        // The star before it goes: swelling and brightening, a slow pulse,
-        // then pinching in for an instant.
-        const pulse = 1 + 0.08 * Math.sin(since * 6 * (0.4 + pre));
-        const pinch = preroll && since > 4.3 ? Math.max(0.3, 1 - (since - 4.3) * 3.5) : 1;
-        const g = (12 + pre * pre * 46) * pulse * pinch;
-        ctx.globalAlpha = 0.35 + pre * 0.45;
-        ctx.drawImage(big[2], cx - g * 3.2, cy - g * 3.2, g * 6.4, g * 6.4);
-        ctx.globalAlpha = 0.9;
-        ctx.drawImage(white, cx - g, cy - g, g * 2, g * 2);
+        // The star before it goes. It swells, its surface boils faster and
+        // brighter, flares arc off it more and more often, it shudders; then
+        // in the last moments gas pours in and it collapses to a point.
+        const T = preroll ? 4.7 : 0.01;
+        const q = Math.min(1, since / T);
+        const R0 = Math.min(W, H) * 0.075;
+        const collapseAt = T - 0.38;
+        const collapse = since > collapseAt ? Math.min(1, (since - collapseAt) / 0.38) : 0;
+        const unstable = q * q;
+        const wobble = 1 + unstable * 0.05 * Math.sin(since * (9 + unstable * 14)) + unstable * 0.02 * Math.sin(since * 31);
+        const R = R0 * (1 + 0.45 * q) * wobble * (1 - 0.85 * collapse ** 1.5);
+        const heat = 0.8 + 0.4 * unstable + 0.4 * collapse;
+        // Corona: a broad, shimmering glow.
+        ctx.globalAlpha = Math.min(1, (0.35 + 0.35 * unstable) * (1 + 0.15 * Math.sin(since * 7)));
+        const cor = R * (4.2 + 1.2 * Math.sin(since * 2.3));
+        ctx.drawImage(big[3], cx - cor, cy - cor, cor * 2, cor * 2);
+        ctx.globalAlpha = 0.5 + 0.3 * unstable;
+        const cor2 = R * 2.2;
+        ctx.drawImage(big[2], cx - cor2, cy - cor2, cor2 * 2, cor2 * 2);
+        // Flares: arcs of glowing gas rising off the rim and falling back.
+        if (since > nextFlare && collapse === 0) {
+          const ang = Math.random() * Math.PI * 2;
+          flares.push({ ang, span: 0.12 + Math.random() * 0.22, h: 0.15 + Math.random() * 0.45, born: since, life: 0.7 + Math.random() * 0.8, c: [6, 1, 4, 2][Math.floor(Math.random() * 4)] });
+          nextFlare = since + Math.max(0.08, 0.7 - unstable * 0.6) * (0.5 + Math.random());
+        }
+        ctx.lineCap = "round";
+        for (let k = flares.length - 1; k >= 0; k -= 1) {
+          const f = flares[k];
+          const p = (since - f.born) / f.life;
+          if (p >= 1 || collapse > 0) {
+            flares.splice(k, 1);
+            continue;
+          }
+          const rise = Math.sin(p * Math.PI);
+          const a1 = f.ang - f.span / 2;
+          const a2 = f.ang + f.span / 2;
+          const x1 = cx + Math.cos(a1) * R * 0.96;
+          const y1 = cy + Math.sin(a1) * R * 0.96;
+          const x2 = cx + Math.cos(a2) * R * 0.96;
+          const y2 = cy + Math.sin(a2) * R * 0.96;
+          const hx = cx + Math.cos(f.ang) * R * (1 + f.h * rise);
+          const hy = cy + Math.sin(f.ang) * R * (1 + f.h * rise);
+          const [cr, cg, cb] = PAL[f.c];
+          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.35 * rise})`;
+          ctx.lineWidth = R * 0.12;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.quadraticCurveTo(hx * 2 - (x1 + x2) / 2, hy * 2 - (y1 + y2) / 2, x2, y2);
+          ctx.stroke();
+          ctx.strokeStyle = `rgba(255,235,255,${0.35 * rise})`;
+          ctx.lineWidth = R * 0.035;
+          ctx.stroke();
+        }
+        // The surface itself, churning: two layers turning against each other.
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(since * 0.25);
+        ctx.drawImage(surfA, -R, -R, R * 2, R * 2);
+        ctx.rotate(-since * 0.55);
+        ctx.globalAlpha = 0.55;
+        ctx.drawImage(surfB, -R, -R, R * 2, R * 2);
+        ctx.restore();
+        ctx.globalCompositeOperation = "lighter";
+        // It heats up: a white-hot heart that grows as it nears the end.
+        ctx.globalAlpha = Math.min(1, 0.12 + unstable * 0.45 + collapse * 0.8) * (heat / 1.6);
+        const hc = R * (0.7 + 0.6 * collapse);
+        ctx.drawImage(white, cx - hc, cy - hc, hc * 2, hc * 2);
+        // The last moments: gas and light streaming in towards it.
+        if (q > 0.72) {
+          const inflow = (q - 0.72) / 0.28;
+          for (let k = 0; k < 90; k += 1) {
+            const ang = brainNoise(k, 371) * Math.PI * 2 + since * 0.8;
+            const ph = (since * (0.9 + brainNoise(k, 372)) + brainNoise(k, 373)) % 1;
+            const d = R * (1.2 + (1 - ph) * 7);
+            const x = cx + Math.cos(ang) * d;
+            const y = cy + Math.sin(ang) * d;
+            const g = 1.2 + brainNoise(k, 374) * 2;
+            ctx.globalAlpha = inflow * ph * 0.8;
+            ctx.drawImage(sprites[[1, 4, 6, 2][k % 4]], x - g * 2, y - g * 2, g * 4, g * 4);
+          }
+        }
+        // A shudder of the whole frame as it becomes unstable.
+        if (unstable > 0.5) {
+          const jig = (unstable - 0.5) * 4;
+          canvas.style.transform = `translate(${Math.sin(since * 57) * jig}px, ${Math.cos(since * 43) * jig}px)`;
+        }
       } else {
+        if (canvas.style.transform) canvas.style.transform = "";
         // The remnant: wisps thrown out and slowing, then settling dim.
         const grow = 1 - Math.exp(-t / 1.5);
         const bright = Math.min(1, t * 2.5) * (0.35 + 0.65 * Math.exp(-t / 1.8));
