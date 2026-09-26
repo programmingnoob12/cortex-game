@@ -17021,6 +17021,11 @@ function NBackSessionApp() {
           0% { opacity: 0; transform: translateY(10px); filter: blur(8px); }
           100% { opacity: 1; transform: translateY(0); filter: blur(0); }
         }
+        @keyframes lvSoftIn {
+          0% { opacity: 0; transform: translateY(5px); filter: blur(3px); }
+          60% { filter: blur(0); }
+          100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
         @keyframes gemEmerge {
           0% { transform: scale(0.12); opacity: 0; filter: brightness(4) blur(10px); }
           30% { opacity: 1; filter: brightness(2.4) blur(4px); }
@@ -19713,20 +19718,25 @@ function NBackSessionApp() {
               />
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                const next = !dailyCinematicOff;
-                try {
-                  if (next) localStorage.setItem(SS_EDIT_OFF_KEY, "1");
-                  else localStorage.removeItem(SS_EDIT_OFF_KEY);
-                } catch {}
-                setDailyCinematicOff(next);
-              }}
-              className="w-full bg-slate-900 hover:bg-slate-800 border border-slate-700/70 rounded-lg py-5 px-7 text-left text-xl font-medium transition-colors"
-            >
-              {dailyCinematicOff ? "Turn on daily cinematic" : "Turn off daily cinematic"}
-            </button>
+            <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
+              <div>
+                <div className="text-xl font-medium">Daily cinematic</div>
+                <div className="text-slate-500 text-base mt-1">
+                  Plays the first time you open the app each day
+                </div>
+              </div>
+              <Toggle
+                on={!dailyCinematicOff}
+                onToggle={() => {
+                  const next = !dailyCinematicOff;
+                  try {
+                    if (next) localStorage.setItem(SS_EDIT_OFF_KEY, "1");
+                    else localStorage.removeItem(SS_EDIT_OFF_KEY);
+                  } catch {}
+                  setDailyCinematicOff(next);
+                }}
+              />
+            </div>
 
             <div className="w-full bg-slate-900 border border-slate-700/70 rounded-lg py-5 px-7 flex items-center justify-between">
               <div>
@@ -21853,7 +21863,7 @@ function NBackSessionApp() {
                         backgroundClip: "text",
                         color: "transparent",
                         opacity: 0,
-                        animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards",
+                        animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards",
                       }}
                     >
                       {w}
@@ -21881,7 +21891,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards" }}
+                  style={{ opacity: 0, animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21893,7 +21903,7 @@ function NBackSessionApp() {
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
                       opacity: 0,
-                      animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards",
+                      animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21901,7 +21911,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ opacity: 0, animation: "ssSoftIn 0.9s cubic-bezier(0.22,1,0.36,1) 0.45s forwards" }}>
+              <div className="w-full flex justify-center" style={{ opacity: 0, animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
