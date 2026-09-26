@@ -12000,7 +12000,7 @@ function LaunchEdit({ onExit }) {
 // then pinches in; then a flash, a streak of lens flare, a shudder of the
 // camera, debris streaking outward and slowing, a soft wave of light rolling
 // through the gas, and a dim, glowing remnant left behind the gem.
-function SupernovaSky({ revealed, preroll }) {
+function SupernovaSky({ revealed, preroll, orange = false }) {
   const ref = useRef(null);
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
@@ -12021,6 +12021,21 @@ function SupernovaSky({ revealed, preroll }) {
     const sprites = PAL.map((c) => spaceSprite(c, 64));
     const big = PAL.map((c) => spaceSprite(c, 128));
     const white = sprites[0];
+    // The blast and what it leaves behind: violet, cyan and pink normally;
+    // in the orange version, the sun's own colours carried through.
+    const EXPAL = orange
+      ? [
+          [255, 250, 235],
+          [255, 226, 150],
+          [255, 190, 90],
+          [255, 140, 40],
+          [255, 100, 30],
+          [255, 170, 70],
+          [240, 80, 40],
+        ]
+      : PAL;
+    const exSprites = orange ? EXPAL.map((c) => spaceSprite(c, 64)) : sprites;
+    const exBig = orange ? EXPAL.map((c) => spaceSprite(c, 128)) : big;
     // The star's face: a disc with a white-hot middle darkening to violet at
     // the rim, covered in boiling cells of brighter gas. Two versions, so the
     // surface can churn as they turn against each other.
@@ -12212,7 +12227,7 @@ function SupernovaSky({ revealed, preroll }) {
         const tw = 0.7 + 0.3 * Math.sin(since * s.sp + s.tw);
         ctx.globalAlpha = Math.min(1, s.a * tw + glow);
         const g = s.r * (3 + glow * 5);
-        ctx.drawImage(glow > 0.2 ? sprites[4] : white, px - g, y - g, g * 2, g * 2);
+        ctx.drawImage(glow > 0.2 ? exSprites[4] : white, px - g, y - g, g * 2, g * 2);
       }
       if (t < 0) {
         // The star before it goes. It swells, its surface boils faster and
@@ -12363,7 +12378,7 @@ function SupernovaSky({ revealed, preroll }) {
           const ang = w.ang + w.drift * t;
           const sz = w.size * unit * (0.6 + 0.9 * grow);
           ctx.globalAlpha = w.a * bright * 2;
-          ctx.drawImage(big[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
+          ctx.drawImage(exBig[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
         }
         // Debris: streaks along their path, fast then slowing, fading.
         if (t < 4.6) {
@@ -12379,7 +12394,7 @@ function SupernovaSky({ revealed, preroll }) {
             const x = cx + Math.cos(ang) * dist;
             const y = cy + Math.sin(ang) * dist;
             const tail = Math.min(60, speed * 0.05);
-            const [r, g, b] = PAL[p.c];
+            const [r, g, b] = EXPAL[p.c];
             ctx.globalAlpha = Math.min(1, fade * 0.9);
             ctx.strokeStyle = `rgb(${r},${g},${b})`;
             ctx.lineWidth = p.size;
@@ -12390,7 +12405,7 @@ function SupernovaSky({ revealed, preroll }) {
             if (p.size > 2) {
               const gl = p.size * 3;
               ctx.globalAlpha = fade * 0.5;
-              ctx.drawImage(sprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
+              ctx.drawImage(exSprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
             }
           }
         }
@@ -12406,7 +12421,7 @@ function SupernovaSky({ revealed, preroll }) {
             ctx.translate(cx, cy);
             ctx.rotate(ang);
             ctx.globalAlpha = fb * (0.12 + brainNoise(k, 404) * 0.2);
-            ctx.drawImage(big[[1, 4, 6, 2, 0][k % 5]], 0, -wid, len, wid * 2);
+            ctx.drawImage(exBig[[1, 4, 6, 2, 0][k % 5]], 0, -wid, len, wid * 2);
             ctx.restore();
           }
         }
@@ -12417,15 +12432,15 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
         const halo = unit * (0.1 + 0.45 * flash);
         ctx.globalAlpha = 0.45 * flash + 0.06;
-        ctx.drawImage(big[1], cx - halo, cy - halo, halo * 2, halo * 2);
+        ctx.drawImage(exBig[1], cx - halo, cy - halo, halo * 2, halo * 2);
         // A horizontal streak of lens flare as it goes.
         if (t < 1.2) {
           const f = (1 - t / 1.2) ** 1.5;
           const len = unit * (0.4 + t * 0.6);
           const grd = ctx.createLinearGradient(cx - len, cy, cx + len, cy);
-          grd.addColorStop(0, "rgba(160,200,255,0)");
-          grd.addColorStop(0.5, `rgba(235,240,255,${0.9 * f})`);
-          grd.addColorStop(1, "rgba(160,200,255,0)");
+          grd.addColorStop(0, orange ? "rgba(255,190,110,0)" : "rgba(160,200,255,0)");
+          grd.addColorStop(0.5, orange ? `rgba(255,240,215,${0.9 * f})` : `rgba(235,240,255,${0.9 * f})`);
+          grd.addColorStop(1, orange ? "rgba(255,190,110,0)" : "rgba(160,200,255,0)");
           ctx.globalAlpha = 1;
           ctx.fillStyle = grd;
           ctx.fillRect(cx - len, cy - 1.5 - 3 * f, len * 2, 3 + 6 * f);
@@ -12436,7 +12451,7 @@ function SupernovaSky({ revealed, preroll }) {
       if (t >= 0 && t < 0.3) {
         ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = (1 - t / 0.3) ** 2 * 0.9;
-        ctx.fillStyle = "#F4F0FF";
+        ctx.fillStyle = orange ? "#FFF4E2" : "#F4F0FF";
         ctx.fillRect(0, 0, W, H);
       }
       ctx.globalAlpha = 1;
@@ -12446,7 +12461,7 @@ function SupernovaSky({ revealed, preroll }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", build);
     };
-  }, [preroll]);
+  }, [preroll, orange]);
   return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
 }
 
@@ -13094,6 +13109,11 @@ function NBackSessionApp() {
   const [homeLive, setHomeLive] = useState(() => mainView !== "home");
   // The second, launch-style opening edit, played from Pages.
   const [launchEditOn, setLaunchEditOn] = useState(false);
+  // Test only (Pages): the level-up with an orange supernova.
+  const [supernovaOrange, setSupernovaOrange] = useState(false);
+  useEffect(() => {
+    if (!unlockInfo) setSupernovaOrange(false);
+  }, [unlockInfo]);
   // No build-up when the brain was made under the opening edit; a quick one
   // when coming back to Home from elsewhere.
   const constellationEntrance = useRef(mainView === "home" ? 0 : 700);
@@ -18401,6 +18421,15 @@ function NBackSessionApp() {
                   setSessionCompleteAnim(true);
                   setTimeout(() => setSessionCompleteAnim(false), 5500);
                 }),
+                go("Level up celebration (orange supernova)", () => {
+                  setSupernovaOrange(true);
+                  setUnlockInfo({
+                    exerciseKey: "dual",
+                    level: Math.min(EXERCISE_LIBRARY.dual.maxN, (exerciseLevels.dual ?? 2) + 1),
+                    title: "Dual N-Back",
+                    isNewPR: true,
+                  });
+                }),
                 go("Level up celebration", () =>
                   setUnlockInfo({
                     exerciseKey: "dual",
@@ -21763,7 +21792,7 @@ function NBackSessionApp() {
           style={{ animation: "ssIn 0.6s ease-out both" }}
         >
           {/* Space, and a star going supernova as the level lands. */}
-          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} />
+          <SupernovaSky revealed={!prCinematic || prRevealed} preroll={prCinematic} orange={supernovaOrange} />
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none"
