@@ -1964,6 +1964,36 @@ function hexToHsl(hex) {
   return { h, s, l };
 }
 
+// An exercise's colour as text on the near-black page. The darker ones
+// (maroon, green) are lifted to a readable lightness; hue and saturation
+// stay, so it still reads as that exercise's colour.
+function exerciseTextColor(hex) {
+  const { h, s, l } = hexToHsl(hex);
+  const lift = Math.max(l, 0.56);
+  return `hsl(${h.toFixed(1)} ${(Math.min(s, 0.85) * 100).toFixed(1)}% ${(lift * 100).toFixed(1)}%)`;
+}
+
+// A regime's exercise list with each exercise in its own colour, for the
+// regime picker. Split from the summary so the short names it already uses
+// (RRT, QNB') are kept; the colour comes from the step in the same position.
+function RegimeSummary({ regime }) {
+  const parts = String(regime.summary || "").split(" \u00B7 ");
+  return (
+    <>
+      {parts.map((p, i) => {
+        const key = regime.steps?.[i]?.key;
+        const c = key && EXERCISE_COLORS[key] ? exerciseTextColor(EXERCISE_COLORS[key]) : "#F7F8F8";
+        return (
+          <span key={i}>
+            {i > 0 && <span className="text-slate-500" style={{ margin: "0 0.5em" }}>·</span>}
+            <span style={{ color: c }}>{p}</span>
+          </span>
+        );
+      })}
+    </>
+  );
+}
+
 function exerciseDeepFill(hex) {
   const { h, s, l } = hexToHsl(hex);
   // This used to mix toward near-black by a fixed ratio, which pushed the
@@ -17441,9 +17471,9 @@ function NBackSessionApp() {
                     <button
                       key="upgrade"
                       onClick={goToCheckout}
-                      style={{ "--ex": "#1E982B" }}
-                      className="w-full deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left"
+                      className="w-full relative overflow-hidden bg-slate-900 hover:bg-slate-800 border border-slate-700/60 transition-colors rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-left text-white"
                     >
+                      <span aria-hidden="true" className="absolute inset-y-0 left-0" style={{ width: 5, background: "#1E982B" }} />
                       <div className="flex items-center justify-between gap-6">
                         <div className="text-2xl font-semibold">Get membership</div>
                         <div className="text-lg font-medium">Unlock all regimes ›</div>
@@ -17467,14 +17497,14 @@ function NBackSessionApp() {
                     /* Same filled treatment as an exercise's Start button,
                        carrying that exercise's colour, so the choice looks
                        like the thing it starts. */
-                    style={{ "--ex": rc }}
-                    /* A locked regime keeps its own colour but sits dimmed:
-                       it is something to buy, not something broken, so it
-                       still looks like the thing it starts. */
-                    className={`w-full text-left deep-fill rounded-xl px-7 py-6 shadow-lg shadow-black/30${
+                    /* Same as the Home exercise cards: slate face, the
+                       regime's colour spent on the left rail. A locked
+                       regime sits dimmed: something to buy, not broken. */
+                    className={`w-full text-left relative overflow-hidden bg-slate-900 hover:bg-slate-800 border border-slate-700/60 transition-colors rounded-xl px-7 py-6 shadow-lg shadow-black/30 text-white${
                       locked ? " opacity-45" : ""
                     }`}
                   >
+                    <span aria-hidden="true" className="absolute inset-y-0 left-0" style={{ width: 5, background: rc }} />
                     <div className="flex items-center justify-between gap-6">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl font-semibold">
@@ -17495,7 +17525,7 @@ function NBackSessionApp() {
                       <div className="text-lg font-medium">{r.subtitle}</div>
                     </div>
                     <div className="text-base font-medium mt-1">
-                      {locked ? "Membership required" : r.summary}
+                      {locked ? "Membership required" : <RegimeSummary regime={r} />}
                     </div>
                   </button>
                 );
@@ -17513,14 +17543,14 @@ function NBackSessionApp() {
                       <div key={entry.id} className="regime-card relative">
                         <button
                           onClick={() => chooseRegime(r.key)}
-                          style={{ "--ex": REGIME_COLORS.custom }}
-                          className="w-full text-left deep-fill rounded-xl pl-7 pr-14 py-6 shadow-lg shadow-black/30"
+                          className="w-full text-left relative overflow-hidden bg-slate-900 hover:bg-slate-800 border border-slate-700/60 transition-colors rounded-xl pl-7 pr-14 py-6 shadow-lg shadow-black/30 text-white"
                         >
+                          <span aria-hidden="true" className="absolute inset-y-0 left-0" style={{ width: 5, background: REGIME_COLORS.custom }} />
                           <div className="flex items-center justify-between gap-6">
                             <div className="text-2xl font-semibold">{r.title}</div>
                             <div className="text-lg font-medium">{r.subtitle}</div>
                           </div>
-                          <div className="text-base font-medium mt-1">{r.summary}</div>
+                          <div className="text-base font-medium mt-1"><RegimeSummary regime={r} /></div>
                         </button>
                         <button
                           onClick={() =>
@@ -19790,14 +19820,16 @@ function NBackSessionApp() {
               </span>
             </button>
 
-            <div className="grow" />
+            {/* No margin of its own: with the page's space-y on both this and
+                Log out, the gap under Membership was double what it looked. */}
+            <div className="grow" style={{ marginTop: 0 }} />
 
             {/* Last thing on the page, hard right, immediately above the
                 footer rule: nothing anyone is looking for on the way in. */}
             {/* marginBottom inline: the page's space-y puts 36px UNDER every
                 child in this build, which is the whole gap between the
                 button and the footer rule. Measured in the browser. */}
-            <div className="flex justify-end" style={{ marginBottom: "0.85rem" }}>
+            <div className="flex justify-end" style={{ marginTop: "1.25rem", marginBottom: "0.85rem" }}>
               <button
                 onClick={() => {
                   try {
