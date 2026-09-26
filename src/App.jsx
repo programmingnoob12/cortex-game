@@ -9881,11 +9881,23 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
         const a = places[from];
         const b = places[to];
         const h = near((a.x + b.x) / 2, (a.y + b.y) / 2);
-        ctx.strokeStyle = rgba(regions[to], 0.32 + 0.55 * h, 0.25 + 0.45 * h);
-        ctx.lineWidth = (0.55 + 0.6 * h) * scale;
+        const x1 = px(a.x);
+        const y1 = py(a.y);
+        const x2 = px(a.x + (b.x - a.x) * t);
+        const y2 = py(a.y + (b.y - a.y) * t);
+        // A soft wide glow under each line, then the fine bright line itself,
+        // so the wiring reads as light rather than as drawn strokes.
+        ctx.strokeStyle = rgba(regions[to], 0.1 + 0.2 * h, 0.1);
+        ctx.lineWidth = (2.6 + 1.4 * h) * scale;
         ctx.beginPath();
-        ctx.moveTo(px(a.x), py(a.y));
-        ctx.lineTo(px(a.x + (b.x - a.x) * t), py(a.y + (b.y - a.y) * t));
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+        ctx.strokeStyle = rgba(regions[to], 0.42 + 0.5 * h, 0.35 + 0.45 * h);
+        ctx.lineWidth = (0.45 + 0.5 * h) * scale;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
         ctx.stroke();
       }
 
@@ -9906,8 +9918,11 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
             else h = Math.max(h, k * 0.9);
           }
         }
-        const r = (newest ? 2 : sizes[i]) * (1 + 0.7 * h);
-        const glow = (newest ? 7 : r * 2.4) * (1 + 0.9 * h);
+        // One star in seven is a brighter "anchor" with a bigger halo, so the
+        // field has the uneven brightness of a real sky.
+        const anchor = i % 7 === 3;
+        const r = (newest ? 2 : sizes[i] * (anchor ? 1.25 : 0.95)) * (1 + 0.7 * h);
+        const glow = (newest ? 8 : r * (anchor ? 3.4 : 2.3)) * (1 + 0.9 * h);
         const x = px(pt.x);
         const y = py(pt.y);
         ctx.globalAlpha = a * (newest ? 0.9 : 0.45 + 0.45 * h);
@@ -9916,6 +9931,12 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
         ctx.fillStyle = rgba(regions[i], 1, 0.35 + 0.4 * h);
         ctx.beginPath();
         ctx.arc(x, y, r * scale, 0, Math.PI * 2);
+        ctx.fill();
+        // A white-hot core.
+        ctx.globalAlpha = a * (anchor || newest ? 0.95 : 0.7);
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(x, y, r * 0.42 * scale, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.globalAlpha = 1;
@@ -10083,10 +10104,12 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive = fals
 
 function HomeConstellationInner({ days, showCaption = true, interactive = true, entranceMs = 1500, alive = false }) {
   return (
-    <div className="constellation flex flex-col items-center gap-5 w-full">
+    <div className="constellation flex flex-col items-center w-full">
       <BrainCanvas days={days} interactive={interactive} entranceMs={entranceMs} alive={alive} />
       {showCaption && (
-        <div className="text-center">
+        // Pulled up into the canvas's empty bottom margin, so it sits just
+        // under the brain rather than far below it.
+        <div className="text-center relative" style={{ marginTop: "-9%" }}>
           <div className="text-lg font-semibold text-slate-100 tabular-nums">
             {days} {days === 1 ? "star" : "stars"}
           </div>
@@ -10194,7 +10217,7 @@ if (typeof window !== "undefined") preloadEditImages();
 const SS_BEAT_MS = SS_TRACK_BEAT_MS * 2;
 const SS_VOLUME = 0.45;
 // How long the track takes to fade out once Home is coming in.
-const SS_FADE_OUT_MS = 4000;
+const SS_FADE_OUT_MS = 7000;
 // How long the picture takes to dissolve into Home.
 const SS_DISSOLVE_MS = 1600;
 const SS_SCENES = [
@@ -10307,8 +10330,7 @@ function SsCards({ text, ms }) {
   );
 }
 function SsGemLadder() {
-  // Novice to Enlightened, a rank every 174ms, then it holds a moment
-  // on Enlightened before the cut.
+  // Novice to Enlightened, a rank every 174ms, then it holds on Enlightened.
   const [level, setLevel] = useState(1);
   useEffect(() => {
     const id = setInterval(
@@ -10321,9 +10343,9 @@ function SsGemLadder() {
   const top = level === MAX_GEM_TIER;
   return (
     <div className="relative flex flex-col items-center gap-8">
-      {/* The last rank lands like a hit: a burst of red light behind it,
-          two shockwave rings, a flash, and the gem slamming in from large
-          with a small shake. */}
+      {/* The last rank lands like a cut in the edit: a hard flash, a streak
+          of light across the frame through the gem, and the gem and its name
+          punching in with the red/blue split. Over in a third of a second. */}
       {top && (
         <>
           <div
@@ -10331,31 +10353,28 @@ function SsGemLadder() {
             className="absolute left-1/2 pointer-events-none rounded-full"
             style={{
               top: 100,
-              width: 520,
-              height: 520,
-              marginLeft: -260,
-              marginTop: -260,
-              background: `radial-gradient(circle, ${tier.color}AA 0%, ${tier.color}33 35%, transparent 70%)`,
-              animation: "ssTopBurst 0.9s cubic-bezier(0.1,0.8,0.2,1) both",
+              width: 700,
+              height: 700,
+              marginLeft: -350,
+              marginTop: -350,
+              background: `radial-gradient(circle, rgba(255,255,255,0.85) 0%, ${tier.color}55 22%, transparent 58%)`,
+              animation: "ssTopFlash 0.2s ease-out both",
             }}
           />
-          {[0, 110].map((delay) => (
-            <div
-              key={delay}
-              aria-hidden="true"
-              className="absolute left-1/2 pointer-events-none rounded-full"
-              style={{
-                top: 100,
-                width: 220,
-                height: 220,
-                marginLeft: -110,
-                marginTop: -110,
-                border: `2px solid ${tier.color}`,
-                boxShadow: `0 0 24px ${tier.color}`,
-                animation: `ssTopRing 0.8s cubic-bezier(0.1,0.7,0.2,1) ${delay}ms both`,
-              }}
-            />
-          ))}
+          <div
+            aria-hidden="true"
+            className="absolute pointer-events-none"
+            style={{
+              top: 99,
+              left: "50%",
+              width: "180vw",
+              marginLeft: "-90vw",
+              height: 2,
+              background: `linear-gradient(90deg, transparent 0%, ${tier.color}00 15%, rgba(255,235,235,0.95) 50%, ${tier.color}00 85%, transparent 100%)`,
+              boxShadow: `0 0 16px 3px ${tier.color}88`,
+              animation: "ssFlare 0.45s ease-out both",
+            }}
+          />
         </>
       )}
       <div
@@ -10363,19 +10382,19 @@ function SsGemLadder() {
         className="relative"
         style={{
           animation: top
-            ? "ssEnlSlam 0.55s cubic-bezier(0.2,1.5,0.3,1) both"
+            ? "ssTopSlam 0.22s cubic-bezier(0.2,1.2,0.3,1) both"
             : "ssPop 0.28s cubic-bezier(0.2,1.4,0.4,1) both",
         }}
       >
-        <LevelGem level={level} size={200} glowPulse={top} />
+        <LevelGem level={level} size={200} glowPulse={top} sparkles={false} />
       </div>
       <div
         key={`l${level}`}
-        className="relative text-4xl sm:text-6xl font-black uppercase tracking-[0.12em]"
+        className={`relative text-4xl sm:text-6xl font-black uppercase tracking-[0.12em]${top ? " ss-split" : ""}`}
         style={{
           color: tier.color,
-          textShadow: top ? `0 0 50px ${tier.color}, 0 0 12px ${tier.color}` : `0 0 40px ${tier.color}88`,
-          animation: top ? "ssEnlLabel 0.6s cubic-bezier(0.2,1.3,0.3,1) 60ms both" : undefined,
+          textShadow: top ? `0 0 34px ${tier.color}` : `0 0 40px ${tier.color}88`,
+          animation: top ? "ssTopLabel 0.22s cubic-bezier(0.2,1.2,0.3,1) both, ssSplit 0.45s ease-out both" : undefined,
         }}
       >
         {tier.label}
@@ -10383,6 +10402,7 @@ function SsGemLadder() {
     </div>
   );
 }
+
 
 
 // Smoke for the opening edit. A handful of large, soft, irregular puffs
@@ -10659,7 +10679,9 @@ function IdleScreensaver({ onExit, onEnding }) {
         const t = snd.ctx.currentTime;
         snd.gain.gain.cancelScheduledValues(t);
         snd.gain.gain.setValueAtTime(snd.gain.gain.value, t);
-        snd.gain.gain.linearRampToValueAtTime(0, t + SS_FADE_OUT_MS / 1000);
+        // A long, natural tail: it falls away quickly at first and then
+        // lingers, rather than a straight line that seems to stop dead.
+        snd.gain.gain.setTargetAtTime(0, t, SS_FADE_OUT_MS / 1000 / 4.5);
         try {
           snd.source.stop(t + SS_FADE_OUT_MS / 1000 + 0.05);
         } catch {
@@ -22338,7 +22360,7 @@ function NBackSessionApp() {
       {SHOW_LEADERBOARD && mainView === "home" && (
         <button
           onClick={() => setMainView("leaderboard")}
-          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-2 px-3 sm:py-3 sm:px-5 text-sm sm:text-base font-medium shadow-lg"
         >
           <span>🏆</span>
           <span className="hidden sm:inline">Leaderboard</span>
@@ -22356,10 +22378,9 @@ function NBackSessionApp() {
       {mainView === "home" && !customRegimeNoticeDismissed && !customRegimeEarned && (
         <div className="fixed z-40 inset-x-4 bottom-32 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-[calc(50%+9.5rem)] sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
-            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden bg-slate-900 border border-slate-700/60"
             style={{
-              background: "#1B1D20",
-              border: "1px solid #2C2F34",
+              // The same face as Home's exercise cards.
               boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
             }}
           >
@@ -22401,10 +22422,9 @@ function NBackSessionApp() {
       {mainView === "home" && !freeMonthNoticeDismissed && !freeMonthNoticeRetired && (
         <div className="fixed z-40 inset-x-4 bottom-4 min-w-[20rem] sm:inset-x-auto sm:bottom-auto sm:right-6 sm:top-1/2 sm:-translate-y-1/2 sm:w-[min(28rem,calc(100vw-2rem))]">
           <div
-            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden"
+            className="flex items-center gap-5 rounded-xl pl-0 pr-3 py-5 overflow-hidden bg-slate-900 border border-slate-700/60"
             style={{
-              background: "#1B1D20",
-              border: "1px solid #2C2F34",
+              // The same face as Home's exercise cards.
               boxShadow: "0 18px 40px -12px rgba(0,0,0,0.75)",
             }}
           >
@@ -22504,8 +22524,8 @@ function NBackSessionApp() {
             // Sized so the brain itself spans the whole gap, from just in
             // from the window edge to the column; only its faded glow runs
             // under the column (clicks pass straight through it).
-            width: "min(820px, calc((100vw - 42.25rem - 100px) * 0.744))",
-            left: "calc(44px - 0.164 * min(820px, calc((100vw - 42.25rem - 100px) * 0.744)))",
+            width: "min(480px, 56vh, calc((100vw - 42.25rem - 100px) * 0.62))",
+            left: "calc(((100vw - 42.25rem) / 2 - min(480px, 56vh, calc((100vw - 42.25rem - 100px) * 0.62))) / 2)",
           }}
         >
           <div id="brain-drift" className="w-full" style={{ willChange: "transform" }}>
@@ -22620,7 +22640,7 @@ function NBackSessionApp() {
       {mainView === "home" && (
         <button
           onClick={() => setMainView("proverbs")}
-          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 left-3 sm:top-6 sm:left-6 z-30 flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
         >
           Proverbs
         </button>
@@ -22643,7 +22663,7 @@ function NBackSessionApp() {
           onClick={() => setMainView("achievements")}
           /* Top right while the Leaderboard is hidden. When that comes back it
              takes this corner and Achievements returns to the left. */
-          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed top-3 right-3 sm:top-6 sm:right-6 z-30 flex items-center gap-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 text-slate-100 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-6 text-base font-medium shadow-lg"
         >
           <span className="text-lg">🏅</span>
           <span className="hidden sm:inline">Achievements</span>
@@ -22694,7 +22714,7 @@ function NBackSessionApp() {
             retireBinauralHint();
             setMainView("account");
           }}
-          className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 right-6 flex items-center gap-4 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-7 text-base font-medium shadow-lg"
         >
           {SHOW_PROFILE_IDENTITY_EDIT && (
             <AvatarFrame tier={ownAvatarFrameTier}>
@@ -22712,7 +22732,7 @@ function NBackSessionApp() {
             setFeedbackText("");
             setFeedbackOpen(true);
           }}
-          className="hidden sm:flex fixed bottom-6 left-6 flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
+          className="hidden sm:flex fixed bottom-6 left-6 flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700/60 hover:border-slate-500 transition-all duration-200 hover:scale-105 hover:shadow-xl rounded-full py-3 px-5 text-base font-medium shadow-lg"
         >
           💬 Feedback
         </button>
