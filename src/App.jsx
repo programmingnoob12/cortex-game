@@ -10073,6 +10073,16 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
       setCursor(false);
       kick();
     }
+    // Clicking (or double-clicking) the brain must not start selecting the
+    // page's text underneath it.
+    const onMouseDown = (ev) => {
+      if (overControl(ev)) return;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom) return;
+      const x = ((ev.clientX - rect.left) / rect.width) * BRAIN_VB.w + BRAIN_VB.x;
+      const y = ((ev.clientY - rect.top) / rect.height) * BRAIN_VB.h + BRAIN_VB.y;
+      if (inBrain(x, y)) ev.preventDefault();
+    };
     const onDown = (ev) => {
       if (overControl(ev)) return;
       const rect = canvas.getBoundingClientRect();
@@ -10099,12 +10109,14 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
     if (interactive) {
       window.addEventListener("pointermove", onMove, { passive: true });
       window.addEventListener("pointerdown", onDown);
+      window.addEventListener("mousedown", onMouseDown);
     }
     return () => {
       cancelAnimationFrame(raf);
       ro.disconnect();
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("mousedown", onMouseDown);
       setCursor(false);
     };
   }, [data, days, interactive, entranceMs]);
@@ -10130,7 +10142,7 @@ function BrainCanvas({ days, interactive = true, entranceMs = 1500, alive: alive
 
 function HomeConstellationInner({ days, showCaption = true, interactive = true, entranceMs = 1500, alive = false }) {
   return (
-    <div className="constellation flex flex-col items-center w-full">
+    <div className="constellation flex flex-col items-center w-full select-none">
       <BrainCanvas days={days} interactive={interactive} entranceMs={entranceMs} alive={alive} />
       {showCaption && (
         // Pulled up into the canvas's empty bottom margin, so it sits just
@@ -12000,7 +12012,10 @@ function LaunchEdit({ onExit }) {
 // then pinches in; then a flash, a streak of lens flare, a shudder of the
 // camera, debris streaking outward and slowing, a soft wave of light rolling
 // through the gas, and a dim, glowing remnant left behind the gem.
-function SupernovaSky({ revealed, preroll }) {
+function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
+  // "birth" (achievements): gas gathers into a new star that ignites, a
+  // gentler cousin of the level-up's supernova.
+  const BIRTH = variant === "birth";
   const ref = useRef(null);
   const revealedRef = useRef(revealed);
   revealedRef.current = revealed;
@@ -12148,11 +12163,11 @@ function SupernovaSky({ revealed, preroll }) {
     let last = 0;
     const draw = (now) => {
       raf = requestAnimationFrame(draw);
-      if (boomAt === null && revealedRef.current) boomAt = now;
+      if (boomAt === null && (revealedRef.current || (BIRTH && (now - start) / 1000 > 1.6))) boomAt = now;
       const t = boomAt === null ? -1 : (now - boomAt) / 1000;
       // Full rate while things are moving fast; the slow drift after that
       // only needs half.
-      if (t > 4.6 && now - last < 33) return;
+      if (t > 6.5 && now - last < 33) return;
       last = now;
       const since = (now - start) / 1000;
       const unit = Math.max(W, H);
@@ -12161,7 +12176,7 @@ function SupernovaSky({ revealed, preroll }) {
       // The camera: a slow push in the whole time, and a shudder on the blast.
       const pre = preroll ? Math.min(1, since / 4.6) : 1;
       const zoom = 1 + 0.05 * pre * pre + (t > 0 ? 0.012 * t : 0);
-      const shake = t >= 0 && t < 0.9 ? (1 - t / 0.9) ** 2 * 14 : 0;
+      const shake = t >= 0 && t < 1.3 ? (1 - t / 1.3) ** 2 * (BIRTH ? 4 : 14) : 0;
       const sx = shake * Math.sin(now * 0.09);
       const sy = shake * Math.cos(now * 0.073);
       ctx.setTransform(RES, 0, 0, RES, 0, 0);
@@ -12175,7 +12190,7 @@ function SupernovaSky({ revealed, preroll }) {
       ctx.translate(-cx, -cy);
       ctx.globalCompositeOperation = "lighter";
       // The blast's light, fading, lifts everything it touches.
-      const lit = t >= 0 ? Math.exp(-t * 1.4) : 0;
+      const lit = t >= 0 ? Math.exp(-t * 1.0) * (BIRTH ? 0.5 : 1) : 0;
       // Gas: breathing and slowly turning.
       const breath = 1 + 0.04 * Math.sin(since * 0.45);
       ctx.save();
@@ -12189,16 +12204,16 @@ function SupernovaSky({ revealed, preroll }) {
       ctx.globalAlpha = Math.min(1, 0.8 + lit);
       ctx.drawImage(far, -W * 0.15 + since * -2.2, -H * 0.15 + since * -0.8, W * 1.3, H * 1.3);
       // A soft wave of light rolling out through the sky from the blast.
-      const waveR = t >= 0 ? t * unit * 0.45 : -1;
+      const waveR = t >= 0 ? t * unit * 0.34 : -1;
       for (let i = 0; i < near.length; i += 1) {
         const s = near[i];
         const x = (s.x * W - since * 5) % (W * 1.2);
         const y = s.y * H - since * 1.6;
         const px = x < -W * 0.1 ? x + W * 1.2 : x;
         let glow = 0;
-        if (waveR > 0 && t < 2.6) {
+        if (waveR > 0 && t < 3.4) {
           const d = Math.hypot(px - cx, y - cy);
-          glow = Math.exp(-((d - waveR) ** 2) / 6000) * (1 - t / 2.6);
+          glow = Math.exp(-((d - waveR) ** 2) / 6000) * (1 - t / 3.4) * (BIRTH ? 0.5 : 1);
         }
         const tw = 0.7 + 0.3 * Math.sin(since * s.sp + s.tw);
         ctx.globalAlpha = Math.min(1, s.a * tw + glow);
@@ -12209,12 +12224,12 @@ function SupernovaSky({ revealed, preroll }) {
         // The star before it goes. It swells, its surface boils faster and
         // brighter, flares arc off it more and more often, it shudders; then
         // in the last moments gas pours in and it collapses to a point.
-        const T = preroll ? 4.7 : 0.01;
+        const T = BIRTH ? 1.6 : preroll ? 4.7 : 0.01;
         const q = Math.min(1, since / T);
-        const R0 = Math.min(W, H) * 0.075;
+        const R0 = Math.min(W, H) * (BIRTH ? 0.03 : 0.075);
         const collapseAt = T - 0.38;
         const collapse = since > collapseAt ? Math.min(1, (since - collapseAt) / 0.38) : 0;
-        const unstable = q * q;
+        const unstable = BIRTH ? q * 0.3 : q * q;
         const wobble = 1 + unstable * 0.05 * Math.sin(since * (9 + unstable * 14)) + unstable * 0.02 * Math.sin(since * 31);
         const R = R0 * (1 + 0.45 * q) * wobble * (1 - 0.85 * collapse ** 1.5);
         const heat = 0.8 + 0.4 * unstable + 0.4 * collapse;
@@ -12243,7 +12258,7 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.drawImage(big[2], cx - cor, cy - cor, cor * 2, cor * 2);
         // Prominences: plumes of glowing plasma looping up off the surface and
         // back, made of drifting gas, not lines.
-        if (since > nextFlare && collapse === 0) {
+        if (since > nextFlare && collapse === 0 && !BIRTH) {
           const ang = Math.random() * Math.PI * 2;
           flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [6, 1, 2, 4][Math.floor(Math.random() * 4)] });
           nextFlare = since + Math.max(0.12, 0.8 - unstable * 0.65) * (0.5 + Math.random());
@@ -12293,8 +12308,8 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.drawImage(white, cx - hc, cy - hc, hc * 2, hc * 2);
         // The last moments: gas and light spiralling in towards it, soft and
         // stretched along its path.
-        if (q > 0.7) {
-          const inflow = (q - 0.7) / 0.3;
+        if (q > (BIRTH ? 0 : 0.7)) {
+          const inflow = BIRTH ? Math.min(1, q * 2) : (q - 0.7) / 0.3;
           for (let k = 0; k < 120; k += 1) {
             const ph = (since * (0.7 + brainNoise(k, 372) * 0.8) + brainNoise(k, 373)) % 1;
             const d = R * (1.1 + (1 - ph) ** 1.5 * 8);
@@ -12315,15 +12330,15 @@ function SupernovaSky({ revealed, preroll }) {
         const fl = R * (6 + 6 * unstable);
         ctx.drawImage(big[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
         // A shudder of the whole frame as it becomes unstable.
-        if (unstable > 0.5) {
+        if (unstable > 0.5 && !BIRTH) {
           const jig = (unstable - 0.5) * 4;
           canvas.style.transform = `translate(${Math.sin(since * 57) * jig}px, ${Math.cos(since * 43) * jig}px)`;
         }
       } else {
         if (canvas.style.transform) canvas.style.transform = "";
         // The remnant: wisps thrown out and slowing, then settling dim.
-        const grow = 1 - Math.exp(-t / 1.5);
-        const bright = Math.min(1, t * 2.5) * (0.35 + 0.65 * Math.exp(-t / 1.8));
+        const grow = 1 - Math.exp(-t / 2.2);
+        const bright = Math.min(1, t * 1.8) * (0.35 + 0.65 * Math.exp(-t / 2.6)) * (BIRTH ? 0.75 : 1);
         for (let i = 0; i < wisps.length; i += 1) {
           const w = wisps[i];
           const d = w.dist * unit * 0.3 * grow;
@@ -12333,16 +12348,16 @@ function SupernovaSky({ revealed, preroll }) {
           ctx.drawImage(big[w.c], cx + Math.cos(ang) * d - sz, cy + Math.sin(ang) * d * 0.82 - sz, sz * 2, sz * 2);
         }
         // Debris: streaks along their path, fast then slowing, fading.
-        if (t < 4.6) {
+        if (t < 6.5) {
           ctx.lineCap = "round";
           for (let i = 0; i < debris.length; i += 1) {
             const p = debris[i];
-            if (t > p.life) continue;
-            const k = Math.exp(-t / 0.7);
-            const dist = p.v * 0.7 * (1 - k);
+            if (t > p.life * 1.35 || (BIRTH && i > 150)) continue;
+            const k = Math.exp(-t / 1.05);
+            const dist = p.v * (BIRTH ? 0.35 : 0.8) * (1 - k);
             const speed = p.v * k;
             const ang = p.ang + p.wob * t;
-            const fade = 1 - t / p.life;
+            const fade = 1 - t / (p.life * 1.35);
             const x = cx + Math.cos(ang) * dist;
             const y = cy + Math.sin(ang) * dist;
             const tail = Math.min(60, speed * 0.05);
@@ -12363,11 +12378,11 @@ function SupernovaSky({ revealed, preroll }) {
         }
         // Shafts of light bursting out from the blast through the gas, then
         // fading.
-        if (t < 1.4) {
-          const fb = (1 - t / 1.4) ** 1.6;
+        if (t < 2.2) {
+          const fb = (1 - t / 2.2) ** 1.6 * (BIRTH ? 0.6 : 1);
           for (let k = 0; k < 40; k += 1) {
             const ang = brainNoise(k, 401) * Math.PI * 2;
-            const len = unit * (0.25 + brainNoise(k, 402) * 0.55) * (0.35 + 0.65 * (1 - Math.exp(-t * 4)));
+            const len = unit * (0.25 + brainNoise(k, 402) * 0.55) * (0.35 + 0.65 * (1 - Math.exp(-t * 2.6)));
             const wid = unit * (0.008 + brainNoise(k, 403) * 0.02);
             ctx.save();
             ctx.translate(cx, cy);
@@ -12378,7 +12393,7 @@ function SupernovaSky({ revealed, preroll }) {
           }
         }
         // The core: the flash, collapsing to a faint pulsing point.
-        const flash = Math.exp(-t * 4.5);
+        const flash = Math.exp(-t * 2.6) * (BIRTH ? 0.65 : 1);
         const core = 14 + 240 * flash + 3 * Math.sin(since * 3);
         ctx.globalAlpha = Math.min(1, 0.22 + flash);
         ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
@@ -12386,8 +12401,8 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.globalAlpha = 0.45 * flash + 0.06;
         ctx.drawImage(big[1], cx - halo, cy - halo, halo * 2, halo * 2);
         // A horizontal streak of lens flare as it goes.
-        if (t < 1.2) {
-          const f = (1 - t / 1.2) ** 1.5;
+        if (t < 1.8) {
+          const f = (1 - t / 1.8) ** 1.5 * (BIRTH ? 0.6 : 1);
           const len = unit * (0.4 + t * 0.6);
           const grd = ctx.createLinearGradient(cx - len, cy, cx + len, cy);
           grd.addColorStop(0, "rgba(160,200,255,0)");
@@ -12400,9 +12415,9 @@ function SupernovaSky({ revealed, preroll }) {
       }
       ctx.restore();
       // The frame whites out for an instant as it goes.
-      if (t >= 0 && t < 0.3) {
+      if (t >= 0 && t < 0.45) {
         ctx.globalCompositeOperation = "source-over";
-        ctx.globalAlpha = (1 - t / 0.3) ** 2 * 0.9;
+        ctx.globalAlpha = (1 - t / 0.45) ** 2 * (BIRTH ? 0.35 : 0.9);
         ctx.fillStyle = "#F4F0FF";
         ctx.fillRect(0, 0, W, H);
       }
@@ -12413,120 +12428,8 @@ function SupernovaSky({ revealed, preroll }) {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", build);
     };
-  }, [preroll]);
+  }, [preroll, BIRTH]);
   return <canvas ref={ref} aria-hidden="true" className="absolute inset-0 w-full h-full pointer-events-none" />;
-}
-
-// A single asteroid, rendered once in detail: a lumpy, irregular rock shaded
-// pixel by pixel from a height field (rough surface noise plus craters with
-// raised rims), lit hard from one side by a distant star, with a faint cool
-// rim of light from the nebula on its dark side.
-function makeAsteroid(seed = 1, S = 200) {
-  const c = document.createElement("canvas");
-  c.width = S;
-  c.height = S;
-  const g = c.getContext("2d");
-  const img = g.createImageData(S, S);
-  const d = img.data;
-  const hash = (x, y) => {
-    let h = (x * 374761393 + y * 668265263 + seed * 2147483647) | 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-  };
-  const vnoise = (x, y) => {
-    const xi = Math.floor(x);
-    const yi = Math.floor(y);
-    const xf = x - xi;
-    const yf = y - yi;
-    const u = xf * xf * (3 - 2 * xf);
-    const v = yf * yf * (3 - 2 * yf);
-    const a = hash(xi, yi);
-    const b = hash(xi + 1, yi);
-    const cc = hash(xi, yi + 1);
-    const dd = hash(xi + 1, yi + 1);
-    return a + (b - a) * u + (cc - a) * v + (a - b - cc + dd) * u * v;
-  };
-  const fbm = (x, y) => {
-    let v = 0;
-    let amp = 0.5;
-    let f = 1;
-    for (let o = 0; o < 5; o += 1) {
-      v += amp * vnoise(x * f, y * f);
-      f *= 2.03;
-      amp *= 0.5;
-    }
-    return v;
-  };
-  // Outline: a radius that wanders with the angle.
-  const harm = Array.from({ length: 6 }, (_, k) => ({
-    a: (hash(k, 11) - 0.5) * (0.22 / (k + 1)) * 2,
-    p: hash(k, 12) * Math.PI * 2,
-  }));
-  const R = S * 0.36;
-  const radius = (th) => {
-    let r = 1;
-    for (let k = 0; k < harm.length; k += 1) r += harm[k].a * Math.sin((k + 2) * th + harm[k].p);
-    return R * r;
-  };
-  const craters = Array.from({ length: 20 }, (_, k) => ({
-    x: (hash(k, 21) - 0.5) * 1.3 * R,
-    y: (hash(k, 22) - 0.5) * 1.1 * R,
-    r: R * (0.06 + hash(k, 23) ** 2 * 0.28),
-    depth: 0.5 + hash(k, 24) * 0.6,
-  }));
-  const height = (x, y) => {
-    let h = fbm(x * 0.035, y * 0.035) * 0.9 + fbm(x * 0.12 + 40, y * 0.12) * 0.32 + fbm(x * 0.4, y * 0.4 + 70) * 0.06;
-    for (let k = 0; k < craters.length; k += 1) {
-      const cr = craters[k];
-      const q = Math.hypot(x - cr.x, y - cr.y) / cr.r;
-      if (q < 1) h -= (1 - q * q) * cr.depth * 0.6;
-      else if (q < 1.35) h += Math.sin(((q - 1) / 0.35) * Math.PI) * cr.depth * 0.12;
-    }
-    return h;
-  };
-  const L = [-0.62, -0.5, 0.6];
-  const ln = Math.hypot(...L);
-  const lx = L[0] / ln;
-  const ly = L[1] / ln;
-  const lz = L[2] / ln;
-  const e = 1.2;
-  for (let py = 0; py < S; py += 1) {
-    for (let px = 0; px < S; px += 1) {
-      const x = px - S / 2;
-      const y = py - S / 2;
-      const th = Math.atan2(y, x);
-      const rr = radius(th);
-      const dist = Math.hypot(x, y);
-      if (dist > rr + 1) continue;
-      const edge = Math.min(1, rr + 1 - dist);
-      // A rounded body, roughened by the height field.
-      const q = Math.min(0.999, dist / rr);
-      let nx = x / rr;
-      let ny = y / rr;
-      let nz = Math.sqrt(1 - q * q);
-      const h0 = height(x, y);
-      const hx = (height(x + e, y) - h0) / e;
-      const hy = (height(x, y + e) - h0) / e;
-      nx -= hx * 4.6;
-      ny -= hy * 4.6;
-      const nl = Math.hypot(nx, ny, nz);
-      nx /= nl;
-      ny /= nl;
-      nz /= nl;
-      const diff = Math.max(0, nx * lx + ny * ly + nz * lz);
-      const rim = Math.max(0, (nx * 0.7 + ny * 0.5)) ** 3 * 0.35;
-      const tone = 0.75 + 0.35 * fbm(x * 0.06 + 90, y * 0.06);
-      const ao = 0.55 + 0.45 * Math.min(1, Math.max(0, h0 + 0.3));
-      const lit = (0.03 + diff * 0.95) * tone * ao;
-      const i = (py * S + px) * 4;
-      d[i] = Math.min(255, 150 * lit + 70 * rim + 6);
-      d[i + 1] = Math.min(255, 138 * lit + 110 * rim + 6);
-      d[i + 2] = Math.min(255, 128 * lit + 150 * rim + 10);
-      d[i + 3] = 255 * edge;
-    }
-  }
-  g.putImageData(img, 0, 0);
-  return c;
 }
 
 function HomeSpace({ live = true, visible = true }) {
@@ -12534,7 +12437,6 @@ function HomeSpace({ live = true, visible = true }) {
   const farRef = useRef(null);
   const nearRef = useRef(null);
   const liveRef = useRef(null);
-  const rockRef = useRef(null);
   const liveOn = useRef(live);
   // The sky fades up once it has been drawn, rather than appearing a beat
   // after the rest of Home in one jump.
@@ -12545,7 +12447,6 @@ function HomeSpace({ live = true, visible = true }) {
     const farC = farRef.current;
     const nearC = nearRef.current;
     const liveC = liveRef.current;
-    const rockC = rockRef.current;
     if (!gasC || !farC || !nearC || !liveC) return undefined;
     const reduce =
       window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -12749,21 +12650,6 @@ function HomeSpace({ live = true, visible = true }) {
     // placed from it even while it is paused, so when it comes alive it
     // carries on from exactly where it sits: no jump.
     let clock = 0;
-    let rock = null;
-    let rockImg = null;
-    let nextRock = 14000 + Math.random() * 14000;
-    // The rock is rendered once, while Home is idle, never mid-animation.
-    const rockTimer = setTimeout(() => {
-      const make = () => {
-        if (!rockC) return;
-        rockImg = makeAsteroid(1 + Math.floor(Math.random() * 1000));
-        rockC.width = rockImg.width;
-        rockC.height = rockImg.height;
-        rockC.getContext("2d").drawImage(rockImg, 0, 0);
-      };
-      if (window.requestIdleCallback) window.requestIdleCallback(make, { timeout: 4000 });
-      else make();
-    }, 6000);
     let prevNow = performance.now();
     let placed = false;
     const frame = (now) => {
@@ -12806,44 +12692,6 @@ function HomeSpace({ live = true, visible = true }) {
       // Half rate is plenty for twinkling, but a shooting star moves fast and
       // stutters at 30 frames a second, so while one is crossing, every frame.
       if (!liveOn.current) return;
-      // Now and then an asteroid tumbles slowly across the sky.
-      if (rockC) {
-        if (!rock && clock > nextRock) {
-          if (!rockImg) {
-            nextRock = clock + 5000;
-            return;
-          }
-          const fromLeft = Math.random() < 0.5;
-          const vw = window.innerWidth;
-          const vh = window.innerHeight;
-          const size = 70 + Math.random() * 70;
-          rock = {
-            born: clock,
-            dur: 22000 + Math.random() * 12000,
-            x0: fromLeft ? -size * 1.5 : vw + size * 1.5,
-            x1: fromLeft ? vw + size * 1.5 : -size * 1.5,
-            y0: vh * (0.1 + Math.random() * 0.5),
-            y1: vh * (0.3 + Math.random() * 0.6),
-            spin: (Math.random() - 0.5) * 40,
-            rot: Math.random() * 360,
-            s: size / rockImg.width,
-          };
-        }
-        if (rock) {
-          const p = (clock - rock.born) / rock.dur;
-          if (p >= 1) {
-            rock = null;
-            rockC.style.opacity = "0";
-            nextRock = clock + 45000 + Math.random() * 45000;
-          } else {
-            const x = rock.x0 + (rock.x1 - rock.x0) * p;
-            const y = rock.y0 + (rock.y1 - rock.y0) * p;
-            const rot = rock.rot + (rock.spin * (clock - rock.born)) / 1000;
-            rockC.style.opacity = "1";
-            rockC.style.transform = `translate3d(${x - rockC.width / 2}px, ${y - rockC.height / 2}px, 0) rotate(${rot}deg) scale(${rock.s})`;
-          }
-        }
-      }
       skip = meteors.length ? false : !skip;
       if (skip) return;
 
@@ -12970,7 +12818,6 @@ function HomeSpace({ live = true, visible = true }) {
     if (!reduce) raf = requestAnimationFrame(frame);
     return () => {
       clearTimeout(firstDraw);
-      clearTimeout(rockTimer);
       cancelAnimationFrame(rafA);
       cancelAnimationFrame(rafB);
       cancelAnimationFrame(raf);
@@ -13001,10 +12848,6 @@ function HomeSpace({ live = true, visible = true }) {
       <canvas ref={farRef} style={layer} />
       <canvas ref={nearRef} style={layer} />
       <canvas ref={liveRef} style={layer} />
-      <canvas
-        ref={rockRef}
-        style={{ position: "absolute", left: 0, top: 0, opacity: 0, transformOrigin: "50% 50%", willChange: "transform", filter: "drop-shadow(0 0 6px rgba(120,140,255,0.15))" }}
-      />
     </div>
   );
 }
@@ -17118,6 +16961,12 @@ function NBackSessionApp() {
           48% { transform: translate(6px, -3px); }
           64% { transform: translate(-3px, 2px); }
           100% { transform: translate(0, 0); }
+        }
+        @keyframes gemEmerge {
+          0% { transform: scale(0.12); opacity: 0; filter: brightness(4) blur(10px); }
+          30% { opacity: 1; filter: brightness(2.4) blur(4px); }
+          70% { filter: brightness(1.3) blur(0.5px); }
+          100% { transform: scale(1); opacity: 1; filter: brightness(1) blur(0); }
         }
         @keyframes ssFlashHard { 0% { opacity: 0.75; } 100% { opacity: 0; } }
         @keyframes ssTapPulse { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
@@ -21923,7 +21772,7 @@ function NBackSessionApp() {
                         WebkitBackgroundClip: "text",
                         backgroundClip: "text",
                         color: "transparent",
-                        animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 90}ms both`,
+                        animation: `ssWordIn 0.7s cubic-bezier(0.16,1,0.3,1) ${1500 + wi * 110}ms both`,
                       }}
                     >
                       {w}
@@ -21936,7 +21785,9 @@ function NBackSessionApp() {
                 </div>
               )}
 
-              <div className="relative" style={{ animation: "ssTopSlam 0.32s cubic-bezier(0.2,1.2,0.3,1) both" }}>
+              {/* The gem emerges out of the blast: born from the light at its
+                  heart, small and blinding, growing and cooling into itself. */}
+              <div className="relative" style={{ animation: "gemEmerge 2s cubic-bezier(0.16,1,0.3,1) 0.35s both" }}>
                 <LevelGem
                   level={unlockInfo.level}
                   size={168}
@@ -21949,7 +21800,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ animation: "ssTaglineIn 0.45s ease-out 180ms both, ssSplit 0.5s ease-out 180ms both" }}
+                  style={{ animation: "ssTaglineIn 0.7s ease-out 1.7s both, ssSplit 0.6s ease-out 1.7s both" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21960,7 +21811,7 @@ function NBackSessionApp() {
                     className="text-lg font-semibold tracking-wide"
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
-                      animation: "ssTaglineIn 0.5s ease-out 320ms both",
+                      animation: "ssTaglineIn 0.7s ease-out 1.95s both",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21968,7 +21819,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.5s ease-out 480ms both" }}>
+              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.7s ease-out 2.3s both" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
@@ -22076,65 +21927,47 @@ function NBackSessionApp() {
         const current = achievementCelebrationQueue[0];
         const groupAccent = ACCENT_STYLES[GROUP_ACCENTS[current.group]];
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm p-8">
-            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-              {Array.from({ length: 24 }).map((_, i) => {
-                const left = (i * 41) % 100;
-                const delay = (i % 10) * 0.22;
-                const duration = 2.4 + (i % 5) * 0.4;
-                const emoji = ["🎉", "✨", "⭐", "🎊"][i % 4];
-                return (
-                  <div
-                    key={`e${i}`}
-                    className="absolute text-2xl"
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black p-8 overflow-hidden" style={{ animation: "ssIn 0.6s ease-out both" }}>
+            {/* Living space: gas gathers into a point, a new star ignites,
+                and the achievement emerges from its light. */}
+            <SupernovaSky key={current.id || current.title} revealed={false} preroll={false} variant="birth" />
+            <div
+              aria-hidden="true"
+              className="absolute inset-0 pointer-events-none"
+              style={{ background: "radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%)" }}
+            />
+
+            <div className="relative flex flex-col items-center text-center gap-10 max-w-md px-6 py-4">
+              <div className="text-base uppercase tracking-widest font-semibold">
+                {"Achievement unlocked".split(" ").map((w, wi) => (
+                  <span
+                    key={wi}
+                    className="inline-block"
                     style={{
-                      left: `${left}%`,
-                      top: "-40px",
-                      animation: `confettiFall ${duration}s ease-in ${delay}s infinite`,
+                      marginRight: "0.35em",
+                      background: "linear-gradient(100deg, #FFFFFF 0%, #D9C8FF 45%, #9A6CF0 100%)",
+                      WebkitBackgroundClip: "text",
+                      backgroundClip: "text",
+                      color: "transparent",
+                      animation: `ssWordIn 0.7s cubic-bezier(0.16,1,0.3,1) ${2300 + wi * 110}ms both`,
                     }}
                   >
-                    {emoji}
-                  </div>
-                );
-              })}
-              {Array.from({ length: 36 }).map((_, i) => {
-                const left = (i * 27 + 13) % 100;
-                const delay = (i % 12) * 0.18;
-                const duration = 2.2 + (i % 6) * 0.35;
-                const color = ["#f59e0b", "#ec4899", "#8b5cf6", "#22d3ee", "#4ade80", "#f472b6"][i % 6];
-                const isRound = i % 3 === 0;
-                return (
-                  <div
-                    key={`c${i}`}
-                    className={isRound ? "absolute rounded-full" : "absolute rounded-sm"}
-                    style={{
-                      left: `${left}%`,
-                      top: "-20px",
-                      width: isRound ? 8 : 10,
-                      height: isRound ? 8 : 6,
-                      backgroundColor: color,
-                      animation: `confettiFall ${duration}s ease-in ${delay}s infinite`,
-                    }}
-                  />
-                );
-              })}
-            </div>
-
-            <div
-              className="relative flex flex-col items-center text-center gap-10 max-w-md px-6 py-4"
-              style={{ animation: "celebrationPop 0.6s cubic-bezier(0.34,1.56,0.64,1)" }}
-            >
-              <div className="text-base uppercase tracking-wide text-indigo-300 font-semibold">
-                Achievement unlocked
+                    {w}
+                  </span>
+                ))}
               </div>
 
               <div
-                className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad} shadow-2xl shadow-black/40`}
+                className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad}`}
+                style={{
+                  boxShadow: "0 0 60px -6px rgba(185,160,245,0.55), 0 20px 40px -12px rgba(0,0,0,0.6)",
+                  animation: "gemEmerge 2s cubic-bezier(0.16,1,0.3,1) 1.75s both",
+                }}
               >
                 {current.icon}
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3" style={{ animation: "ssTaglineIn 0.7s ease-out 2.6s both" }}>
                 <AchievementTitle
                   achievement={current}
                   className="text-3xl font-semibold tracking-tight"
@@ -22147,6 +21980,7 @@ function NBackSessionApp() {
                 )}
               </div>
               <button
+                style={{ animation: "ssTaglineIn 0.7s ease-out 3s both" }}
                 onClick={() => {
                   playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));
