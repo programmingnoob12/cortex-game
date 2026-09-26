@@ -12217,20 +12217,36 @@ function SupernovaSky({ revealed, preroll }) {
         const wobble = 1 + unstable * 0.05 * Math.sin(since * (9 + unstable * 14)) + unstable * 0.02 * Math.sin(since * 31);
         const R = R0 * (1 + 0.45 * q) * wobble * (1 - 0.85 * collapse ** 1.5);
         const heat = 0.8 + 0.4 * unstable + 0.4 * collapse;
-        // Corona: a broad, shimmering glow.
-        ctx.globalAlpha = Math.min(1, (0.35 + 0.35 * unstable) * (1 + 0.15 * Math.sin(since * 7)));
-        const cor = R * (4.2 + 1.2 * Math.sin(since * 2.3));
-        ctx.drawImage(big[3], cx - cor, cy - cor, cor * 2, cor * 2);
-        ctx.globalAlpha = 0.5 + 0.3 * unstable;
-        const cor2 = R * 2.2;
-        ctx.drawImage(big[2], cx - cor2, cy - cor2, cor2 * 2, cor2 * 2);
-        // Flares: arcs of glowing gas rising off the rim and falling back.
+        // The star lights the gas around it: a wide, dim glow in the nebula
+        // that grows as the star brightens.
+        ctx.globalAlpha = Math.min(1, 0.18 + 0.35 * unstable + 0.3 * collapse);
+        const neb = unit * (0.35 + 0.1 * Math.sin(since * 0.7));
+        ctx.drawImage(big[3], cx - neb, cy - neb, neb * 2, neb * 2);
+        // Corona: soft streamers of hot gas flowing off it on every side,
+        // slowly turning, flickering, longer and brighter as it destabilises.
+        for (let k = 0; k < 44; k += 1) {
+          const ang = brainNoise(k, 381) * Math.PI * 2 + since * 0.05 * (brainNoise(k, 382) - 0.4);
+          const flick = 0.6 + 0.4 * Math.sin(since * (1.5 + brainNoise(k, 383) * 3) + k);
+          const len = R * (0.7 + brainNoise(k, 384) * 1.3) * (1 + unstable * 0.8) * flick;
+          const wid = R * (0.18 + brainNoise(k, 385) * 0.25);
+          ctx.save();
+          ctx.translate(cx + Math.cos(ang) * R * 0.9, cy + Math.sin(ang) * R * 0.9);
+          ctx.rotate(ang);
+          ctx.globalAlpha = (0.05 + 0.08 * unstable) * flick * (1 - collapse);
+          ctx.drawImage(big[[2, 1, 6, 4][k % 4]], 0, -wid, len * 2, wid * 2);
+          ctx.restore();
+        }
+        // The broad glow round the disc.
+        ctx.globalAlpha = Math.min(1, (0.4 + 0.35 * unstable) * (1 + 0.12 * Math.sin(since * 5)));
+        const cor = R * (3.4 + 0.6 * Math.sin(since * 2.3));
+        ctx.drawImage(big[2], cx - cor, cy - cor, cor * 2, cor * 2);
+        // Prominences: plumes of glowing plasma looping up off the surface and
+        // back, made of drifting gas, not lines.
         if (since > nextFlare && collapse === 0) {
           const ang = Math.random() * Math.PI * 2;
-          flares.push({ ang, span: 0.12 + Math.random() * 0.22, h: 0.15 + Math.random() * 0.45, born: since, life: 0.7 + Math.random() * 0.8, c: [6, 1, 4, 2][Math.floor(Math.random() * 4)] });
-          nextFlare = since + Math.max(0.08, 0.7 - unstable * 0.6) * (0.5 + Math.random());
+          flares.push({ ang, span: 0.25 + Math.random() * 0.35, h: 0.35 + Math.random() * 0.7, born: since, life: 1.1 + Math.random() * 1.2, c: [6, 1, 2, 4][Math.floor(Math.random() * 4)] });
+          nextFlare = since + Math.max(0.12, 0.8 - unstable * 0.65) * (0.5 + Math.random());
         }
-        ctx.lineCap = "round";
         for (let k = flares.length - 1; k >= 0; k -= 1) {
           const f = flares[k];
           const p = (since - f.born) / f.life;
@@ -12238,25 +12254,25 @@ function SupernovaSky({ revealed, preroll }) {
             flares.splice(k, 1);
             continue;
           }
-          const rise = Math.sin(p * Math.PI);
+          const env = Math.sin(p * Math.PI);
           const a1 = f.ang - f.span / 2;
           const a2 = f.ang + f.span / 2;
-          const x1 = cx + Math.cos(a1) * R * 0.96;
-          const y1 = cy + Math.sin(a1) * R * 0.96;
-          const x2 = cx + Math.cos(a2) * R * 0.96;
-          const y2 = cy + Math.sin(a2) * R * 0.96;
-          const hx = cx + Math.cos(f.ang) * R * (1 + f.h * rise);
-          const hy = cy + Math.sin(f.ang) * R * (1 + f.h * rise);
-          const [cr, cg, cb] = PAL[f.c];
-          ctx.strokeStyle = `rgba(${cr},${cg},${cb},${0.35 * rise})`;
-          ctx.lineWidth = R * 0.12;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.quadraticCurveTo(hx * 2 - (x1 + x2) / 2, hy * 2 - (y1 + y2) / 2, x2, y2);
-          ctx.stroke();
-          ctx.strokeStyle = `rgba(255,235,255,${0.35 * rise})`;
-          ctx.lineWidth = R * 0.035;
-          ctx.stroke();
+          const x1 = cx + Math.cos(a1) * R * 0.95;
+          const y1 = cy + Math.sin(a1) * R * 0.95;
+          const x2 = cx + Math.cos(a2) * R * 0.95;
+          const y2 = cy + Math.sin(a2) * R * 0.95;
+          const top = R * (1 + f.h * (0.4 + 0.6 * env));
+          const kx = cx + Math.cos(f.ang) * top * 1.35 - (x1 + x2 - 2 * cx) * 0.18;
+          const ky = cy + Math.sin(f.ang) * top * 1.35 - (y1 + y2 - 2 * cy) * 0.18;
+          for (let n = 0; n < 26; n += 1) {
+            const u = (n / 26 + (since - f.born) * 0.35) % 1;
+            const iu = 1 - u;
+            const x = iu * iu * x1 + 2 * iu * u * kx + u * u * x2;
+            const y = iu * iu * y1 + 2 * iu * u * ky + u * u * y2;
+            const puff = R * (0.07 + 0.09 * Math.sin(u * Math.PI)) * (0.8 + 0.4 * brainNoise(n, 391));
+            ctx.globalAlpha = env * 0.22 * (0.6 + 0.4 * Math.sin(u * Math.PI));
+            ctx.drawImage(big[f.c], x - puff * 2, y - puff * 2, puff * 4, puff * 4);
+          }
         }
         // The surface itself, churning: two layers turning against each other.
         ctx.globalCompositeOperation = "source-over";
@@ -12274,20 +12290,29 @@ function SupernovaSky({ revealed, preroll }) {
         ctx.globalAlpha = Math.min(1, 0.12 + unstable * 0.45 + collapse * 0.8) * (heat / 1.6);
         const hc = R * (0.7 + 0.6 * collapse);
         ctx.drawImage(white, cx - hc, cy - hc, hc * 2, hc * 2);
-        // The last moments: gas and light streaming in towards it.
-        if (q > 0.72) {
-          const inflow = (q - 0.72) / 0.28;
-          for (let k = 0; k < 90; k += 1) {
-            const ang = brainNoise(k, 371) * Math.PI * 2 + since * 0.8;
-            const ph = (since * (0.9 + brainNoise(k, 372)) + brainNoise(k, 373)) % 1;
-            const d = R * (1.2 + (1 - ph) * 7);
+        // The last moments: gas and light spiralling in towards it, soft and
+        // stretched along its path.
+        if (q > 0.7) {
+          const inflow = (q - 0.7) / 0.3;
+          for (let k = 0; k < 120; k += 1) {
+            const ph = (since * (0.7 + brainNoise(k, 372) * 0.8) + brainNoise(k, 373)) % 1;
+            const d = R * (1.1 + (1 - ph) ** 1.5 * 8);
+            const ang = brainNoise(k, 371) * Math.PI * 2 + (1 - ph) * 1.4;
             const x = cx + Math.cos(ang) * d;
             const y = cy + Math.sin(ang) * d;
-            const g = 1.2 + brainNoise(k, 374) * 2;
-            ctx.globalAlpha = inflow * ph * 0.8;
-            ctx.drawImage(sprites[[1, 4, 6, 2][k % 4]], x - g * 2, y - g * 2, g * 4, g * 4);
+            const len = 4 + ph * 14;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(ang + Math.PI / 2 - 0.5);
+            ctx.globalAlpha = inflow * ph * 0.7;
+            ctx.drawImage(sprites[[1, 4, 6, 2][k % 4]], -len, -2, len * 2, 4);
+            ctx.restore();
           }
         }
+        // A soft horizontal flare off the star, like a camera lens catching it.
+        ctx.globalAlpha = 0.12 + 0.25 * unstable + 0.4 * collapse;
+        const fl = R * (6 + 6 * unstable);
+        ctx.drawImage(big[1], cx - fl, cy - R * 0.18, fl * 2, R * 0.36);
         // A shudder of the whole frame as it becomes unstable.
         if (unstable > 0.5) {
           const jig = (unstable - 0.5) * 4;
@@ -12333,6 +12358,22 @@ function SupernovaSky({ revealed, preroll }) {
               ctx.globalAlpha = fade * 0.5;
               ctx.drawImage(sprites[p.c], x - gl, y - gl, gl * 2, gl * 2);
             }
+          }
+        }
+        // Shafts of light bursting out from the blast through the gas, then
+        // fading.
+        if (t < 1.4) {
+          const fb = (1 - t / 1.4) ** 1.6;
+          for (let k = 0; k < 40; k += 1) {
+            const ang = brainNoise(k, 401) * Math.PI * 2;
+            const len = unit * (0.25 + brainNoise(k, 402) * 0.55) * (0.35 + 0.65 * (1 - Math.exp(-t * 4)));
+            const wid = unit * (0.008 + brainNoise(k, 403) * 0.02);
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(ang);
+            ctx.globalAlpha = fb * (0.12 + brainNoise(k, 404) * 0.2);
+            ctx.drawImage(big[[1, 4, 6, 2, 0][k % 5]], 0, -wid, len, wid * 2);
+            ctx.restore();
           }
         }
         // The core: the flash, collapsing to a faint pulsing point.
