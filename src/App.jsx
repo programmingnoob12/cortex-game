@@ -13152,8 +13152,15 @@ function NBackSessionApp() {
   const runGenerationRef = useRef(0);
 
   const sessionTimersRef = useRef({}); // { [exerciseKey]: timeoutId }
-  const sessionStartedRef = useRef({}); // { [exerciseKey]: true }
-  const sessionTimerStartRef = useRef({}); // { [exerciseKey]: timestamp } — when that exercise's session timer began, for the "time left" readout
+  // Seeded from today's snapshot on the very first render, so a reload
+  // mid-session shows "In progress" straight away instead of flashing
+  // "Next session today" until the restore effect catches up.
+  const bootSnapToday =
+    bootSession?.snap && (!bootSession.snap.day || bootSession.snap.day === new Date().toDateString())
+      ? bootSession.snap
+      : null;
+  const sessionStartedRef = useRef(bootSnapToday ? { ...(bootSnapToday.started || {}) } : {}); // { [exerciseKey]: true }
+  const sessionTimerStartRef = useRef(bootSnapToday ? { ...(bootSnapToday.timerStart || {}) } : {}); // { [exerciseKey]: timestamp } — when that exercise's session timer began, for the "time left" readout
 
   const [exerciseElapsedMs, setExerciseElapsedMs] = useState({}); // { [key]: ms }, updated once per finished/aborted session
   const exerciseElapsedMsRef = useRef({}); // mirrors the above for callbacks that need it synchronously
@@ -15677,7 +15684,7 @@ function NBackSessionApp() {
   // "Start Training" for a session already underway. This covers that gap:
   // the person is parked on an exercise, so the useful action is ending the
   // session rather than starting one.
-  const sessionOpenedRef = useRef(false);
+  const sessionOpenedRef = useRef(!!bootSnapToday);
   useEffect(() => {
     if (mainView === "app" && exercise.key !== "overview") {
       sessionOpenedRef.current = true;
@@ -17020,6 +17027,14 @@ function NBackSessionApp() {
         @keyframes ssSoftIn {
           0% { opacity: 0; transform: translateY(10px); filter: blur(8px); }
           100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+        }
+        /* Level-up reveal: each line is thrown out of the supernova at the
+           gem's centre, white-hot and small, and settles into place. */
+        @keyframes lvBurstIn {
+          0% { opacity: 0; transform: translateY(var(--from, 0)) scale(0.35); filter: brightness(3.2) blur(7px); }
+          30% { opacity: 1; }
+          70% { filter: brightness(1.15) blur(0); }
+          100% { opacity: 1; transform: translateY(0) scale(1); filter: brightness(1) blur(0); }
         }
         @keyframes lvSoftIn {
           0% { opacity: 0; transform: translateY(5px); filter: blur(3px); }
@@ -21863,7 +21878,7 @@ function NBackSessionApp() {
                         backgroundClip: "text",
                         color: "transparent",
                         opacity: 0,
-                        animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards",
+                        "--from": "150px", animation: "lvBurstIn 0.95s cubic-bezier(0.16,1,0.3,1) 0.12s forwards",
                       }}
                     >
                       {w}
@@ -21891,7 +21906,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ opacity: 0, animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards" }}
+                  style={{ opacity: 0, "--from": "-150px", animation: "lvBurstIn 0.95s cubic-bezier(0.16,1,0.3,1) 0.12s forwards" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21903,7 +21918,7 @@ function NBackSessionApp() {
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
                       opacity: 0,
-                      animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards",
+                      "--from": "-195px", animation: "lvBurstIn 0.95s cubic-bezier(0.16,1,0.3,1) 0.12s forwards",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21911,7 +21926,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ opacity: 0, animation: "lvSoftIn 0.7s cubic-bezier(0.33,1,0.68,1) 0.22s forwards" }}>
+              <div className="w-full flex justify-center" style={{ opacity: 0, "--from": "-265px", animation: "lvBurstIn 0.95s cubic-bezier(0.16,1,0.3,1) 0.12s forwards" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
