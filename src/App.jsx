@@ -12224,42 +12224,70 @@ function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
         ctx.drawImage(glow > 0.2 ? sprites[4] : white, px - g, y - g, g * 2, g * 2);
       }
       if (CALM) {
-        const c0 = 0.15;
-        const c1 = 0.95;
+        // A big shooting star: a blazing head with a halo, a long soft tail,
+        // sparks shed along its path, curving in to come to rest at the
+        // centre, where its light blooms and settles to a glow.
+        const c0 = 0.1;
+        const c1 = 1.3;
         const p = Math.min(1, Math.max(0, (since - c0) / (c1 - c0)));
         const e = 1 - (1 - p) ** 3;
-        const sx0 = -W * 0.15;
-        const sy0 = H * 0.08;
-        const hx = sx0 + (cx - sx0) * e;
-        const hy = sy0 + (cy - sy0) * e;
+        const sx0 = -W * 0.18;
+        const sy0 = -H * 0.05;
+        // A gentle curve: along a quadratic path bowing downward.
+        const qx = W * 0.2;
+        const qy = H * 0.45;
+        const at = (u) => {
+          const iu = 1 - u;
+          return [iu * iu * sx0 + 2 * iu * u * qx + u * u * cx, iu * iu * sy0 + 2 * iu * u * qy + u * u * cy];
+        };
+        const [hx, hy] = at(e);
         if (since > c0 && p < 1) {
-          // The streak: a soft trail of light behind the head.
-          const dx = cx - sx0;
-          const dy = cy - sy0;
-          const dl = Math.hypot(dx, dy);
-          const ux = dx / dl;
-          const uy = dy / dl;
-          const tail = unit * 0.28 * (1 - p * 0.6);
-          for (let k = 0; k < 40; k += 1) {
-            const f = k / 40;
-            const g = 2 + (1 - f) * 7;
-            ctx.globalAlpha = (1 - f) * 0.35;
-            ctx.drawImage(k % 3 ? sprites[1] : sprites[4], hx - ux * tail * f - g, hy - uy * tail * f - g, g * 2, g * 2);
+          for (let k = 0; k < 70; k += 1) {
+            const f = k / 70;
+            // The tail is where the head was a moment ago, so it streams
+            // long while it is fast and shortens as it slows to a stop.
+            const pb = Math.max(0, p - f * 0.4);
+            const u = 1 - (1 - pb) ** 3;
+            const [x, y] = at(u);
+            const g = 4 + (1 - f) ** 1.3 * 30;
+            ctx.globalAlpha = (1 - f) ** 1.3 * 0.3;
+            ctx.drawImage(k % 4 === 0 ? big[4] : k % 3 === 0 ? big[6] : big[2], x - g, y - g, g * 2, g * 2);
           }
-          const hg = 16;
+          // Sparks shed from the head, drifting and fading.
+          for (let k = 0; k < 26; k += 1) {
+            const f = ((since * 3 + brainNoise(k, 421)) % 1);
+            const u = Math.max(0, e - f * 0.18);
+            const [x, y] = at(u);
+            const ox = (brainNoise(k, 422) - 0.5) * 60 * f;
+            const oy = (brainNoise(k, 423) - 0.5) * 60 * f + 20 * f;
+            const g = 1.5 + brainNoise(k, 424) * 2;
+            ctx.globalAlpha = (1 - f) * 0.8;
+            ctx.drawImage(sprites[[0, 4, 1, 6][k % 4]], x + ox - g * 2, y + oy - g * 2, g * 4, g * 4);
+          }
+          const halo = 110;
+          ctx.globalAlpha = 0.6;
+          ctx.drawImage(big[1], hx - halo, hy - halo, halo * 2, halo * 2);
+          const hg = 34;
           ctx.globalAlpha = 1;
           ctx.drawImage(white, hx - hg, hy - hg, hg * 2, hg * 2);
+          ctx.drawImage(white, hx - hg * 0.5, hy - hg * 0.5, hg, hg);
         }
         if (since >= c1) {
-          // It comes to rest and its light blooms, then settles to a glow.
           const b = since - c1;
-          const bloom = Math.exp(-b * 1.6);
-          const halo = unit * (0.08 + 0.18 * bloom);
-          ctx.globalAlpha = 0.25 + 0.5 * bloom;
+          const bloom = Math.exp(-b * 1.3);
+          const halo = unit * (0.1 + 0.26 * bloom);
+          ctx.globalAlpha = 0.28 + 0.5 * bloom;
           ctx.drawImage(big[2], cx - halo, cy - halo, halo * 2, halo * 2);
-          ctx.globalAlpha = 0.2 + 0.6 * bloom;
-          const core = 10 + 60 * bloom;
+          ctx.globalAlpha = 0.25 + 0.6 * bloom;
+          const core = 14 + 90 * bloom;
           ctx.drawImage(white, cx - core, cy - core, core * 2, core * 2);
+          // A soft horizontal flare as it lands.
+          if (b < 1.2) {
+            const f = (1 - b / 1.2) ** 1.5;
+            ctx.globalAlpha = 0.5 * f;
+            const fl = unit * 0.35;
+            ctx.drawImage(big[1], cx - fl, cy - 6, fl * 2, 12);
+          }
         }
       } else if (t < 0) {
         // The star before it goes. It swells, its surface boils faster and
@@ -12297,70 +12325,6 @@ function SupernovaSky({ revealed, preroll, variant = "supernova" }) {
         ctx.globalAlpha = Math.min(1, (0.4 + 0.35 * unstable) * (1 + 0.12 * Math.sin(since * 5)));
         const cor = R * (3.4 + 0.6 * Math.sin(since * 2.3));
         ctx.drawImage(big[2], cx - cor, cy - cor, cor * 2, cor * 2);
-        // One great prominence: a loop of glowing plasma rising off the limb,
-        // made of fine twisted strands of gas with brighter knots flowing
-        // along them, hot white at its feet, glowing pink-violet above. It
-        // rises, hangs, then drains back into the star.
-        if (!BIRTH && preroll && collapse === 0) {
-          const P0 = 0.8;
-          const PL = 3.1;
-          const p = (since - P0) / PL;
-          if (p > 0 && p < 1) {
-            const rise = Math.min(1, p / 0.35);
-            const fade = p > 0.75 ? 1 - (p - 0.75) / 0.25 : 1;
-            const env = (1 - (1 - rise) ** 3) * fade;
-            const ang = -0.95;
-            const span = 0.75;
-            const H = R * (0.45 + 1.0 * (1 - (1 - rise) ** 2));
-            // A faint glow of the whole loop.
-            const mx = cx + Math.cos(ang) * (R + H * 0.55);
-            const my = cy + Math.sin(ang) * (R + H * 0.55);
-            ctx.globalAlpha = 0.22 * env;
-            const hg = R * 1.1;
-            ctx.drawImage(big[6], mx - hg, my - hg, hg * 2, hg * 2);
-            for (let st = 0; st < 6; st += 1) {
-              const off = (st - 2.5) / 2.5;
-              const a1 = ang - span / 2 + off * 0.05;
-              const a2 = ang + span / 2 + off * 0.05;
-              const x1 = cx + Math.cos(a1) * R * 0.93;
-              const y1 = cy + Math.sin(a1) * R * 0.93;
-              const x2 = cx + Math.cos(a2) * R * 0.93;
-              const y2 = cy + Math.sin(a2) * R * 0.93;
-              const top = R + H * (1 + off * 0.14);
-              const kx = cx + Math.cos(ang + off * 0.02) * top * 1.5 - (x1 + x2 - 2 * cx) * 0.12;
-              const ky = cy + Math.sin(ang + off * 0.02) * top * 1.5 - (y1 + y2 - 2 * cy) * 0.12;
-              const N = 160;
-              for (let n = 0; n <= N; n += 1) {
-                const u = n / N;
-                const iu = 1 - u;
-                // Strands twist round each other along the loop.
-                const tw = Math.sin(u * Math.PI * 3 + st * 1.1 + since * 1.4) * R * 0.045;
-                const nxv = -(2 * iu * (kx - x1) + 2 * u * (x2 - kx));
-                const nyv = 2 * iu * (ky - y1) + 2 * u * (y2 - ky);
-                const nl = Math.hypot(nxv, nyv) || 1;
-                const x = iu * iu * x1 + 2 * iu * u * kx + u * u * x2 + (nyv / nl) * tw;
-                const y = iu * iu * y1 + 2 * iu * u * ky + u * u * y2 + (nxv / nl) * tw;
-                const arc = Math.sin(u * Math.PI);
-                // The top of the loop drains away first as it fades.
-                const drain = p > 0.75 ? Math.max(0, 1 - arc * (1 - fade) * 2.2) : 1;
-                const foot = 1 - arc;
-                const size = R * (0.045 + 0.03 * arc);
-                ctx.globalAlpha = env * drain * (0.045 + 0.06 * foot) * (0.5 + 0.5 * foot);
-                ctx.drawImage(foot > 0.6 ? big[0] : big[st % 2 ? 6 : 1], x - size * 2, y - size * 2, size * 4, size * 4);
-              }
-              // Brighter knots of plasma flowing along the strand.
-              for (let n = 0; n < 3; n += 1) {
-                const u = (n / 3 + (since - P0) * (0.18 + st * 0.02)) % 1;
-                const iu = 1 - u;
-                const x = iu * iu * x1 + 2 * iu * u * kx + u * u * x2;
-                const y = iu * iu * y1 + 2 * iu * u * ky + u * u * y2;
-                const g = R * 0.045;
-                ctx.globalAlpha = env * 0.18 * Math.sin(u * Math.PI);
-                ctx.drawImage(sprites[0], x - g, y - g, g * 2, g * 2);
-              }
-            }
-          }
-        }
         // The surface itself, churning: two layers turning against each other.
         ctx.globalCompositeOperation = "source-over";
         ctx.globalAlpha = 1;
@@ -21843,7 +21807,7 @@ function NBackSessionApp() {
                         WebkitBackgroundClip: "text",
                         backgroundClip: "text",
                         color: "transparent",
-                        animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${650 + wi * 80}ms both`,
+                        animation: `ssWordIn 0.45s cubic-bezier(0.16,1,0.3,1) ${120 + wi * 60}ms both`,
                       }}
                     >
                       {w}
@@ -21858,7 +21822,7 @@ function NBackSessionApp() {
 
               {/* The gem emerges out of the blast: born from the light at its
                   heart, small and blinding, growing and cooling into itself. */}
-              <div className="relative" style={{ animation: "gemEmerge 1.3s cubic-bezier(0.16,1,0.3,1) 0.15s both" }}>
+              <div className="relative" style={{ animation: "gemEmerge 1.1s cubic-bezier(0.16,1,0.3,1) 0.05s both" }}>
                 <LevelGem
                   level={unlockInfo.level}
                   size={168}
@@ -21871,7 +21835,7 @@ function NBackSessionApp() {
               <div className="space-y-2">
                 <div
                   className="text-3xl font-semibold tracking-tight ss-split"
-                  style={{ animation: "ssTaglineIn 0.5s ease-out 0.8s both, ssSplit 0.5s ease-out 0.8s both" }}
+                  style={{ animation: "ssTaglineIn 0.4s ease-out 0.25s both, ssSplit 0.5s ease-out 0.25s both" }}
                 >
                   {/* Always the level reached ("Quad 5-Back"), never the bare
                       exercise name. */}
@@ -21882,7 +21846,7 @@ function NBackSessionApp() {
                     className="text-lg font-semibold tracking-wide"
                     style={{
                       color: gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).color,
-                      animation: "ssTaglineIn 0.5s ease-out 0.95s both",
+                      animation: "ssTaglineIn 0.4s ease-out 0.35s both",
                     }}
                   >
                     {gemTierFor(unlockInfo.level, unlockInfo.exerciseKey).label} tier unlocked
@@ -21890,7 +21854,7 @@ function NBackSessionApp() {
                 )}
               </div>
 
-              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.5s ease-out 1.15s both" }}>
+              <div className="w-full flex justify-center" style={{ animation: "ssTaglineIn 0.4s ease-out 0.45s both" }}>
               <button
                 onClick={() => {
                   // The tune, not the click: this button is the moment the
@@ -22020,7 +21984,7 @@ function NBackSessionApp() {
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       color: "transparent",
-                      animation: `ssWordIn 0.55s cubic-bezier(0.16,1,0.3,1) ${1250 + wi * 80}ms both`,
+                      animation: `ssWordIn 0.45s cubic-bezier(0.16,1,0.3,1) ${1250 + wi * 60}ms both`,
                     }}
                   >
                     {w}
@@ -22032,13 +21996,13 @@ function NBackSessionApp() {
                 className={`w-32 h-32 rounded-full flex items-center justify-center text-6xl bg-gradient-to-br ${groupAccent.grad}`}
                 style={{
                   boxShadow: "0 0 60px -6px rgba(185,160,245,0.55), 0 20px 40px -12px rgba(0,0,0,0.6)",
-                  animation: "gemEmerge 1.2s cubic-bezier(0.16,1,0.3,1) 0.95s both",
+                  animation: "gemEmerge 1.1s cubic-bezier(0.16,1,0.3,1) 1.1s both",
                 }}
               >
                 {current.icon}
               </div>
 
-              <div className="space-y-3" style={{ animation: "ssTaglineIn 0.5s ease-out 1.45s both" }}>
+              <div className="space-y-3" style={{ animation: "ssTaglineIn 0.4s ease-out 1.4s both" }}>
                 <AchievementTitle
                   achievement={current}
                   className="text-3xl font-semibold tracking-tight"
@@ -22051,7 +22015,7 @@ function NBackSessionApp() {
                 )}
               </div>
               <button
-                style={{ animation: "ssTaglineIn 0.5s ease-out 1.65s both" }}
+                style={{ animation: "ssTaglineIn 0.4s ease-out 1.5s both" }}
                 onClick={() => {
                   playLevelUp();
                   setAchievementCelebrationQueue((q) => q.slice(1));
